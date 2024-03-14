@@ -12,3 +12,23 @@ libe2sar_t = static_library('e2sar_t',
 libe2sar = static_library('e2sar',
                         objects : [libe2sar_t.extract_all_objects(recursive: false),
                                    liblbgrpc.extract_all_objects(recursive: false)])
+#### Python bindings
+pybind11_module_name = 'e2sar_py'
+
+pybind11_src = ['pybind/py_e2sar.cpp']
+
+py_install = import('python').find_installation('python3.11')
+pybind11_includes = run_command(
+    py_install, '-c', 'import pybind11; print(pybind11.get_include());', check : true).stdout().strip()
+
+py_install.extension_module(pybind11_module_name,
+    sources: pybind11_src,
+    include_directories: [inc, pybind11_includes],
+    dependencies: [py_install.dependency(), boost_dep, grpc_dep, protobuf_dep],
+    link_language : 'cpp',
+    override_options: [
+        'cpp_rtti=true'
+    ],
+    link_with: libe2sar,
+    install : true
+)
