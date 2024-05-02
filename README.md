@@ -53,3 +53,10 @@ $ meson compile
 ### Building python bindings
 
 
+# Related information
+
+- [UDPLBd repo](https://github.com/esnet/udplbd) (aka Control Plane)
+- [ejfat-rs repo](https://github.com/esnet/ejfat-rs) (command-line tool for testing)
+- [Integrating with EJFAT](https://docs.google.com/document/d/1aUju_pWtHpS0Coesu8dC7HP6LbuKBJZqRYAMSSBtpWQ/edit#heading=h.zbhmzz3u1sna) document
+
+
