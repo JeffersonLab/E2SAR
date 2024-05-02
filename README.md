@@ -1,6 +1,10 @@
 # E2SAR
 The internal dev repo of E2SAR.
 
+## Documentation
+
+Documentation is contained in the [wiki](JeffersonLab/E2SAR/wiki).
+
 ## Checking out the code
 
 ### Via cloning
@@ -51,5 +55,12 @@ $ meson compile
 ```
 
 ### Building python bindings
+
+
+# Related information
+
+- [UDPLBd repo](https://github.com/esnet/udplbd) (aka Control Plane)
+- [ejfat-rs repo](https://github.com/esnet/ejfat-rs) (command-line tool for testing)
+- [Integrating with EJFAT](https://docs.google.com/document/d/1aUju_pWtHpS0Coesu8dC7HP6LbuKBJZqRYAMSSBtpWQ/edit#heading=h.zbhmzz3u1sna) document
 
 
