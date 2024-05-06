@@ -3,7 +3,7 @@ The internal dev repo of E2SAR.
 
 ## Documentation
 
-Documentation is contained in the [wiki](JeffersonLab/E2SAR/wiki).
+Documentation is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki).
 
 ## Checking out the code
 

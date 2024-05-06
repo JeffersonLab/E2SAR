@@ -4,14 +4,29 @@ project('E2SAR library', 'cpp',
 # -Wall
 warning_level=1
 
-# some dependencies
+# Dependencies that can be installed by package tools such as brew, apt, dnf etc.
 glib_dep = dependency('glib-2.0')
-grpc_dep = dependency('grpc++', version: '>=1.60')
 protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
-boost_dep = dependency('boost')
+# For RHEL, install via `sudo dnf install boost-devel`.
+# RHEL also needs to declare the modules explicitly.
+boost_dep = dependency('boost', modules: ['system'])
+
+# On RHEL platforms, gRPC C++ has to be manually installed and found.
+# Meson dependency guide: https://mesonbuild.com/Dependencies.html
+grpc_dep = dependency('grpc++', version: '>=1.60', required: false)
+if not grpc_dep.found()
+  # gRPC C++ building from source guide: https://github.com/grpc/grpc/blob/v1.62.0/BUILDING.md
+  # TODO: link the path to some ENV vars or grpc++.pc
+  grpc_dep = declare_dependency(
+    include_directories: '/usr/local/include/grpc++',
+    link_args: ['-L/usr/local/lib' , 'lgrpc++']
+  )
+  message('Declare grpc++ dependency manually')
+endif
 
 inc = include_directories('include')
+
 protoc_cmd = find_program('protoc', required: true)
 grpc_cpp_plugin_cmd = find_program('grpc_cpp_plugin', required: true)
 
