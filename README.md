@@ -21,14 +21,14 @@ Overview: the build process requires multiple dependencies for tools and code (g
 
 - Tool dependencies: 
     - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
-    - Linux: 
+    - Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev`
 - [Install `protoc` compiler](https://grpc.io/docs/protoc-installation/)
     - MacOS: `brew install protoc`
-    - Linux: 
+    - Linux: `sudo apt-get -yq install protobuf-compiler`
 - Only if installing gRPC from source: [build and Install gRPC C++ library](https://grpc.io/blog/installation/)
     - Clone the [gRPC repo](https://github.com/grpc/grpc/tree/master) somewhere 
     - Build
-        - MacOS and Linux:
+        - MacOS:
 ```
 $ mkdir -p cmake/build && cd cmake/build
 $ cmake ../.. -DgRPC_INSTALL=ON                \
@@ -43,13 +43,29 @@ $ cmake ../.. -DgRPC_INSTALL=ON                \
 $ make
 $ make install
 ```
+        - Linux (Ubuntu 22)
+            - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
+            - Use the following command to build:
+```
+$ cmake -DgRPC_INSTALL=ON  \
+        -DgRPC_BUILD_TESTS=OFF \
+        -DCMAKE_INSTALL_PREFIX=/home/ubuntu/grpc-install \
+        -DBUILD_SHARED_LIBS=ON ../..
+```
+            - After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
+```
+$ export LD_LIBRARY_PATH=/home/ubuntu/grpc-install/lib/
+$ export PATH=~/grpc-install/bin/:$PATH   
+$ export PKG_CONFIG_PATH=/home/ubuntu/grpc-install/lib/pkgconfig/
+```
+            - Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
 
 ### Building base libe2sar library
 
 Make sure Meson is installed (with Ninja backend). The build should work for both LLVM/CLang and g++ compilers.
 
 ```
-$ meson build -C builddir
+$ meson setup builddir
 $ cd builddir
 $ meson compile
 ```
