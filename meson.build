@@ -6,7 +6,7 @@ warning_level=1
 
 # some dependencies
 glib_dep = dependency('glib-2.0')
-grpc_dep = dependency('grpc++', version: '>=1.60')
+grpc_dep = dependency('grpc++', version: '>=1.54')
 protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 boost_dep = dependency('boost')
