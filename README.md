@@ -21,7 +21,7 @@ Overview: the build process requires multiple dependencies for tools and code (g
 
 - Tool dependencies: 
     - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
-    - Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev`
+    - Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev; pip3 install --user meson`
 - [Install `protoc` compiler](https://grpc.io/docs/protoc-installation/)
     - MacOS: `brew install protoc`
     - Linux: `sudo apt-get -yq install protobuf-compiler`
