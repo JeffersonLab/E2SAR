@@ -22,7 +22,7 @@ namespace e2sar
             };
             ErrorCode(int c, const std::string &m): error_code{c}, error_msg{m} {}
             void setMsg(const std::string_view &m) {
-                error_msg.
+                ;
             }
     };
 
