@@ -15,7 +15,7 @@ boost_dep = dependency('boost', modules: ['system'])
 
 # On RHEL platforms, gRPC C++ has to be manually installed and found.
 # Meson dependency guide: https://mesonbuild.com/Dependencies.html
-grpc_dep = dependency('grpc++', version: '>=1.60', required: false)
+grpc_dep = dependency('grpc++', version: '>=1.54.1', required: false)
 if not grpc_dep.found()
   # gRPC C++ building from source guide: https://github.com/grpc/grpc/blob/v1.62.0/BUILDING.md
   # TODO: link the path to some ENV vars or grpc++.pc
