@@ -21,6 +21,9 @@ namespace e2sar
                 CaughtException = 1
             };
             ErrorCode(int c, const std::string &m): error_code{c}, error_msg{m} {}
+            void setMsg(const std::string_view &m) {
+                error_msg.
+            }
     };
 
     ErrorCode NO_ERROR{ErrorCode::ECode::NoError, ""};
