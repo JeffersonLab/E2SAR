@@ -19,19 +19,26 @@ Overview: the build process requires multiple dependencies for tools and code (g
 
 ### Pre-requisistes
 
-- Tool dependencies: 
-    - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
-    - Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev; pip3 install --user meson`
-- [Install `protoc` compiler](https://grpc.io/docs/protoc-installation/)
-    - MacOS: `brew install protoc`
-    - Linux: `sudo apt-get -yq install protobuf-compiler`
-- Only if installing gRPC from source: [build and Install gRPC C++ library](https://grpc.io/blog/installation/)
-    - Clone the [gRPC repo](https://github.com/grpc/grpc/tree/master) somewhere 
-    - Build
-        - MacOS:
-            - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
-            - Use the following command to build:
-```
+#### Installing dependencies
+
+Build dependences
+
+- MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
+- Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev; pip3 install --user meson`
+
+Install [`protoc` compiler](https://grpc.io/docs/protoc-installation/)
+- MacOS: `brew install protoc`
+- Linux: `sudo apt-get -yq install protobuf-compiler`
+
+#### Installing gRPC from source
+
+gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source
+
+
+##### MacOS
+- Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
+- Use the following command to build:
+```bash
 $ mkdir -p cmake/build && cd cmake/build
 $ cmake ../.. -DgRPC_INSTALL=ON                \
               -DCMAKE_INSTALL_PREFIX=/wherever/grpc-install/ \
@@ -40,29 +47,29 @@ $ cmake ../.. -DgRPC_INSTALL=ON                \
 $ make -j 16
 $ make install
 ```
-            - After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
-```
+After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
+```bash
 $ export DYLD_LIBRARY_PATH=/wherever/grpc-install/lib/
 $ export PATH=/wherever/grpc-install/bin/:$PATH   
 $ export PKG_CONFIG_PATH=/wherever/grpc-install/lib/pkgconfig/
 ```
-            - Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
-        - Linux (Ubuntu 22)
-            - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
-            - Use the following command to build:
-```
+Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+##### Linux (Ubuntu 22)
+- Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
+- Use the following command to build:
+```bash
 $ cmake -DgRPC_INSTALL=ON  \
         -DgRPC_BUILD_TESTS=OFF \
         -DCMAKE_INSTALL_PREFIX=/home/ubuntu/grpc-install \
         -DBUILD_SHARED_LIBS=ON ../..
 ```
-            - After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
-```
+After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
+```bash
 $ export LD_LIBRARY_PATH=/home/ubuntu/grpc-install/lib/
 $ export PATH=~/grpc-install/bin/:$PATH   
 $ export PKG_CONFIG_PATH=/home/ubuntu/grpc-install/lib/pkgconfig/
 ```
-            - Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
 
 ### Building base libe2sar library
 
