@@ -29,20 +29,24 @@ Overview: the build process requires multiple dependencies for tools and code (g
     - Clone the [gRPC repo](https://github.com/grpc/grpc/tree/master) somewhere 
     - Build
         - MacOS:
+            - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
+            - Use the following command to build:
 ```
 $ mkdir -p cmake/build && cd cmake/build
 $ cmake ../.. -DgRPC_INSTALL=ON                \
-              -DCMAKE_INSTALL_PREFIX=/some/local/path/to/avoid/version/clashes/or/need/for/sudo/like/home/user/lib \
-              -DCMAKE_BUILD_TYPE=Release       \
-              -DgRPC_ABSL_PROVIDER=package     \
-              -DgRPC_CARES_PROVIDER=package    \
-              -DgRPC_PROTOBUF_PROVIDER=package \
-              -DgRPC_RE2_PROVIDER=package      \
-              -DgRPC_SSL_PROVIDER=package      \
+              -DCMAKE_INSTALL_PREFIX=/wherever/grpc-install/ \
+              -DgRPC_BUILD_TESTS=OFF           \
               -DgRPC_ZLIB_PROVIDER=package
-$ make
+$ make -j 16
 $ make install
 ```
+            - After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
+```
+$ export DYLD_LIBRARY_PATH=/wherever/grpc-install/lib/
+$ export PATH=/wherever/grpc-install/bin/:$PATH   
+$ export PKG_CONFIG_PATH=/wherever/grpc-install/lib/pkgconfig/
+```
+            - Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
         - Linux (Ubuntu 22)
             - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
             - Use the following command to build:
