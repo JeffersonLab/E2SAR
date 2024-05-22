@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # install missing software
-sudo apt-get install -y unzip
+sudo apt-get -yq update 
+sudo apt-get -yq install unzip
 
 # make sure we are in the 'docker' group
 sudo usermod -a -G docker ubuntu
