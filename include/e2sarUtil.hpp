@@ -69,8 +69,13 @@ namespace e2sar {
                 return lbName;
             }
 
+            /** get LB ID */
+            inline const std::string get_lbId() {
+                return lbId;
+            }
+
             /** get control plane ip address and port */ 
-            inline const std::pair<ip::address, int> get_cpAddr() const {
+            inline const outcome::result<std::pair<ip::address, int>> get_cpAddr() const {
                 return std::pair<ip::address, int>(cpAddr, cpPort);
             }
 
