@@ -10,7 +10,7 @@ protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 # For RHEL, install via `sudo dnf install boost-devel`.
 # RHEL also needs to declare the modules explicitly.
-boost_dep = dependency('boost', modules: ['system'])
+boost_dep = dependency('boost', modules: ['system', 'url'])
 
 # On RHEL platforms, gRPC C++ has to be manually installed and found.
 # Meson dependency guide: https://mesonbuild.com/Dependencies.html

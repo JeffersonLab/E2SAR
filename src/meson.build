@@ -1,6 +1,6 @@
 subdir('grpc')
 
-e2sar_sources = ['e2sar.cpp', 'cp-api.cpp']
+e2sar_sources = ['e2sar.cpp', 'cp-api.cpp', 'e2sarUtil.cpp']
 
 libe2sar_t = static_library('e2sar_t',
                         e2sar_sources,

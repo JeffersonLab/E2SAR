@@ -5,5 +5,4 @@
 #include "e2sarCP.hpp"
 #include "e2sarDP.hpp"
 
-int add(int x, int y);
 #endif

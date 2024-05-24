@@ -1,9 +1,14 @@
+#include <iostream>
 #include <string>
-#include <regex>
+#include <vector>
+#include <boost/url.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "e2sarUtil.hpp"
 
 namespace e2sar {
+
+
     /**
      * <p>
      * This is a method to parse a URI which was obtained with the reservation
@@ -33,171 +38,71 @@ namespace e2sar {
      * </p>
      *
      * @param uri URI to parse.
-     * @param uriInfo ref to ejfatURI struct to fill with parsed values.
-     * @return true if parse successful, else false.
      */
-    EjfatURI(const std::string_view &uri) {
+    EjfatURI::EjfatURI(const std::string &uri) {
+        rawURI = uri;
 
-        // URI must match this regex pattern
-        // Note: the pattern (\[?[a-fA-F\d:.]+\]?) matches either IPv6 or IPv4 addresses
-        // in which the addr may be surrounded by [] and thus is stripped off.
-        std::regex pattern(R"regex(ejfat://(?:([^@]+)@)?(\[?[a-fA-F\d:.]+\]?):(\d+)/lb/([^?]+)(?:\?(?:(?:data=(\[?[a-fA-F\d:.]+\]?):(\d+)){1}(?:&sync=(\[?[a-fA-F\d:.]+\]?):(\d+))?|(?:sync=(\[?[a-fA-F\d:.]+\]?):(\d+)){1}))?)regex");
+        // parse the URI
+        boost::system::result<boost::url_view> r = boost::urls::parse_uri(rawURI);
 
-        std::smatch match;
-        if (std::regex_match(uri, match, pattern)) {
-            // we're here if uri is in the proper format ...
-
-            // optional token
-            std::string token = match[1];
-
-            if (!token.empty()) {
-                uriInfo.instanceToken = token;
-                uriInfo.haveInstanceToken = true;
-            }
-            else {
-                uriInfo.haveInstanceToken = false;
-            }
-
-            // Remove square brackets from address if present
-            std::string addr = match[2];
-            if (!addr.empty() && addr.front() == '[' && addr.back() == ']') {
-                addr = addr.substr(1, addr.size() - 2);
-            }
-
-            uriInfo.cpAddr = addr;
-            uriInfo.cpPort = std::stoi(match[3]);
-            uriInfo.lbId   = match[4];
-
-            if (isIPv6(addr)) {
-                uriInfo.useIPv6Cp = true;
-            }
-
-                // in this case only syncAddr and syncPort defined
-            if (!match[9].str().empty()) {
-                uriInfo.haveSync = true;
-                uriInfo.haveData = false;
-
-                // Remove square brackets if present
-                std::string addr = match[9];
-                if (!addr.empty() && addr.front() == '[' && addr.back() == ']') {
-                    addr = addr.substr(1, addr.size() - 2);
-                }
-
-                // decide if this is IPv4 or IPv6 or neither
-                if (isIPv6(addr)) {
-                    uriInfo.syncAddrV6  = addr;
-                    uriInfo.useIPv6Sync = true;
-                }
-                else if (isIPv4(addr)) {
-                    uriInfo.syncAddrV4 = addr;
-                }
-                else {
-                    // invalid IP addr
-                    uriInfo.haveSync = false;
-                }
-
-                try {
-                    // look at the sync port
-                    int port = std::stoi(match[10]);
-                    if (port < 1024 || port > 65535) {
-                        // port is out of range
-                        uriInfo.haveSync = false;
-                    }
-                    else {
-                        uriInfo.syncPort = port;
-                    }
-
-                } catch (const std::exception& e) {
-                    // string is not a valid integer
-                    uriInfo.haveSync = false;
-                }
-            }
-            else {
-                // if dataAddr and dataPort defined
-                if (!match[5].str().empty()) {
-                    uriInfo.haveData = true;
-
-                    std::string addr = match[5];
-                    if (!addr.empty() && addr.front() == '[' && addr.back() == ']') {
-                        addr = addr.substr(1, addr.size() - 2);
-                    }
-
-                    if (isIPv6(addr)) {
-                        uriInfo.dataAddrV6  = addr;
-                        uriInfo.useIPv6Data = true;
-                    }
-                    else if (isIPv4(addr)) {
-                        uriInfo.dataAddrV4 = addr;
-                    }
-                    else {
-                        uriInfo.haveData = false;
-                    }
-
-                    try {
-                        // look at the data port
-                        int port = std::stoi(match[6]);
-                        if (port < 1024 || port > 65535) {
-                            // port is out of range
-                            uriInfo.haveData = false;
-                        }
-                        else {
-                            uriInfo.dataPort = port;
-                        }
-
-                    } catch (const std::exception& e) {
-                        // string is not a valid integer
-                        uriInfo.haveData = false;
-                    }
-
-                }
-                else {
-                    uriInfo.haveData = false;
-                }
-
-                // if syncAddr and syncPort defined
-                if (!match[7].str().empty()) {
-                    uriInfo.haveSync = true;
-
-                    std::string addr = match[7];
-                    if (!addr.empty() && addr.front() == '[' && addr.back() == ']') {
-                        addr = addr.substr(1, addr.size() - 2);
-                    }
-
-                    // decide if this is IPv4 or IPv6 or neither
-                    if (isIPv6(addr)) {
-                        uriInfo.syncAddrV6  = addr;
-                        uriInfo.useIPv6Sync = true;
-                    }
-                    else if (isIPv4(addr)) {
-                        uriInfo.syncAddrV4 = addr;
-                    }
-                    else {
-                        uriInfo.haveSync = false;
-                    }
-
-                    try {
-                        // look at the sync port
-                        int port = std::stoi(match[8]);
-                        if (port < 1024 || port > 65535) {
-                            // port is out of range
-                            uriInfo.haveSync = false;
-                        }
-                        else {
-                            uriInfo.syncPort = port;
-                        }
-
-                    } catch (const std::exception& e) {
-                        // string is not a valid integer
-                        uriInfo.haveSync = false;
-                    }
-                }
-                else {
-                    uriInfo.haveSync = false;
-                }
-            }
-            return true;
+        if (!r) {
+            throw E2SARException("Unable to parse the provided URL "s + rawURI);
         }
 
-        return false;
+        boost::url_view u = r.value();
+
+        if (u.scheme().compare("ejfat")) 
+            throw E2SARException("Invalid EJFAT URL scheme: "s + std::string(u.scheme()) + " in URI"s + rawURI);
+
+        if (u.userinfo().length() > 0) {
+            instanceToken = u.userinfo();
+            haveInstanceToken = true;
+        } else
+            haveInstanceToken = false;
+
+        outcome::result<ip::address> cpAddr_r = string_to_ip(u.host());
+        outcome::result<int> cpPort_r = string_to_port(u.port());
+
+        if (cpAddr_r && cpPort_r) {
+            cpAddr = cpAddr_r.value();
+            cpPort = cpPort_r.value();
+        } else 
+            throw E2SARException("Unable to parse CP address and/or port in URL "s + rawURI);
+
+        // extract the lb ID
+        std::vector<std::string> lb_path;
+        boost::split(lb_path, u.path(), boost::is_any_of("/"));
+        lbId = lb_path.back();
+
+        if (lbId.length() == 0) 
+            throw E2SARException("Invalid LB Id: "s + rawURI);
+
+        // deal with the query portion 
+        for (auto param: u.params()) {
+            outcome::result<std::pair<ip::address, int>> r = string_tuple_to_ip_and_port(param.value);
+            if (r) {
+                std::pair<ip::address, int> p = r.value();
+                if (!param.key.compare("sync"s)) {
+                    haveSync = true;
+                    syncAddr = p.first;
+                    syncPort = p.second;
+                } else if (!param.key.compare("data"s)) {
+                    haveData = true;
+                    dataAddr = p.first;
+                    dataPort = DATAPLANE_PORT;
+                } else 
+                    throw E2SARException("Unknown parameter "s + param.key + " in URL "s + rawURI);
+            } else 
+                throw E2SARException("Unable to parse "s + param.key + " address is URL"s + rawURI);
+        }
+    }
+
+    /** implicit conversion operator */
+    EjfatURI::operator std::string() const {
+        return "uri: " + rawURI + " cpAdddr: " + cpAddr.to_string() + ":" + std::to_string(cpPort) +
+            (haveSync ? " syncAddr: " + syncAddr.to_string() + ":" + std::to_string(syncPort) : "") +
+            (haveData ? " dataAddr: " + dataAddr.to_string() + ":" + std::to_string(dataPort) : "") + 
+            " lbName: " + lbName + " lbId: " + lbId + " adminToken: " + adminToken + 
+            (haveInstanceToken ? + " instanceToken: " + instanceToken : "");
     }
 }

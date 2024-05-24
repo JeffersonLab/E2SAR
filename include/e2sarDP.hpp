@@ -1,6 +1,9 @@
 #ifndef E2SARDPHPP
 #define E2SARDPHPP
+
 #include <boost/asio.hpp>
+#include "e2sarError.hpp"
+
 /***
  * Dataplane definitions for E2SAR
 */
@@ -35,19 +38,22 @@ namespace e2sar
 
             // Blocking call. Event number automatically set.
             // Any core affinity needs to be done by caller.
-            ErrorCode sendEvent(char *event, size_t bytes);
+            E2SARErrorc sendEvent(u_int8_t *event, size_t bytes);
 
             // Blocking call specifying event number.
-            ErrorCode sendEvent(char *event, size_t bytes, uint64_t eventNumber);
+            E2SARErrorc sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber);
 
             // Non-blocking call to place event on internal queue.
             // Event number automatically set. 
-            ErrorCode addToSendQueue(char *event, size_t bytes,
-                                     void* (*callback)(void *) = nullptr, void *cbArg = nullptr);
+            E2SARErrorc addToSendQueue(u_int8_t *event, size_t bytes, 
+                void* (*callback)(void *) = nullptr, 
+                void *cbArg = nullptr);
 
             // Non-blocking call specifying event number.
-            ErrorCode addToSendQueue(char *event, size_t bytes, uint64_t eventNumber,
-                                     void* (*callback)(void *) = nullptr, void *cbArg = nullptr);
+            E2SARErrorc addToSendQueue(u_int8_t *event, size_t bytes, 
+                uint64_t eventNumber, 
+                void* (*callback)(void *) = nullptr, 
+                void *cbArg = nullptr);
     };
 
     /*
@@ -73,7 +79,7 @@ namespace e2sar
             ~Reassembler();
             
             // Non-blocking call to get events
-            ErrorCode getEvent(char **event, size_t *bytes, uint64_t* eventNum, uint16_t *srcId);
+            E2SARErrorc getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *srcId);
 
             int probeStats();
         protected:

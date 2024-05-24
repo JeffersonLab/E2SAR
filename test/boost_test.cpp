@@ -1,18 +1,30 @@
 #include <iostream>
+#include <system_error>
 #include <boost/asio.hpp>
+#include <boost/outcome.hpp>
+#include <boost/url.hpp>
+#include <boost/algorithm/string.hpp>
+
 
 using namespace boost::asio;
+namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
+using namespace std::string_literals;
 
 int main() {
 
-    // test boost IP addresses
+    // Test boost IP addresses
     ip::address ipv4 = ip::make_address("192.168.1.1");
     ip::address ipv6 = ip::make_address("2001:db8:0000:1:1:1:1:1");
+    try {
+        ip::make_address("blaaaa");
+    } catch (boost::system::system_error e) {
+        std::cout << "Unable to convert string to address" << std::endl;
+    }
 
     std::cout << "IPv4 " << ipv4 << ' ' << ipv4.is_v4() << '\n';
     std::cout << "IPv6 " << ipv6 << ' ' << ipv6.is_v6() << '\n';
 
-    // test name resolution
+    // Test name resolution
     boost::asio::io_service io_service;
 
     ip::udp::resolver resolver(io_service);
@@ -24,5 +36,33 @@ int main() {
         ip::udp::endpoint endpoint = *iter++;
         ip::address address = endpoint.address();
         std::cout << address << ' ' << address.is_v4() << ' ' << std::endl;
+    }
+
+    // Test URL parsing
+    std::string uri_string{"ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20"};
+    boost::system::result<boost::url_view> r = boost::urls::parse_uri(uri_string);
+
+    if (!r) {
+            if (r.error()) 
+            std::cout << "Unable to convert! "s << r.error() << std::endl;
+    } else {
+
+        boost::url_view u = r.value();
+
+        std::cout << u.scheme() << std::endl;
+        std::cout << u.userinfo() << " " << u.userinfo().length() << std::endl;
+        std::cout << u.host() << std::endl;
+        std::cout << u.port() << std::endl;
+        std::cout << u.path() << std::endl;
+        std::cout << u.query() << std::endl;
+
+        for (auto param: u.params()) 
+            std::cout << param.key << ": " << param.value << std::endl;
+
+        std::vector<std::string> lb_path;
+        boost::split(lb_path, u.path(), boost::is_any_of("/"));
+        for(auto g: lb_path) {
+            std::cout << ": " << g << std::endl;
+        }
     }
 }
