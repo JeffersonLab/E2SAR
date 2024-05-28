@@ -11,3 +11,5 @@ e2sarboosttest = executable('e2sar_boost_test', 'e2sar_boost_test.cpp',
                             include_directories: inc,
                             link_with: libe2sar,
                             dependencies: [boost_dep, thread_dep])
+
+test('Run basic test suite', e2sarboosttest)
