@@ -139,9 +139,10 @@ namespace e2sar {
                             }
                         }
                         file.close();
+                        return E2SARErrorc::Undefined;
                     }
                 }
-                return E2SARErrorc::Undefined;
+                return E2SARErrorc::NotFound;
             }
     };
 
@@ -227,6 +228,31 @@ namespace e2sar {
         }
         else
             return E2SARErrorc::ParameterError;
+    }
+
+        /**
+     * Function to take a host name and turn it into IP addresses, IPv4 and IPv6.
+     *
+     * @param host_name name of host to examine.
+     * @return outcome variable with either has_error() set or value() returning a list of ip::address
+     */
+    static inline outcome::result<std::vector<ip::address>> resolveHost(const std::string& host_name) {
+
+        boost::asio::io_service io_service;
+
+        ip::udp::resolver resolver(io_service);
+        ip::udp::resolver::query query(host_name, "443");
+        ip::udp::resolver::iterator iter = resolver.resolve(query);
+        ip::udp::resolver::iterator end; // End marker.
+        std::vector<ip::address> addresses;
+        while (iter != end)
+        {
+            ip::udp::endpoint endpoint = *iter++;
+            addresses.push_back(endpoint.address());
+        }
+        if (addresses.size() == 0) 
+            return E2SARErrorc::NotFound;
+        return addresses;
     }
 };
 #endif
