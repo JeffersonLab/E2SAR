@@ -83,6 +83,8 @@ When using it with meson be sure to set `BOOST_ROOT` to wherever it is installed
 
 Make sure Meson is installed (with Ninja backend). The build should work for both LLVM/CLang and g++ compilers.
 
+Update `setup_compile_env.sh` file for your environment. Then run:
+
 ```
 $ meson setup build
 $ cd build
