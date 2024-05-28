@@ -236,23 +236,26 @@ namespace e2sar {
      * @param host_name name of host to examine.
      * @return outcome variable with either has_error() set or value() returning a list of ip::address
      */
-    static inline outcome::result<std::vector<ip::address>> resolveHost(const std::string& host_name) {
+    static inline outcome::result<std::vector<ip::address>> resolveHost(const std::string& host_name) noexcept {
 
+        std::vector<ip::address> addresses;
         boost::asio::io_service io_service;
 
-        ip::udp::resolver resolver(io_service);
-        ip::udp::resolver::query query(host_name, "443");
-        ip::udp::resolver::iterator iter = resolver.resolve(query);
-        ip::udp::resolver::iterator end; // End marker.
-        std::vector<ip::address> addresses;
-        while (iter != end)
-        {
-            ip::udp::endpoint endpoint = *iter++;
-            addresses.push_back(endpoint.address());
-        }
-        if (addresses.size() == 0) 
+        try {
+            ip::udp::resolver resolver(io_service);
+            ip::udp::resolver::query query(host_name, "443");
+            ip::udp::resolver::iterator iter = resolver.resolve(query);
+            ip::udp::resolver::iterator end; // End marker.
+
+            while (iter != end) {
+                ip::udp::endpoint endpoint = *iter++;
+                addresses.push_back(endpoint.address());
+            }
+            return addresses;
+        } catch (...) {
+            // anything happens - we can't find the host
             return E2SARErrorc::NotFound;
-        return addresses;
+        }
     }
 };
 #endif

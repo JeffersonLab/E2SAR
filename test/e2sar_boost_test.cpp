@@ -60,4 +60,24 @@ BOOST_AUTO_TEST_CASE(Test5) {
 
     std::cout << static_cast<std::string>(euri.value()) << std::endl;
 }
+
+BOOST_AUTO_TEST_CASE(Test6) {
+
+    // test name resolution
+    outcome::result<std::vector<ip::address>> addresses = resolveHost("www.jlab.org"s);
+
+    BOOST_TEST(addresses.has_error() == false);
+
+    for (auto addr: addresses.value()) {
+        std::cout << "Address is " << addr << std::endl;
+    }
+}
+
+BOOST_AUTO_TEST_CASE(Test7) {
+
+    // test name resolution
+    outcome::result<std::vector<ip::address>> addresses = resolveHost("fake.jlab.org"s);
+
+    BOOST_TEST(addresses.has_error() == true);
+}
 BOOST_AUTO_TEST_SUITE_END()
