@@ -17,7 +17,7 @@ int main() {
     ip::address ipv6 = ip::make_address("2001:db8:0000:1:1:1:1:1");
     try {
         ip::make_address("blaaaa");
-    } catch (boost::system::system_error e) {
+    } catch (boost::system::system_error &e) {
         std::cout << "Unable to convert string to address" << std::endl;
     }
 
