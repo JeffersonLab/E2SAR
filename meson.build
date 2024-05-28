@@ -8,11 +8,8 @@ warning_level=1
 glib_dep = dependency('glib-2.0')
 protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
-# For RHEL, install via `sudo dnf install boost-devel`.
-# RHEL also needs to declare the modules explicitly.
-boost_dep = dependency('boost', modules: ['system', 'url'])
 
-# On RHEL platforms, gRPC C++ has to be manually installed and found.
+# On many platforms, gRPC C++ has to be manually installed and found.
 # Meson dependency guide: https://mesonbuild.com/Dependencies.html
 grpc_dep = dependency('grpc++', version: '>=1.54.1', required: false)
 if not grpc_dep.found()
@@ -24,6 +21,12 @@ if not grpc_dep.found()
   )
   message('Declare grpc++ dependency manually')
 endif
+
+# boost also tends to lag so a source-based installation is preferred
+# it also doesn't produce a .pc file - only cmake-based configuration is possible
+# and meson can ONLY find it via BOOST_ROOT env variable
+# (i.e. setting cmake_prefix_path doesn't work)
+boost_dep = dependency('boost', modules: ['system', 'url'], method: 'cmake', version: '>=1.83.0')
 
 inc = include_directories('include')
 
