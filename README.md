@@ -55,6 +55,7 @@ $ export PATH=/wherever/grpc-install/bin/:$PATH
 $ export PKG_CONFIG_PATH=/wherever/grpc-install/lib/pkgconfig/
 ```
 Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+
 ##### Linux (Ubuntu 22)
 - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
 - Use the following command to build:
@@ -72,14 +73,21 @@ $ export PKG_CONFIG_PATH=/home/ubuntu/grpc-install/lib/pkgconfig/
 ```
 Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
 
+#### Install Boost from source
+
+Use [this procedure](https://www.boost.io/doc/user-guide/getting-started.html) to build Boost from scratch (particularly on older Linux systems, like ubuntu 22).
+
+When using it with meson be sure to set `BOOST_ROOT` to wherever it is installed (like e.g. `export BOOST_ROOT=/home/ubuntu/boost-install`) as per [these instructions](https://mesonbuild.com/Dependencies.html#boost).
+
 ### Building base libe2sar library
 
 Make sure Meson is installed (with Ninja backend). The build should work for both LLVM/CLang and g++ compilers.
 
 ```
-$ meson setup builddir
-$ cd builddir
+$ meson setup build
+$ cd build
 $ meson compile
+$ meson test
 ```
 
 ### Building python bindings
