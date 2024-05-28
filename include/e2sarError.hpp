@@ -27,6 +27,7 @@ namespace e2sar {
         ParameterNotAvailable = 4,
         OutOfRange = 5,
         Undefined = 6,
+        NotFound = 7,
     };
 
     /** constructors typically throw this exception which may be a rethrow */
@@ -75,8 +76,12 @@ namespace detail {
         case e2sar::E2SARErrorc::ParameterNotAvailable:
             return "parameter note available";
         case e2sar::E2SARErrorc::OutOfRange:
-            return "parameter out of range";
-      default:
+            return "value out of range";
+        case e2sar::E2SARErrorc::Undefined:
+            return "value undefined";
+        case e2sar::E2SARErrorc::NotFound:
+            return "file not found";
+        default:
             return "unknown";
       }
     }
