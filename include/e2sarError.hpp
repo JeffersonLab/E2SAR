@@ -26,6 +26,7 @@ namespace e2sar {
         ParameterError = 3,
         ParameterNotAvailable = 4,
         OutOfRange = 5,
+        Undefined = 6,
     };
 
     /** constructors typically throw this exception which may be a rethrow */

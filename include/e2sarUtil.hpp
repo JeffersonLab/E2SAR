@@ -1,6 +1,7 @@
 #ifndef E2SARUTILHPP
 #define E2SARUTILHPP
 
+#include <fstream>
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -59,6 +60,11 @@ namespace e2sar {
             /** destructor */
             ~EjfatURI() {}
 
+            /** set admin token */
+            inline void set_AdminToken(const std::string &t) {
+                adminToken = t;
+            }
+
             /** set LB name */
             inline void set_lbName(const std::string &n) {
                 lbName = n;
@@ -106,8 +112,37 @@ namespace e2sar {
             operator std::string() const;
 
             /** from environment variable or file */
-            static EjfatURI getURIfromEnv(const std::string& envVar = "EJFAT_URI"s);
-            static EjfatURI getURIfromFile(const std::string& fileName = "/tmp/ejfat_uri"s);
+            static inline outcome::result<EjfatURI> getFromEnv(const std::string& envVar = "EJFAT_URI"s) noexcept {
+                const char *envStr = std::getenv(envVar.c_str());
+                if (envStr != nullptr) {
+                    try {
+                        return EjfatURI(envStr);
+                    } catch (const E2SARException &e) {
+                        return E2SARErrorc::CaughtException;
+                    }
+                }
+                return E2SARErrorc::Undefined;
+            }
+
+            /** from a file */
+            static inline outcome::result<EjfatURI> getFromFile(const std::string& fileName = "/tmp/ejfat_uri"s) noexcept {
+                if (!fileName.empty()) {
+                    std::ifstream file(fileName);
+                    if (file.is_open()) {
+                        std::string uriLine;
+                        if (std::getline(file, uriLine)) {
+                            file.close();
+                            try {
+                                return EjfatURI(uriLine);
+                            } catch (const E2SARException &e) {
+                                return E2SARErrorc::CaughtException;
+                            }
+                        }
+                        file.close();
+                    }
+                }
+                return E2SARErrorc::Undefined;
+            }
     };
 
     /**
