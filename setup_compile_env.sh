@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Update and run this script to setup your environment so meson can find things
+# Update and source this script to setup your environment so meson can find things
 # point wherever gRPC installation is 
 
 # Pay particular attention to where gRPC (likely installed from source) and Boost (possibly

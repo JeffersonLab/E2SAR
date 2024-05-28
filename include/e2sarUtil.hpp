@@ -230,7 +230,7 @@ namespace e2sar {
             return E2SARErrorc::ParameterError;
     }
 
-        /**
+    /**
      * Function to take a host name and turn it into IP addresses, IPv4 and IPv6.
      *
      * @param host_name name of host to examine.
