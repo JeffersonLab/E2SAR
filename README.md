@@ -54,7 +54,7 @@ $ export DYLD_LIBRARY_PATH=/wherever/grpc-install/lib/
 $ export PATH=/wherever/grpc-install/bin/:$PATH   
 $ export PKG_CONFIG_PATH=/wherever/grpc-install/lib/pkgconfig/
 ```
-Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+The `setup_compile_env.sh` script sets it up (below). Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
 
 ##### Linux (Ubuntu 22)
 - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
@@ -71,7 +71,7 @@ $ export LD_LIBRARY_PATH=/home/ubuntu/grpc-install/lib/
 $ export PATH=~/grpc-install/bin/:$PATH   
 $ export PKG_CONFIG_PATH=/home/ubuntu/grpc-install/lib/pkgconfig/
 ```
-Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+The `setup_compile_env.sh` script sets it up (below). Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
 
 #### Install Boost from source
 
