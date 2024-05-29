@@ -28,7 +28,8 @@ endif
 # (i.e. setting cmake_prefix_path doesn't work)
 boost_dep = dependency('boost', modules: ['system', 'url'], method: 'cmake', version: '>=1.83.0')
 
-inc = include_directories('include')
+# we include 'src' because auto-generated headers for gRPC stubs go there 
+inc = include_directories('include', 'src')
 
 protoc_cmd = find_program('protoc', required: true)
 grpc_cpp_plugin_cmd = find_program('grpc_cpp_plugin', required: true)
