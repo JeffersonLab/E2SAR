@@ -28,6 +28,7 @@ namespace e2sar {
         OutOfRange = 5,
         Undefined = 6,
         NotFound = 7,
+        RPCError = 8,
     };
 
     /** constructors typically throw this exception which may be a rethrow */
@@ -81,6 +82,8 @@ namespace detail {
             return "value undefined";
         case e2sar::E2SARErrorc::NotFound:
             return "file not found";
+        case e2sar::E2SARErrorc::RPCError:
+            return "gRPC error";
         default:
             return "unknown";
       }

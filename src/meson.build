@@ -1,6 +1,6 @@
 subdir('grpc')
 
-e2sar_sources = ['e2sar.cpp', 'cp-api.cpp', 'e2sarUtil.cpp']
+e2sar_sources = ['e2sar.cpp', 'cp-api.cpp', 'e2sarUtil.cpp', 'e2sarCP.cpp']
 
 libe2sar_t = static_library('e2sar_t',
                         e2sar_sources,
@@ -10,5 +10,6 @@ libe2sar_t = static_library('e2sar_t',
 
 # build one library from the E2SAR and gRPC library pieces
 libe2sar = static_library('e2sar',
-                        objects : [libe2sar_t.extract_all_objects(recursive: false), 
+                        objects : [libe2sar_t.extract_all_objects(recursive: false),
                                    liblbgrpc.extract_all_objects(recursive: false)])
+                                   

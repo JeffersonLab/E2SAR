@@ -15,7 +15,7 @@ using namespace std::string_literals;
  * Supporting classes for E2SAR
 */
 namespace e2sar {
-    const int DATAPLANE_PORT = 19522;
+    const u_int16_t DATAPLANE_PORT = 19522;
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). */
     class EjfatURI {
@@ -40,34 +40,57 @@ namespace e2sar {
             std::string lbName;
             /** String identifier of an LB instance, set by the CP on an LB reservation. */
             std::string lbId;
-            /** Admin token for the CP being used. */
+            /** Admin token for the CP being used. Set from URI string*/
             std::string adminToken;
             /** Instance token set by the CP on an LB reservation. */
             std::string instanceToken;
+
+            /**
+             * Note we make no distinction between IPv4 or IPv6 as it is represented by
+             * boost's ip::address which can do either and can also be asked if it is
+             * IPv4 or IPv6 using is_v4() or is_v6() methods. Initialization from string
+             * 'does the right thing' depending on the address.
+            */
             /** address to send events (data) to (v4 or v6). */
             ip::address dataAddr;
             /** address to send sync messages to. Not used, for future expansion. (v4 or v6)*/
             ip::address syncAddr;
-
             /** IP address for grpc communication with CP. */
             ip::address cpAddr;
         
         public:
-            /** base constructor */
+            /** base constructor, sets instance token from string */
             EjfatURI(const std::string& uri);
             /** rely on implicitly-declared copy constructor as needed */
 
             /** destructor */
             ~EjfatURI() {}
 
-            /** set admin token */
-            inline void set_AdminToken(const std::string &t) {
-                adminToken = t;
+            /** set instance token based on gRPC return */
+            inline void set_InstanceToken(const std::string &t) {
+                instanceToken = t;
+                haveInstanceToken = true;
             }
-
             /** set LB name */
             inline void set_lbName(const std::string &n) {
                 lbName = n;
+            }
+
+            /** set LB Id */
+            inline void set_lbId(const std::string &i) {
+                lbId = i;
+            }
+
+            inline void set_syncAddr(std::pair<ip::address, u_int16_t> &a) {
+                syncAddr = a.first;
+                syncPort = a.second;
+                haveSync = true;
+            }
+
+            inline void set_dataAddr(std::pair<ip::address, u_int16_t> &a) {
+                dataAddr = a.first;
+                dataPort = a.second;
+                haveData = true;
             }
 
             /** get LB name */
@@ -81,8 +104,8 @@ namespace e2sar {
             }
 
             /** get control plane ip address and port */ 
-            inline const outcome::result<std::pair<ip::address, int>> get_cpAddr() const {
-                return std::pair<ip::address, int>(cpAddr, cpPort);
+            inline const outcome::result<std::pair<ip::address, u_int16_t>> get_cpAddr() const {
+                return std::pair<ip::address, u_int16_t>(cpAddr, cpPort);
             }
 
             /** does the URI contain a dataplane address? */
@@ -96,16 +119,16 @@ namespace e2sar {
             }
 
             /** get data plane address and port */ 
-            inline const outcome::result<std::pair<ip::address, int>> get_dataAddr() const noexcept {
+            inline const outcome::result<std::pair<ip::address, u_int16_t>> get_dataAddr() const noexcept {
                 if (haveData) 
-                    return std::pair<ip::address, int>(dataAddr, dataPort);
+                    return std::pair<ip::address, u_int16_t>(dataAddr, dataPort);
                 return E2SARErrorc::ParameterNotAvailable;
             }
 
             /** get sync address and port */
-            inline const outcome::result<std::pair<ip::address, int>> get_syncAddr() const noexcept {
+            inline const outcome::result<std::pair<ip::address, u_int16_t>> get_syncAddr() const noexcept {
                 if (haveSync)
-                    return std::pair<ip::address, int>(syncAddr, syncPort);
+                    return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
                 return E2SARErrorc::ParameterNotAvailable;
             }
             /** implicit cast to string */
@@ -192,9 +215,9 @@ namespace e2sar {
     /**
      * Convert a string to a port number, checking range
     */
-    static inline const outcome::result<int> string_to_port(const std::string& port_string) {
+    static inline const outcome::result<u_int16_t> string_to_port(const std::string& port_string) {
         try {
-            int port = std::stoi(port_string);
+            u_int16_t port = std::stoi(port_string);
             if (port < 1024 || port > 65535) {
                 // port is out of range
                 return E2SARErrorc::OutOfRange;
@@ -208,13 +231,13 @@ namespace e2sar {
     /**
      * Convert a colon-separated tuple into ip address and port
     */
-    static inline const outcome::result<std::pair<ip::address, int>> string_tuple_to_ip_and_port(const std::string &t) {
+    static inline const outcome::result<std::pair<ip::address, u_int16_t>> string_tuple_to_ip_and_port(const std::string &t) {
         std::vector<std::string> ipPort;
 
         boost::algorithm::split(ipPort, t, boost::is_any_of(":"));
         if (ipPort.size() == 2) {
             outcome::result<ip::address> r1 = string_to_ip(ipPort[0]);
-            outcome::result<int> r2 = string_to_port(ipPort[1]);
+            outcome::result<u_int16_t> r2 = string_to_port(ipPort[1]);
             if (r1 && r2) 
                 return std::pair<ip::address, int> (r1.value(), r2.value());
             else
@@ -222,7 +245,7 @@ namespace e2sar {
         } else if (ipPort.size() == 1) {
             outcome::result<ip::address> r1 = string_to_ip(ipPort[0]);
             if (r1)
-                return std::pair<ip::address, int> (r1.value(), 0);
+                return std::pair<ip::address, u_int16_t> (r1.value(), 0);
             else 
                 return E2SARErrorc::ParameterError;
         }

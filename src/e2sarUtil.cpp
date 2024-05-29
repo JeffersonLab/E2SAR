@@ -41,6 +41,7 @@ namespace e2sar {
      */
     EjfatURI::EjfatURI(const std::string &uri) {
         rawURI = uri;
+        haveInstanceToken = false;
 
         // parse the URI
         boost::system::result<boost::url_view> r = boost::urls::parse_uri(rawURI);
@@ -55,13 +56,11 @@ namespace e2sar {
             throw E2SARException("Invalid EJFAT URL scheme: "s + std::string(u.scheme()) + " in URI"s + rawURI);
 
         if (u.userinfo().length() > 0) {
-            instanceToken = u.userinfo();
-            haveInstanceToken = true;
-        } else
-            haveInstanceToken = false;
+            adminToken = u.userinfo();
+        }
 
         outcome::result<ip::address> cpAddr_r = string_to_ip(u.host());
-        outcome::result<int> cpPort_r = string_to_port(u.port());
+        outcome::result<u_int16_t> cpPort_r = string_to_port(u.port());
 
         if (cpAddr_r && cpPort_r) {
             cpAddr = cpAddr_r.value();
@@ -79,7 +78,7 @@ namespace e2sar {
 
         // deal with the query portion 
         for (auto param: u.params()) {
-            outcome::result<std::pair<ip::address, int>> r = string_tuple_to_ip_and_port(param.value);
+            outcome::result<std::pair<ip::address, u_int16_t>> r = string_tuple_to_ip_and_port(param.value);
             if (r) {
                 std::pair<ip::address, int> p = r.value();
                 if (!param.key.compare("sync"s)) {
