@@ -86,6 +86,7 @@ Make sure Meson is installed (with Ninja backend). The build should work for bot
 Update `setup_compile_env.sh` file for your environment. Then run:
 
 ```
+$ . ./setup_compile_env.sh
 $ meson setup build
 $ cd build
 $ meson compile
