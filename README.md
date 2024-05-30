@@ -9,11 +9,21 @@ Documentation is contained in the [wiki](JeffersonLab/E2SAR/wiki).
 
 ### Via cloning
 
-All binary artifacts are stored using Git LFS (and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents).
+All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
-Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to get the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb). 
+Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to get the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb), then run `git submodule update` to get the code:
+```bash
+$ git clone git@github.com:JeffersonLab/E2SAR.git  # use -b if you want a specific branch
+$ cd E2SAR
+$ git submodule init
+$ git submodule update
+```
 
-If you want to update to the latest udplbd then also execute `git submodule update`. Note that you may need the correct branch of this project and as of this writing the is the `develop` branch and not `main`. You can do that by `cd udplbd && git fetch && get switch <branch>`.
+If you want to update to the latest udplbd then also execute `git submodule update`. Note that you may need the correct branch of this project and as of this writing the is the `develop` branch and not `main`. You can do that by:
+```bash
+$ cd udplbd 
+$ git fetch && get switch develop
+```
 
 ## Building the code
 

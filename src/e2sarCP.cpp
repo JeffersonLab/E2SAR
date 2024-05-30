@@ -3,15 +3,26 @@
 namespace e2sar 
 {
 
-outcome::result<int> LBManager::reserveLB(const std::string &lb_name, const TimeUntil &until) {
+outcome::result<int> LBManager::reserveLB(const std::string &lb_name, const TimeUntil &until, bool bearerToken) {
 
     ClientContext context;
     ReserveLoadBalancerRequest req;
     ReserveLoadBalancerReply *rep = nullptr;
 
+    if (bearerToken) {
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error()) 
+            // set bearer token in header
+            context.AddMetadata("Authorization", "Bearer "s + adminToken.value());
+        else
+            return E2SARErrorc::ParameterNotAvailable;
+    } else
+#if OLD_UDPLBD
+        req.set_token(_cpuri.get_AdminToken());
+#endif
+
     _cpuri.set_lbName(lb_name);
     req.set_name(lb_name);
-    req.set_token("token"s);
 
     // make the RPC call
     Status status = _stub->ReserveLoadBalancer(&context, req, rep);

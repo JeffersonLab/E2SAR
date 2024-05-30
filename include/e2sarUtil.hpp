@@ -22,8 +22,6 @@ namespace e2sar {
 
         private:
             std::string rawURI; 
-            /** Is there a valid instance token? */
-            bool haveInstanceToken;
             /** Is there a valid data addr & port? */
             bool haveData;
             /** Is there a valid sync addr & port? */
@@ -69,8 +67,24 @@ namespace e2sar {
             /** set instance token based on gRPC return */
             inline void set_InstanceToken(const std::string &t) {
                 instanceToken = t;
-                haveInstanceToken = true;
             }
+
+            /** get instance token */
+            inline outcome::result<std::string> get_InstanceToken() const {
+                if (!instanceToken.empty()) 
+                    return instanceToken;
+                else
+                    return E2SARErrorc::ParameterNotAvailable;
+            }
+
+            /** return the admin token */
+            inline outcome::result<std::string> get_AdminToken() const {
+                if (!adminToken.empty()) 
+                    return adminToken;
+                else
+                    return E2SARErrorc::ParameterNotAvailable;
+            }
+
             /** set LB name */
             inline void set_lbName(const std::string &n) {
                 lbName = n;
@@ -92,7 +106,7 @@ namespace e2sar {
                 dataPort = a.second;
                 haveData = true;
             }
-
+            
             /** get LB name */
             inline const std::string get_lbName() {
                 return lbName;

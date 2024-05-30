@@ -41,7 +41,6 @@ namespace e2sar {
      */
     EjfatURI::EjfatURI(const std::string &uri) {
         rawURI = uri;
-        haveInstanceToken = false;
 
         // parse the URI
         boost::system::result<boost::url_view> r = boost::urls::parse_uri(rawURI);
@@ -102,6 +101,6 @@ namespace e2sar {
             (haveSync ? " syncAddr: " + syncAddr.to_string() + ":" + std::to_string(syncPort) : "") +
             (haveData ? " dataAddr: " + dataAddr.to_string() + ":" + std::to_string(dataPort) : "") + 
             " lbName: " + lbName + " lbId: " + lbId + " adminToken: " + adminToken + 
-            (haveInstanceToken ? + " instanceToken: " + instanceToken : "");
+            " instanceToken: " + instanceToken;
     }
 }

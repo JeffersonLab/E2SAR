@@ -24,6 +24,10 @@ using loadbalancer::LoadBalancer;
 using loadbalancer::ReserveLoadBalancerRequest;
 using loadbalancer::ReserveLoadBalancerReply;
 
+// change to '1' to test older versions of UDPLBd
+#ifndef OLD_UDPLBD
+#define OLD_UDPLBD 0
+#endif
 
 /***
  * Control Plane definitions for E2SAR
@@ -48,28 +52,27 @@ namespace e2sar
         protected:
         public:
             /**
-             * Initialize manager without SSL
+             * Initialize manager. Default is with TLS/SSL and default client options. To enable
+             * custom SSL configuration with custom root certs, private key (for authN) and cert
+             * use makeSslOptions[FromFiles]() methods and pass the output to this constructor.
+             * @param cpuri an EjfatURI object parsed from configuration data
+             * @param tlsOn a boolean flag (default true)
+             * @param opts a grpc::SslCredentialsOptions object (default object with no parameters)
             */
-            LBManager(const EjfatURI &cpuri): _cpuri(cpuri), _state_reserved(false) {
-                auto cp_addr_r = cpuri.get_cpAddr();
-                if (cp_addr_r.has_error())
-                    throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
-                auto cp_addr_v = cp_addr_r.value();
-                std::string addr_string{cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second)};
-                _channel = grpc::CreateChannel(addr_string, grpc::InsecureChannelCredentials());
-                _stub = LoadBalancer::NewStub(_channel);
-            }
+            LBManager(const EjfatURI &cpuri, 
+                bool tlsOn = true, 
+                grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()): _cpuri(cpuri), _state_reserved(false) {
 
-            /**
-             * Initialize manager with SSL configuration (obtained via makeSslOptions().value() helper method)
-            */
-            LBManager(const EjfatURI &cpuri, grpc::SslCredentialsOptions opts): _cpuri(cpuri), _state_reserved(false) {
                 auto cp_addr_r = cpuri.get_cpAddr();
                 if (cp_addr_r.has_error())
                     throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
                 auto cp_addr_v = cp_addr_r.value();
-                std::string addr_string{cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second)};
-                _channel = grpc::CreateChannel(addr_string, grpc::SslCredentials(opts));
+                auto addr_string{cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second)};
+                if (tlsOn) {
+                    _channel = grpc::CreateChannel(addr_string, grpc::SslCredentials(opts));
+                } else {
+                    _channel = grpc::CreateChannel(addr_string, grpc::InsecureChannelCredentials());
+                }
                 _stub = LoadBalancer::NewStub(_channel);
             }
 
@@ -79,8 +82,16 @@ namespace e2sar
             inline bool isReserved() const {
                 return _state_reserved;
             }
-            // Reserve a new Load Balancer
-            outcome::result<int> reserveLB(const std::string &lb_name, const TimeUntil &until);
+            /**
+             * Reserve a new load balancer with this name until specified time
+             * 
+             * @param lb_name LB name internal to you
+             * @param until time until it's needed
+             * @param bearerToken use bearer token rather than putting admin token into the body (default true)
+             * 
+             * @return outcome which is either an error or a 0(==E2SARErrorc::NoError)
+            */
+            outcome::result<int> reserveLB(const std::string &lb_name, const TimeUntil &until, bool bearerToken = true);
             // get load balancer info (same returns as reserverLB)
             int getLB();
             // get load balancer status
@@ -97,13 +108,13 @@ namespace e2sar
             int probeStats();
 
             /**
-             * Generate gRPC-compliant SSL Options object with the following parameters, 
+             * Generate gRPC-compliant custom SSL Options object with the following parameters, 
              * where any parameter can be empty. Uses std::move to avoid copies.
              * @param pem_root_certs    The buffer containing the PEM encoding of the server root certificates.
              * @param pem_private_key   The buffer containing the PEM encoding of the client's private key.
              * @param pem_cert_chain    The buffer containing the PEM encoding of the client's certificate chain.
              * 
-             * @return grpc::SslCredentialsOptions object with parameters filled in
+             * @return outcome for grpc::SslCredentialsOptions object with parameters filled in
             */
             static inline outcome::result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
                                             const std::string &pem_private_key,
@@ -112,13 +123,13 @@ namespace e2sar
             }
 
             /**
-             * Generate gRPC-compliant SSL Options object with the following parameters, 
+             * Generate gRPC-compliant custom SSL Options object with the following parameters, 
              * where any parameter can be empty
              * @param pem_root_certs    The file name containing the PEM encoding of the server root certificates.
              * @param pem_private_key   The file name containing the PEM encoding of the client's private key.
              * @param pem_cert_chain    The file name containing the PEM encoding of the client's certificate chain.
              * 
-             * @return grpc::SslCredentialsOptions object with parameters filled in
+             * @return outcome for grpc::SslCredentialsOptions object with parameters filled in
             */
             static outcome::result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
                                             std::string_view pem_root_certs,
