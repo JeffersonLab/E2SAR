@@ -7,9 +7,15 @@ boosttest = executable('boost_test', 'boost_test.cpp',
                        include_directories: inc,
                        dependencies: [boost_dep, thread_dep])
 
-e2sarboosttest = executable('e2sar_boost_test', 'e2sar_boost_test.cpp',
+e2sar_uri_test = executable('e2sar_uri_test', 'e2sar_uri_test.cpp',
+                            include_directories: inc,
+                            link_with: libe2sar,
+                            dependencies: [boost_dep, grpc_dep])
+
+e2sar_lbcp_test = executable('e2sar_lbcp_test', 'e2sar_lbcp_test.cpp',
                             include_directories: inc,
                             link_with: libe2sar,
                             dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
 
-test('BasicTests', e2sarboosttest)
+test('URITests', e2sar_uri_test)
+test('LBCPTests', e2sar_lbcp_test)
