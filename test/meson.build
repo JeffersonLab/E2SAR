@@ -17,5 +17,5 @@ e2sar_lbcp_test = executable('e2sar_lbcp_test', 'e2sar_lbcp_test.cpp',
                             link_with: libe2sar,
                             dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
 
-test('URITests', e2sar_uri_test)
-test('LBCPTests', e2sar_lbcp_test)
+test('URITests', e2sar_uri_test, suite: 'unit')
+test('LBCPTests', e2sar_lbcp_test, suite: 'unit')
