@@ -31,7 +31,7 @@ using loadbalancer::ReserveLoadBalancerReply;
 
 namespace e2sar
 {
-    /*
+    /**
     The LBManager knows how to speak to load balancer control plane over gRPC.
     It can be run from Segmenter, Reassembler or a third party like the
     workflow manager.
@@ -61,7 +61,7 @@ namespace e2sar
             }
 
             /**
-             * Initialize manager with SSL configuration
+             * Initialize manager with SSL configuration (obtained via makeSslOptions().value() helper method)
             */
             LBManager(const EjfatURI &cpuri, grpc::SslCredentialsOptions opts): _cpuri(cpuri), _state_reserved(false) {
                 auto cp_addr_r = cpuri.get_cpAddr();
@@ -98,18 +98,32 @@ namespace e2sar
 
             /**
              * Generate gRPC-compliant SSL Options object with the following parameters, 
-             * where any parameter can be empty
+             * where any parameter can be empty. Uses std::move to avoid copies.
              * @param pem_root_certs    The buffer containing the PEM encoding of the server root certificates.
              * @param pem_private_key   The buffer containing the PEM encoding of the client's private key.
              * @param pem_cert_chain    The buffer containing the PEM encoding of the client's certificate chain.
              * 
              * @return grpc::SslCredentialsOptions object with parameters filled in
             */
-            static inline grpc::SslCredentialsOptions getSslOptions(const std::string &pem_root_certs,
+            static inline outcome::result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
                                             const std::string &pem_private_key,
                                             const std::string &pem_cert_chain) {
-                return grpc::SslCredentialsOptions{pem_root_certs, pem_private_key, pem_cert_chain};
+                return grpc::SslCredentialsOptions{std::move(pem_root_certs), std::move(pem_private_key), std::move(pem_cert_chain)};
             }
+
+            /**
+             * Generate gRPC-compliant SSL Options object with the following parameters, 
+             * where any parameter can be empty
+             * @param pem_root_certs    The file name containing the PEM encoding of the server root certificates.
+             * @param pem_private_key   The file name containing the PEM encoding of the client's private key.
+             * @param pem_cert_chain    The file name containing the PEM encoding of the client's certificate chain.
+             * 
+             * @return grpc::SslCredentialsOptions object with parameters filled in
+            */
+            static outcome::result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
+                                            std::string_view pem_root_certs,
+                                            std::string_view pem_private_key,
+                                            std::string_view pem_cert_chain);
     };
 
     /*
