@@ -11,7 +11,7 @@ Documentation is contained in the [wiki](JeffersonLab/E2SAR/wiki).
 
 All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
-Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to get the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb), then run `git submodule update` to get the code:
+Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to initialize the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb), then run `git submodule update` to get the code:
 ```bash
 $ git clone git@github.com:JeffersonLab/E2SAR.git  # use -b if you want a specific branch
 $ cd E2SAR

@@ -8,7 +8,6 @@
 
 namespace e2sar {
 
-
     /**
      * <p>
      * This is a method to parse a URI which was obtained with the reservation
@@ -97,10 +96,16 @@ namespace e2sar {
 
     /** implicit conversion operator */
     EjfatURI::operator std::string() const {
-        return "uri: " + rawURI + " cpAdddr: " + cpAddr.to_string() + ":" + std::to_string(cpPort) +
-            (haveSync ? " syncAddr: " + syncAddr.to_string() + ":" + std::to_string(syncPort) : "") +
-            (haveData ? " dataAddr: " + dataAddr.to_string() + ":" + std::to_string(dataPort) : "") + 
-            " lbName: " + lbName + " lbId: " + lbId + " adminToken: " + adminToken + 
-            " instanceToken: " + instanceToken;
+        std::string token;
+        // prefer instance token to admin token for printing out
+        if (!adminToken.empty())
+            token = adminToken;
+        if (!instanceToken.empty())
+            token = instanceToken;
+        
+        return "ejfat://" + (!token.empty() ? token + "@"s: ""s) + 
+            cpAddr.to_string() + ":"s + std::to_string(cpPort) + "/lb/"s + lbId + "?"s + 
+            (haveSync ? "sync="s + syncAddr.to_string() + ":"s + std::to_string(syncPort) + "&"s : ""s) +
+            (haveData ? "data="s + dataAddr.to_string() + ":"s + std::to_string(dataPort) : ""s);
     }
 }

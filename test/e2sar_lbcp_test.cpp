@@ -10,6 +10,8 @@
 
 using namespace e2sar;
 
+std::string uri_string1{"ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20"};
+
 BOOST_AUTO_TEST_SUITE(E2SARTestSuite)
 
 BOOST_AUTO_TEST_CASE(LBMTest1) {
@@ -55,5 +57,12 @@ BOOST_AUTO_TEST_CASE(LBMTest2) {
     std::filesystem::remove(rootn);
     std::filesystem::remove(privn);
     std::filesystem::remove(certn);
+}
+
+BOOST_AUTO_TEST_CASE(LBMTest3) {
+
+    EjfatURI uri(uri_string1);
+
+    LBManager lbm(uri);
 }
 BOOST_AUTO_TEST_SUITE_END()

@@ -25,8 +25,8 @@ using loadbalancer::ReserveLoadBalancerRequest;
 using loadbalancer::ReserveLoadBalancerReply;
 
 // change to '1' to test older versions of UDPLBd
-#ifndef OLD_UDPLBD
-#define OLD_UDPLBD 0
+#ifndef TOKEN_IN_BODY
+#define TOKEN_IN_BODY 0
 #endif
 
 /***
@@ -89,7 +89,9 @@ namespace e2sar
              * @param until time until it's needed
              * @param bearerToken use bearer token rather than putting admin token into the body (default true)
              * 
-             * @return outcome which is either an error or a 0(==E2SARErrorc::NoError)
+             * @return outcome which is either an error or a 0(==E2SARErrorc::NoError); 
+             * RPCError - if unable to connect to the UDPLBd server; 
+             * ParameterNotAvailable - if admin token or other parameters not available
             */
             outcome::result<int> reserveLB(const std::string &lb_name, const TimeUntil &until, bool bearerToken = true);
             // get load balancer info (same returns as reserverLB)

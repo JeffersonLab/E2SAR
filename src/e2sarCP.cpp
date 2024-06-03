@@ -17,7 +17,7 @@ outcome::result<int> LBManager::reserveLB(const std::string &lb_name, const Time
         else
             return E2SARErrorc::ParameterNotAvailable;
     } else
-#if OLD_UDPLBD
+#if TOKEN_IN_BODY
         req.set_token(_cpuri.get_AdminToken());
 #endif
 
@@ -62,7 +62,7 @@ outcome::result<int> LBManager::reserveLB(const std::string &lb_name, const Time
         _cpuri.set_dataAddr(a);
     }    
 
-    return E2SARErrorc::NoError;
+    return 0;
 }
 
 /**
