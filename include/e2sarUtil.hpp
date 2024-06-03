@@ -70,7 +70,7 @@ namespace e2sar {
             }
 
             /** get instance token */
-            inline outcome::result<std::string> get_InstanceToken() const {
+            inline const outcome::result<std::string> get_InstanceToken() const {
                 if (!instanceToken.empty()) 
                     return instanceToken;
                 else
@@ -78,7 +78,7 @@ namespace e2sar {
             }
 
             /** return the admin token */
-            inline outcome::result<std::string> get_AdminToken() const {
+            inline const outcome::result<std::string> get_AdminToken() const {
                 if (!adminToken.empty()) 
                     return adminToken;
                 else
@@ -95,13 +95,13 @@ namespace e2sar {
                 lbId = i;
             }
 
-            inline void set_syncAddr(std::pair<ip::address, u_int16_t> &a) {
+            inline void set_syncAddr(const std::pair<ip::address, u_int16_t> &a) {
                 syncAddr = a.first;
                 syncPort = a.second;
                 haveSync = true;
             }
 
-            inline void set_dataAddr(std::pair<ip::address, u_int16_t> &a) {
+            inline void set_dataAddr(const std::pair<ip::address, u_int16_t> &a) {
                 dataAddr = a.first;
                 dataPort = a.second;
                 haveData = true;

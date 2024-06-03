@@ -24,7 +24,9 @@ using loadbalancer::LoadBalancer;
 using loadbalancer::ReserveLoadBalancerRequest;
 using loadbalancer::ReserveLoadBalancerReply;
 
-// change to '1' to test older versions of UDPLBd
+// change to '1' to test older versions of UDPLBd where token
+// was sent as a parameter in the body. The new way is to send
+// it in the authorization header as bearer token
 #ifndef TOKEN_IN_BODY
 #define TOKEN_IN_BODY 0
 #endif

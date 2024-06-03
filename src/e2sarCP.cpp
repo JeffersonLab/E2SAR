@@ -16,10 +16,11 @@ outcome::result<int> LBManager::reserveLB(const std::string &lb_name, const Time
             context.AddMetadata("Authorization", "Bearer "s + adminToken.value());
         else
             return E2SARErrorc::ParameterNotAvailable;
-    } else
+    } else {
 #if TOKEN_IN_BODY
         req.set_token(_cpuri.get_AdminToken());
 #endif
+    }
 
     _cpuri.set_lbName(lb_name);
     req.set_name(lb_name);
