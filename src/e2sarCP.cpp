@@ -48,7 +48,7 @@ namespace e2sar
         // add sender IP addresses, but check they are valid
         for(auto s: senders) {
             try {
-                auto s_ip = ip::make_address(s);
+                ip::make_address(s);
             } catch (...) {
                 return E2SARErrorc::ParameterError;
             }
@@ -58,8 +58,10 @@ namespace e2sar
         // make the RPC call
         Status status = _stub->ReserveLoadBalancer(&context, req, &rep);
 
-        if (!status.ok())
+        if (!status.ok()) {
+            std::cout << status.error_code() << ": " << status.error_message() << std::endl;
             return E2SARErrorc::RPCError;
+        }
 
         if (!rep.token().empty())
             _cpuri.set_InstanceToken(rep.token());
