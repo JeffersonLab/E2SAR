@@ -12,7 +12,7 @@ namespace e2sar
 
         ClientContext context;
         ReserveLoadBalancerRequest req;
-        ReserveLoadBalancerReply *rep = nullptr;
+        ReserveLoadBalancerReply rep;
 
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
@@ -56,40 +56,40 @@ namespace e2sar
         }
 
         // make the RPC call
-        Status status = _stub->ReserveLoadBalancer(&context, req, rep);
+        Status status = _stub->ReserveLoadBalancer(&context, req, &rep);
 
         if (!status.ok())
             return E2SARErrorc::RPCError;
 
-        if (!rep->token().empty())
-            _cpuri.set_InstanceToken(rep->token());
+        if (!rep.token().empty())
+            _cpuri.set_InstanceToken(rep.token());
 
-        if (!rep->lbid().empty())
-            _cpuri.set_lbId(rep->lbid());
+        if (!rep.lbid().empty())
+            _cpuri.set_lbId(rep.lbid());
 
-        if (!rep->syncipaddress().empty())
+        if (!rep.syncipaddress().empty())
         {
             /** protobuf definition uses u_int32 */
-            u_int16_t short_port = rep->syncudpport();
-            auto o = string_to_ip(rep->syncipaddress());
+            u_int16_t short_port = rep.syncudpport();
+            auto o = string_to_ip(rep.syncipaddress());
             if (o.has_error())
                 return o.error();
             std::pair<ip::address, u_int16_t> a(o.value(), short_port);
             _cpuri.set_syncAddr(a);
         }
 
-        if (!rep->dataipv4address().empty())
+        if (!rep.dataipv4address().empty())
         {
-            auto o = string_to_ip(rep->dataipv4address());
+            auto o = string_to_ip(rep.dataipv4address());
             if (o.has_error())
                 return o.error();
             std::pair<ip::address, u_int16_t> a(o.value(), DATAPLANE_PORT);
             _cpuri.set_dataAddr(a);
         }
 
-        if (!rep->dataipv6address().empty())
+        if (!rep.dataipv6address().empty())
         {
-            auto o = string_to_ip(rep->dataipv6address());
+            auto o = string_to_ip(rep.dataipv6address());
             if (o.has_error())
                 return o.error();
             std::pair<ip::address, u_int16_t> a(o.value(), DATAPLANE_PORT);
