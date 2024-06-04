@@ -23,6 +23,11 @@ outcome::result<EjfatURI> reserveLB(const std::string &lbname, const std::vector
 
     std::cout << "Will attempt a connection to control plane on " << uri.get_cpAddr().value().first << (uri.get_useTls() ? " using TLS"s : " without using TLS"s) << std::endl;
 
+    std::cout << "Sender list is " << std::endl;
+    for (auto s: senders) {
+        std::cout << " " << s << std::endl;
+    }
+
     // create LBManager
     auto lbman = LBManager(uri);
 
@@ -47,7 +52,7 @@ int main(int argc, char **argv)
 
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("command,c", po::value<std::string>(), "specify command");
-    opts("senders,s", po::value<std::string>()->multitoken(), "list of sender IPv4/6 addresses");
+    opts("senders,s", po::value<std::vector<std::string>>()->multitoken(), "list of sender IPv4/6 addresses");
 
     po::variables_map vm;
 
