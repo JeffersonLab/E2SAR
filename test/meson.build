@@ -10,7 +10,7 @@ boosttest = executable('boost_test', 'boost_test.cpp',
 e2sar_uri_test = executable('e2sar_uri_test', 'e2sar_uri_test.cpp',
                             include_directories: inc,
                             link_with: libe2sar,
-                            dependencies: [boost_dep, grpc_dep])
+                            dependencies: [boost_dep, grpc_dep, protobuf_dep])
 
 e2sar_lbcp_test = executable('e2sar_lbcp_test', 'e2sar_lbcp_test.cpp',
                             include_directories: inc,
