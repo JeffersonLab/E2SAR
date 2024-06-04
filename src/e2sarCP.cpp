@@ -6,7 +6,7 @@ using namespace boost::posix_time;
 namespace e2sar
 {
     outcome::result<int> LBManager::reserveLB(const std::string &lb_name,
-                                              TimeUntil *until,
+                                              const TimeUntil &until,
                                               const std::vector<std::string> &senders)
     {
 
@@ -31,25 +31,17 @@ namespace e2sar
         _cpuri.set_lbName(lb_name);
         req.set_name(lb_name);
 
-        if (until != nullptr)
-        {
-            req.set_allocated_until(until);
-        }
-        else
-        {
-            // if until is null, set until to now + 24 hours
-            auto pt = second_clock::local_time();
-            auto td = hours(DEFAULT_LB_RESERVE_DURATION);
-            ptime pt1 = pt + td;
-            auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
-            req.set_allocated_until(&ts1);
-        }
+        req.mutable_until()->CopyFrom(until);
 
         // add sender IP addresses, but check they are valid
-        for(auto s: senders) {
-            try {
+        for (auto s : senders)
+        {
+            try
+            {
                 ip::make_address(s);
-            } catch (...) {
+            }
+            catch (...)
+            {
                 return E2SARErrorc::ParameterError;
             }
             req.add_senderaddresses(s);
@@ -58,7 +50,8 @@ namespace e2sar
         // make the RPC call
         Status status = _stub->ReserveLoadBalancer(&context, req, &rep);
 
-        if (!status.ok()) {
+        if (!status.ok())
+        {
             std::cout << status.error_code() << ": " << status.error_message() << std::endl;
             return E2SARErrorc::RPCError;
         }
@@ -109,7 +102,7 @@ namespace e2sar
         auto pt = second_clock::local_time();
         auto pt1 = pt + duration;
         auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
-        return reserveLB(lb_name, &ts1, senders);
+        return reserveLB(lb_name, ts1, senders);
     }
 
     /**

@@ -105,13 +105,13 @@ namespace e2sar
          *
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
-         * Null pointer indicates default duration of 24 hours from now.
          *
          * @return outcome which is either an error or a 0;
          * RPCError - if unable to connect to the UDPLBd server;
          * ParameterNotAvailable - if admin token or other parameters not available
          */
-        outcome::result<int> reserveLB(const std::string &lb_name, TimeUntil *until,
+        outcome::result<int> reserveLB(const std::string &lb_name,
+                                       const TimeUntil &until,
                                        const std::vector<std::string> &senders);
 
         /**
