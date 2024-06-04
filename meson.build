@@ -42,6 +42,7 @@ lb_proto = lb_proto_dir + '/loadbalancer.proto'
 subdir('include')
 subdir('src')
 subdir('test')
+subdir('bin')
 
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(libraries : libe2sar,

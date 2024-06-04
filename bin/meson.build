@@ -1,0 +1,1 @@
+executable('lbadm', 'lbadm.cpp', dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])

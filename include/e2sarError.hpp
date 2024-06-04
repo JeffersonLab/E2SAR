@@ -75,7 +75,7 @@ namespace detail {
         case e2sar::E2SARErrorc::ParameterError:
             return "parameter error";
         case e2sar::E2SARErrorc::ParameterNotAvailable:
-            return "parameter note available";
+            return "parameter not available";
         case e2sar::E2SARErrorc::OutOfRange:
             return "value out of range";
         case e2sar::E2SARErrorc::Undefined:

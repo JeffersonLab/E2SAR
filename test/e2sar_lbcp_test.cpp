@@ -14,25 +14,27 @@ std::string uri_string1{"ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.
 
 BOOST_AUTO_TEST_SUITE(E2SARTestSuite)
 
-BOOST_AUTO_TEST_CASE(LBMTest1) {
+BOOST_AUTO_TEST_CASE(LBMTest1)
+{
     // test generating ssl options
 
     std::string root{"root cert"}, priv{"priv key"}, cert{"cert chain"};
 
-    std::cout<< root << "|" << priv << "|" << cert << std::endl;
+    std::cout << root << "|" << priv << "|" << cert << std::endl;
 
     outcome::result<grpc::SslCredentialsOptions> opts{LBManager::makeSslOptions(root, priv, cert)};
 
     BOOST_TEST(!opts.has_error());
 
-    std::cout<< root << "|" << priv << "|" << cert << std::endl;
+    std::cout << root << "|" << priv << "|" << cert << std::endl;
 
     BOOST_TEST(opts.value().pem_root_certs == "root cert"s);
     BOOST_TEST(opts.value().pem_private_key == "priv key"s);
     BOOST_TEST(opts.value().pem_cert_chain == "cert chain"s);
 }
 
-BOOST_AUTO_TEST_CASE(LBMTest2) {
+BOOST_AUTO_TEST_CASE(LBMTest2)
+{
 
     std::string rootn{"/tmp/root.pem"};
     std::ofstream rootf{rootn};
@@ -59,7 +61,8 @@ BOOST_AUTO_TEST_CASE(LBMTest2) {
     std::filesystem::remove(certn);
 }
 
-BOOST_AUTO_TEST_CASE(LBMTest3) {
+BOOST_AUTO_TEST_CASE(LBMTest3)
+{
 
     EjfatURI uri(uri_string1);
 

@@ -13,174 +13,220 @@ using namespace std::string_literals;
 
 /***
  * Supporting classes for E2SAR
-*/
-namespace e2sar {
+ */
+namespace e2sar
+{
     const u_int16_t DATAPLANE_PORT = 19522;
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). */
-    class EjfatURI {
+    class EjfatURI
+    {
 
-        private:
-            std::string rawURI; 
-            /** Is there a valid data addr & port? */
-            bool haveData;
-            /** Is there a valid sync addr & port? */
-            bool haveSync;
+    private:
+        std::string rawURI;
+        /** Is there a valid data addr & port? */
+        bool haveData;
+        /** Is there a valid sync addr & port? */
+        bool haveSync;
+        /** Use TLS */
+        bool useTls;
 
-            /** UDP port to send events (data) to. */
-            uint16_t dataPort;
-            /** UDP port for event sender to send sync messages to. */
-            uint16_t syncPort;
-            /** TCP port for grpc communications with CP. */
-            uint16_t cpPort;
+        /** UDP port to send events (data) to. */
+        uint16_t dataPort;
+        /** UDP port for event sender to send sync messages to. */
+        uint16_t syncPort;
+        /** TCP port for grpc communications with CP. */
+        uint16_t cpPort;
 
-            /** String given by user, during registration, to label an LB instance. */
-            std::string lbName;
-            /** String identifier of an LB instance, set by the CP on an LB reservation. */
-            std::string lbId;
-            /** Admin token for the CP being used. Set from URI string*/
-            std::string adminToken;
-            /** Instance token set by the CP on an LB reservation. */
-            std::string instanceToken;
+        /** String given by user, during registration, to label an LB instance. */
+        std::string lbName;
+        /** String identifier of an LB instance, set by the CP on an LB reservation. */
+        std::string lbId;
+        /** Admin token for the CP being used. Set from URI string*/
+        std::string adminToken;
+        /** Instance token set by the CP on an LB reservation. */
+        std::string instanceToken;
 
-            /**
-             * Note we make no distinction between IPv4 or IPv6 as it is represented by
-             * boost's ip::address which can do either and can also be asked if it is
-             * IPv4 or IPv6 using is_v4() or is_v6() methods. Initialization from string
-             * 'does the right thing' depending on the address.
-            */
-            /** address to send events (data) to (v4 or v6). */
-            ip::address dataAddr;
-            /** address to send sync messages to. Not used, for future expansion. (v4 or v6)*/
-            ip::address syncAddr;
-            /** IP address for grpc communication with CP. */
-            ip::address cpAddr;
-        
-        public:
-            /** base constructor, sets instance token from string */
-            EjfatURI(const std::string& uri);
-            /** rely on implicitly-declared copy constructor as needed */
+        /**
+         * Note we make no distinction between IPv4 or IPv6 as it is represented by
+         * boost's ip::address which can do either and can also be asked if it is
+         * IPv4 or IPv6 using is_v4() or is_v6() methods. Initialization from string
+         * 'does the right thing' depending on the address.
+         */
+        /** address to send events (data) to (v4 or v6). */
+        ip::address dataAddr;
+        /** address to send sync messages to. Not used, for future expansion. (v4 or v6)*/
+        ip::address syncAddr;
+        /** IP address (and host if available) for grpc communication with CP. */
+        ip::address cpAddr;
+        std::string cpHost;
 
-            /** destructor */
-            ~EjfatURI() {}
+    public:
+        /** base constructor, sets instance token from string */
+        EjfatURI(const std::string &uri);
+        /** rely on implicitly-declared copy constructor as needed */
 
-            /** set instance token based on gRPC return */
-            inline void set_InstanceToken(const std::string &t) {
-                instanceToken = t;
-            }
+        /** destructor */
+        ~EjfatURI() {}
 
-            /** get instance token */
-            inline const outcome::result<std::string> get_InstanceToken() const {
-                if (!instanceToken.empty()) 
-                    return instanceToken;
-                else
-                    return E2SARErrorc::ParameterNotAvailable;
-            }
+        /** check if TLS should be used */
+        inline bool get_useTls() const
+        {
+            return useTls;
+        }
 
-            /** return the admin token */
-            inline const outcome::result<std::string> get_AdminToken() const {
-                if (!adminToken.empty()) 
-                    return adminToken;
-                else
-                    return E2SARErrorc::ParameterNotAvailable;
-            }
+        /** set instance token based on gRPC return */
+        inline void set_InstanceToken(const std::string &t)
+        {
+            instanceToken = t;
+        }
 
-            /** set LB name */
-            inline void set_lbName(const std::string &n) {
-                lbName = n;
-            }
-
-            /** set LB Id */
-            inline void set_lbId(const std::string &i) {
-                lbId = i;
-            }
-
-            inline void set_syncAddr(const std::pair<ip::address, u_int16_t> &a) {
-                syncAddr = a.first;
-                syncPort = a.second;
-                haveSync = true;
-            }
-
-            inline void set_dataAddr(const std::pair<ip::address, u_int16_t> &a) {
-                dataAddr = a.first;
-                dataPort = a.second;
-                haveData = true;
-            }
-            
-            /** get LB name */
-            inline const std::string get_lbName() {
-                return lbName;
-            }
-
-            /** get LB ID */
-            inline const std::string get_lbId() {
-                return lbId;
-            }
-
-            /** get control plane ip address and port */ 
-            inline const outcome::result<std::pair<ip::address, u_int16_t>> get_cpAddr() const {
-                return std::pair<ip::address, u_int16_t>(cpAddr, cpPort);
-            }
-
-            /** does the URI contain a dataplane address? */
-            inline const bool has_dataAddr() const {
-                return haveData;
-            }
-
-            /** does the URI contain a sync address */
-            inline const bool has_syncAddr() const {
-                return haveSync;
-            }
-
-            /** get data plane address and port */ 
-            inline const outcome::result<std::pair<ip::address, u_int16_t>> get_dataAddr() const noexcept {
-                if (haveData) 
-                    return std::pair<ip::address, u_int16_t>(dataAddr, dataPort);
+        /** get instance token */
+        inline const outcome::result<std::string> get_InstanceToken() const
+        {
+            if (!instanceToken.empty())
+                return instanceToken;
+            else
                 return E2SARErrorc::ParameterNotAvailable;
-            }
+        }
 
-            /** get sync address and port */
-            inline const outcome::result<std::pair<ip::address, u_int16_t>> get_syncAddr() const noexcept {
-                if (haveSync)
-                    return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
+        /** return the admin token */
+        inline const outcome::result<std::string> get_AdminToken() const
+        {
+            if (!adminToken.empty())
+                return adminToken;
+            else
                 return E2SARErrorc::ParameterNotAvailable;
-            }
-            /** implicit cast to string */
-            operator std::string() const;
+        }
 
-            /** from environment variable or file */
-            static inline outcome::result<EjfatURI> getFromEnv(const std::string& envVar = "EJFAT_URI"s) noexcept {
-                const char *envStr = std::getenv(envVar.c_str());
-                if (envStr != nullptr) {
-                    try {
-                        return EjfatURI(envStr);
-                    } catch (const E2SARException &e) {
-                        return E2SARErrorc::CaughtException;
-                    }
+        /** set LB name */
+        inline void set_lbName(const std::string &n)
+        {
+            lbName = n;
+        }
+
+        /** set LB Id */
+        inline void set_lbId(const std::string &i)
+        {
+            lbId = i;
+        }
+
+        inline void set_syncAddr(const std::pair<ip::address, u_int16_t> &a)
+        {
+            syncAddr = a.first;
+            syncPort = a.second;
+            haveSync = true;
+        }
+
+        inline void set_dataAddr(const std::pair<ip::address, u_int16_t> &a)
+        {
+            dataAddr = a.first;
+            dataPort = a.second;
+            haveData = true;
+        }
+
+        /** get LB name */
+        inline const std::string get_lbName()
+        {
+            return lbName;
+        }
+
+        /** get LB ID */
+        inline const std::string get_lbId()
+        {
+            return lbId;
+        }
+
+        /** get control plane ip address and port */
+        inline const outcome::result<std::pair<ip::address, u_int16_t>> get_cpAddr() const
+        {
+            return std::pair<ip::address, u_int16_t>(cpAddr, cpPort);
+        }
+
+        /** get control plan hostname and port */
+        inline const outcome::result<std::pair<std::string, u_int16_t>> get_cpHost() const
+        {
+            if (!cpHost.empty())
+                return std::pair<std::string, u_int16_t>(cpHost, cpPort);
+            else
+                return E2SARErrorc::ParameterNotAvailable;
+        }
+
+        /** does the URI contain a dataplane address? */
+        inline const bool has_dataAddr() const
+        {
+            return haveData;
+        }
+
+        /** does the URI contain a sync address */
+        inline const bool has_syncAddr() const
+        {
+            return haveSync;
+        }
+
+        /** get data plane address and port */
+        inline const outcome::result<std::pair<ip::address, u_int16_t>> get_dataAddr() const noexcept
+        {
+            if (haveData)
+                return std::pair<ip::address, u_int16_t>(dataAddr, dataPort);
+            return E2SARErrorc::ParameterNotAvailable;
+        }
+
+        /** get sync address and port */
+        inline const outcome::result<std::pair<ip::address, u_int16_t>> get_syncAddr() const noexcept
+        {
+            if (haveSync)
+                return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
+            return E2SARErrorc::ParameterNotAvailable;
+        }
+        /** implicit cast to string */
+        operator std::string() const;
+
+        /** from environment variable or file */
+        static inline outcome::result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
+        {
+            const char *envStr = std::getenv(envVar.c_str());
+            if (envStr != nullptr)
+            {
+                try
+                {
+                    return EjfatURI(envStr);
                 }
-                return E2SARErrorc::Undefined;
+                catch (const E2SARException &e)
+                {
+                    return E2SARErrorc::CaughtException;
+                }
             }
+            return E2SARErrorc::Undefined;
+        }
 
-            /** from a file */
-            static inline outcome::result<EjfatURI> getFromFile(const std::string& fileName = "/tmp/ejfat_uri"s) noexcept {
-                if (!fileName.empty()) {
-                    std::ifstream file(fileName);
-                    if (file.is_open()) {
-                        std::string uriLine;
-                        if (std::getline(file, uriLine)) {
-                            file.close();
-                            try {
-                                return EjfatURI(uriLine);
-                            } catch (const E2SARException &e) {
-                                return E2SARErrorc::CaughtException;
-                            }
-                        }
+        /** from a file */
+        static inline outcome::result<EjfatURI> getFromFile(const std::string &fileName = "/tmp/ejfat_uri"s) noexcept
+        {
+            if (!fileName.empty())
+            {
+                std::ifstream file(fileName);
+                if (file.is_open())
+                {
+                    std::string uriLine;
+                    if (std::getline(file, uriLine))
+                    {
                         file.close();
-                        return E2SARErrorc::Undefined;
+                        try
+                        {
+                            return EjfatURI(uriLine);
+                        }
+                        catch (const E2SARException &e)
+                        {
+                            return E2SARErrorc::CaughtException;
+                        }
                     }
+                    file.close();
+                    return E2SARErrorc::Undefined;
                 }
-                return E2SARErrorc::NotFound;
             }
+            return E2SARErrorc::NotFound;
+        }
     };
 
     /**
@@ -190,24 +236,28 @@ namespace e2sar {
      * @param sourceCount max # of data sources backend will see.
      * @return corressponding PortRange.
      */
-    static inline int getPortRange(int sourceCount) noexcept {
+    static inline int getPortRange(int sourceCount) noexcept
+    {
 
         // Based on the proto file enum for the load balancer, seen below,
         // map the max # of sources a backend will see to the PortRange value.
         // This is necessay to provide the control plane when registering.
 
         // Handle edge cases
-        if (sourceCount < 2) {
+        if (sourceCount < 2)
+        {
             return 0;
         }
-        else if (sourceCount > 16384) {
+        else if (sourceCount > 16384)
+        {
             return 14;
         }
 
-        int maxCount  = 2;
+        int maxCount = 2;
         int iteration = 1;
 
-        while (sourceCount > maxCount) {
+        while (sourceCount > maxCount)
+        {
             iteration++;
             maxCount >>= 1;
         }
@@ -217,54 +267,79 @@ namespace e2sar {
 
     /**
      * Convert a string into an IPv4 or v6 address throwing E2SARException if a problem is encountered
-    */
-    static inline const outcome::result<ip::address> string_to_ip(const std::string& addr) noexcept {
-        try {
-            return ip::make_address(addr);
-        } catch (boost::system::system_error &e) {
+     */
+    static inline const outcome::result<ip::address> string_to_ip(const std::string &addr) noexcept
+    {
+        try
+        {
+            if (addr[0] == '[')
+            {
+                // strip '[]' from IPv6
+                std::cout << "Stripping brackets " << addr.substr(1, addr.length() - 2) << std::endl;
+                try
+                {
+                    ip::make_address(addr.substr(1, addr.length() - 2));
+                }
+                catch (...)
+                {
+                    std::cout << "Unable to convert to IP address" << std::endl;
+                }
+                return ip::make_address(addr.substr(1, addr.length() - 2));
+            }
+            else
+                return ip::make_address(addr);
+        }
+        catch (boost::system::system_error &e)
+        {
             return E2SARErrorc::ParameterError;
         }
     }
 
     /**
      * Convert a string to a port number, checking range
-    */
-    static inline const outcome::result<u_int16_t> string_to_port(const std::string& port_string) {
-        try {
+     */
+    static inline const outcome::result<u_int16_t> string_to_port(const std::string &port_string) noexcept
+    {
+        try
+        {
             u_int16_t port = std::stoi(port_string);
-            if (port < 1024 || port > 65535) {
+            if (port < 1024 || port > 65535)
+            {
                 // port is out of range
                 return E2SARErrorc::OutOfRange;
             }
             return port;
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             return E2SARErrorc::ParameterError;
         }
     }
 
     /**
-     * Convert a colon-separated tuple into ip address and port
-    */
-    static inline const outcome::result<std::pair<ip::address, u_int16_t>> string_tuple_to_ip_and_port(const std::string &t) {
-        std::vector<std::string> ipPort;
+     * Convert a colon-separated tuple into ip address and port. Note that IPv6 in [] can contain colons.
+     */
+    static inline const outcome::result<std::pair<ip::address, u_int16_t>> string_tuple_to_ip_and_port(const std::string &t) noexcept
+    {
+        // search for last ":" (ip:port) or "]" (ipv6 by itself) whichever comes last
+        auto const pos = t.find_last_of("]:");
 
-        boost::algorithm::split(ipPort, t, boost::is_any_of(":"));
-        if (ipPort.size() == 2) {
-            outcome::result<ip::address> r1 = string_to_ip(ipPort[0]);
-            outcome::result<u_int16_t> r2 = string_to_port(ipPort[1]);
-            if (r1 && r2) 
-                return std::pair<ip::address, int> (r1.value(), r2.value());
+        // IPv4 or IPv6 by itself
+        if ((pos == std::string::npos) || (t[pos] == ']'))
+        {
+            outcome::result<ip::address> r1 = string_to_ip(t);
+            if (r1)
+                return std::pair<ip::address, u_int16_t>(r1.value(), 0);
             else
                 return E2SARErrorc::ParameterError;
-        } else if (ipPort.size() == 1) {
-            outcome::result<ip::address> r1 = string_to_ip(ipPort[0]);
-            if (r1)
-                return std::pair<ip::address, u_int16_t> (r1.value(), 0);
-            else 
-                return E2SARErrorc::ParameterError;
         }
-        else
-            return E2SARErrorc::ParameterError;
+
+        // port with either IPv4 or IPv6 address x.x.x.x:num or [x:x:x:x::y]:num
+        outcome::result<ip::address> r1 = string_to_ip(t.substr(0, pos));
+        outcome::result<u_int16_t> r2 = string_to_port(t.substr(pos + 1));
+        if (r1 && r2)
+            return std::pair<ip::address, int>(r1.value(), r2.value());
+        return E2SARErrorc::ParameterError;
     }
 
     /**
@@ -273,23 +348,28 @@ namespace e2sar {
      * @param host_name name of host to examine.
      * @return outcome variable with either has_error() set or value() returning a list of ip::address
      */
-    static inline outcome::result<std::vector<ip::address>> resolveHost(const std::string& host_name) noexcept {
+    static inline outcome::result<std::vector<ip::address>> resolveHost(const std::string &host_name) noexcept
+    {
 
         std::vector<ip::address> addresses;
         boost::asio::io_service io_service;
 
-        try {
+        try
+        {
             ip::udp::resolver resolver(io_service);
             ip::udp::resolver::query query(host_name, "443");
             ip::udp::resolver::iterator iter = resolver.resolve(query);
             ip::udp::resolver::iterator end; // End marker.
 
-            while (iter != end) {
+            while (iter != end)
+            {
                 ip::udp::endpoint endpoint = *iter++;
                 addresses.push_back(endpoint.address());
             }
             return addresses;
-        } catch (...) {
+        }
+        catch (...)
+        {
             // anything happens - we can't find the host
             return E2SARErrorc::NotFound;
         }
