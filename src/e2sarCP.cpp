@@ -5,7 +5,9 @@ using namespace boost::posix_time;
 
 namespace e2sar
 {
-    outcome::result<int> LBManager::reserveLB(const std::string &lb_name, TimeUntil *until)
+    outcome::result<int> LBManager::reserveLB(const std::string &lb_name,
+                                              TimeUntil *until,
+                                              const std::vector<std::string> &senders)
     {
 
         ClientContext context;
@@ -20,7 +22,7 @@ namespace e2sar
             req.set_token(_cpuri.get_AdminToken());
 #else
             // set bearer token in header
-            context.AddMetadata("Authorization"s, "Bearer "s + adminToken.value());
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
 #endif
         }
         else
@@ -41,6 +43,16 @@ namespace e2sar
             ptime pt1 = pt + td;
             auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
             req.set_allocated_until(&ts1);
+        }
+
+        // add sender IP addresses, but check they are valid
+        for(auto s: senders) {
+            try {
+                auto s_ip = ip::make_address(s);
+            } catch (...) {
+                return E2SARErrorc::ParameterError;
+            }
+            req.add_senderaddresses(s);
         }
 
         // make the RPC call
@@ -87,13 +99,15 @@ namespace e2sar
         return 0;
     }
 
-    outcome::result<int> LBManager::reserveLB(const std::string &lb_name, const boost::posix_time::time_duration &duration)
+    outcome::result<int> LBManager::reserveLB(const std::string &lb_name,
+                                              const boost::posix_time::time_duration &duration,
+                                              const std::vector<std::string> &senders)
     {
 
         auto pt = second_clock::local_time();
         auto pt1 = pt + duration;
         auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
-        return reserveLB(lb_name, &ts1);
+        return reserveLB(lb_name, &ts1, senders);
     }
 
     /**

@@ -1,5 +1,6 @@
 #ifndef E2SARCPHPP
 #define E2SARCPHPP
+#include <vector>
 #include <boost/asio.hpp>
 
 #include <grpc/grpc.h>
@@ -110,7 +111,8 @@ namespace e2sar
          * RPCError - if unable to connect to the UDPLBd server;
          * ParameterNotAvailable - if admin token or other parameters not available
          */
-        outcome::result<int> reserveLB(const std::string &lb_name, TimeUntil *until);
+        outcome::result<int> reserveLB(const std::string &lb_name, TimeUntil *until,
+                                       const std::vector<std::string> &senders);
 
         /**
          * Reserve a new load balancer with this name until specified time
@@ -118,12 +120,15 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param duration for how long it is needed as boost::posix_time::time_duration. You can use
          * boost::posix_time::duration_from_string from string like "23:59:59.000"s
+         * @param senders list of sender IP addresses
          *
          * @return outcome which is either an error or a 0;
          * RPCError - if unable to connect to the UDPLBd server;
          * ParameterNotAvailable - if admin token or other parameters not available
          */
-        outcome::result<int> reserveLB(const std::string &lb_name, const boost::posix_time::time_duration &duration);
+        outcome::result<int> reserveLB(const std::string &lb_name,
+                                       const boost::posix_time::time_duration &duration,
+                                       const std::vector<std::string> &senders);
         // get load balancer info (same returns as reserverLB)
         int getLB();
         // get load balancer status

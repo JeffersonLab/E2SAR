@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <boost/program_options.hpp>
 
 #include "e2sar.hpp"
@@ -7,7 +8,7 @@ namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 using namespace e2sar;
 
-outcome::result<EjfatURI> reserveLB(const std::string &lbname)
+outcome::result<EjfatURI> reserveLB(const std::string &lbname, const std::vector<std::string> &senders)
 {
 
     // parse URI from env variable
@@ -27,7 +28,7 @@ outcome::result<EjfatURI> reserveLB(const std::string &lbname)
 
     // attempt to reserve
 
-    auto res = lbman.reserveLB(lbname, pt::duration_from_string("01"));
+    auto res = lbman.reserveLB(lbname, pt::duration_from_string("01"), senders);
 
     if (res.has_error()) {
         std::cerr << "Unable to connect to Load Balancer, error " << res.error() << std::endl;
@@ -46,6 +47,7 @@ int main(int argc, char **argv)
 
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("command,c", po::value<std::string>(), "specify command");
+    opts("senders,s", po::value<std::string>()->multitoken(), "list of sender IPv4/6 addresses");
 
     po::variables_map vm;
 
@@ -62,16 +64,21 @@ int main(int argc, char **argv)
     {
         std::cout << "LB Name: " << vm["lbname"].as<std::string>() << std::endl;
     }
-
+    
     if (vm.count("command"))
     {
         std::cout << "Command: " << vm["command"].as<std::string>() << std::endl;
 
-        auto uri_r = reserveLB(vm["lbname"].as<std::string>());
+        if (vm.count("senders") < 1) {
+            std::cerr << "You must specify a list of sender IP addresses" << std::endl;
+            return -1;
+        }
+        auto uri_r = reserveLB(vm["lbname"].as<std::string>(), vm["senders"].as<std::vector<std::string>>());
         if (uri_r.has_error()) {
+            std::cerr << "There was an error communicating to LB: " << uri_r.error() << std::endl;
             return -1;
         }
 
-        std::cout << "Updated URI adter reserve " << static_cast<std::string>(uri_r.value()) << std::endl;
+        std::cout << "Updated URI after reserve " << static_cast<std::string>(uri_r.value()) << std::endl;
     }
 }
