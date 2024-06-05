@@ -38,12 +38,12 @@ namespace e2sar
     E2SARErrorc ec;
     std::string msg;
 
-    inline const E2SARErrorc code() 
+    inline const E2SARErrorc code() const
     { 
       return ec;
     }
 
-    inline const std::string_view message() {
+    inline const std::string &message() const {
       return msg;
     }
   };

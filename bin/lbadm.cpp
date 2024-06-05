@@ -16,14 +16,15 @@ result<EjfatURI> reserveLB(const std::string &lbname, const std::vector<std::str
 
     if (uri_r.has_error())
     {
-        return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Unable to parse URI from environment, exiting"s};
+        return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Unable to parse URI from environment, error "s + uri_r.error().message()};
     }
     auto uri = uri_r.value();
 
     std::cout << "Will attempt a connection to control plane on " << uri.get_cpAddr().value().first << (uri.get_useTls() ? " using TLS"s : " without using TLS"s) << std::endl;
 
     std::cout << "Sender list is " << std::endl;
-    for (auto s: senders) {
+    for (auto s : senders)
+    {
         std::cout << " " << s << std::endl;
     }
 
@@ -34,9 +35,13 @@ result<EjfatURI> reserveLB(const std::string &lbname, const std::vector<std::str
 
     auto res = lbman.reserveLB(lbname, pt::duration_from_string("01"), senders);
 
-    if (res.has_error()) {
-        return E2SARErrorInfo{E2SARErrorc::RPCError, "Unable to connect to Load Balancer, error "s};
-    } else {
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "Unable to connect to Load Balancer, error "s + res.error().message()};
+    }
+    else
+    {
         return uri;
     }
 }
@@ -67,17 +72,19 @@ int main(int argc, char **argv)
     {
         std::cout << "LB Name: " << vm["lbname"].as<std::string>() << std::endl;
     }
-    
+
     if (vm.count("command"))
     {
         std::cout << "Command: " << vm["command"].as<std::string>() << std::endl;
 
-        if (vm.count("senders") < 1) {
+        if (vm.count("senders") < 1)
+        {
             std::cerr << "You must specify a list of sender IP addresses" << std::endl;
             return -1;
         }
         auto uri_r = reserveLB(vm["lbname"].as<std::string>(), vm["senders"].as<std::vector<std::string>>());
-        if (uri_r.has_error()) {
+        if (uri_r.has_error())
+        {
             std::cerr << "There was an error communicating to LB: " << uri_r.error().message() << std::endl;
             return -1;
         }
