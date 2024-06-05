@@ -103,7 +103,7 @@ namespace e2sar
         // deal with the query portion
         for (auto param : u.params())
         {
-            outcome::result<std::pair<ip::address, u_int16_t>> r = string_tuple_to_ip_and_port(param.value);
+            result<std::pair<ip::address, u_int16_t>> r = string_tuple_to_ip_and_port(param.value);
             if (r)
             {
                 std::pair<ip::address, int> p = r.value();

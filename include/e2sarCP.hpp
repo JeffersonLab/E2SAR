@@ -110,9 +110,9 @@ namespace e2sar
          * RPCError - if unable to connect to the UDPLBd server;
          * ParameterNotAvailable - if admin token or other parameters not available
          */
-        outcome::result<int> reserveLB(const std::string &lb_name,
-                                       const TimeUntil &until,
-                                       const std::vector<std::string> &senders);
+        result<int> reserveLB(const std::string &lb_name,
+                              const TimeUntil &until,
+                              const std::vector<std::string> &senders);
 
         /**
          * Reserve a new load balancer with this name until specified time
@@ -126,9 +126,9 @@ namespace e2sar
          * RPCError - if unable to connect to the UDPLBd server;
          * ParameterNotAvailable - if admin token or other parameters not available
          */
-        outcome::result<int> reserveLB(const std::string &lb_name,
-                                       const boost::posix_time::time_duration &duration,
-                                       const std::vector<std::string> &senders);
+        result<int> reserveLB(const std::string &lb_name,
+                              const boost::posix_time::time_duration &duration,
+                              const std::vector<std::string> &senders);
         // get load balancer info (same returns as reserverLB)
         int getLB();
         // get load balancer status
@@ -153,7 +153,7 @@ namespace e2sar
          *
          * @return outcome for grpc::SslCredentialsOptions object with parameters filled in
          */
-        static inline outcome::result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
+        static inline result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
                                                                                   const std::string &pem_private_key,
                                                                                   const std::string &pem_cert_chain)
         {
@@ -171,7 +171,7 @@ namespace e2sar
          *
          * @return outcome for grpc::SslCredentialsOptions object with parameters filled in
          */
-        static outcome::result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
+        static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
             std::string_view pem_root_certs,
             std::string_view pem_private_key,
             std::string_view pem_cert_chain);

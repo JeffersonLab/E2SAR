@@ -8,7 +8,7 @@ namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 using namespace e2sar;
 
-outcome::result<EjfatURI> reserveLB(const std::string &lbname, const std::vector<std::string> &senders)
+result<EjfatURI> reserveLB(const std::string &lbname, const std::vector<std::string> &senders)
 {
 
     // parse URI from env variable
@@ -16,8 +16,7 @@ outcome::result<EjfatURI> reserveLB(const std::string &lbname, const std::vector
 
     if (uri_r.has_error())
     {
-        std::cerr << "Unable to parse URI from environment, exiting" << std::endl;
-        return E2SARErrorc::ParseError;
+        return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Unable to parse URI from environment, exiting"s};
     }
     auto uri = uri_r.value();
 
@@ -36,8 +35,7 @@ outcome::result<EjfatURI> reserveLB(const std::string &lbname, const std::vector
     auto res = lbman.reserveLB(lbname, pt::duration_from_string("01"), senders);
 
     if (res.has_error()) {
-        std::cerr << "Unable to connect to Load Balancer, error " << res.error() << std::endl;
-        return E2SARErrorc::RPCError;
+        return E2SARErrorInfo{E2SARErrorc::RPCError, "Unable to connect to Load Balancer, error "s};
     } else {
         return uri;
     }
@@ -80,7 +78,7 @@ int main(int argc, char **argv)
         }
         auto uri_r = reserveLB(vm["lbname"].as<std::string>(), vm["senders"].as<std::vector<std::string>>());
         if (uri_r.has_error()) {
-            std::cerr << "There was an error communicating to LB: " << uri_r.error() << std::endl;
+            std::cerr << "There was an error communicating to LB: " << uri_r.error().message() << std::endl;
             return -1;
         }
 

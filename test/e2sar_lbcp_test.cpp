@@ -22,7 +22,7 @@ BOOST_AUTO_TEST_CASE(LBMTest1)
 
     std::cout << root << "|" << priv << "|" << cert << std::endl;
 
-    outcome::result<grpc::SslCredentialsOptions> opts{LBManager::makeSslOptions(root, priv, cert)};
+    result<grpc::SslCredentialsOptions> opts{LBManager::makeSslOptions(root, priv, cert)};
 
     BOOST_TEST(!opts.has_error());
 
@@ -51,10 +51,10 @@ BOOST_AUTO_TEST_CASE(LBMTest2)
     certf << "cert chain";
     certf.close();
 
-    outcome::result<grpc::SslCredentialsOptions> opts{LBManager::makeSslOptionsFromFiles(rootn, privn, certn)};
+    result<grpc::SslCredentialsOptions> opts{LBManager::makeSslOptionsFromFiles(rootn, privn, certn)};
 
     if (opts.has_error())
-        std::cout << opts.error().message() << std::endl;
+        std::cout << opts.error().msg << std::endl;
     BOOST_TEST(!opts.has_error());
     std::filesystem::remove(rootn);
     std::filesystem::remove(privn);

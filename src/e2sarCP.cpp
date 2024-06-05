@@ -5,7 +5,7 @@ using namespace boost::posix_time;
 
 namespace e2sar
 {
-    outcome::result<int> LBManager::reserveLB(const std::string &lb_name,
+    result<int> LBManager::reserveLB(const std::string &lb_name,
                                               const TimeUntil &until,
                                               const std::vector<std::string> &senders)
     {
@@ -26,7 +26,7 @@ namespace e2sar
 #endif
         }
         else
-            return E2SARErrorc::ParameterNotAvailable;
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
         _cpuri.set_lbName(lb_name);
         req.set_name(lb_name);
@@ -42,7 +42,7 @@ namespace e2sar
             }
             catch (...)
             {
-                return E2SARErrorc::ParameterError;
+                return E2SARErrorInfo{E2SARErrorc::ParameterError, "Invalid sender IP addresses"s};
             }
             req.add_senderaddresses(s);
         }
@@ -52,8 +52,7 @@ namespace e2sar
 
         if (!status.ok())
         {
-            std::cout << status.error_code() << ": " << status.error_message() << std::endl;
-            return E2SARErrorc::RPCError;
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP: "s + status.error_message()};
         }
 
         if (!rep.token().empty())
@@ -94,7 +93,7 @@ namespace e2sar
         return 0;
     }
 
-    outcome::result<int> LBManager::reserveLB(const std::string &lb_name,
+    result<int> LBManager::reserveLB(const std::string &lb_name,
                                               const boost::posix_time::time_duration &duration,
                                               const std::vector<std::string> &senders)
     {
@@ -109,7 +108,7 @@ namespace e2sar
      * modified from
      * https://stackoverflow.com/questions/116038/how-do-i-read-an-entire-file-into-a-stdstring-in-c
      */
-    outcome::result<std::string> read_file(std::string_view path)
+   result<std::string> read_file(std::string_view path)
     {
         constexpr auto read_size = std::size_t(4096);
 
@@ -121,7 +120,7 @@ namespace e2sar
 
         if (not stream)
         {
-            return E2SARErrorc::NotFound;
+            return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to open file"};
         }
 
         auto out = std::string();
@@ -134,7 +133,7 @@ namespace e2sar
         return out;
     }
 
-    outcome::result<grpc::SslCredentialsOptions> LBManager::makeSslOptionsFromFiles(std::string_view pem_root_certs,
+    result<grpc::SslCredentialsOptions> LBManager::makeSslOptionsFromFiles(std::string_view pem_root_certs,
                                                                                     std::string_view pem_private_key,
                                                                                     std::string_view pem_cert_chain)
     {
@@ -143,7 +142,7 @@ namespace e2sar
         auto cert = read_file(pem_cert_chain);
 
         if (root.has_error() || priv.has_error() || cert.has_error())
-            return E2SARErrorc::NotFound;
+            return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to find certificate, key or root cert files"s};
 
         return makeSslOptions(std::move(root.value()),
                               std::move(priv.value()),

@@ -123,7 +123,7 @@ BOOST_AUTO_TEST_CASE(URITest4)
     std::string sv{"EJFAT_URI=ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20"};
     putenv(sv.data());
 
-    outcome::result<EjfatURI> euri = EjfatURI::getFromEnv();
+    auto euri = EjfatURI::getFromEnv();
 
     std::cout << static_cast<std::string>(euri.value()) << std::endl;
 }
@@ -135,9 +135,9 @@ BOOST_AUTO_TEST_CASE(URITest5)
     putenv(sv.data());
 
     // try old name and fail
-    outcome::result<EjfatURI> euri = EjfatURI::getFromEnv();
+    auto euri = EjfatURI::getFromEnv();
 
-    BOOST_TEST(euri.error() == E2SARErrorc::Undefined);
+    BOOST_TEST(euri.error().code() == E2SARErrorc::Undefined);
 
     euri = EjfatURI::getFromEnv("EJFAT_URI_NEW"s);
 
@@ -151,7 +151,7 @@ BOOST_AUTO_TEST_CASE(URITest6)
 {
 
     // test name resolution
-    outcome::result<std::vector<ip::address>> addresses = resolveHost("www.jlab.org"s);
+    auto addresses = resolveHost("www.jlab.org"s);
 
     BOOST_TEST(addresses.has_error() == false);
 
@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE(URITest7)
 {
 
     // test name resolution
-    outcome::result<std::vector<ip::address>> addresses = resolveHost("fake.jlab.org"s);
+    auto addresses = resolveHost("fake.jlab.org"s);
 
     BOOST_TEST(addresses.has_error() == true);
 }

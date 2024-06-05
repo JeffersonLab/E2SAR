@@ -82,21 +82,21 @@ namespace e2sar
         }
 
         /** get instance token */
-        inline const outcome::result<std::string> get_InstanceToken() const
+        inline const result<std::string> get_InstanceToken() const
         {
             if (!instanceToken.empty())
                 return instanceToken;
             else
-                return E2SARErrorc::ParameterNotAvailable;
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available"s};
         }
 
         /** return the admin token */
-        inline const outcome::result<std::string> get_AdminToken() const
+        inline const result<std::string> get_AdminToken() const
         {
             if (!adminToken.empty())
                 return adminToken;
             else
-                return E2SARErrorc::ParameterNotAvailable;
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available"s};
         }
 
         /** set LB name */
@@ -138,18 +138,18 @@ namespace e2sar
         }
 
         /** get control plane ip address and port */
-        inline const outcome::result<std::pair<ip::address, u_int16_t>> get_cpAddr() const
+        inline const result<std::pair<ip::address, u_int16_t>> get_cpAddr() const
         {
             return std::pair<ip::address, u_int16_t>(cpAddr, cpPort);
         }
 
-        /** get control plan hostname and port */
-        inline const outcome::result<std::pair<std::string, u_int16_t>> get_cpHost() const
+        /** get control plane hostname and port */
+        inline const result<std::pair<std::string, u_int16_t>> get_cpHost() const
         {
             if (!cpHost.empty())
                 return std::pair<std::string, u_int16_t>(cpHost, cpPort);
             else
-                return E2SARErrorc::ParameterNotAvailable;
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Control plane address not available"s};
         }
 
         /** does the URI contain a dataplane address? */
@@ -165,25 +165,25 @@ namespace e2sar
         }
 
         /** get data plane address and port */
-        inline const outcome::result<std::pair<ip::address, u_int16_t>> get_dataAddr() const noexcept
+        inline const result<std::pair<ip::address, u_int16_t>> get_dataAddr() const noexcept
         {
             if (haveData)
                 return std::pair<ip::address, u_int16_t>(dataAddr, dataPort);
-            return E2SARErrorc::ParameterNotAvailable;
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 
         /** get sync address and port */
-        inline const outcome::result<std::pair<ip::address, u_int16_t>> get_syncAddr() const noexcept
+        inline const result<std::pair<ip::address, u_int16_t>> get_syncAddr() const noexcept
         {
             if (haveSync)
                 return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
-            return E2SARErrorc::ParameterNotAvailable;
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Sync address not available"s};
         }
         /** implicit cast to string */
         operator std::string() const;
 
         /** from environment variable or file */
-        static inline outcome::result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
+        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
         {
             const char *envStr = std::getenv(envVar.c_str());
             if (envStr != nullptr)
@@ -194,14 +194,14 @@ namespace e2sar
                 }
                 catch (const E2SARException &e)
                 {
-                    return E2SARErrorc::CaughtException;
+                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from environment variable"s};
                 }
             }
-            return E2SARErrorc::Undefined;
+            return E2SARErrorInfo{E2SARErrorc::Undefined, "Environment variable "s + envVar + " not defined."s};
         }
 
         /** from a file */
-        static inline outcome::result<EjfatURI> getFromFile(const std::string &fileName = "/tmp/ejfat_uri"s) noexcept
+        static inline result<EjfatURI> getFromFile(const std::string &fileName = "/tmp/ejfat_uri"s) noexcept
         {
             if (!fileName.empty())
             {
@@ -218,14 +218,14 @@ namespace e2sar
                         }
                         catch (const E2SARException &e)
                         {
-                            return E2SARErrorc::CaughtException;
+                            return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI."s};
                         }
                     }
                     file.close();
-                    return E2SARErrorc::Undefined;
+                    return E2SARErrorInfo{E2SARErrorc::Undefined, "Unable to parse URI."s};
                 }
             }
-            return E2SARErrorc::NotFound;
+            return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to find file "s + fileName};
         }
     };
 
@@ -238,7 +238,6 @@ namespace e2sar
      */
     static inline int getPortRange(int sourceCount) noexcept
     {
-
         // Based on the proto file enum for the load balancer, seen below,
         // map the max # of sources a backend will see to the PortRange value.
         // This is necessay to provide the control plane when registering.
@@ -268,21 +267,20 @@ namespace e2sar
     /**
      * Convert a string into an IPv4 or v6 address throwing E2SARException if a problem is encountered
      */
-    static inline const outcome::result<ip::address> string_to_ip(const std::string &addr) noexcept
+    static inline const result<ip::address> string_to_ip(const std::string &addr) noexcept
     {
         try
         {
             if (addr[0] == '[')
             {
                 // strip '[]' from IPv6
-                std::cout << "Stripping brackets " << addr.substr(1, addr.length() - 2) << std::endl;
                 try
                 {
                     ip::make_address(addr.substr(1, addr.length() - 2));
                 }
                 catch (...)
                 {
-                    std::cout << "Unable to convert to IP address" << std::endl;
+                    ;
                 }
                 return ip::make_address(addr.substr(1, addr.length() - 2));
             }
@@ -291,14 +289,14 @@ namespace e2sar
         }
         catch (boost::system::system_error &e)
         {
-            return E2SARErrorc::ParameterError;
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert IP address from "s + addr};
         }
     }
 
     /**
      * Convert a string to a port number, checking range
      */
-    static inline const outcome::result<u_int16_t> string_to_port(const std::string &port_string) noexcept
+    static inline const result<u_int16_t> string_to_port(const std::string &port_string) noexcept
     {
         try
         {
@@ -306,20 +304,20 @@ namespace e2sar
             if (port < 1024 || port > 65535)
             {
                 // port is out of range
-                return E2SARErrorc::OutOfRange;
+                return E2SARErrorInfo{E2SARErrorc::OutOfRange, "Port value "s + port_string + " is out of range"s};
             }
             return port;
         }
         catch (const std::exception &e)
         {
-            return E2SARErrorc::ParameterError;
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + port_string + " to integer"s};
         }
     }
 
     /**
      * Convert a colon-separated tuple into ip address and port. Note that IPv6 in [] can contain colons.
      */
-    static inline const outcome::result<std::pair<ip::address, u_int16_t>> string_tuple_to_ip_and_port(const std::string &t) noexcept
+    static inline const result<std::pair<ip::address, u_int16_t>> string_tuple_to_ip_and_port(const std::string &t) noexcept
     {
         // search for last ":" (ip:port) or "]" (ipv6 by itself) whichever comes last
         auto const pos = t.find_last_of("]:");
@@ -327,19 +325,19 @@ namespace e2sar
         // IPv4 or IPv6 by itself
         if ((pos == std::string::npos) || (t[pos] == ']'))
         {
-            outcome::result<ip::address> r1 = string_to_ip(t);
+            auto r1 = string_to_ip(t);
             if (r1)
                 return std::pair<ip::address, u_int16_t>(r1.value(), 0);
             else
-                return E2SARErrorc::ParameterError;
+                return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port"s};
         }
 
         // port with either IPv4 or IPv6 address x.x.x.x:num or [x:x:x:x::y]:num
-        outcome::result<ip::address> r1 = string_to_ip(t.substr(0, pos));
-        outcome::result<u_int16_t> r2 = string_to_port(t.substr(pos + 1));
+        auto r1 = string_to_ip(t.substr(0, pos));
+        auto r2 = string_to_port(t.substr(pos + 1));
         if (r1 && r2)
             return std::pair<ip::address, int>(r1.value(), r2.value());
-        return E2SARErrorc::ParameterError;
+        return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port"s};
     }
 
     /**
@@ -347,8 +345,8 @@ namespace e2sar
      *
      * @param host_name name of host to examine.
      * @return outcome variable with either has_error() set or value() returning a list of ip::address
-     */
-    static inline outcome::result<std::vector<ip::address>> resolveHost(const std::string &host_name) noexcept
+    */
+    static inline result<std::vector<ip::address>> resolveHost(const std::string &host_name) noexcept
     {
 
         std::vector<ip::address> addresses;
@@ -371,7 +369,7 @@ namespace e2sar
         catch (...)
         {
             // anything happens - we can't find the host
-            return E2SARErrorc::NotFound;
+            return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to convert "s + host_name + " to ip address"s};
         }
     }
 };
