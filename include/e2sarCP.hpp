@@ -144,6 +144,8 @@ namespace e2sar
         // get updated statistics
         int probeStats();
 
+        inline const EjfatURI &get_URI() const { return _cpuri; }
+
         /**
          * Generate gRPC-compliant custom SSL Options object with the following parameters,
          * where any parameter can be empty. Uses std::move to avoid copies.

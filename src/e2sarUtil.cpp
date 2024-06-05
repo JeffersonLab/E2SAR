@@ -34,7 +34,7 @@ namespace e2sar
      *
      * @param uri URI to parse.
      */
-    EjfatURI::EjfatURI(const std::string &uri) : rawURI{uri}, haveData{false}, haveSync(false), useTls{false}
+    EjfatURI::EjfatURI(const std::string &uri) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}
     {
 
         // parse the URI
@@ -86,7 +86,8 @@ namespace e2sar
                     cpHost = u.host();
                 }
                 else
-                    throw E2SARException("Unable to resolve host name to IP address in URL "s + u.host());
+                    throw E2SARException("Unable to resolve host name to IP address in URL "s + u.host() +
+                                         " due to "s + ip_list_r.error().message());
             }
             else
                 throw E2SARException("Unable to parse CP address and/or port in URL "s + rawURI);
@@ -95,10 +96,9 @@ namespace e2sar
         // extract the lb ID
         std::vector<std::string> lb_path;
         boost::split(lb_path, u.path(), boost::is_any_of("/"));
-        lbId = lb_path.back();
-
-        if (lbId.length() == 0)
-            throw E2SARException("Invalid LB Id: "s + rawURI);
+        // if there is lb
+        if (lb_path.size())
+            lbId = lb_path.back();
 
         // deal with the query portion
         for (auto param : u.params())
@@ -115,9 +115,13 @@ namespace e2sar
                 }
                 else if (!param.key.compare("data"s))
                 {
-                    haveData = true;
-                    dataAddr = p.first;
-                    dataPort = DATAPLANE_PORT;
+                    if (p.first.is_v4()) {
+                        haveDatav4 = true;
+                        dataAddrv4 = p.first;
+                    } else {
+                        haveDatav6 = true;
+                        dataAddrv6 = p.first;
+                    }
                 }
                 else
                     throw E2SARException("Unknown parameter "s + param.key + " in URL "s + rawURI);
@@ -138,11 +142,13 @@ namespace e2sar
             token = instanceToken;
 
         return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.empty() ? token + "@"s : ""s) +
-               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
-               "/lb/"s + lbId +
-               (haveSync || haveData ? "?"s : ""s) +
+               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) + 
+               "/"s +
+               (!lbId.empty()? "lb/"s + lbId : ""s) +
+               (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
                (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
-               (haveSync && haveData ? "&"s : ""s) +
-               (haveData ? "data="s + (dataAddr.is_v6() ? "[" + dataAddr.to_string() + "]" : dataAddr.to_string()) : ""s);
+               (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
+               (haveDatav4 ? "data="s + dataAddrv4.to_string() : ""s) +
+               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
     }
 }

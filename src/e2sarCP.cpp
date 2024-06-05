@@ -6,8 +6,8 @@ using namespace boost::posix_time;
 namespace e2sar
 {
     result<int> LBManager::reserveLB(const std::string &lb_name,
-                                              const TimeUntil &until,
-                                              const std::vector<std::string> &senders)
+                                     const TimeUntil &until,
+                                     const std::vector<std::string> &senders)
     {
 
         ClientContext context;
@@ -94,8 +94,8 @@ namespace e2sar
     }
 
     result<int> LBManager::reserveLB(const std::string &lb_name,
-                                              const boost::posix_time::time_duration &duration,
-                                              const std::vector<std::string> &senders)
+                                     const boost::posix_time::time_duration &duration,
+                                     const std::vector<std::string> &senders)
     {
 
         auto pt = second_clock::local_time();
@@ -108,7 +108,7 @@ namespace e2sar
      * modified from
      * https://stackoverflow.com/questions/116038/how-do-i-read-an-entire-file-into-a-stdstring-in-c
      */
-   result<std::string> read_file(std::string_view path)
+    result<std::string> read_file(std::string_view path)
     {
         constexpr auto read_size = std::size_t(4096);
 
@@ -134,8 +134,8 @@ namespace e2sar
     }
 
     result<grpc::SslCredentialsOptions> LBManager::makeSslOptionsFromFiles(std::string_view pem_root_certs,
-                                                                                    std::string_view pem_private_key,
-                                                                                    std::string_view pem_cert_chain)
+                                                                           std::string_view pem_private_key,
+                                                                           std::string_view pem_cert_chain)
     {
         auto root = read_file(pem_root_certs);
         auto priv = read_file(pem_private_key);

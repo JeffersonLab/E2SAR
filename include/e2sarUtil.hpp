@@ -2,6 +2,7 @@
 #define E2SARUTILHPP
 
 #include <fstream>
+#include <vector>
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -25,14 +26,13 @@ namespace e2sar
     private:
         std::string rawURI;
         /** Is there a valid data addr & port? */
-        bool haveData;
+        bool haveDatav4;
+        bool haveDatav6;
         /** Is there a valid sync addr & port? */
         bool haveSync;
         /** Use TLS */
         bool useTls;
 
-        /** UDP port to send events (data) to. */
-        uint16_t dataPort;
         /** UDP port for event sender to send sync messages to. */
         uint16_t syncPort;
         /** TCP port for grpc communications with CP. */
@@ -47,14 +47,9 @@ namespace e2sar
         /** Instance token set by the CP on an LB reservation. */
         std::string instanceToken;
 
-        /**
-         * Note we make no distinction between IPv4 or IPv6 as it is represented by
-         * boost's ip::address which can do either and can also be asked if it is
-         * IPv4 or IPv6 using is_v4() or is_v6() methods. Initialization from string
-         * 'does the right thing' depending on the address.
-         */
-        /** address to send events (data) to (v4 or v6). */
-        ip::address dataAddr;
+        /** data plane addresses - there can ever only be one v4 and one v6 */
+        ip::address dataAddrv4;
+        ip::address dataAddrv6;
         /** address to send sync messages to. Not used, for future expansion. (v4 or v6)*/
         ip::address syncAddr;
         /** IP address (and host if available) for grpc communication with CP. */
@@ -111,6 +106,9 @@ namespace e2sar
             lbId = i;
         }
 
+        /**
+         * Set the sync address (v4 or v6)
+        */
         inline void set_syncAddr(const std::pair<ip::address, u_int16_t> &a)
         {
             syncAddr = a.first;
@@ -118,11 +116,15 @@ namespace e2sar
             haveSync = true;
         }
 
+        /**
+         * Set a dataplane address (v4 or v6)
+        */
         inline void set_dataAddr(const std::pair<ip::address, u_int16_t> &a)
         {
-            dataAddr = a.first;
-            dataPort = a.second;
-            haveData = true;
+            if (a.first.is_v4()) 
+                dataAddrv4 = a.first;
+            else
+                dataAddrv6 = a.first;
         }
 
         /** get LB name */
@@ -152,10 +154,22 @@ namespace e2sar
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Control plane address not available"s};
         }
 
-        /** does the URI contain a dataplane address? */
+        /** does the URI contain a v4 dataplane address? */
+        inline const bool has_dataAddrv4() const
+        {
+            return haveDatav4;
+        }
+
+        /** does the URI contain a v6 dataplane address? */
+        inline const bool has_dataAddrv6() const
+        {
+            return haveDatav6;
+        }
+
+        /** does the URI contain any dataplane address? */
         inline const bool has_dataAddr() const
         {
-            return haveData;
+            return haveDatav4 || haveDatav6;
         }
 
         /** does the URI contain a sync address */
@@ -164,11 +178,19 @@ namespace e2sar
             return haveSync;
         }
 
-        /** get data plane address and port */
-        inline const result<std::pair<ip::address, u_int16_t>> get_dataAddr() const noexcept
+        /** get data plane v4 address and port */
+        inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv4() const noexcept
         {
-            if (haveData)
-                return std::pair<ip::address, u_int16_t>(dataAddr, dataPort);
+            if (haveDatav4)
+                return std::pair<ip::address, u_int16_t>(dataAddrv4, DATAPLANE_PORT);
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
+        }
+
+        /** get data plane v6 address and port */
+        inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv6() const noexcept
+        {
+            if (haveDatav6)
+                return std::pair<ip::address, u_int16_t>(dataAddrv6, DATAPLANE_PORT);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 

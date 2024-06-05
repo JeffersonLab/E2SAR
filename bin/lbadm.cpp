@@ -42,7 +42,7 @@ result<EjfatURI> reserveLB(const std::string &lbname, const std::vector<std::str
     }
     else
     {
-        return uri;
+        return lbman.get_URI();
     }
 }
 
