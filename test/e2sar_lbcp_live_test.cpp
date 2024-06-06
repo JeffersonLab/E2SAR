@@ -39,8 +39,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest1)
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
     BOOST_CHECK(lbman.get_URI().has_syncAddr());
-    // don't expect data address in a null setup
-    //BOOST_CHECK(lbman.get_URI().has_dataAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
     // call free
     res = lbman.freeLB();

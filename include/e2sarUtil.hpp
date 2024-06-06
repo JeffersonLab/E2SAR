@@ -121,10 +121,14 @@ namespace e2sar
         */
         inline void set_dataAddr(const std::pair<ip::address, u_int16_t> &a)
         {
-            if (a.first.is_v4()) 
+            if (a.first.is_v4()) {
                 dataAddrv4 = a.first;
-            else
+                haveDatav4 = true;
+            }
+            else {
                 dataAddrv6 = a.first;
+                haveDatav6 = true;
+            }
         }
 
         /** get LB name */
