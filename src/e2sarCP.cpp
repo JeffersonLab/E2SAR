@@ -3,8 +3,17 @@
 using namespace google::protobuf;
 using namespace boost::posix_time;
 
+using loadbalancer::ReserveLoadBalancerRequest;
+using loadbalancer::ReserveLoadBalancerReply;
+
+using loadbalancer::FreeLoadBalancerReply;
+using loadbalancer::FreeLoadBalancerRequest;
+
 namespace e2sar
 {
+    /**
+     * Reserve using TimeUntil
+     */
     result<int> LBManager::reserveLB(const std::string &lb_name,
                                      const TimeUntil &until,
                                      const std::vector<std::string> &senders)
@@ -52,7 +61,7 @@ namespace e2sar
 
         if (!status.ok())
         {
-            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP: "s + status.error_message()};
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in reserveLB(): "s + status.error_message()};
         }
 
         if (!rep.token().empty())
@@ -93,6 +102,9 @@ namespace e2sar
         return 0;
     }
 
+    /**
+     * Reserve using duration instead of until.
+     */
     result<int> LBManager::reserveLB(const std::string &lb_name,
                                      const boost::posix_time::time_duration &duration,
                                      const std::vector<std::string> &senders)
@@ -102,6 +114,47 @@ namespace e2sar
         auto pt1 = pt + duration;
         auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
         return reserveLB(lb_name, ts1, senders);
+    }
+
+    /**
+     * Free previously reserved load balancer
+     */
+    result<int> LBManager::freeLB() 
+    {
+
+        // we only need lb id from the URI
+        ClientContext context;
+        FreeLoadBalancerRequest req;
+        FreeLoadBalancerReply rep;
+
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        if (_cpuri.get_lbId().empty()) 
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
+
+        req.set_lbid(_cpuri.get_lbId());
+
+        // make the RPC call
+        Status status = _stub->FreeLoadBalancer(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in freeLB(): "s + status.error_message()};
+        }
+
+        return 0;
     }
 
     /**

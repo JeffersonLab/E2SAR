@@ -24,8 +24,6 @@ using grpc::ClientWriter;
 using grpc::Status;
 
 using loadbalancer::LoadBalancer;
-using loadbalancer::ReserveLoadBalancerReply;
-using loadbalancer::ReserveLoadBalancerRequest;
 
 // default reservation duration for a load balancer in hours
 #define DEFAULT_LB_RESERVE_DURATION 24
@@ -134,7 +132,7 @@ namespace e2sar
         // get load balancer status
         int getLBStatus();
         // Free a Load Balancer
-        int freeLB();
+        result<int> freeLB();
         // register worker
         int registerWorker();
         // send worker queue state

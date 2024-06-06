@@ -134,14 +134,12 @@ namespace e2sar
     /** implicit conversion operator */
     EjfatURI::operator std::string() const
     {
-        std::string token;
+        auto token = std::cref(adminToken);
         // prefer instance token to admin token for printing out
-        if (!adminToken.empty())
-            token = adminToken;
         if (!instanceToken.empty())
-            token = instanceToken;
+            token = std::cref(instanceToken);
 
-        return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.empty() ? token + "@"s : ""s) +
+        return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
                (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) + 
                "/"s +
                (!lbId.empty()? "lb/"s + lbId : ""s) +
