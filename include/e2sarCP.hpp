@@ -104,9 +104,7 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
          *
-         * @return outcome which is either an error or a 0;
-         * RPCError - if unable to connect to the UDPLBd server;
-         * ParameterNotAvailable - if admin token or other parameters not available
+         * @return - 0 on success or error code with message on failure
          */
         result<int> reserveLB(const std::string &lb_name,
                               const TimeUntil &until,
@@ -120,18 +118,31 @@ namespace e2sar
          * boost::posix_time::duration_from_string from string like "23:59:59.000"s
          * @param senders list of sender IP addresses
          *
-         * @return outcome which is either an error or a 0;
-         * RPCError - if unable to connect to the UDPLBd server;
-         * ParameterNotAvailable - if admin token or other parameters not available
+         * @return - 0 on success or error code with message on failure
          */
         result<int> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
                               const std::vector<std::string> &senders);
-        // get load balancer info (same returns as reserverLB)
-        int getLB();
+        /**
+         * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB. 
+         * Uses admin token.
+         * @param lbid - externally provided lb id, in this case the URI only needs to contain
+         * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
+         * @return - 0 on success or error code with message on failure
+         */
+        result<int> getLB(const std::string &lbid);
+        /**
+         * Get load balancer info using lb id in the URI object
+         * @return - 0 on success or error code with message on failure
+         */
+        result<int> getLB();
         // get load balancer status
-        int getLBStatus();
-        // Free a Load Balancer
+        result<int> getLBStatus();
+
+        /**
+         * Free previously reserved load balancer. Uses admin token.
+         * @return - 0 on success or error code with message on failure
+         */
         result<int> freeLB();
         // register worker
         int registerWorker();

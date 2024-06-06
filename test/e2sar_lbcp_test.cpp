@@ -36,6 +36,7 @@ BOOST_AUTO_TEST_CASE(LBMTest1)
 BOOST_AUTO_TEST_CASE(LBMTest2)
 {
 
+    // test generating ssl options from files
     std::string rootn{"/tmp/root.pem"};
     std::ofstream rootf{rootn};
     rootf << "root cert";
