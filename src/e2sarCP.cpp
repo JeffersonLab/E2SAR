@@ -86,7 +86,6 @@ namespace e2sar
 
         if (!rep.dataipv4address().empty())
         {
-            std::cout << "GETTING IPv4 DATA ADDRESS " << rep.dataipv4address() << std::endl;
             auto o = string_to_ip(rep.dataipv4address());
             if (o.has_error())
                 return o.error();
@@ -96,7 +95,6 @@ namespace e2sar
 
         if (!rep.dataipv6address().empty())
         {
-            std::cout << "GETTING IPv6 DATA ADDRESS " << rep.dataipv6address() << std::endl;
             auto o = string_to_ip(rep.dataipv6address());
             if (o.has_error())
                 return o.error();
