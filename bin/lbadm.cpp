@@ -79,7 +79,7 @@ result<EjfatURI> reserveLB(const std::string &lbname,
     }
     else
     {
-        std::cout << "Sucess.";
+        std::cout << "Sucess." << std::endl;
         return lbman.get_URI();
     }
 }
@@ -114,7 +114,7 @@ result<int> freeLB()
     }
     else
     {
-        std::cout << "Sucess.";
+        std::cout << "Sucess." << std::endl;
         return 0;
     }
 }
