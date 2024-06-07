@@ -1,0 +1,52 @@
+lb:
+  id: 0
+  ipv4:
+    - "192.0.2.1"
+    - "192.0.2.2"
+    - "192.0.2.3"
+    - "192.0.2.4"
+  ipv6:
+    - "2001:DB8::1"
+    - "2001:DB8::2"
+    - "2001:DB8::3"
+    - "2001:DB8::4"
+  mac_unicast: "AB:CD:DE:F1:23:45"
+  mac_broadcast: "33:33:ff:00:00:16"
+database:
+  file: "/tmp/udplbd.db"
+  collection:
+    enable: true
+    interval: "100ms"
+    retention: "168h"
+event_numbers:
+  ports:
+    - 19531
+    - 19532
+    - 19533
+    - 19534
+controller:
+  interval: 1s
+  offset: 800ms
+server:
+  host: "0.0.0.0"
+  port: 18347
+  auth_token: "udplbd"
+  tls:
+    enable: false
+    certFile: "x509/server_cert.pem"
+    keyFile: "x509/server_key.pem"
+log:
+  level: debug
+smartnic:
+  - mock: true
+    host: "smartnic-p4"
+    port: 50051
+    tls:
+      enable: false
+      cert_file: "x509/smartnic_cert.pem"
+mockclient:
+  status_update_interval_ms: 1000
+  status_update_to_p4_update_latency_ms: 500
+  buffer_slope_per_second: 100
+  buf_count: 1000
+  set_point_percent: 0.5

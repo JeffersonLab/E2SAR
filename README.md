@@ -9,9 +9,21 @@ Documentation is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/w
 
 ### Via cloning
 
-Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to get the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb). Note that the submodule is added via `https://` URL not `git://` URL and is not meant to be modified even if developing E2SAR.
+All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
-If you want to update to the latest udplbd then also execute `git submodule update`. Note that you may need the correct branch of this project and as of this writing the is the `develop` branch and not `main`. You can do that by `cd udplbd && git fetch && get switch <branch>`.
+Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to initialize the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb), then run `git submodule update` to get the code:
+```bash
+$ git clone git@github.com:JeffersonLab/E2SAR.git  # use -b if you want a specific branch
+$ cd E2SAR
+$ git submodule init
+$ git submodule update
+```
+
+If you want to update to the latest udplbd then also execute `git submodule update`. Note that you may need the correct branch of this project and as of this writing the is the `develop` branch and not `main`. You can do that by:
+```bash
+$ cd udplbd 
+$ git fetch && get switch develop
+```
 
 ## Building the code
 
@@ -19,42 +31,87 @@ Overview: the build process requires multiple dependencies for tools and code (g
 
 ### Pre-requisistes
 
-- Tool dependencies: 
-    - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
-    - Linux: 
-- [Install `protoc` compiler](https://grpc.io/docs/protoc-installation/)
-    - MacOS: `brew install protoc`
-    - Linux: 
-- Only if installing gRPC from source: [build and Install gRPC C++ library](https://grpc.io/blog/installation/)
-    - Clone the [gRPC repo](https://github.com/grpc/grpc/tree/master) somewhere 
-    - Build
-        - MacOS and Linux:
-```
+#### Installing dependencies
+
+Build dependences
+
+- MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
+- Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev; pip3 install --user meson`
+
+Install [`protoc` compiler](https://grpc.io/docs/protoc-installation/)
+- MacOS: `brew install protoc`
+- Linux: `sudo apt-get -yq install protobuf-compiler`
+
+#### Installing gRPC from source
+
+gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source
+
+##### MacOS
+- Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
+- Use the following command to build:
+```bash
 $ mkdir -p cmake/build && cd cmake/build
 $ cmake ../.. -DgRPC_INSTALL=ON                \
-              -DCMAKE_INSTALL_PREFIX=/some/local/path/to/avoid/version/clashes/or/need/for/sudo/like/home/user/lib \
-              -DCMAKE_BUILD_TYPE=Release       \
-              -DgRPC_ABSL_PROVIDER=package     \
-              -DgRPC_CARES_PROVIDER=package    \
-              -DgRPC_PROTOBUF_PROVIDER=package \
-              -DgRPC_RE2_PROVIDER=package      \
-              -DgRPC_SSL_PROVIDER=package      \
+              -DCMAKE_INSTALL_PREFIX=/wherever/grpc-install/ \
+              -DgRPC_BUILD_TESTS=OFF           \
               -DgRPC_ZLIB_PROVIDER=package
-$ make
+$ make -j 16
 $ make install
 ```
+After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
+```bash
+$ export DYLD_LIBRARY_PATH=/wherever/grpc-install/lib/
+$ export PATH=/wherever/grpc-install/bin/:$PATH   
+$ export PKG_CONFIG_PATH=/wherever/grpc-install/lib/pkgconfig/
+```
+The `setup_compile_env.sh` script sets it up (below). Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+
+##### Linux (Ubuntu 22)
+- Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
+- Use the following command to build:
+```bash
+$ cmake -DgRPC_INSTALL=ON  \
+        -DgRPC_BUILD_TESTS=OFF \
+        -DCMAKE_INSTALL_PREFIX=/home/ubuntu/grpc-install \
+        -DBUILD_SHARED_LIBS=ON ../..
+```
+After you do `make -j <n>` and `make install` to the location you need to tell various parts of the build system where to find gRPC++:
+```bash
+$ export LD_LIBRARY_PATH=/home/ubuntu/grpc-install/lib/
+$ export PATH=~/grpc-install/bin/:$PATH   
+$ export PKG_CONFIG_PATH=/home/ubuntu/grpc-install/lib/pkgconfig/
+```
+The `setup_compile_env.sh` script sets it up (below). Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
+
+#### Install Boost from source
+
+Use [this procedure](https://www.boost.io/doc/user-guide/getting-started.html) to build Boost from scratch (particularly on older Linux systems, like ubuntu 22).
+
+When using it with meson be sure to set `BOOST_ROOT` to wherever it is installed (like e.g. `export BOOST_ROOT=/home/ubuntu/boost-install`) as per [these instructions](https://mesonbuild.com/Dependencies.html#boost).
 
 ### Building base libe2sar library
 
 Make sure Meson is installed (with Ninja backend). The build should work for both LLVM/CLang and g++ compilers.
 
+Update `setup_compile_env.sh` file for your environment. Then run:
+
 ```
-$ meson build -C builddir
-$ cd builddir
+$ . ./setup_compile_env.sh
+$ meson setup build
+$ cd build
 $ meson compile
+$ meson test
 ```
 
 ### Building python bindings
+
+TBD
+
+# Related information
+
+- [UDPLBd repo](https://github.com/esnet/udplbd) (aka Control Plane)
+- [ejfat-rs repo](https://github.com/esnet/ejfat-rs) (command-line tool for testing)
+- [Integrating with EJFAT](https://docs.google.com/document/d/1aUju_pWtHpS0Coesu8dC7HP6LbuKBJZqRYAMSSBtpWQ/edit#heading=h.zbhmzz3u1sna) document
 
 
 # Related information
