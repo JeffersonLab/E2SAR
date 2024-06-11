@@ -94,6 +94,14 @@ namespace e2sar
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available"s};
         }
 
+        /** swap admin token into instance token. Normally when parsed from environment
+         * or string the token in the URI is set to admin token. However in some cases it is
+         * an instance token and only an external directive can say 'use this token as instance token'
+         */
+        inline void swap_InstanceToAdminToken() {
+            adminToken = std::move(instanceToken);
+        }
+
         /** set LB name */
         inline void set_lbName(const std::string &n)
         {
@@ -208,7 +216,7 @@ namespace e2sar
         /** implicit cast to string */
         operator std::string() const;
 
-        /** from environment variable or file */
+        /** from environment variable */
         static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
         {
             const char *envStr = std::getenv(envVar.c_str());
@@ -224,6 +232,19 @@ namespace e2sar
                 }
             }
             return E2SARErrorInfo{E2SARErrorc::Undefined, "Environment variable "s + envVar + " not defined."s};
+        }
+
+        /** from string */
+        static inline result<EjfatURI> getFromString(const std::string &uriStr) noexcept
+        {
+            try
+            {
+                return EjfatURI(uriStr);
+            }
+            catch (const E2SARException &e)
+            {
+                return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from string"s};
+            }
         }
 
         /** from a file */

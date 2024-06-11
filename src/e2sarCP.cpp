@@ -11,6 +11,9 @@ using loadbalancer::FreeLoadBalancerRequest;
 
 using loadbalancer::GetLoadBalancerRequest;
 
+using loadbalancer::LoadBalancerStatusRequest;
+using loadbalancer::LoadBalancerStatusReply;
+
 namespace e2sar
 {
     // reserve load balancer
@@ -117,8 +120,8 @@ namespace e2sar
         return reserveLB(lb_name, ts1, senders);
     }
 
-    // free previously allocated lb
-    result<int> LBManager::freeLB() 
+    // free previously allocated lb using explicit lb id
+    result<int> LBManager::freeLB(const std::string &lbid) 
     {
 
         // we only need lb id from the URI
@@ -140,10 +143,7 @@ namespace e2sar
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
-        if (_cpuri.get_lbId().empty()) 
-            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
-
-        req.set_lbid(_cpuri.get_lbId());
+        req.set_lbid(lbid);
 
         // make the RPC call
         Status status = _stub->FreeLoadBalancer(&context, req, &rep);
@@ -154,6 +154,18 @@ namespace e2sar
         }
 
         return 0;
+    }
+
+    // free load balancer using the URI
+    result<int> LBManager::freeLB()
+    {
+
+        if (_cpuri.get_lbId().empty()) 
+        {
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable in the URI"s};
+        }
+
+        return freeLB(_cpuri.get_lbId());
     }
 
     // get load balancer info using lbid in the URI
@@ -245,15 +257,64 @@ namespace e2sar
         return 0;
     }
 
-    /**
-     * Get load balancer extended info
-     * Uses admin token.
-     * @return - 0 on success or error code with message on failure
-     */
-    result<int> LBManager::getLBStatus()
+    // get LB Status
+    result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus(const std::string &lbid)
     {
-        return 0;
+        auto rep = std::make_unique<LoadBalancerStatusReply>();
+
+        // we only need lb id from the URI
+        ClientContext context;
+        LoadBalancerStatusRequest req;
+
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s}; 
+
+       req.set_lbid(_cpuri.get_lbId());
+
+        // make the RPC call
+        Status status = _stub->LoadBalancerStatus(&context, req, rep.get());
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in getLB(): "s + status.error_message()};
+        }
+
+        return rep;
     }
+
+    result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus()
+    {
+        if (_cpuri.get_lbId().empty()) 
+        {
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable in the URI"s};
+        }
+
+        return getLBStatus(_cpuri.get_lbId());
+    }
+
+    // register worker nodes
+    result<int> registerWorker();
+
+    // send worker queue state
+    result<int> sendState();
+
+    // deregister worker
+    result<int> deregisterWorker();
+
+    // get updated statistics
+    result<int> probeStats();
+
     /**
      * modified from
      * https://stackoverflow.com/questions/116038/how-do-i-read-an-entire-file-into-a-stdstring-in-c

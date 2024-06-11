@@ -1,6 +1,7 @@
 #ifndef E2SARCPHPP
 #define E2SARCPHPP
 #include <vector>
+#include <memory>
 #include <boost/asio.hpp>
 
 #include <grpc/grpc.h>
@@ -24,6 +25,9 @@ using grpc::ClientWriter;
 using grpc::Status;
 
 using loadbalancer::LoadBalancer;
+
+using loadbalancer::LoadBalancerStatusReply;
+using loadbalancer::WorkerStatus;
 
 // default reservation duration for a load balancer in hours
 #define DEFAULT_LB_RESERVE_DURATION 24
@@ -124,7 +128,7 @@ namespace e2sar
                               const boost::posix_time::time_duration &duration,
                               const std::vector<std::string> &senders);
         /**
-         * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB. 
+         * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
          * Uses admin token.
          * @param lbid - externally provided lb id, in this case the URI only needs to contain
          * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
@@ -136,22 +140,83 @@ namespace e2sar
          * @return - 0 on success or error code with message on failure
          */
         result<int> getLB();
-        // get load balancer status
-        result<int> getLBStatus();
 
+        /**
+         * Get load balancer status including list of workers, sender IP addresses
+         * @param lbid - externally provided lbid, in this case the URI only needs to contain
+         * cp address and admin token
+         * @return - loadbalancer::LoadBalancerStatusReply protobuf object with getters for fields
+         * like timestamp, currentepoch, currentpredictedeventnumber and iterators over senders
+         * and workers. For each worker you get name, fill percent, controlsignal, slotsassigned and
+         * timestamp last updated.
+         */
+        result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus(const std::string &lbid);
+
+        /**
+         * Get load balancer status including list of workers, sender IP addresses etc
+         * using lb id in the URI object
+         * @return - loadbalancer::LoadBalancerStatusReply protobuf object with getters for fields
+         * like timestamp, currentepoch, currentpredictedeventnumber and iterators over senders
+         * and workers. For each worker you get name, fill percent, controlsignal, slotsassigned and
+         * timestamp last updated.
+         */
+        result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus();
+
+        /** Helper function copies worker records into a vector
+         * It takes a unique_ptr from getLBStatus() call and helps parse it. 
+         * @param rep - the return of the getLBStatus() call
+         * 
+         * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
+         * slotsassigned and a lastupdated timestamp
+         */
+        static inline const std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> rep)
+        {
+            std::vector<WorkerStatus> ret(rep->workers_size());
+
+            for (auto i = rep->workers().begin(); i != rep->workers().end(); ++i)
+            {
+                ret.push_back(*i);
+            }
+            return ret;
+        }
+
+        /** Helper function copies sender addresses into a vector 
+         * @param rep - the return of getLBStatus() call
+         * 
+         * @return - a vector of strings with known sender addresses communicated in the reserve call
+         */
+        static inline const std::vector<std::string> get_SenderAddresses(std::unique_ptr<LoadBalancerStatusReply> rep)
+        {
+            std::vector<std::string> ret(rep->senderaddresses_size());
+
+            for (auto i = rep->senderaddresses().begin(); i != rep->senderaddresses().end(); ++i)
+            {
+                ret.push_back(*i);
+            }
+            return ret;
+        }
+
+        /**
+         * Free previously reserved load balancer. Uses admin token.
+         * @param - externally provided lbid, in this case the URI only needs to contain
+         * cp address and admin token
+         * @return - 0 on success or error code with message on failure
+         */
+        result<int> freeLB(const std::string &lbid);
         /**
          * Free previously reserved load balancer. Uses admin token.
          * @return - 0 on success or error code with message on failure
          */
         result<int> freeLB();
         // register worker
-        int registerWorker();
+        result<int> registerWorker();
         // send worker queue state
-        int sendState();
+        result<int> sendState();
         // deregister worker
-        int deregisterWorker();
+        result<int> deregisterWorker();
         // get updated statistics
-        int probeStats();
+        result<int> probeStats();
+
 
         inline const EjfatURI &get_URI() const { return _cpuri; }
 
@@ -165,8 +230,8 @@ namespace e2sar
          * @return outcome for grpc::SslCredentialsOptions object with parameters filled in
          */
         static inline result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
-                                                                                  const std::string &pem_private_key,
-                                                                                  const std::string &pem_cert_chain)
+                                                                         const std::string &pem_private_key,
+                                                                         const std::string &pem_cert_chain)
         {
             return grpc::SslCredentialsOptions{std::move(pem_root_certs),
                                                std::move(pem_private_key),

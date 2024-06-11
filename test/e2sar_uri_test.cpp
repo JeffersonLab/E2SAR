@@ -243,4 +243,21 @@ BOOST_AUTO_TEST_CASE(URITest10)
     BOOST_CHECK(euri.get_useTls());
     BOOST_CHECK(euri.get_cpHost().value().first == "jlab.org"s);
 }
+
+BOOST_AUTO_TEST_CASE(URITest11)
+{
+    // test swap functionality for tokens
+    EjfatURI euri(uri_string1);
+
+    std::cout << "Initial token "s << static_cast<std::string>(euri) << std::endl;
+
+    euri.set_InstanceToken("instancetoken"s);
+    BOOST_TEST(!euri.get_InstanceToken().has_error());
+
+    euri.swap_InstanceToAdminToken();
+
+    BOOST_TEST(!euri.get_AdminToken().has_error());
+    BOOST_TEST(!euri.get_AdminToken().value().empty());
+    BOOST_TEST(euri.get_InstanceToken().has_error());
+}
 BOOST_AUTO_TEST_SUITE_END()

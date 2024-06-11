@@ -32,21 +32,11 @@ void option_dependency(const po::variables_map &vm,
  * @param senders is the list of IP addresses of sender nodes
  * @param duration is a string indicating the duration you wish to reserve LB for format "hh:mm::ss"
  */
-result<EjfatURI> reserveLB(const std::string &lbname,
-                           const std::vector<std::string> &senders,
-                           const std::string &duration)
+result<int> reserveLB(EjfatURI &uri,
+                      const std::string &lbname,
+                      const std::vector<std::string> &senders,
+                      const std::string &duration)
 {
-
-    // parse URI from env variable
-    auto uri_r = EjfatURI::getFromEnv();
-
-    if (uri_r.has_error())
-    {
-        return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable,
-                              "unable to parse URI from environment, error "s + uri_r.error().message()};
-    }
-    auto uri = uri_r.value();
-
     // create LBManager
     auto lbman = LBManager(uri);
 
@@ -80,22 +70,12 @@ result<EjfatURI> reserveLB(const std::string &lbname,
     else
     {
         std::cout << "Sucess." << std::endl;
-        return lbman.get_URI();
+        return 0;
     }
 }
 
-result<int> freeLB()
+result<int> freeLB(EjfatURI &uri, const std::string &lbid)
 {
-    // parse URI from env variable
-    auto uri_r = EjfatURI::getFromEnv();
-
-    if (uri_r.has_error())
-    {
-        return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable,
-                              "unable to parse URI from environment, error "s + uri_r.error().message()};
-    }
-    auto uri = uri_r.value();
-
     // create LBManager
     auto lbman = LBManager(uri);
 
@@ -104,8 +84,13 @@ result<int> freeLB()
     std::cout << "   LB Name: " << uri.get_lbName() << std::endl;
     std::cout << "   LB ID: " << uri.get_lbId() << std::endl;
 
+    result<int> res{0};
+
     // attempt to free
-    auto res = lbman.freeLB();
+    if (lbid.empty())
+        res = lbman.freeLB();
+    else
+        res = lbman.freeLB(lbid);
 
     if (res.has_error())
     {
@@ -128,8 +113,10 @@ int main(int argc, char **argv)
 
     // parameters
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
+    opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
     opts("senders,s", po::value<std::vector<std::string>>()->multitoken(), "list of sender IPv4/6 addresses");
     opts("duration,d", po::value<std::string>(), "specify duration as 'hh:mm:ss'");
+    opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
     // commands
     opts("reserve", "reserve a load balancer (-l, -s, -d required)");
     opts("free", "free a load balancer");
@@ -158,11 +145,19 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    std::string ejfat_uri;
+    auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>()) : EjfatURI::getFromEnv());
+    if (uri_r.has_error())
+    {
+        std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message();
+    }
+    auto uri = uri_r.value();
+
     // Reserve
     if (vm.count("reserve"))
     {
         // execute command
-        auto uri_r = reserveLB(vm["lbname"].as<std::string>(),
+        auto uri_r = reserveLB(uri, vm["lbname"].as<std::string>(),
                                vm["senders"].as<std::vector<std::string>>(),
                                vm["duration"].as<std::string>());
         if (uri_r.has_error())
@@ -171,11 +166,15 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        std::cout << "Updated URI after reserve " << static_cast<std::string>(uri_r.value()) << std::endl;
-    } else if (vm.count("free")) 
+        std::cout << "Updated URI after reserve " << static_cast<std::string>(uri) << std::endl;
+    }
+    else if (vm.count("free"))
     {
-        auto int_r = freeLB();
-        if (int_r.has_error()) 
+        std::string lbid;
+        if (vm.count("lbid"))
+            lbid = vm["lbid"].as<std::string>();
+        auto int_r = freeLB(uri, lbid);
+        if (int_r.has_error())
         {
             std::cerr << "There was an error freeing LB: " << int_r.error().message() << std::endl;
             return -1;

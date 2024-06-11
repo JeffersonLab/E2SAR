@@ -41,7 +41,8 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest1)
     BOOST_CHECK(lbman.get_URI().has_syncAddr());
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
-    // call free
+    // call free - this will correctly use the admin token (even though instance token
+    // is added by reserve call and updated URI inside with LB ID added to it
     res = lbman.freeLB();
 
     BOOST_CHECK(!res.has_error());
