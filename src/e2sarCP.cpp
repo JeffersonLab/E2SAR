@@ -3,16 +3,26 @@
 using namespace google::protobuf;
 using namespace boost::posix_time;
 
-using loadbalancer::ReserveLoadBalancerRequest;
 using loadbalancer::ReserveLoadBalancerReply;
+using loadbalancer::ReserveLoadBalancerRequest;
 
 using loadbalancer::FreeLoadBalancerReply;
 using loadbalancer::FreeLoadBalancerRequest;
 
 using loadbalancer::GetLoadBalancerRequest;
 
-using loadbalancer::LoadBalancerStatusRequest;
 using loadbalancer::LoadBalancerStatusReply;
+using loadbalancer::LoadBalancerStatusRequest;
+
+using loadbalancer::PortRange;
+using loadbalancer::RegisterReply;
+using loadbalancer::RegisterRequest;
+
+using loadbalancer::DeregisterReply;
+using loadbalancer::DeregisterRequest;
+
+using loadbalancer::SendStateReply;
+using loadbalancer::SendStateRequest;
 
 namespace e2sar
 {
@@ -43,6 +53,7 @@ namespace e2sar
         _cpuri.set_lbName(lb_name);
         req.set_name(lb_name);
 
+        // Timestamp type is weird. 'Nuf said.
         req.mutable_until()->CopyFrom(until);
 
         // add sender IP addresses, but check they are valid
@@ -121,7 +132,7 @@ namespace e2sar
     }
 
     // free previously allocated lb using explicit lb id
-    result<int> LBManager::freeLB(const std::string &lbid) 
+    result<int> LBManager::freeLB(const std::string &lbid)
     {
 
         // we only need lb id from the URI
@@ -160,7 +171,7 @@ namespace e2sar
     result<int> LBManager::freeLB()
     {
 
-        if (_cpuri.get_lbId().empty()) 
+        if (_cpuri.get_lbId().empty())
         {
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable in the URI"s};
         }
@@ -172,7 +183,7 @@ namespace e2sar
     result<int> LBManager::getLB()
     {
 
-        if (_cpuri.get_lbId().empty()) 
+        if (_cpuri.get_lbId().empty())
         {
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable in the URI"s};
         }
@@ -203,7 +214,7 @@ namespace e2sar
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
-        if (_cpuri.get_lbId().empty()) 
+        if (_cpuri.get_lbId().empty())
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
 
         req.set_lbid(_cpuri.get_lbId());
@@ -278,16 +289,16 @@ namespace e2sar
 #endif
         }
         else
-            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s}; 
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
-       req.set_lbid(_cpuri.get_lbId());
+        req.set_lbid(_cpuri.get_lbId());
 
         // make the RPC call
         Status status = _stub->LoadBalancerStatus(&context, req, rep.get());
 
         if (!status.ok())
         {
-            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in getLB(): "s + status.error_message()};
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in LoadBalancerStatus(): "s + status.error_message()};
         }
 
         return rep;
@@ -295,7 +306,7 @@ namespace e2sar
 
     result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus()
     {
-        if (_cpuri.get_lbId().empty()) 
+        if (_cpuri.get_lbId().empty())
         {
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable in the URI"s};
         }
@@ -304,13 +315,166 @@ namespace e2sar
     }
 
     // register worker nodes
-    result<int> registerWorker();
+    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count)
+    {
+        // we only need lb id from the URI
+        ClientContext context;
+        RegisterRequest req;
+        RegisterReply rep;
 
-    // send worker queue state
-    result<int> sendState();
+        // NOTE: This uses instance token
+        auto instanceToken = _cpuri.get_InstanceToken();
+        if (!instanceToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + instanceToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available in the URI"s};
+
+        if (_cpuri.get_lbId().empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
+
+        req.set_lbid(_cpuri.get_lbId());
+
+        req.set_weight(weight);
+
+        if (node_name.empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Node name can't be empty"s};
+        req.set_name(node_name);
+
+        req.set_portrange(static_cast<PortRange>(get_PortRange(source_count)));
+
+        req.set_ipaddress(node_ip_port.first.to_string());
+
+        if (node_ip_port.second <= 1024)
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Ports below 1024 are generally reserved, worker UDP port too low"s};
+
+        req.set_udpport(static_cast<uint32_t>(node_ip_port.second));
+
+        // make the RPC call
+        Status status = _stub->Register(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in Register(): "s + status.error_message()};
+        }
+
+        //
+        // Fill the URI with information from the reply
+        //
+        if (!rep.token().empty())
+            _cpuri.set_SessionToken(rep.token());
+
+        if (!rep.sessionid().empty())
+            _cpuri.set_sessionId(rep.sessionid());
+
+        return 0;
+    }
 
     // deregister worker
-    result<int> deregisterWorker();
+    result<int> LBManager::deregisterWorker()
+    {
+        // we only need lb id from the URI
+        ClientContext context;
+        DeregisterRequest req;
+        DeregisterReply rep;
+
+        // NOTE: This uses session token
+        auto sessionToken = _cpuri.get_SessionToken();
+        if (!sessionToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + sessionToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available in the URI"s};
+
+        if (_cpuri.get_lbId().empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
+
+        req.set_lbid(_cpuri.get_lbId());
+
+        req.set_sessionid(_cpuri.get_sessionId());
+
+        // make the RPC call
+        Status status = _stub->Deregister(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in Deregister(): "s + status.error_message()};
+        }
+        return 0;
+    }
+
+    // send worker queue state with explicit timestamp
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts)
+    {
+        // we only need lb id from the URI
+        ClientContext context;
+        SendStateRequest req;
+        SendStateReply rep;
+
+        // NOTE: This uses session token
+        auto sessionToken = _cpuri.get_SessionToken();
+        if (!sessionToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + sessionToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available in the URI"s};
+
+        if (_cpuri.get_lbId().empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
+
+        req.set_lbid(_cpuri.get_lbId());
+
+        req.set_sessionid(_cpuri.get_sessionId());
+
+        if ((fill_percent < 0.0) || (fill_percent > 10))
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Fill percent must be a number between 0.0 and 1.0"s};
+
+        req.set_fillpercent(fill_percent);
+
+        req.set_controlsignal(control_signal);
+
+        req.set_isready(is_ready);
+
+        // Timestamp type is weird. 'Nuf said.
+        req.mutable_timestamp()->CopyFrom(ts);
+
+        // make the RPC call
+        Status status = _stub->SendState(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in SendState(): "s + status.error_message()};
+        }
+        return 0;
+    }
+
+    // send worker queue state with using local time
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready)
+    {
+        return sendState(fill_percent, control_signal, is_ready,
+                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::local_time())));
+    }
 
     // get updated statistics
     result<int> probeStats();

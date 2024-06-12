@@ -29,6 +29,8 @@ using loadbalancer::LoadBalancer;
 using loadbalancer::LoadBalancerStatusReply;
 using loadbalancer::WorkerStatus;
 
+using google::protobuf::Timestamp;
+
 // default reservation duration for a load balancer in hours
 #define DEFAULT_LB_RESERVE_DURATION 24
 
@@ -163,9 +165,9 @@ namespace e2sar
         result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus();
 
         /** Helper function copies worker records into a vector
-         * It takes a unique_ptr from getLBStatus() call and helps parse it. 
+         * It takes a unique_ptr from getLBStatus() call and helps parse it.
          * @param rep - the return of the getLBStatus() call
-         * 
+         *
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
          * slotsassigned and a lastupdated timestamp
          */
@@ -180,9 +182,9 @@ namespace e2sar
             return ret;
         }
 
-        /** Helper function copies sender addresses into a vector 
+        /** Helper function copies sender addresses into a vector
          * @param rep - the return of getLBStatus() call
-         * 
+         *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
          */
         static inline const std::vector<std::string> get_SenderAddresses(std::unique_ptr<LoadBalancerStatusReply> rep)
@@ -208,15 +210,48 @@ namespace e2sar
          * @return - 0 on success or error code with message on failure
          */
         result<int> freeLB();
-        // register worker
-        result<int> registerWorker();
-        // send worker queue state
-        result<int> sendState();
-        // deregister worker
+
+        /**
+         * Register a workernode/backend with an allocated loadbalancer. Note that this call uses
+         * instance token, not admin token.
+         * @param node_name - name of the node (can be FQDN)
+         * @param node_ip_port - a pair of ip::address and u_int16_t starting UDP port on which it listens
+         * @param weight - weight given to this node in terms of processing power
+         * @param source_count - how many sources we can listen to (gets converted to port range [0,14])
+         *
+         * @return - 0 on success or an error condition
+         */
+        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count);
+
+        /**
+         * Deregister worker using session ID and session token from the register call
+         * 
+         * @return - 0 on success or an error condition
+         */
         result<int> deregisterWorker();
+
+        /**
+         * Send worker state update using session ID and session token from register call. Automatically
+         * uses localtime to set the timestamp.
+         * @param fill_percent - [0:1] percentage filled of the queue
+         * @param control_signal - change to data rate
+         * @param is_ready - if true, worker ready to accept more data, else not ready
+         */
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready);
+
+        /**
+         * Send worker state update using session ID and session token from register call. Automatically
+         * timestamps with current time.
+         * @param fill_percent - [0:1] percentage filled of the queue
+         * @param control_signal - change to data rate
+         * @param is_ready - if true, worker ready to accept more data, else not ready
+         * @param ts - google::protobuf::Timestamp timestamp for this message (if you want to explicitly not
+         * use localtime)
+         */
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts);
+
         // get updated statistics
         result<int> probeStats();
-
 
         inline const EjfatURI &get_URI() const { return _cpuri; }
 
@@ -251,6 +286,41 @@ namespace e2sar
             std::string_view pem_root_certs,
             std::string_view pem_private_key,
             std::string_view pem_cert_chain);
+
+        /**
+         * Method to map max # of data sources a backend will see to
+         * the corressponding PortRange (enum) value in loadbalancer.proto.
+         *
+         * @param sourceCount max # of data sources backend will see.
+         * @return corressponding PortRange.
+         */
+        static inline int get_PortRange(int source_count) noexcept
+        {
+            // Based on the proto file enum for the load balancer, seen below,
+            // map the max # of sources a backend will see to the PortRange value.
+            // This is necessay to provide the control plane when registering.
+
+            // Handle edge cases
+            if (source_count < 2)
+            {
+                return 0;
+            }
+            else if (source_count > 16384)
+            {
+                return 14;
+            }
+
+            int maxCount = 2;
+            int iteration = 1;
+
+            while (source_count > maxCount)
+            {
+                iteration++;
+                maxCount >>= 1;
+            }
+
+            return iteration;
+        }
     };
 
     /*

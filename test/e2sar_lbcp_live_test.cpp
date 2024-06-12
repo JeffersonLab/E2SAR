@@ -48,4 +48,58 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest1)
     BOOST_CHECK(!res.has_error());
 }
 
+BOOST_AUTO_TEST_CASE(LBMLiveTest2)
+{
+    // reseserve, get, then free
+
+    // parse URI from env variable
+    auto uri_r = EjfatURI::getFromEnv();
+    BOOST_CHECK(!uri_r.has_error());
+    auto uri = uri_r.value();
+
+    // create LBManager
+    auto lbman = LBManager(uri);
+
+    auto duration_v = pt::duration_from_string("01");
+    std::string lbname{"mylb"};
+    std::vector<std::string> senders {"192.168.100.1"s, "192.168.100.2"s};
+
+    // call reserve
+    auto res = lbman.reserveLB(lbname, duration_v, senders);
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
+    BOOST_CHECK(lbman.get_URI().has_syncAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
+
+    // call get on a new uri object so we can compare
+    uri_r = EjfatURI::getFromEnv();
+    BOOST_CHECK(!uri_r.has_error());
+    auto uri1 = uri_r.value();
+
+    auto lbman1 = LBManager(uri1);
+
+    // get lb ID from other URI object
+    res = lbman1.getLB(lbman.get_URI().get_lbId());
+
+    BOOST_CHECK(!res.has_error());
+
+    BOOST_CHECK(lbman.get_URI() == lbman1.get_URI());
+
+    res = lbman.freeLB();
+
+    BOOST_CHECK(!res.has_error());
+}
+
+BOOST_AUTO_TEST_CASE(LBMLiveTest3)
+{
+    // reserve, register worker, unregister worker, free
+}
+
+BOOST_AUTO_TEST_CASE(LBMLiveTest4)
+{
+    // reserve, register worker, get status, unregister worker, get status, free
+    
+}
+
 BOOST_AUTO_TEST_SUITE_END()

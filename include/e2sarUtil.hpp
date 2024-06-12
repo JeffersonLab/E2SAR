@@ -46,6 +46,10 @@ namespace e2sar
         std::string adminToken;
         /** Instance token set by the CP on an LB reservation. */
         std::string instanceToken;
+        /** Session token used by the worker  */
+        std::string sessionToken;
+        /** Session ID issued via register call */
+        std::string sessionId;
 
         /** data plane addresses - there can ever only be one v4 and one v6 */
         ip::address dataAddrv4;
@@ -63,6 +67,13 @@ namespace e2sar
 
         /** destructor */
         ~EjfatURI() {}
+
+        friend bool operator== (const EjfatURI &u1, const EjfatURI &u2);
+
+        friend inline bool operator!= (const EjfatURI &u1, const EjfatURI &u2) 
+        {
+            return !(u1 == u2);
+        }
 
         /** check if TLS should be used */
         inline bool get_useTls() const
@@ -83,6 +94,21 @@ namespace e2sar
                 return instanceToken;
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available"s};
+        }
+
+        /** set session token based on gRPC return */
+        inline void set_SessionToken(const std::string &t)
+        {
+            sessionToken = t;
+        }
+
+        /** get session token */
+        inline const result<std::string> get_SessionToken() const
+        {
+            if (!sessionToken.empty())
+                return sessionToken;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available"s};
         }
 
         /** return the admin token */
@@ -114,6 +140,12 @@ namespace e2sar
             lbId = i;
         }
 
+        /** set session Id from gRPC return */
+        inline void set_sessionId(const std::string &i)
+        {
+            sessionId = i;
+        }
+
         /**
          * Set the sync address (v4 or v6)
         */
@@ -140,15 +172,21 @@ namespace e2sar
         }
 
         /** get LB name */
-        inline const std::string get_lbName()
+        inline const std::string get_lbName() const
         {
             return lbName;
         }
 
         /** get LB ID */
-        inline const std::string get_lbId()
+        inline const std::string get_lbId() const
         {
             return lbId;
+        }
+
+        /** get session Id  */
+        inline const std::string get_sessionId() const 
+        {
+            return sessionId;
         }
 
         /** get control plane ip address and port */
@@ -228,7 +266,7 @@ namespace e2sar
                 }
                 catch (const E2SARException &e)
                 {
-                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from environment variable"s};
+                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse EJFAT_URI from environment variable"s};
                 }
             }
             return E2SARErrorInfo{E2SARErrorc::Undefined, "Environment variable "s + envVar + " not defined."s};
@@ -275,41 +313,6 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to find file "s + fileName};
         }
     };
-
-    /**
-     * Method to map max # of data sources a backend will see to
-     * the corressponding PortRange (enum) value in loadbalancer.proto.
-     *
-     * @param sourceCount max # of data sources backend will see.
-     * @return corressponding PortRange.
-     */
-    static inline int getPortRange(int sourceCount) noexcept
-    {
-        // Based on the proto file enum for the load balancer, seen below,
-        // map the max # of sources a backend will see to the PortRange value.
-        // This is necessay to provide the control plane when registering.
-
-        // Handle edge cases
-        if (sourceCount < 2)
-        {
-            return 0;
-        }
-        else if (sourceCount > 16384)
-        {
-            return 14;
-        }
-
-        int maxCount = 2;
-        int iteration = 1;
-
-        while (sourceCount > maxCount)
-        {
-            iteration++;
-            maxCount >>= 1;
-        }
-
-        return iteration;
-    }
 
     /**
      * Convert a string into an IPv4 or v6 address throwing E2SARException if a problem is encountered
