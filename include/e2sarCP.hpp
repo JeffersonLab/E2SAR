@@ -250,6 +250,12 @@ namespace e2sar
          */
         result<int> sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts);
 
+        /**
+         * Get the version of the load balancer (the commit string)
+         * @return the commit string
+         */
+        result<std::string> version();
+
         // get updated statistics
         result<int> probeStats();
 

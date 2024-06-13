@@ -24,6 +24,9 @@ using loadbalancer::DeregisterRequest;
 using loadbalancer::SendStateReply;
 using loadbalancer::SendStateRequest;
 
+using loadbalancer::VersionRequest;
+using loadbalancer::VersionReply;
+
 namespace e2sar
 {
     // reserve load balancer
@@ -474,6 +477,37 @@ namespace e2sar
     {
         return sendState(fill_percent, control_signal, is_ready,
                          util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::local_time())));
+    }
+
+    result<std::string> LBManager::version() {
+       // we only need lb id from the URI
+        ClientContext context;
+        VersionRequest req;
+        VersionReply rep;
+
+        // NOTE: This uses session token
+        auto sessionToken = _cpuri.get_SessionToken();
+        if (!sessionToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + sessionToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available in the URI"s};
+
+        // make the RPC call
+        Status status = _stub->Version(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in Version(): "s + status.error_message()};
+        }
+        return rep.commit();
     }
 
     // get updated statistics
