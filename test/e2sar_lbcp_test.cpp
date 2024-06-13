@@ -1,4 +1,4 @@
-#define BOOST_TEST_MODULE MyTestSuite
+#define BOOST_TEST_MODULE CPUnitTests
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
@@ -12,7 +12,7 @@ using namespace e2sar;
 
 std::string uri_string1{"ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20"};
 
-BOOST_AUTO_TEST_SUITE(E2SARTestSuite)
+BOOST_AUTO_TEST_SUITE(CPUnitTestSuite)
 
 BOOST_AUTO_TEST_CASE(LBMTest1)
 {

@@ -24,6 +24,9 @@ namespace e2sar
     {
 
     private:
+        enum class TokenType {
+            admin, instance, session
+        };
         std::string rawURI;
         /** Is there a valid data addr & port? */
         bool haveDatav4;
@@ -50,6 +53,9 @@ namespace e2sar
         std::string sessionToken;
         /** Session ID issued via register call */
         std::string sessionId;
+
+        /** token type to be used */
+        TokenType tt = TokenType::admin;
 
         /** data plane addresses - there can ever only be one v4 and one v6 */
         ip::address dataAddrv4;
@@ -81,10 +87,32 @@ namespace e2sar
             return useTls;
         }
 
+        /** set which token to use */
+        inline void use_AdminToken()
+        {
+            tt = TokenType::admin;
+        }
+
+        inline void use_InstanceToken()
+        {
+            tt = TokenType::instance;
+        }
+
+        inline void use_SessionToken()
+        {
+            tt = TokenType::session;
+        }
+
         /** set instance token based on gRPC return */
         inline void set_InstanceToken(const std::string &t)
         {
             instanceToken = t;
+        }
+
+        /** set session token based on gRPC return */
+        inline void set_SessionToken(const std::string &t)
+        {
+            sessionToken = t;
         }
 
         /** get instance token */
@@ -94,12 +122,6 @@ namespace e2sar
                 return instanceToken;
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available"s};
-        }
-
-        /** set session token based on gRPC return */
-        inline void set_SessionToken(const std::string &t)
-        {
-            sessionToken = t;
         }
 
         /** get session token */
@@ -118,14 +140,6 @@ namespace e2sar
                 return adminToken;
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available"s};
-        }
-
-        /** swap admin token into instance token. Normally when parsed from environment
-         * or string the token in the URI is set to admin token. However in some cases it is
-         * an instance token and only an external directive can say 'use this token as instance token'
-         */
-        inline void swap_InstanceToAdminToken() {
-            adminToken = std::move(instanceToken);
         }
 
         /** set LB name */

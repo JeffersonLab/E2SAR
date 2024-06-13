@@ -171,7 +171,7 @@ namespace e2sar
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
          * slotsassigned and a lastupdated timestamp
          */
-        static inline const std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> rep)
+        static inline const std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
         {
             std::vector<WorkerStatus> ret(rep->workers_size());
 
@@ -187,7 +187,7 @@ namespace e2sar
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
          */
-        static inline const std::vector<std::string> get_SenderAddresses(std::unique_ptr<LoadBalancerStatusReply> rep)
+        static inline const std::vector<std::string> get_SenderAddressVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
         {
             std::vector<std::string> ret(rep->senderaddresses_size());
 

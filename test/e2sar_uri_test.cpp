@@ -1,4 +1,4 @@
-#define BOOST_TEST_MODULE MyTestSuite
+#define BOOST_TEST_MODULE URITests
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
@@ -29,7 +29,7 @@ std::string uri_string8{"ejfats://192.188.29.6:18020/lb/36?sync=192.188.29.6:190
 // with TLS and hostname
 std::string uri_string9{"ejfats://jlab.org:18020/lb/36?sync=192.188.29.6:19020"};
 
-BOOST_AUTO_TEST_SUITE(E2SARTestSuite)
+BOOST_AUTO_TEST_SUITE(URITestSuite)
 
 BOOST_AUTO_TEST_CASE(URITest1)
 {
@@ -244,20 +244,4 @@ BOOST_AUTO_TEST_CASE(URITest10)
     BOOST_CHECK(euri.get_cpHost().value().first == "jlab.org"s);
 }
 
-BOOST_AUTO_TEST_CASE(URITest11)
-{
-    // test swap functionality for tokens
-    EjfatURI euri(uri_string1);
-
-    std::cout << "Initial token "s << static_cast<std::string>(euri) << std::endl;
-
-    euri.set_InstanceToken("instancetoken"s);
-    BOOST_TEST(!euri.get_InstanceToken().has_error());
-
-    euri.swap_InstanceToAdminToken();
-
-    BOOST_TEST(!euri.get_AdminToken().has_error());
-    BOOST_TEST(!euri.get_AdminToken().value().empty());
-    BOOST_TEST(euri.get_InstanceToken().has_error());
-}
 BOOST_AUTO_TEST_SUITE_END()

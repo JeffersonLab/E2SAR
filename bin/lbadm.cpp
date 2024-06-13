@@ -104,6 +104,30 @@ result<int> freeLB(EjfatURI &uri, const std::string &lbid)
     }
 }
 
+result<std::string> version(EjfatURI &uri)
+{
+    // create LBManager
+    auto lbman = LBManager(uri);
+
+    std::cout << "Getting load balancer version " << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(uri) << std::endl;
+
+    result<std::string> res{""};
+
+    res = lbman.version();
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        std::cout << "Sucess." << std::endl;
+        return res.value();
+    }
+}
+
 int main(int argc, char **argv)
 {
 
@@ -120,6 +144,7 @@ int main(int argc, char **argv)
     // commands
     opts("reserve", "reserve a load balancer (-l, -s, -d required)");
     opts("free", "free a load balancer");
+    opts("version", "report the version of the LB");
 
     po::variables_map vm;
 
@@ -166,6 +191,7 @@ int main(int argc, char **argv)
             return -1;
         }
 
+        uri.use_InstanceToken();
         std::cout << "Updated URI after reserve " << static_cast<std::string>(uri) << std::endl;
     }
     else if (vm.count("free"))
@@ -179,5 +205,15 @@ int main(int argc, char **argv)
             std::cerr << "There was an error freeing LB: " << int_r.error().message() << std::endl;
             return -1;
         }
+    }
+    else if (vm.count("version"))
+    {
+        auto int_r = version(uri);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error getting LB version: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+        std::cout << "Reported version: " << int_r.value() << std::endl;
     }
 }
