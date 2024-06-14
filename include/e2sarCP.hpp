@@ -334,7 +334,7 @@ namespace e2sar
             while (source_count > maxCount)
             {
                 iteration++;
-                maxCount >>= 1;
+                maxCount <<= 1;
             }
 
             return iteration;
