@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
 
 BOOST_AUTO_TEST_CASE(LBMLiveTest3)
 {
-    // reserve, register worker, unregister worker, free
+    // reserve, register worker, send state, unregister worker, free
 
     // parse URI from env variable
     auto uri_r = EjfatURI::getFromEnv();
@@ -121,6 +121,11 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
     BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
+
+    // send state - every registered worker must do that every 100ms or be auto-deregistered
+    auto res = lbman.sendState(0.8, 1.0, true);
+
+    BOOST_CHECK(!res.has_error());
 
     // unregister (should use session token and session id)
     res = lbman.deregisterWorker();
@@ -165,6 +170,11 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
     BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
+
+    // send state - every registered worker must do that every 100ms or be auto-deregistered
+    auto res = lbman.sendState(0.8, 1.0, true);
+
+    BOOST_CHECK(!res.has_error());
 
     // get LB status
     auto status_res = lbman.getLBStatus();

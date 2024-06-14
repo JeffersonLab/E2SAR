@@ -281,6 +281,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::admin};
     if (vm.count("reserve") || vm.count("free") || vm.count("status") || vm.count("version")) 
     {
