@@ -485,16 +485,16 @@ namespace e2sar
         VersionRequest req;
         VersionReply rep;
 
-        // NOTE: This uses session token
-        auto sessionToken = _cpuri.get_SessionToken();
-        if (!sessionToken.has_error())
+        // NOTE: This uses admin token
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
         {
 #if TOKEN_IN_BODY
             // set bearer token in body (the old way)
             req.set_token(_cpuri.get_AdminToken());
 #else
             // set bearer token in header
-            context.AddMetadata("authorization"s, "Bearer "s + sessionToken.value());
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
 #endif
         }
         else
