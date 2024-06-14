@@ -1,3 +1,4 @@
 [submodule "udplbd"]
 	path = udplbd
 	url = git@github.com:/esnet/udplbd.git
+	branch = develop
