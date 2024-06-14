@@ -139,17 +139,12 @@ namespace e2sar
     {
         // select which token to print
         auto token = std::cref(adminToken);
-        switch (tt)
-        {
-        case TokenType::instance:
+
+        if (!instanceToken.empty())
             token = std::cref(instanceToken);
-            break;
-        case TokenType::session:
+
+        if (!sessionToken.empty())
             token = std::cref(sessionToken);
-            break;
-        case TokenType::admin:
-            ;;
-        }
 
         return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
                (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
@@ -176,5 +171,32 @@ namespace e2sar
                 u1.lbId == u2.lbId &&
                 u1.sessionId == u2.sessionId &&
                 u1.lbName == u2.lbName);
+    }
+
+    const std::string EjfatURI::to_string(TokenType tt) const
+    {
+        // select which token to print
+        auto token = std::cref(adminToken);
+
+        switch (tt)
+        {
+        case TokenType::instance:
+            token = std::cref(instanceToken);
+            break;
+        case TokenType::session:
+            token = std::cref(sessionToken);
+        case TokenType::admin:;
+            ;
+        }
+
+        return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
+               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
+               "/"s +
+               (!lbId.empty() ? "lb/"s + lbId : ""s) +
+               (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
+               (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
+               (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
+               (haveDatav4 ? "data="s + dataAddrv4.to_string() : ""s) +
+               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
     }
 }

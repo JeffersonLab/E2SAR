@@ -70,6 +70,8 @@ result<int> reserveLB(EjfatURI &uri,
     else
     {
         std::cout << "Sucess." << std::endl;
+
+        std::cout << "Updated URI after reserve " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
         return 0;
     }
 }
@@ -190,9 +192,6 @@ int main(int argc, char **argv)
             std::cerr << "There was an error reserving LB: " << uri_r.error().message() << std::endl;
             return -1;
         }
-
-        uri.use_InstanceToken();
-        std::cout << "Updated URI after reserve " << static_cast<std::string>(uri) << std::endl;
     }
     else if (vm.count("free"))
     {

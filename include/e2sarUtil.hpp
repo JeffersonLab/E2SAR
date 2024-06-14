@@ -22,11 +22,12 @@ namespace e2sar
     /** Structure to hold info parsed from an ejfat URI (and a little extra). */
     class EjfatURI
     {
-
-    private:
+    public:
         enum class TokenType {
             admin, instance, session
         };
+
+    private:
         std::string rawURI;
         /** Is there a valid data addr & port? */
         bool haveDatav4;
@@ -53,9 +54,6 @@ namespace e2sar
         std::string sessionToken;
         /** Session ID issued via register call */
         std::string sessionId;
-
-        /** token type to be used */
-        TokenType tt = TokenType::admin;
 
         /** data plane addresses - there can ever only be one v4 and one v6 */
         ip::address dataAddrv4;
@@ -85,22 +83,6 @@ namespace e2sar
         inline bool get_useTls() const
         {
             return useTls;
-        }
-
-        /** set which token to use */
-        inline void use_AdminToken()
-        {
-            tt = TokenType::admin;
-        }
-
-        inline void use_InstanceToken()
-        {
-            tt = TokenType::instance;
-        }
-
-        inline void use_SessionToken()
-        {
-            tt = TokenType::session;
         }
 
         /** set instance token based on gRPC return */
@@ -265,9 +247,14 @@ namespace e2sar
                 return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Sync address not available"s};
         }
-        /** implicit cast to string */
+        /** implicit cast to string which prints session token if available, otherwise insstance
+         * token if available, otherwise admin token if available, otherwise no token.
+         * To get the URI string with specific token use the to_string(TokenType) method.
+        */
         operator std::string() const;
 
+        const std::string to_string(TokenType tt = TokenType::admin) const;
+ 
         /** from environment variable */
         static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
         {
