@@ -123,7 +123,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
     BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
 
     // send state - every registered worker must do that every 100ms or be auto-deregistered
-    auto res = lbman.sendState(0.8, 1.0, true);
+    res = lbman.sendState(0.8, 1.0, true);
 
     BOOST_CHECK(!res.has_error());
 
@@ -172,7 +172,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
 
     // send state - every registered worker must do that every 100ms or be auto-deregistered
-    auto res = lbman.sendState(0.8, 1.0, true);
+    res = lbman.sendState(0.8, 1.0, true);
 
     BOOST_CHECK(!res.has_error());
 
