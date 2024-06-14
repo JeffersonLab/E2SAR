@@ -132,7 +132,8 @@ namespace e2sar
                               const std::vector<std::string> &senders);
         /**
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
-         * Uses admin token and sets instance token on the internal URI object.
+         * Uses admin token of the internal URI object. Note that unlike reserve it does NOT set
+         * the instance token - it is not available.
          * 
          * @param lbid - externally provided lb id, in this case the URI only needs to contain
          * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
