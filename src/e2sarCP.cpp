@@ -157,6 +157,9 @@ namespace e2sar
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
+        if (lbid.empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID must be provided externally and is empty"s};
+
         req.set_lbid(lbid);
 
         // make the RPC call
@@ -217,10 +220,12 @@ namespace e2sar
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
-        if (_cpuri.get_lbId().empty())
-            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
-
-        req.set_lbid(_cpuri.get_lbId());
+        if (!lbid.empty())
+            req.set_lbid(lbid);
+        else if (!_cpuri.get_lbId().empty())
+            req.set_lbid(_cpuri.get_lbId());
+        else 
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID was not provided in URI or externally"s};
 
         // make the RPC call
         Status status = _stub->GetLoadBalancer(&context, req, &rep);
@@ -294,7 +299,12 @@ namespace e2sar
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
 
-        req.set_lbid(_cpuri.get_lbId());
+        if (!lbid.empty())
+            req.set_lbid(lbid);
+        else if (!_cpuri.get_lbId().empty())
+            req.set_lbid(_cpuri.get_lbId());
+        else 
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID was not provided in URI or externally"s};
 
         // make the RPC call
         Status status = _stub->LoadBalancerStatus(&context, req, rep.get());

@@ -235,14 +235,14 @@ int main(int argc, char **argv)
     // parameters
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
-    opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address");
+    opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address, can be used multiple times for 'reserve' call");
     opts("duration,d", po::value<std::string>(), "specify duration as 'hh:mm:ss'");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
     opts("name,n", po::value<std::string>(), "specify node name for registration");
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
     opts("weight,w", po::value<float>(), "node weight");
     opts("count,c", po::value<u_int16_t>(), "node source count");
-    opts("session,s", po::value<std::string>(), "session id");
+    opts("session,s", po::value<std::string>(), "session id from 'register' call");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required)");
     opts("free", "free a load balancer");
