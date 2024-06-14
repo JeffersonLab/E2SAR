@@ -10,17 +10,7 @@ protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 
 # On many platforms, gRPC C++ has to be manually installed and found.
-# Meson dependency guide: https://mesonbuild.com/Dependencies.html
 grpc_dep = dependency('grpc++', version: '>=1.54.1', required: false)
-if not grpc_dep.found()
-  # gRPC C++ building from source guide: https://github.com/grpc/grpc/blob/v1.62.0/BUILDING.md
-  # TODO: link the path to some ENV vars or grpc++.pc
-  grpc_dep = declare_dependency(
-    include_directories: '/usr/local/include/grpc++',
-    link_args: ['-L/usr/local/lib' , 'lgrpc++']
-  )
-  message('Declare grpc++ dependency manually')
-endif
 
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
