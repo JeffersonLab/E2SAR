@@ -196,7 +196,7 @@ namespace e2sar
                (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
                (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
                (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
-               (haveDatav4 ? "data="s + dataAddrv4.to_string() : ""s) +
+               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s): ""s) +
                (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
     }
 }

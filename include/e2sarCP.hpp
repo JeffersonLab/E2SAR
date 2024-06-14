@@ -117,7 +117,8 @@ namespace e2sar
                               const std::vector<std::string> &senders);
 
         /**
-         * Reserve a new load balancer with this name until specified time
+         * Reserve a new load balancer with this name until specified time. It sets the intstance
+         * token on the internal URI object.
          *
          * @param lb_name LB name internal to you
          * @param duration for how long it is needed as boost::posix_time::time_duration. You can use
@@ -131,7 +132,8 @@ namespace e2sar
                               const std::vector<std::string> &senders);
         /**
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
-         * Uses admin token.
+         * Uses admin token and sets instance token on the internal URI object.
+         * 
          * @param lbid - externally provided lb id, in this case the URI only needs to contain
          * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
          * @return - 0 on success or error code with message on failure
@@ -144,7 +146,8 @@ namespace e2sar
         result<int> getLB();
 
         /**
-         * Get load balancer status including list of workers, sender IP addresses
+         * Get load balancer status including list of workers, sender IP addresses.
+         * 
          * @param lbid - externally provided lbid, in this case the URI only needs to contain
          * cp address and admin token
          * @return - loadbalancer::LoadBalancerStatusReply protobuf object with getters for fields
@@ -157,6 +160,7 @@ namespace e2sar
         /**
          * Get load balancer status including list of workers, sender IP addresses etc
          * using lb id in the URI object
+         * 
          * @return - loadbalancer::LoadBalancerStatusReply protobuf object with getters for fields
          * like timestamp, currentepoch, currentpredictedeventnumber and iterators over senders
          * and workers. For each worker you get name, fill percent, controlsignal, slotsassigned and
@@ -166,6 +170,7 @@ namespace e2sar
 
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it.
+         * 
          * @param rep - the return of the getLBStatus() call
          *
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
@@ -183,6 +188,7 @@ namespace e2sar
         }
 
         /** Helper function copies sender addresses into a vector
+         * 
          * @param rep - the return of getLBStatus() call
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
@@ -213,7 +219,8 @@ namespace e2sar
 
         /**
          * Register a workernode/backend with an allocated loadbalancer. Note that this call uses
-         * instance token, not admin token.
+         * instance token. It sets session token and session id on the internal
+         * URI object.
          * @param node_name - name of the node (can be FQDN)
          * @param node_ip_port - a pair of ip::address and u_int16_t starting UDP port on which it listens
          * @param weight - weight given to this node in terms of processing power
@@ -240,8 +247,9 @@ namespace e2sar
         result<int> sendState(float fill_percent, float control_signal, bool is_ready);
 
         /**
-         * Send worker state update using session ID and session token from register call. Automatically
-         * timestamps with current time.
+         * Send worker state update using session ID and session token from register call. Allows to explicitly
+         * set the timestamp.
+         * 
          * @param fill_percent - [0:1] percentage filled of the queue
          * @param control_signal - change to data rate
          * @param is_ready - if true, worker ready to accept more data, else not ready
@@ -252,6 +260,7 @@ namespace e2sar
 
         /**
          * Get the version of the load balancer (the commit string)
+         * 
          * @return the commit string
          */
         result<std::string> version();
@@ -259,6 +268,9 @@ namespace e2sar
         // get updated statistics
         result<int> probeStats();
 
+        /**
+         * Get the internal URI object.
+         */
         inline const EjfatURI &get_URI() const { return _cpuri; }
 
         /**
