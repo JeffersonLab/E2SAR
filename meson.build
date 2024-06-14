@@ -10,7 +10,7 @@ protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 
 # On many platforms, gRPC C++ has to be manually installed and found.
-grpc_dep = dependency('grpc++', version: '>=1.54.1', required: false)
+grpc_dep = dependency('grpc++', version: '>=1.54.1')
 
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
