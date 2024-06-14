@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
 
     BOOST_CHECK(!res.has_error());
 
-    BOOST_CHECK(lbman.get_URI() == lbman1.get_URI());
+    BOOST_CHECK(lbman.get_URI().get_syncAddr().value() == lbman1.get_URI().get_syncAddr().value());
 
     res = lbman.freeLB();
 
@@ -154,7 +154,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
-    std::vector<std::string> senders {"192.168.100.1"s, "192.168.100.2"s};
+    std::vector<std::string> senders {"192.168.20.1"s, "192.168.20.2"s};
 
     // call reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
@@ -181,8 +181,8 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
 
     BOOST_CHECK(!status_res.has_error());
     auto saddrs = LBManager::get_SenderAddressVector(status_res.value());
-    BOOST_CHECK(saddrs.size() == 1);
-    BOOST_CHECK(saddrs[0] == "192.168.101.5"s);
+    BOOST_CHECK(saddrs.size() == 2);
+    BOOST_CHECK(saddrs[0] == "192.168.20.1"s);
     auto workers = LBManager::get_WorkerStatusVector(status_res.value());
     BOOST_CHECK(workers.size() == 1);
     BOOST_CHECK(workers[0].name() == "my_node"s);

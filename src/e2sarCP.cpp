@@ -238,9 +238,7 @@ namespace e2sar
         //
         // Fill the URI with information from the reply
         //
-        if (!rep.token().empty())
-            _cpuri.set_InstanceToken(rep.token());
-
+        // Note that unlike reserve this call CANNOT return an instance token
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
