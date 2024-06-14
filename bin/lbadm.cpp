@@ -200,6 +200,30 @@ result<int> getLBStatus(EjfatURI &uri, const std::string &lbid)
     }
 }
 
+result<int> sendState(EjfatURI &uri, float fill_percent, float ctrl_signal, bool is_ready)
+{
+    // create LBManager
+    auto lbman = LBManager(uri);
+
+    std::cout << "Sending Worker State " << std::endl;
+    std::cout << "   Contacting: " << uri.to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   LB Name: " << (uri.get_lbName().empty() ? "not set"s : uri.get_lbId()) << std::endl;
+
+    auto res = lbman.sendState(fill_percent, ctrl_signal, is_ready);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        std::cout << "Sucess." << std::endl;
+
+        return 0;
+    }
+}
+
 result<int> version(EjfatURI &uri)
 {
     // create LBManager
@@ -243,13 +267,17 @@ int main(int argc, char **argv)
     opts("weight,w", po::value<float>(), "node weight");
     opts("count,c", po::value<u_int16_t>(), "node source count");
     opts("session,s", po::value<std::string>(), "session id from 'register' call");
+    opts("queue,q", po::value<float>(), "queue fill");
+    opts("ctrl,c", po::value<float>(), "control signal value");
+    opts("ready,r", po::value<bool>(), "worker ready state");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required)");
     opts("free", "free a load balancer");
     opts("version", "report the version of the LB");
-    opts("register", "register a worker (-n, -a, -p, -w, -c required)");
+    opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered");
     opts("deregister", "deregister worker (-s required)");
     opts("status", "get and print LB status");
+    opts("state", "send worker state update (must be done within 10 sec of registration)");
 
     po::variables_map vm;
 
@@ -268,6 +296,9 @@ int main(int argc, char **argv)
         option_dependency(vm, "register", "weight");
         option_dependency(vm, "register", "count");
         option_dependency(vm, "deregister", "session");
+        option_dependency(vm, "state", "queue");
+        option_dependency(vm, "state", "ctrl");   
+        option_dependency(vm, "state", "ready");    
     }
     catch (const std::logic_error &le)
     {
@@ -289,7 +320,7 @@ int main(int argc, char **argv)
     } else if (vm.count("register")) 
     {
         tt = EjfatURI::TokenType::instance;
-    } else if (vm.count("deregister"))
+    } else if (vm.count("deregister") || vm.count("state"))
     {
         tt = EjfatURI::TokenType::session;
     }
@@ -372,6 +403,15 @@ int main(int argc, char **argv)
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting LB status: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("state"))
+    {
+        auto int_r = sendState(uri, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
             return -1;
         }
     }

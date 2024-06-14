@@ -221,7 +221,9 @@ namespace e2sar
         /**
          * Register a workernode/backend with an allocated loadbalancer. Note that this call uses
          * instance token. It sets session token and session id on the internal
-         * URI object.
+         * URI object. Note that a new worker must send state immediately (within 10s) 
+         * or be automatically deregistered. 
+         * 
          * @param node_name - name of the node (can be FQDN)
          * @param node_ip_port - a pair of ip::address and u_int16_t starting UDP port on which it listens
          * @param weight - weight given to this node in terms of processing power
@@ -240,7 +242,8 @@ namespace e2sar
 
         /**
          * Send worker state update using session ID and session token from register call. Automatically
-         * uses localtime to set the timestamp.
+         * uses localtime to set the timestamp. Workers are expected to send state every 100ms or so.
+         * 
          * @param fill_percent - [0:1] percentage filled of the queue
          * @param control_signal - change to data rate
          * @param is_ready - if true, worker ready to accept more data, else not ready
