@@ -34,7 +34,7 @@ namespace e2sar
      *
      * @param uri URI to parse.
      */
-    EjfatURI::EjfatURI(const std::string &uri) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}
+    EjfatURI::EjfatURI(const std::string &uri, TokenType tt) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}
     {
 
         // parse the URI
@@ -60,7 +60,18 @@ namespace e2sar
 
         if (u.userinfo().length() > 0)
         {
-            adminToken = u.userinfo();
+            switch (tt)
+            {
+            case TokenType::admin:
+                adminToken = u.userinfo();
+                break;
+            case TokenType::instance:
+                instanceToken = u.userinfo();
+                break;
+            case TokenType::session:
+                sessionToken = u.userinfo();
+                break;
+            }
         }
 
         // see if the host needs resolving
@@ -196,7 +207,7 @@ namespace e2sar
                (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
                (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
                (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
-               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s): ""s) +
+               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
                (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
     }
 }

@@ -129,6 +129,7 @@ result<int> registerWorker(EjfatURI &uri, const std::string &node_name, const st
     {
         std::cout << "Sucess." << std::endl;
         std::cout << "Updated URI after register " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+        std::cout << "Session id is " << lbman.get_URI().get_sessionId() << std::endl;
         return 0;
     }
 }
@@ -241,12 +242,13 @@ int main(int argc, char **argv)
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
     opts("weight,w", po::value<float>(), "node weight");
     opts("count,c", po::value<u_int16_t>(), "node source count");
+    opts("session,s", po::value<std::string>(), "session id");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required)");
     opts("free", "free a load balancer");
     opts("version", "report the version of the LB");
     opts("register", "register a worker (-n, -a, -p, -w, -c required)");
-    opts("deregister", "deregister worker");
+    opts("deregister", "deregister worker (-s required)");
     opts("status", "get and print LB status");
 
     po::variables_map vm;
@@ -265,6 +267,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "register", "port");
         option_dependency(vm, "register", "weight");
         option_dependency(vm, "register", "count");
+        option_dependency(vm, "deregister", "session");
     }
     catch (const std::logic_error &le)
     {
@@ -278,8 +281,20 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    EjfatURI::TokenType tt{EjfatURI::TokenType::admin};
+    if (vm.count("reserve") || vm.count("free") || vm.count("status") || vm.count("version")) 
+    {
+        tt = EjfatURI::TokenType::admin;
+    } else if (vm.count("register")) 
+    {
+        tt = EjfatURI::TokenType::instance;
+    } else if (vm.count("deregister"))
+    {
+        tt = EjfatURI::TokenType::session;
+    }
+
     std::string ejfat_uri;
-    auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>()) : EjfatURI::getFromEnv());
+    auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt) : EjfatURI::getFromEnv("EJFAT_URI"s, tt));
     if (uri_r.has_error())
     {
         std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message();
@@ -324,7 +339,7 @@ int main(int argc, char **argv)
     {
         auto int_r = registerWorker(uri,
                                     vm["name"].as<std::string>(),
-                                    vm["address"].as<std::string>(),
+                                    vm["address"].as<std::vector<std::string>>()[0],
                                     vm["port"].as<u_int16_t>(),
                                     vm["weight"].as<float>(),
                                     vm["count"].as<u_int16_t>());
@@ -337,6 +352,8 @@ int main(int argc, char **argv)
     }
     else if (vm.count("deregister"))
     {
+        // remember to set session 
+        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = deregisterWorker(uri);
         if (int_r.has_error())
         {
@@ -349,7 +366,7 @@ int main(int argc, char **argv)
         std::string lbid;
         if (vm.count("lbid"))
             lbid = vm["lbid"].as<std::string>();
-            
+
         auto int_r = getLBStatus(uri, lbid);
         if (int_r.has_error())
         {

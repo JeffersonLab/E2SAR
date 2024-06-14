@@ -66,7 +66,7 @@ namespace e2sar
 
     public:
         /** base constructor, sets instance token from string */
-        EjfatURI(const std::string &uri);
+        EjfatURI(const std::string &uri, TokenType tt=TokenType::admin);
         /** rely on implicitly-declared copy constructor as needed */
 
         /** destructor */
@@ -256,14 +256,14 @@ namespace e2sar
         const std::string to_string(TokenType tt = TokenType::admin) const;
  
         /** from environment variable */
-        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
+        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s, TokenType tt=TokenType::admin) noexcept
         {
             const char *envStr = std::getenv(envVar.c_str());
             if (envStr != nullptr)
             {
                 try
                 {
-                    return EjfatURI(envStr);
+                    return EjfatURI(envStr, tt);
                 }
                 catch (const E2SARException &e)
                 {
@@ -274,11 +274,11 @@ namespace e2sar
         }
 
         /** from string */
-        static inline result<EjfatURI> getFromString(const std::string &uriStr) noexcept
+        static inline result<EjfatURI> getFromString(const std::string &uriStr, TokenType tt=TokenType::admin) noexcept
         {
             try
             {
-                return EjfatURI(uriStr);
+                return EjfatURI(uriStr, tt);
             }
             catch (const E2SARException &e)
             {
