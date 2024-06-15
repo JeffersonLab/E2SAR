@@ -8,7 +8,7 @@
 #include <pybind11/stl.h> // For std::string conversion
 #include <pybind11/functional.h>
 
-#include "e2sarUtil.hpp"
+#include "e2sarCP.hpp"
  
 namespace py = pybind11;
 
@@ -20,7 +20,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     m.doc() = "Python bindings for the e2sar namesapce.";
 
     /**
-     * Bindings for the E2SARErrorc enum class.
+     * Bind the E2SARErrorc enum class
      */
     py::enum_<E2SARErrorc>(m, "E2SARErrorc")
         .value("NoError", E2SARErrorc::NoError)
@@ -35,7 +35,7 @@ PYBIND11_MODULE(e2sar_py, m) {
         .export_values();
 
     /**
-     * Bindings for the E2SARErrorInfo class.
+     * Bind the E2SARErrorInfo class
      */
     py::class_<E2SARErrorInfo>(m, "E2SARErrorInfo")
         .def(py::init<E2SARErrorc, std::string>())
@@ -43,7 +43,7 @@ PYBIND11_MODULE(e2sar_py, m) {
         .def("message", &E2SARErrorInfo::message);
 
     /**
-     * Bind a "IPAddress" class for future usage.
+     * Bind "IPAddress" class for future usage
      */
     py::class_<boost::asio::ip::address>(m, "IPAddress")
         .def(py::init<>())
@@ -56,7 +56,7 @@ PYBIND11_MODULE(e2sar_py, m) {
         });
 
     /** 
-     * Binding for the result type containing std::string.
+     * Bind the result type containing std::string
      */
     py::class_<outcome::result<std::string, E2SARErrorInfo>>(m, "E2SARResultString")
         .def("value", [](const outcome::result<std::string, E2SARErrorInfo> &res) {
@@ -73,7 +73,7 @@ PYBIND11_MODULE(e2sar_py, m) {
         });
   
     /**
-     * Binding for the result type containing std::pair<std::string, uint16_t>.
+     * Binding the result type containing std::pair<std::string, uint16_t>
      */
     py::class_<outcome::result<std::pair<std::string, uint16_t>, E2SARErrorInfo>>(m, "E2SARResultPairString")
         .def("value", [](const outcome::result<std::pair<std::string, uint16_t>, E2SARErrorInfo> &res) {
@@ -90,7 +90,7 @@ PYBIND11_MODULE(e2sar_py, m) {
         });
 
     /**
-     * Binding for the result type containing std::pair<ip::address, uint16_t>.
+     * Bind the result type containing std::pair<ip::address, uint16_t>
      */
     py::class_<outcome::result<std::pair<boost::asio::ip::address, uint16_t>, E2SARErrorInfo>>(m, "E2SARResultPairIP")
         .def("value", [](const outcome::result<std::pair<boost::asio::ip::address, uint16_t>, E2SARErrorInfo> &res) {
@@ -107,7 +107,7 @@ PYBIND11_MODULE(e2sar_py, m) {
         });
 
     /**
-     * Binding for the result type containing EjfatURI.
+     * Bind the result type containing EjfatURI
      */
     py::class_<outcome::result<EjfatURI, E2SARErrorInfo>>(m, "E2SARResultEjfatURI")
         .def("value", [](const outcome::result<EjfatURI, E2SARErrorInfo> &res) {
@@ -124,11 +124,46 @@ PYBIND11_MODULE(e2sar_py, m) {
         });
 
     /**
-     * Binding for the e2sar::EjfatURI class.
+     * Bind the result type containing int.
+     */
+    py::class_<outcome::result<int, E2SARErrorInfo>>(m, "E2SARResultInt")
+        .def("value", [](const outcome::result<int, E2SARErrorInfo> &res) {
+            if (res)
+                return res.value();
+            else
+                throw std::runtime_error(res.error().message());
+        })
+        .def("error", [](const outcome::result<int, E2SARErrorInfo> &res) {
+            if (!res)
+                return res.error();
+            else
+                throw std::runtime_error("No error present");
+        });
+
+    /**
+     * Bind the result type containing grpc::SslCredentialsOptions
+     */
+    py::class_<outcome::result<grpc::SslCredentialsOptions, E2SARErrorInfo>>(
+        m, "E2SARResultSslCredentialsOptions")
+        .def("value", [](const outcome::result<grpc::SslCredentialsOptions, E2SARErrorInfo> &res) {
+            if (res)
+                return res.value();
+            else
+                throw std::runtime_error(res.error().message());
+        })
+        .def("error", [](const outcome::result<grpc::SslCredentialsOptions, E2SARErrorInfo> &res) {
+            if (!res)
+                return res.error();
+            else
+                throw std::runtime_error("No error present");
+        });
+
+    /**
+     * Bind the e2sar::EjfatURI class.
      */
 
     /// NOTE: Do not use py::class_<EjfatURI> EjfatURI(m, "EjfatURI").
-    ///       This will cause trouble.
+    ///       This will cause trouble for the classes depend on it!
     py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
 
     py::enum_<EjfatURI::TokenType>(ejfat_uri, "TokenType")
@@ -192,35 +227,51 @@ PYBIND11_MODULE(e2sar_py, m) {
      * Register grpc::SslCredentialsOptions.
      * The dependency chain of e2sar::LBManager.
      */
-    // py::class_<grpc::SslCredentialsOptions>(m, "SslCredentialsOptions")
-    //     .def(py::init<>());
+    py::class_<grpc::SslCredentialsOptions>(m, "SslCredentialsOptions")
+        .def(py::init<>());
 
-    // /**
-    //  * Bind the LBManager
-    //  */
-    // py::class_<LBManager> lb_manager(m, "LBManager");
+    /**
+     * Bind the LBManager
+     */
+    py::class_<LBManager> lb_manager(m, "LBManager");
     
-    // lb_manager.def(py::init<const EjfatURI &, grpc::SslCredentialsOptions>(),
-    //               py::arg("cpuri"), py::arg("opts") = grpc::SslCredentialsOptions());
+    // Constructor
+    lb_manager.def(
+        py::init<const EjfatURI &, bool &, grpc::SslCredentialsOptions>(),
+        py::arg("cpuri"), py::arg("validate_server") = true, py::arg("opts") = grpc::SslCredentialsOptions()
+        );
 
-    // lb_manager.def_property_readonly("is_reserved", &LBManager::isReserved);
+    lb_manager.def_property_readonly("is_reserved", &LBManager::isReserved);
 
-    // /// NOTE: Bindings for overloaded methods.
-    // ///       Ref: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
+    // Bind LBManager::reserveLB to use duration in seconds
+    // It is specifically designed to interface with Python datetime.timedelta
+    lb_manager.def(
+        "reserve_lb_seconds",
+        static_cast<result<int> (LBManager::*)(
+            const std::string &,
+            const double &,
+            const std::vector<std::string> &
+            )>(&LBManager::reserveLB),
+        py::arg("lb_id"), py::arg("seconds"), py::arg("senders")
+    );
 
-    // // Bind LBManager::reserveLB to use duration in seconds
-    // lb_manager.def(
-    //     "reserve_lb_seconds",
-    //     static_cast<result<int> (LBManager::*)(
-    //         const std::string &,
-    //         const double &,
-    //         const std::vector<std::string> &
-    //         )>(&LBManager::reserveLB),
-    //     py::arg("lb_name"), py::arg("seconds"), py::arg("senders")
-    // );
+    /// NOTE: Bindings for overloaded methods.
+    ///       Ref: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
+    lb_manager.def(
+        "get_lb",
+        static_cast<result<int> (LBManager::*)()>(&LBManager::getLB)
+    );
 
-    // // Return an EjfatURI object.
-    // lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
+    lb_manager.def(
+        "get_lb_by_id",
+        static_cast<result<int> (LBManager::*)(
+            const std::string &
+        )>(&LBManager::getLB),
+        py::arg("lb_id")
+    );
+
+    // Return an EjfatURI object.
+    lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
 
     // lb_manager.def("get_lb_status", &LBManager::getLBStatus);
 }

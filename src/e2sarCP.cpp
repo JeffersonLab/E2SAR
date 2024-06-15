@@ -134,8 +134,19 @@ namespace e2sar
         return reserveLB(lb_name, ts1, senders);
     }
 
+    // reserve via duration in seconds
+    result<int> LBManager::reserveLB(const std::string &lb_name,
+                                     const double &durationSeconds,
+                                     const std::vector<std::string> &senders)
+    {
+        /// NOTE: this static casting may lose time accuracy, but should be accepted
+        boost::posix_time::time_duration duration = boost::posix_time::seconds(static_cast<long>(durationSeconds));
+        return reserveLB(lb_name, duration, senders);
+    }
+
+
     // free previously allocated lb using explicit lb id
-    result<int> LBManager::freeLB(const std::string &lbid)
+    result<int> LBManager::freeLB(const std::string &lbid) 
     {
 
         // we only need lb id from the URI
