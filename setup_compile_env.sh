@@ -20,4 +20,5 @@ export PATH=${GRPC_ROOT}/bin:$PATH
 # for MacOS point to lib where grpc and boost compiled artifacts can be
 export DYLD_LIBRARY_PATH=${GRPC_ROOT}/lib:${BOOST_ROOT}/lib
 # for Linux point to lib where grpc and boost compiled artifacts can be
+# for RHEL, also add ${GRPC_ROOT}/lib64
 export LD_LIBRARY_PATH=${GRPC_ROOT}/lib:${BOOST_ROOT}/lib
