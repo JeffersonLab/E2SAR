@@ -92,7 +92,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     /**
      * Binding for the result type containing std::pair<ip::address, uint16_t>.
      */
-    py::class_<outcome::result<std::pair<boost::asio::ip::address, uint16_t>, E2SARErrorInfo>>(m, "E2SARResultPair")
+    py::class_<outcome::result<std::pair<boost::asio::ip::address, uint16_t>, E2SARErrorInfo>>(m, "E2SARResultPairIP")
         .def("value", [](const outcome::result<std::pair<boost::asio::ip::address, uint16_t>, E2SARErrorInfo> &res) {
             if (res)
                 return res.value();
