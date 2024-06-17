@@ -1,7 +1,10 @@
 #define BOOST_TEST_MODULE CPLiveTests
 #include <stdlib.h>
 #include <iostream>
+#include <cmath>
 #include <boost/asio.hpp>
+#include <boost/chrono.hpp>
+#include <boost/thread/thread.hpp>
 #include <vector>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/program_options.hpp>
@@ -31,7 +34,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest1)
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
-    std::vector<std::string> senders {"192.168.100.1"s, "192.168.100.2"s};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
 
     // call reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
@@ -62,7 +65,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
-    std::vector<std::string> senders {"192.168.100.1"s, "192.168.100.2"s};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
 
     // call reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
@@ -105,7 +108,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
-    std::vector<std::string> senders {"192.168.100.1"s, "192.168.100.2"s};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
 
     // call reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
@@ -142,7 +145,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
 {
     // reserve, register worker, get status, unregister worker, get status, free
 
-        // reserve, register worker, unregister worker, free
+    // reserve, register worker, unregister worker, free
 
     // parse URI from env variable
     auto uri_r = EjfatURI::getFromEnv();
@@ -154,7 +157,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
-    std::vector<std::string> senders {"192.168.20.1"s, "192.168.20.2"s};
+    std::vector<std::string> senders{"192.168.20.1"s, "192.168.20.2"s};
 
     // call reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
@@ -171,10 +174,14 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
     BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
 
-    // send state - every registered worker must do that every 100ms or be auto-deregistered
-    res = lbman.sendState(0.8, 1.0, true);
-
-    BOOST_CHECK(!res.has_error());
+    // send state - every registered worker must do that every 100ms or be auto-deregistered after 10s of silence
+    // first 2 seconds of the state are discarded as too noisy
+    for (int i = 25; i > 0; i--)
+    {
+        res = lbman.sendState(0.8, 1.0, true);
+        BOOST_CHECK(!res.has_error());
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    }
 
     // get LB status
     auto status_res = lbman.getLBStatus();
@@ -186,12 +193,13 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     auto workers = LBManager::get_WorkerStatusVector(status_res.value());
     BOOST_CHECK(workers.size() == 1);
     BOOST_CHECK(workers[0].name() == "my_node"s);
-    BOOST_CHECK(workers[0].fillpercent() == 0.5);
+#define DELTAD 0.000001
+    BOOST_CHECK(std::abs(workers[0].fillpercent() - 0.8) < DELTAD);
+    BOOST_CHECK(std::abs(workers[0].controlsignal() - 1.0) < DELTAD);
     std::cout << "Last Updated " << workers[0].lastupdated() << std::endl;
 
     // unregister (should use session token and session id)
     res = lbman.deregisterWorker();
-
     BOOST_CHECK(!res.has_error());
 
     // free

@@ -26,7 +26,7 @@ endif
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
 # and meson can ONLY find it via BOOST_ROOT env variable
 # (i.e. setting cmake_prefix_path doesn't work)
-boost_dep = dependency('boost', modules: ['system', 'url', 'program_options'], method: 'cmake', version: '>=1.83.0')
+boost_dep = dependency('boost', modules: ['system', 'url', 'program_options', 'chrono', 'thread'], method: 'cmake', version: '>=1.83.0')
 
 # we include 'src' because auto-generated headers for gRPC stubs go there 
 inc = include_directories('include', 'src')

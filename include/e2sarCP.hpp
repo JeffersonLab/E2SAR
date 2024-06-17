@@ -184,7 +184,7 @@ namespace e2sar
             size_t j = 0;
             for (auto i = rep->workers().begin(); i != rep->workers().end(); ++i, j++)
             {
-                ret[j] = *i;
+                ret[j].CopyFrom(*i);
             }
             return ret;
         }
