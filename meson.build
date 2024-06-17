@@ -24,7 +24,12 @@ boost_dep = dependency('boost', modules: ['system', 'url', 'program_options', 'c
 # we include 'src' because auto-generated headers for gRPC stubs go there 
 inc = include_directories('include', 'src')
 
-protoc_cmd = find_program('protoc', required: true)
+# Make sure find the one at ${GRPC_ROOT}/bin. /usr/bin/protoc may come with lower version.
+# protobuf_include_path = protobuf_dep.get_variable(pkgconfig : 'includedir')
+# protobuf_bin_path = join_paths(protobuf_include_path, '..', 'bin')
+# protoc_cmd = find_program('protoc', required: true, dirs : [protobuf_bin_path], version : '>=3.21.12')
+protoc_cmd = find_program('protoc', required: true, version : '>=3.21.12')
+
 grpc_cpp_plugin_cmd = find_program('grpc_cpp_plugin', required: true)
 
 # gRPC definitions
