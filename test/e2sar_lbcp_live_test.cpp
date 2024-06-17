@@ -30,7 +30,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest1)
     auto uri = uri_r.value();
 
     // create LBManager
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, false);
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
@@ -61,7 +61,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
     auto uri = uri_r.value();
 
     // create LBManager
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, false);
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
@@ -80,7 +80,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
     BOOST_CHECK(!uri_r.has_error());
     auto uri1 = uri_r.value();
 
-    auto lbman1 = LBManager(uri1);
+    auto lbman1 = LBManager(uri1, false);
 
     // get lb ID from other URI object
     res = lbman1.getLB(lbman.get_URI().get_lbId());
@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
     auto uri = uri_r.value();
 
     // create LBManager
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, false);
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
@@ -153,7 +153,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     auto uri = uri_r.value();
 
     // create LBManager
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, false);
 
     auto duration_v = pt::duration_from_string("01");
     std::string lbname{"mylb"};
@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest5)
     auto uri = uri_r.value();
 
     // create LBManager
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, false);
 
     // call version
     auto res = lbman.version();
