@@ -170,7 +170,7 @@ namespace e2sar
         result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus();
 
         /** Helper function copies worker records into a vector
-         * It takes a unique_ptr from getLBStatus() call and helps parse it.
+         * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
          * 
          * @param rep - the return of the getLBStatus() call
          *
@@ -181,14 +181,15 @@ namespace e2sar
         {
             std::vector<WorkerStatus> ret(rep->workers_size());
 
-            for (auto i = rep->workers().begin(); i != rep->workers().end(); ++i)
+            size_t j = 0;
+            for (auto i = rep->workers().begin(); i != rep->workers().end(); ++i, j++)
             {
-                ret.push_back(*i);
+                ret[j] = *i;
             }
             return ret;
         }
 
-        /** Helper function copies sender addresses into a vector
+        /** Helper function copies sender addresses into a vector. Relies on move semantics.
          * 
          * @param rep - the return of getLBStatus() call
          *
@@ -198,9 +199,10 @@ namespace e2sar
         {
             std::vector<std::string> ret(rep->senderaddresses_size());
 
-            for (auto i = rep->senderaddresses().begin(); i != rep->senderaddresses().end(); ++i)
+            size_t j = 0;
+            for (auto i = rep->senderaddresses().begin(); i != rep->senderaddresses().end(); ++i, j++)
             {
-                ret.push_back(*i);
+                ret[j] = *i;
             }
             return ret;
         }

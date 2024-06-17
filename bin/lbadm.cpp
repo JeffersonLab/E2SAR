@@ -277,7 +277,7 @@ int main(int argc, char **argv)
     opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered");
     opts("deregister", "deregister worker (-s required)");
     opts("status", "get and print LB status");
-    opts("state", "send worker state update (must be done within 10 sec of registration)");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required)");
 
     po::variables_map vm;
 
