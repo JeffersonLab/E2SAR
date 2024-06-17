@@ -74,10 +74,11 @@ namespace e2sar
          * custom SSL configuration with custom root certs, private key (for authN) and cert
          * use makeSslOptions[FromFiles]() methods and pass the output to this constructor.
          * @param cpuri an EjfatURI object parsed from configuration data
-         * @param opts a grpc::SslCredentialsOptions object (default object with no parameters). The
+         * @param validateServer if false, skip server certificate validation (useful for self-signed testing)
+         * @param opts grpc::SslCredentialsOptions containing some combination of server root certs, client key and client cert
          * use of SSL/TLS is governed by the URI scheme ('ejfat' vs 'ejfats')
          */
-        LBManager(const EjfatURI &cpuri,
+        LBManager(const EjfatURI &cpuri, bool validateServer = true,
                   grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri), _state_reserved(false)
         {
 
@@ -88,7 +89,21 @@ namespace e2sar
             auto addr_string{cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second)};
             if (cpuri.get_useTls())
             {
-                _channel = grpc::CreateChannel(addr_string, grpc::SslCredentials(opts));
+                grpc::experimental::TlsChannelCredentialsOptions topts;
+                if (!validateServer)
+                {
+                    // disable most of server certificate validation
+                    std::shared_ptr<grpc::experimental::NoOpCertificateVerifier> verifier = std::make_shared<grpc::experimental::NoOpCertificateVerifier>();
+                    topts.set_verify_server_certs(false);
+                    topts.set_check_call_host(false);
+                    topts.set_certificate_verifier(verifier);
+                    _channel = grpc::CreateChannel(addr_string, grpc::experimental::TlsCredentials(topts));
+                } 
+                else
+                {
+                    // use provided SSL options
+                    _channel = grpc::CreateChannel(addr_string, grpc::SslCredentials(opts));
+                }
             }
             else
             {
@@ -134,7 +149,7 @@ namespace e2sar
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
          * Uses admin token of the internal URI object. Note that unlike reserve it does NOT set
          * the instance token - it is not available.
-         * 
+         *
          * @param lbid - externally provided lb id, in this case the URI only needs to contain
          * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
          * @return - 0 on success or error code with message on failure
@@ -148,7 +163,7 @@ namespace e2sar
 
         /**
          * Get load balancer status including list of workers, sender IP addresses.
-         * 
+         *
          * @param lbid - externally provided lbid, in this case the URI only needs to contain
          * cp address and admin token
          * @return - loadbalancer::LoadBalancerStatusReply protobuf object with getters for fields
@@ -161,7 +176,7 @@ namespace e2sar
         /**
          * Get load balancer status including list of workers, sender IP addresses etc
          * using lb id in the URI object
-         * 
+         *
          * @return - loadbalancer::LoadBalancerStatusReply protobuf object with getters for fields
          * like timestamp, currentepoch, currentpredictedeventnumber and iterators over senders
          * and workers. For each worker you get name, fill percent, controlsignal, slotsassigned and
@@ -171,7 +186,7 @@ namespace e2sar
 
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
-         * 
+         *
          * @param rep - the return of the getLBStatus() call
          *
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
@@ -190,7 +205,7 @@ namespace e2sar
         }
 
         /** Helper function copies sender addresses into a vector. Relies on move semantics.
-         * 
+         *
          * @param rep - the return of getLBStatus() call
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
@@ -223,9 +238,9 @@ namespace e2sar
         /**
          * Register a workernode/backend with an allocated loadbalancer. Note that this call uses
          * instance token. It sets session token and session id on the internal
-         * URI object. Note that a new worker must send state immediately (within 10s) 
-         * or be automatically deregistered. 
-         * 
+         * URI object. Note that a new worker must send state immediately (within 10s)
+         * or be automatically deregistered.
+         *
          * @param node_name - name of the node (can be FQDN)
          * @param node_ip_port - a pair of ip::address and u_int16_t starting UDP port on which it listens
          * @param weight - weight given to this node in terms of processing power
@@ -237,7 +252,7 @@ namespace e2sar
 
         /**
          * Deregister worker using session ID and session token from the register call
-         * 
+         *
          * @return - 0 on success or an error condition
          */
         result<int> deregisterWorker();
@@ -245,7 +260,7 @@ namespace e2sar
         /**
          * Send worker state update using session ID and session token from register call. Automatically
          * uses localtime to set the timestamp. Workers are expected to send state every 100ms or so.
-         * 
+         *
          * @param fill_percent - [0:1] percentage filled of the queue
          * @param control_signal - change to data rate
          * @param is_ready - if true, worker ready to accept more data, else not ready
@@ -255,7 +270,7 @@ namespace e2sar
         /**
          * Send worker state update using session ID and session token from register call. Allows to explicitly
          * set the timestamp.
-         * 
+         *
          * @param fill_percent - [0:1] percentage filled of the queue
          * @param control_signal - change to data rate
          * @param is_ready - if true, worker ready to accept more data, else not ready
@@ -266,7 +281,7 @@ namespace e2sar
 
         /**
          * Get the version of the load balancer (the commit string)
-         * 
+         *
          * @return the commit string
          */
         result<std::string> version();
@@ -300,7 +315,7 @@ namespace e2sar
         /**
          * Generate gRPC-compliant custom SSL Options object with the following parameters,
          * where any parameter can be empty
-         * @param pem_root_certs    The file name containing the PEM encoding of the server root certificates.
+         * @param pem_root_certs    The file name containing the PEM encoding of the server root certificate.
          * @param pem_private_key   The file name containing the PEM encoding of the client's private key.
          * @param pem_cert_chain    The file name containing the PEM encoding of the client's certificate chain.
          *
@@ -310,6 +325,12 @@ namespace e2sar
             std::string_view pem_root_certs,
             std::string_view pem_private_key,
             std::string_view pem_cert_chain);
+
+        /**
+         * Generate gRPC-compliant custom SSL Options object with just the server root cert
+         */
+        static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
+            std::string_view pem_root_certs);
 
         /**
          * Method to map max # of data sources a backend will see to

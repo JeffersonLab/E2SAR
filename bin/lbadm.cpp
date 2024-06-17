@@ -32,14 +32,11 @@ void option_dependency(const po::variables_map &vm,
  * @param senders is the list of IP addresses of sender nodes
  * @param duration is a string indicating the duration you wish to reserve LB for format "hh:mm::ss"
  */
-result<int> reserveLB(EjfatURI &uri,
+result<int> reserveLB(LBManager &lbman,
                       const std::string &lbname,
                       const std::vector<std::string> &senders,
                       const std::string &duration)
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
-
     boost::posix_time::time_duration duration_v;
     try
     {
@@ -52,7 +49,7 @@ result<int> reserveLB(EjfatURI &uri,
     }
 
     std::cout << "Reserving a new load balancer " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(uri) << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << std::endl;
     std::cout << "   LB Name: " << lbname << std::endl;
     std::cout << "   Allowed senders: ";
     for (auto s : senders)
@@ -76,15 +73,13 @@ result<int> reserveLB(EjfatURI &uri,
     }
 }
 
-result<int> freeLB(EjfatURI &uri, const std::string &lbid = "")
+result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
 
     std::cout << "Freeing a load balancer " << std::endl;
-    std::cout << "   Contacting: " << uri.to_string(EjfatURI::TokenType::admin) << std::endl;
-    std::cout << "   LB Name: " << (uri.get_lbName().empty() ? "not set"s : uri.get_lbId()) << std::endl;
-    std::cout << "   LB ID: " << (lbid.empty() ? uri.get_lbId() : lbid) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     result<int> res{0};
 
@@ -106,14 +101,11 @@ result<int> freeLB(EjfatURI &uri, const std::string &lbid = "")
     }
 }
 
-result<int> registerWorker(EjfatURI &uri, const std::string &node_name, const std::string &node_ip, u_int16_t node_port, float weight, u_int16_t src_cnt)
+result<int> registerWorker(LBManager &lbman, const std::string &node_name, const std::string &node_ip, u_int16_t node_port, float weight, u_int16_t src_cnt)
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
-
     std::cout << "Registering a worker " << std::endl;
-    std::cout << "   Contacting: " << uri.to_string(EjfatURI::TokenType::instance) << std::endl;
-    std::cout << "   LB Name: " << (uri.get_lbName().empty() ? "not set"s : uri.get_lbId()) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
     std::cout << "   CP parameters: "
               << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
@@ -134,14 +126,11 @@ result<int> registerWorker(EjfatURI &uri, const std::string &node_name, const st
     }
 }
 
-result<int> deregisterWorker(EjfatURI &uri)
+result<int> deregisterWorker(LBManager &lbman)
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
-
     std::cout << "De-Registering a worker " << std::endl;
-    std::cout << "   Contacting: " << uri.to_string(EjfatURI::TokenType::session) << std::endl;
-    std::cout << "   LB Name: " << (uri.get_lbName().empty() ? "not set"s : uri.get_lbId()) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.deregisterWorker();
 
@@ -157,15 +146,12 @@ result<int> deregisterWorker(EjfatURI &uri)
     }
 }
 
-result<int> getLBStatus(EjfatURI &uri, const std::string &lbid)
+result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
-
     std::cout << "Getting LB Status " << std::endl;
-    std::cout << "   Contacting: " << uri.to_string(EjfatURI::TokenType::session) << std::endl;
-    std::cout << "   LB Name: " << (uri.get_lbName().empty() ? "not set"s : uri.get_lbId()) << std::endl;
-    std::cout << "   LB ID: " << (lbid.empty() ? uri.get_lbId() : lbid) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     auto res = lbman.getLBStatus(lbid);
 
@@ -200,14 +186,11 @@ result<int> getLBStatus(EjfatURI &uri, const std::string &lbid)
     }
 }
 
-result<int> sendState(EjfatURI &uri, float fill_percent, float ctrl_signal, bool is_ready)
+result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready)
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
-
     std::cout << "Sending Worker State " << std::endl;
-    std::cout << "   Contacting: " << uri.to_string(EjfatURI::TokenType::session) << std::endl;
-    std::cout << "   LB Name: " << (uri.get_lbName().empty() ? "not set"s : uri.get_lbId()) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.sendState(fill_percent, ctrl_signal, is_ready);
 
@@ -224,13 +207,11 @@ result<int> sendState(EjfatURI &uri, float fill_percent, float ctrl_signal, bool
     }
 }
 
-result<int> version(EjfatURI &uri)
+result<int> version(LBManager &lbman)
 {
-    // create LBManager
-    auto lbman = LBManager(uri);
 
     std::cout << "Getting load balancer version " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(uri) << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << std::endl;
 
     result<std::string> res{""};
 
@@ -270,6 +251,8 @@ int main(int argc, char **argv)
     opts("queue,q", po::value<float>(), "queue fill");
     opts("ctrl,c", po::value<float>(), "control signal value");
     opts("ready,r", po::value<bool>(), "worker ready state");
+    opts("root,o", po::value<std::string>(), "root cert for SSL communications");
+    opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required)");
     opts("free", "free a load balancer");
@@ -299,6 +282,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");    
+        conflicting_options(vm, "root", "novalidate");
     }
     catch (const std::logic_error &le)
     {
@@ -330,14 +314,42 @@ int main(int argc, char **argv)
     if (uri_r.has_error())
     {
         std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message();
+        return -1;
     }
     auto uri = uri_r.value();
+    auto lbman = LBManager(uri);
+
+    if (vm.count("root") && !uri.get_useTls())
+    {
+        std::cerr << "Root certificate passed in, but URL doesn't require TLS/SSL, ignoring "s;
+    }
+    else 
+    {
+        if (vm.count("root")) 
+        {
+            result<grpc::SslCredentialsOptions> opts_res = LBManager::makeSslOptionsFromFiles(vm["root"].as<std::string>());
+            if (opts_res.has_error()) 
+            {
+                std::cerr << "Unable to read server root certificate file "s;
+                return -1;
+            }
+            lbman = LBManager(uri, true, opts_res.value());
+        } 
+        else
+        {
+            if (vm.count("novalidate"))
+            {
+                std::cerr << "Skipping server certificate validation" << std::endl;
+                lbman = LBManager(uri, false);
+            }
+        }
+    }
 
     // Reserve
     if (vm.count("reserve"))
     {
         // execute command
-        auto uri_r = reserveLB(uri, vm["lbname"].as<std::string>(),
+        auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
                                vm["address"].as<std::vector<std::string>>(),
                                vm["duration"].as<std::string>());
         if (uri_r.has_error())
@@ -351,7 +363,7 @@ int main(int argc, char **argv)
         std::string lbid;
         if (vm.count("lbid"))
             lbid = vm["lbid"].as<std::string>();
-        auto int_r = freeLB(uri, lbid);
+        auto int_r = freeLB(lbman, lbid);
         if (int_r.has_error())
         {
             std::cerr << "There was an error freeing LB: " << int_r.error().message() << std::endl;
@@ -360,7 +372,7 @@ int main(int argc, char **argv)
     }
     else if (vm.count("version"))
     {
-        auto int_r = version(uri);
+        auto int_r = version(lbman);
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting LB version: " << int_r.error().message() << std::endl;
@@ -369,7 +381,7 @@ int main(int argc, char **argv)
     }
     else if (vm.count("register"))
     {
-        auto int_r = registerWorker(uri,
+        auto int_r = registerWorker(lbman,
                                     vm["name"].as<std::string>(),
                                     vm["address"].as<std::vector<std::string>>()[0],
                                     vm["port"].as<u_int16_t>(),
@@ -386,7 +398,7 @@ int main(int argc, char **argv)
     {
         // remember to set session 
         uri.set_sessionId(vm["session"].as<std::string>());
-        auto int_r = deregisterWorker(uri);
+        auto int_r = deregisterWorker(lbman);
         if (int_r.has_error())
         {
             std::cerr << "There was an error deregistering worker: " << int_r.error().message() << std::endl;
@@ -399,7 +411,7 @@ int main(int argc, char **argv)
         if (vm.count("lbid"))
             lbid = vm["lbid"].as<std::string>();
 
-        auto int_r = getLBStatus(uri, lbid);
+        auto int_r = getLBStatus(lbman, lbid);
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting LB status: " << int_r.error().message() << std::endl;
@@ -408,7 +420,7 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
-        auto int_r = sendState(uri, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
+        auto int_r = sendState(lbman, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;

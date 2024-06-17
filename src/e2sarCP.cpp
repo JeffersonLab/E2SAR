@@ -566,4 +566,17 @@ namespace e2sar
                               std::move(cert.value()));
     }
 
+
+    // just the server root cert (useful for self-signed)
+    result<grpc::SslCredentialsOptions> LBManager::makeSslOptionsFromFiles(
+            std::string_view pem_root_certs)
+    {
+        auto root = read_file(pem_root_certs);
+
+        if (root.has_error())
+            return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to find root cert file"s};
+
+        return makeSslOptions(std::move(root.value()),
+                              ""s,""s);
+    }
 }
