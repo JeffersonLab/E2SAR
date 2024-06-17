@@ -126,43 +126,46 @@ PYBIND11_MODULE(e2sar_py, m) {
     /**
      * Binding for the e2sar::EjfatURI class.
      */
-    py::class_<EjfatURI> EjfatURI(m, "EjfatURI");
+
+    /// NOTE: Do not use py::class_<EjfatURI> EjfatURI(m, "EjfatURI").
+    ///       This will cause trouble.
+    py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
     
-    EjfatURI.def(py::init<const std::string &>(), "Set instance token from string");
+    ejfat_uri.def(py::init<const std::string &>(), "Set instance token from string");
   
-    EjfatURI.def("get_use_tls", &EjfatURI::get_useTls);
+    ejfat_uri.def("get_use_tls", &EjfatURI::get_useTls);
 
     // Private variables and their get/set methods are dealt with class_::def_property()
     // Ref: https://pybind11.readthedocs.io/en/stable/classes.html#instance-and-static-fields
-    EjfatURI.def_property("lb_name", &EjfatURI::get_lbName, &EjfatURI::set_lbName);
-    EjfatURI.def_property("lb_id", &EjfatURI::get_lbId, &EjfatURI::set_lbId);
+    ejfat_uri.def_property("lb_name", &EjfatURI::get_lbName, &EjfatURI::set_lbName);
+    ejfat_uri.def_property("lb_id", &EjfatURI::get_lbId, &EjfatURI::set_lbId);
 
-    EjfatURI.def("set_instance_token", &EjfatURI::set_InstanceToken);
+    ejfat_uri.def("set_instance_token", &EjfatURI::set_InstanceToken);
 
-    EjfatURI.def("set_sync_addr", &EjfatURI::set_syncAddr);
-    EjfatURI.def("set_data_addr", &EjfatURI::set_dataAddr);
+    ejfat_uri.def("set_sync_addr", &EjfatURI::set_syncAddr);
+    ejfat_uri.def("set_data_addr", &EjfatURI::set_dataAddr);
 
-    EjfatURI.def("has_data_addr_v4", &EjfatURI::has_dataAddrv4);
-    EjfatURI.def("has_data_addr_v6", &EjfatURI::has_dataAddrv6);
+    ejfat_uri.def("has_data_addr_v4", &EjfatURI::has_dataAddrv4);
+    ejfat_uri.def("has_data_addr_v6", &EjfatURI::has_dataAddrv6);
 
-    EjfatURI.def("has_data_addr", &EjfatURI::has_dataAddr);
-    EjfatURI.def("has_sync_addr", &EjfatURI::has_syncAddr);
+    ejfat_uri.def("has_data_addr", &EjfatURI::has_dataAddr);
+    ejfat_uri.def("has_sync_addr", &EjfatURI::has_syncAddr);
 
     // Return types of result<std::string>.
-    EjfatURI.def("get_instance_token", &EjfatURI::get_InstanceToken);
-    EjfatURI.def("get_admin_token", &EjfatURI::get_AdminToken);
+    ejfat_uri.def("get_instance_token", &EjfatURI::get_InstanceToken);
+    ejfat_uri.def("get_admin_token", &EjfatURI::get_AdminToken);
 
     // Return types of result<std::pair<ip::address, u_int16_t>>.
-    EjfatURI.def("get_cp_addr", &EjfatURI::get_cpAddr);
-    EjfatURI.def("get_data_addr_v4", &EjfatURI::get_dataAddrv4);
-    EjfatURI.def("get_data_addr_v6", &EjfatURI::get_dataAddrv6);
-    EjfatURI.def("get_sync_addr", &EjfatURI::get_syncAddr);
+    ejfat_uri.def("get_cp_addr", &EjfatURI::get_cpAddr);
+    ejfat_uri.def("get_data_addr_v4", &EjfatURI::get_dataAddrv4);
+    ejfat_uri.def("get_data_addr_v6", &EjfatURI::get_dataAddrv6);
+    ejfat_uri.def("get_sync_addr", &EjfatURI::get_syncAddr);
 
     // Return type of result<std::pair<std::string, u_int16_t>>.
-    EjfatURI.def("get_cp_host", &EjfatURI::get_cpHost);
+    ejfat_uri.def("get_cp_host", &EjfatURI::get_cpHost);
 
     ///TODO: not tested with Python.
     // Return type of result<EjfatURI>.
-    // EjfatURI.def_static("getFromEnv", &EjfatURI::getFromEnv);
-    // EjfatURI.def_static("getFromFile", &EjfatURI::getFromFile);
+    // ejfat_uri.def_static("getFromEnv", &EjfatURI::getFromEnv);
+    // ejfat_uri.def_static("getFromFile", &EjfatURI::getFromFile);
 }
