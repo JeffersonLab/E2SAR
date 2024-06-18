@@ -1,4 +1,4 @@
-#define BOOST_TEST_MODULE MyTestSuite
+#define BOOST_TEST_MODULE URITests
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
@@ -29,7 +29,7 @@ std::string uri_string8{"ejfats://192.188.29.6:18020/lb/36?sync=192.188.29.6:190
 // with TLS and hostname
 std::string uri_string9{"ejfats://jlab.org:18020/lb/36?sync=192.188.29.6:19020"};
 
-BOOST_AUTO_TEST_SUITE(E2SARTestSuite)
+BOOST_AUTO_TEST_SUITE(URITestSuite)
 
 BOOST_AUTO_TEST_CASE(URITest1)
 {
@@ -243,4 +243,5 @@ BOOST_AUTO_TEST_CASE(URITest10)
     BOOST_CHECK(euri.get_useTls());
     BOOST_CHECK(euri.get_cpHost().value().first == "jlab.org"s);
 }
+
 BOOST_AUTO_TEST_SUITE_END()

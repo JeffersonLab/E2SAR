@@ -34,7 +34,7 @@ namespace e2sar
      *
      * @param uri URI to parse.
      */
-    EjfatURI::EjfatURI(const std::string &uri) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}
+    EjfatURI::EjfatURI(const std::string &uri, TokenType tt) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}
     {
 
         // parse the URI
@@ -60,7 +60,18 @@ namespace e2sar
 
         if (u.userinfo().length() > 0)
         {
-            adminToken = u.userinfo();
+            switch (tt)
+            {
+            case TokenType::admin:
+                adminToken = u.userinfo();
+                break;
+            case TokenType::instance:
+                instanceToken = u.userinfo();
+                break;
+            case TokenType::session:
+                sessionToken = u.userinfo();
+                break;
+            }
         }
 
         // see if the host needs resolving
@@ -115,10 +126,13 @@ namespace e2sar
                 }
                 else if (!param.key.compare("data"s))
                 {
-                    if (p.first.is_v4()) {
+                    if (p.first.is_v4())
+                    {
                         haveDatav4 = true;
                         dataAddrv4 = p.first;
-                    } else {
+                    }
+                    else
+                    {
                         haveDatav6 = true;
                         dataAddrv6 = p.first;
                     }
@@ -134,19 +148,66 @@ namespace e2sar
     /** implicit conversion operator */
     EjfatURI::operator std::string() const
     {
+        // select which token to print
         auto token = std::cref(adminToken);
-        // prefer instance token to admin token for printing out
+
         if (!instanceToken.empty())
             token = std::cref(instanceToken);
 
+        if (!sessionToken.empty())
+            token = std::cref(sessionToken);
+
         return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
-               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) + 
+               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
                "/"s +
-               (!lbId.empty()? "lb/"s + lbId : ""s) +
+               (!lbId.empty() ? "lb/"s + lbId : ""s) +
                (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
                (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
                (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
-               (haveDatav4 ? "data="s + dataAddrv4.to_string() : ""s) +
+               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
+               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
+    }
+
+    bool operator==(const EjfatURI &u1, const EjfatURI &u2)
+    {
+        return (u1.adminToken == u2.adminToken &&
+                u1.instanceToken == u2.instanceToken &&
+                u1.sessionToken == u2.sessionToken &&
+                u1.cpAddr == u2.cpAddr &&
+                u1.cpPort == u2.cpPort &&
+                u1.dataAddrv4 == u2.dataAddrv4 &&
+                u1.dataAddrv6 == u2.dataAddrv6 &&
+                u1.syncAddr == u2.syncAddr &&
+                u1.syncPort == u2.syncPort &&
+                u1.lbId == u2.lbId &&
+                u1.sessionId == u2.sessionId &&
+                u1.lbName == u2.lbName);
+    }
+
+    const std::string EjfatURI::to_string(TokenType tt) const
+    {
+        // select which token to print
+        auto token = std::cref(adminToken);
+
+        switch (tt)
+        {
+        case TokenType::instance:
+            token = std::cref(instanceToken);
+            break;
+        case TokenType::session:
+            token = std::cref(sessionToken);
+        case TokenType::admin:;
+            ;
+        }
+
+        return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
+               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
+               "/"s +
+               (!lbId.empty() ? "lb/"s + lbId : ""s) +
+               (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
+               (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
+               (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
+               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
                (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
     }
 }

@@ -19,6 +19,7 @@ database:
     interval: "100ms"
     retention: "168h"
 event_numbers:
+  host: 192.168.0.3
   ports:
     - 19531
     - 19532
@@ -33,8 +34,8 @@ server:
   auth_token: "udplbd"
   tls:
     enable: false
-    certFile: "x509/server_cert.pem"
-    keyFile: "x509/server_key.pem"
+    certFile: "/etc/udplbd/server_cert.pem"
+    keyFile: "/etc/udplbd/server_key.pem"
 log:
   level: debug
 smartnic:

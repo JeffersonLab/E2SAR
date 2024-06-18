@@ -22,6 +22,10 @@ namespace e2sar
     /** Structure to hold info parsed from an ejfat URI (and a little extra). */
     class EjfatURI
     {
+    public:
+        enum class TokenType {
+            admin, instance, session
+        };
 
     private:
         std::string rawURI;
@@ -46,6 +50,10 @@ namespace e2sar
         std::string adminToken;
         /** Instance token set by the CP on an LB reservation. */
         std::string instanceToken;
+        /** Session token used by the worker  */
+        std::string sessionToken;
+        /** Session ID issued via register call */
+        std::string sessionId;
 
         /** data plane addresses - there can ever only be one v4 and one v6 */
         ip::address dataAddrv4;
@@ -58,11 +66,18 @@ namespace e2sar
 
     public:
         /** base constructor, sets instance token from string */
-        EjfatURI(const std::string &uri);
+        EjfatURI(const std::string &uri, TokenType tt=TokenType::admin);
         /** rely on implicitly-declared copy constructor as needed */
 
         /** destructor */
         ~EjfatURI() {}
+
+        friend bool operator== (const EjfatURI &u1, const EjfatURI &u2);
+
+        friend inline bool operator!= (const EjfatURI &u1, const EjfatURI &u2) 
+        {
+            return !(u1 == u2);
+        }
 
         /** check if TLS should be used */
         inline bool get_useTls() const
@@ -76,6 +91,12 @@ namespace e2sar
             instanceToken = t;
         }
 
+        /** set session token based on gRPC return */
+        inline void set_SessionToken(const std::string &t)
+        {
+            sessionToken = t;
+        }
+
         /** get instance token */
         inline const result<std::string> get_InstanceToken() const
         {
@@ -83,6 +104,15 @@ namespace e2sar
                 return instanceToken;
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available"s};
+        }
+
+        /** get session token */
+        inline const result<std::string> get_SessionToken() const
+        {
+            if (!sessionToken.empty())
+                return sessionToken;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available"s};
         }
 
         /** return the admin token */
@@ -104,6 +134,12 @@ namespace e2sar
         inline void set_lbId(const std::string &i)
         {
             lbId = i;
+        }
+
+        /** set session Id from gRPC return */
+        inline void set_sessionId(const std::string &i)
+        {
+            sessionId = i;
         }
 
         /**
@@ -132,15 +168,21 @@ namespace e2sar
         }
 
         /** get LB name */
-        inline const std::string get_lbName()
+        inline const std::string get_lbName() const
         {
             return lbName;
         }
 
         /** get LB ID */
-        inline const std::string get_lbId()
+        inline const std::string get_lbId() const
         {
             return lbId;
+        }
+
+        /** get session Id  */
+        inline const std::string get_sessionId() const 
+        {
+            return sessionId;
         }
 
         /** get control plane ip address and port */
@@ -155,7 +197,7 @@ namespace e2sar
             if (!cpHost.empty())
                 return std::pair<std::string, u_int16_t>(cpHost, cpPort);
             else
-                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Control plane host not available"s};
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Control plane hostname not available"s};
         }
 
         /** does the URI contain a v4 dataplane address? */
@@ -205,25 +247,43 @@ namespace e2sar
                 return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Sync address not available"s};
         }
-        /** implicit cast to string */
+        /** implicit cast to string which prints session token if available, otherwise insstance
+         * token if available, otherwise admin token if available, otherwise no token.
+         * To get the URI string with specific token use the to_string(TokenType) method.
+        */
         operator std::string() const;
 
-        /** from environment variable or file */
-        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s) noexcept
+        const std::string to_string(TokenType tt = TokenType::admin) const;
+ 
+        /** from environment variable */
+        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s, TokenType tt=TokenType::admin) noexcept
         {
             const char *envStr = std::getenv(envVar.c_str());
             if (envStr != nullptr)
             {
                 try
                 {
-                    return EjfatURI(envStr);
+                    return EjfatURI(envStr, tt);
                 }
                 catch (const E2SARException &e)
                 {
-                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from environment variable"s};
+                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse EJFAT_URI from environment variable"s};
                 }
             }
             return E2SARErrorInfo{E2SARErrorc::Undefined, "Environment variable "s + envVar + " not defined."s};
+        }
+
+        /** from string */
+        static inline result<EjfatURI> getFromString(const std::string &uriStr, TokenType tt=TokenType::admin) noexcept
+        {
+            try
+            {
+                return EjfatURI(uriStr, tt);
+            }
+            catch (const E2SARException &e)
+            {
+                return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from string"s};
+            }
         }
 
         /** from a file */
@@ -254,41 +314,6 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to find file "s + fileName};
         }
     };
-
-    /**
-     * Method to map max # of data sources a backend will see to
-     * the corressponding PortRange (enum) value in loadbalancer.proto.
-     *
-     * @param sourceCount max # of data sources backend will see.
-     * @return corressponding PortRange.
-     */
-    static inline int getPortRange(int sourceCount) noexcept
-    {
-        // Based on the proto file enum for the load balancer, seen below,
-        // map the max # of sources a backend will see to the PortRange value.
-        // This is necessay to provide the control plane when registering.
-
-        // Handle edge cases
-        if (sourceCount < 2)
-        {
-            return 0;
-        }
-        else if (sourceCount > 16384)
-        {
-            return 14;
-        }
-
-        int maxCount = 2;
-        int iteration = 1;
-
-        while (sourceCount > maxCount)
-        {
-            iteration++;
-            maxCount >>= 1;
-        }
-
-        return iteration;
-    }
 
     /**
      * Convert a string into an IPv4 or v6 address throwing E2SARException if a problem is encountered
