@@ -123,8 +123,23 @@ UDPLBd implements gRPC over TLS to support channel privacy. Only server-side cer
 $ openssl req -x509 -newkey rsa:4096 -keyout udplbd/etc/server_key.pem -out udplbd/etc/server_cert.pem -sha256 -days 365 -nodes -subj "/CN=cpnode/subjectAltName=IP:192.168.0.3" -nodes
 ```
 
-Unit test code disables server certificate validation completely. When using `lbadm` you can either use `-v` option to disable the validation or copy the self-signed server certificate from UDPLBd host onto a file on the E2SAR host and point to it using `--root` or `-o` option. These two options (`-v` and `-o`) are mutually exclusive. If using a private CA, the `-o` option should be used to point to the CA certificate, assuming
-the server certificate contains the chain to the CA.
+Unit test code disables server certificate validation completely. When using `lbadm` you can either use `-v` option to disable the validation or copy the self-signed server certificate from UDPLBd host onto a file on the E2SAR host and point to it using `--root` or `-o` option. These two options (`-v` and `-o`) are mutually exclusive:
+```bash
+ubuntu@sender:~/E2SAR$ export EJFAT_URI="ejfats://udplbd@cpnode:18347/"
+ubuntu@sender:~/E2SAR$ ./build/bin/lbadm --version -o ../server_cert.pem 
+Getting load balancer version 
+   Contacting: ejfats://udplbd@cpnode:18347/
+Sucess.
+Reported version: 1fb5d83f0186298f99a57f7d4df4177871e8524f
+ubuntu@sender:~/E2SAR$ ./build/bin/lbadm --version -v
+Skipping server certificate validation
+Getting load balancer version 
+   Contacting: ejfats://udplbd@cpnode:18347/
+Sucess.
+Reported version: 1fb5d83f0186298f99a57f7d4df4177871e8524f
+```
+
+If using a private CA, the `-o` option should be used to point to the CA certificate, assuming the server certificate contains the chain to the CA. Note also that you must specify EJFAT_URI using a hostname, not IP address if using certificate validation. When using `-v` option, IP addresses can be used.
 
 See [lbadm](bin/lbadm.cpp) code on how the two options are implemented and used. Programmatically it is possible to supply client-side certs to E2SAR, however UDPLBd does not validate them. See [LBManager constructor](src/e2sarCP.cpp) for how that can be done.
 
