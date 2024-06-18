@@ -82,11 +82,24 @@ namespace e2sar
                   grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri), _state_reserved(false)
         {
 
-            auto cp_addr_r = cpuri.get_cpAddr();
-            if (cp_addr_r.has_error())
-                throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
-            auto cp_addr_v = cp_addr_r.value();
-            auto addr_string{cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second)};
+            auto cp_host_r = cpuri.get_cpHost();
+            std::string addr_string;
+            if (!cp_host_r.has_error())
+            {
+                // try hostname
+                auto cp_host_v = cp_host_r.value();
+                addr_string = cp_host_v.first + ":"s + std::to_string(cp_host_v.second);
+            }
+            else
+            {
+                // try address
+                auto cp_addr_r = cpuri.get_cpAddr();
+                if (cp_addr_r.has_error())
+                    throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
+                auto cp_addr_v = cp_addr_r.value();
+                addr_string = cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
+            }
+
             if (cpuri.get_useTls())
             {
                 grpc::experimental::TlsChannelCredentialsOptions topts;

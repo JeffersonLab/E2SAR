@@ -197,7 +197,7 @@ namespace e2sar
             if (!cpHost.empty())
                 return std::pair<std::string, u_int16_t>(cpHost, cpPort);
             else
-                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Control plane address not available"s};
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Control plane hostname not available"s};
         }
 
         /** does the URI contain a v4 dataplane address? */
