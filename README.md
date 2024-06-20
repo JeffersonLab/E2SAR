@@ -42,6 +42,15 @@ Install [`protoc` compiler](https://grpc.io/docs/protoc-installation/)
 - MacOS: `brew install protoc`
 - Linux: `sudo apt-get -yq install protobuf-compiler`
 
+For python dependencies minimum Python 3.11 is required. It is recommended you create a virtual environment for Python build dependencies, then activate the venv and install pybind11 and other dependencies:
+
+```bash
+$ python3 -m venv /path/to/e2sar/venv
+$ . /path/to/e2sar/venv/bin/activate
+$ pip install pybind11
+```
+Continue using the venv when compiling and testing e2sar. PSA: you can get out of the venv by running `deactivate` from inside the venv. 
+
 #### Installing gRPC from source
 
 gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source
@@ -102,6 +111,7 @@ $ cd build
 $ meson compile
 $ meson test
 ```
+If you desire a custom installation directory you can add `--prefix=/absolute/path/to/install/root`. If you have a custom location for pkg-config scripts, you can also add `-Dpkg_config_path=/path/to/pkg-config/scripts` to the setup command. 
 
 ### Building python bindings
 
