@@ -17,10 +17,10 @@ pybind11_module_name = 'e2sar_py'
 
 pybind11_src = ['pybind/py_e2sar.cpp']
 
-py_install = import('python').find_installation('python3')
+py_install = import('python').find_installation()
 
 # check the version of Python by looking for python executable
-py_exec = find_program('python3', required: true, version: '>=3.11.0')
+py_exec = find_program('python', required: true, version: '>=3.9.0')
 
 pybind11_includes = run_command(
     py_install, '-c', 'import pybind11; print(pybind11.get_include());', check : true).stdout().strip()
