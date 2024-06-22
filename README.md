@@ -1,5 +1,5 @@
 # E2SAR
-The internal dev repo of E2SAR.
+The internal dev repo of E2SAR - a C++ library and associated Python binding that support segmentation/reassembly (SAR) and control plane functionality of EJ-FAT project.
 
 ## Documentation
 
@@ -35,14 +35,11 @@ Overview: the build process requires multiple dependencies for tools and code (g
 
 Build dependences
 
-- MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost`
-- Linux: `sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev libboost-all-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev; pip3 install --user meson`
+- MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost protoc`
+- Linux: see [this script](scripts/notebooks//EJFAT/LBCP-tester.ipynb) for necessary dependencies.
 
-Install [`protoc` compiler](https://grpc.io/docs/protoc-installation/)
-- MacOS: `brew install protoc`
-- Linux: `sudo apt-get -yq install protobuf-compiler`
 
-For python dependencies minimum Python 3.11 is required. It is recommended you create a virtual environment for Python build dependencies, then activate the venv and install pybind11 and other dependencies:
+For python dependencies minimum Python 3.9 is required. It is recommended you create a virtual environment for Python build dependencies, then activate the venv and install pybind11 and other dependencies:
 
 ```bash
 $ python3 -m venv /path/to/e2sar/venv
@@ -75,7 +72,7 @@ $ export PKG_CONFIG_PATH=/wherever/grpc-install/lib/pkgconfig/
 ```
 The `setup_compile_env.sh` script sets it up (below). Then meson should be able to find everything. You can always test by doing e.g. `pkg-config --cflags grpc++`. 
 
-##### Linux (Ubuntu 22)
+##### Linux (Ubuntu 22 or RHEL8)
 - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
 - Use the following command to build:
 ```bash
@@ -98,7 +95,7 @@ Use [this procedure](https://www.boost.io/doc/user-guide/getting-started.html) t
 
 When using it with meson be sure to set `BOOST_ROOT` to wherever it is installed (like e.g. `export BOOST_ROOT=/home/ubuntu/boost-install`) as per [these instructions](https://mesonbuild.com/Dependencies.html#boost).
 
-### Building base libe2sar library
+### Building libe2sar library
 
 Make sure Meson is installed (with Ninja backend). The build should work for both LLVM/CLang and g++ compilers.
 
@@ -113,9 +110,9 @@ $ meson test
 ```
 If you desire a custom installation directory you can add `--prefix=/absolute/path/to/install/root`. If you have a custom location for pkg-config scripts, you can also add `-Dpkg_config_path=/path/to/pkg-config/scripts` to the setup command. 
 
-### Building python bindings
+### Building on older systems (e.g. RHEL8)
 
-TBD
+Due to a much older g++ compiler on those systems meson produces incorrect ninja.build files. After the `setup build` step execute the following command to correct the build file: `sed -i 's/-std=c++11//g' build/build.ninja`. 
 
 # Testing
 
@@ -124,6 +121,10 @@ TBD
 E2SAR code comes with a set of tests under [test/](test/) folder. It relies on Boost unit-testing framework as well as meson testing capabilities. The easiest way is to execute `meson test` or `meson test --suite unit` or `meson test --suite live`. The latter requires an instance of UDPLBd running and `EJFAT_URI` environment variable to be set to point to it (e.g. `export EJFAT_URI="ejfats://udplbd@192.168.0.3:18347/").
 
 There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which runs all the tests on FABRIC testbed.
+
+## Python
+
+TBD
 
 ## Dealing with SSL certificate validation
 
