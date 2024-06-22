@@ -15,8 +15,7 @@ e2sar_uri_test = executable('e2sar_uri_test', 'e2sar_uri_test.cpp',
 e2sar_lbcp_test = executable('e2sar_lbcp_test', 'e2sar_lbcp_test.cpp',
                             include_directories: inc,
                             link_with: libe2sar,
-                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep],
-                            link_args: ['-lstdc++fs'])
+                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep, stdcppfs_dep])
 
 e2sar_lbcp_live_test = executable('e2sar_lbcp_live_test', 'e2sar_lbcp_live_test.cpp',
                             include_directories: inc,
