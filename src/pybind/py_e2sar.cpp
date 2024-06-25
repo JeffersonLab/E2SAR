@@ -130,8 +130,19 @@ PYBIND11_MODULE(e2sar_py, m) {
     /// NOTE: Do not use py::class_<EjfatURI> EjfatURI(m, "EjfatURI").
     ///       This will cause trouble.
     py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
-    
-    ejfat_uri.def(py::init<const std::string &>(), "Set instance token from string");
+
+    py::enum_<EjfatURI::TokenType>(ejfat_uri, "TokenType")
+        .value("admin", EjfatURI::TokenType::admin)
+        .value("instance", EjfatURI::TokenType::instance)
+        .value("session", EjfatURI::TokenType::session)
+        .export_values();
+
+    // Constructor
+    ejfat_uri.def(
+        py::init<const std::string &, EjfatURI::TokenType>(),
+        py::arg("uri"), py::arg("tt") = EjfatURI::TokenType::admin,
+        "Set instance token from string"
+        );
   
     ejfat_uri.def("get_use_tls", &EjfatURI::get_useTls);
 
@@ -139,8 +150,10 @@ PYBIND11_MODULE(e2sar_py, m) {
     // Ref: https://pybind11.readthedocs.io/en/stable/classes.html#instance-and-static-fields
     ejfat_uri.def_property("lb_name", &EjfatURI::get_lbName, &EjfatURI::set_lbName);
     ejfat_uri.def_property("lb_id", &EjfatURI::get_lbId, &EjfatURI::set_lbId);
+    ejfat_uri.def_property("session_id", &EjfatURI::get_sessionId, &EjfatURI::set_sessionId);
 
     ejfat_uri.def("set_instance_token", &EjfatURI::set_InstanceToken);
+    ejfat_uri.def("set_session_token", &EjfatURI::set_SessionToken);
 
     ejfat_uri.def("set_sync_addr", &EjfatURI::set_syncAddr);
     ejfat_uri.def("set_data_addr", &EjfatURI::set_dataAddr);
@@ -153,6 +166,7 @@ PYBIND11_MODULE(e2sar_py, m) {
 
     // Return types of result<std::string>.
     ejfat_uri.def("get_instance_token", &EjfatURI::get_InstanceToken);
+    ejfat_uri.def("get_session_token", &EjfatURI::get_SessionToken);
     ejfat_uri.def("get_admin_token", &EjfatURI::get_AdminToken);
 
     // Return types of result<std::pair<ip::address, u_int16_t>>.
@@ -165,7 +179,48 @@ PYBIND11_MODULE(e2sar_py, m) {
     ejfat_uri.def("get_cp_host", &EjfatURI::get_cpHost);
 
     ///TODO: not tested with Python.
+    ejfat_uri.def(
+        "to_string", &EjfatURI::to_string,
+        py::arg("tt") = EjfatURI::TokenType::admin
+        );
     // Return type of result<EjfatURI>.
-    // ejfat_uri.def_static("getFromEnv", &EjfatURI::getFromEnv);
-    // ejfat_uri.def_static("getFromFile", &EjfatURI::getFromFile);
+    ejfat_uri.def_static("get_from_env", &EjfatURI::getFromEnv);
+    ejfat_uri.def_static("get_from_string", &EjfatURI::getFromString);
+    ejfat_uri.def_static("get_from_file", &EjfatURI::getFromFile);
+
+    /**
+     * Register grpc::SslCredentialsOptions.
+     * The dependency chain of e2sar::LBManager.
+     */
+    // py::class_<grpc::SslCredentialsOptions>(m, "SslCredentialsOptions")
+    //     .def(py::init<>());
+
+    // /**
+    //  * Bind the LBManager
+    //  */
+    // py::class_<LBManager> lb_manager(m, "LBManager");
+    
+    // lb_manager.def(py::init<const EjfatURI &, grpc::SslCredentialsOptions>(),
+    //               py::arg("cpuri"), py::arg("opts") = grpc::SslCredentialsOptions());
+
+    // lb_manager.def_property_readonly("is_reserved", &LBManager::isReserved);
+
+    // /// NOTE: Bindings for overloaded methods.
+    // ///       Ref: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
+
+    // // Bind LBManager::reserveLB to use duration in seconds
+    // lb_manager.def(
+    //     "reserve_lb_seconds",
+    //     static_cast<result<int> (LBManager::*)(
+    //         const std::string &,
+    //         const double &,
+    //         const std::vector<std::string> &
+    //         )>(&LBManager::reserveLB),
+    //     py::arg("lb_name"), py::arg("seconds"), py::arg("senders")
+    // );
+
+    // // Return an EjfatURI object.
+    // lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
+
+    // lb_manager.def("get_lb_status", &LBManager::getLBStatus);
 }
