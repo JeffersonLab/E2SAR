@@ -8,6 +8,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <google/protobuf/util/time_util.h>
 
+#include <boost/pool/object_pool.hpp>
+
 using namespace boost::asio;
 namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 using namespace std::string_literals;
@@ -88,4 +90,37 @@ int main()
     std::cout << "Now + 1 day is " << pt1 << std::endl;
     google::protobuf::Timestamp ts1 = google::protobuf::util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
     std::cout << ts1 << std::endl;
+
+
+    // pool tests
+
+    // object pool for queue items
+    struct qItem {
+        char preamble[2] {'L', 'B'};
+        uint32_t bytes;
+        uint64_t tick;
+        char     *event;
+        void     *cbArg;
+        void* (*callback)(void *);
+
+        qItem(): bytes{100}, tick{1000} {};
+    };
+
+    std::cout << "Item size " << sizeof(qItem) << std::endl;
+    boost::object_pool<qItem> pool{sizeof(qItem) * 10, 0};
+    std::cout << pool.get_next_size() << '\n';
+
+    auto newItem = pool.construct();
+
+    std::cout << pool.get_next_size() << '\n';
+
+    newItem->tick = 1001;
+
+    std::cout << newItem->tick << " " << newItem->bytes << std::endl;
+
+    std::cout << newItem->preamble[0] << newItem->preamble[1] << std::endl;
+
+    pool.free(newItem);
+
+    std::cout << (1 << 4) << std::endl;
 }
