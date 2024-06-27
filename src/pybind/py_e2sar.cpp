@@ -252,6 +252,8 @@ PYBIND11_MODULE(e2sar_py, m) {
         py::arg("cpuri"), py::arg("validate_server") = true, py::arg("opts") = grpc::SslCredentialsOptions()
         );
 
+    lb_manager.def("get_version", &LBManager::version);
+
     lb_manager.def_property_readonly("is_reserved", &LBManager::isReserved);
 
     // Bind LBManager::reserveLB to use duration in seconds
@@ -281,6 +283,39 @@ PYBIND11_MODULE(e2sar_py, m) {
         py::arg("lb_id")
     );
 
+    lb_manager.def(
+        "free_lb",
+        static_cast<result<int> (LBManager::*)()>(&LBManager::freeLB)
+    );
+
+    lb_manager.def(
+        "free_lb_by_id",
+        static_cast<result<int> (LBManager::*)(
+            const std::string &
+        )>(&LBManager::freeLB),
+        py::arg("lb_id")
+    );
+
+    lb_manager.def("register_worker", &LBManager::registerWorker);
+    lb_manager.def("deregister_worker", &LBManager::deregisterWorker);
+
+    lb_manager.def("prob_stats", &LBManager::probeStats);
+
+    lb_manager.def(
+        "send_state",
+        static_cast<result<int> (LBManager::*)(float, float, bool)>(&LBManager::sendState),
+        "Send worker state update using session ID and session token from register call.",
+        py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready")
+    );
+
+    /// TODO: type cast between C++ google::protobuf::Timestamp between Python datetime package
+    // lb_manager.def(
+    //     "send_state_with_timestamp",
+    //     static_cast<result<int> (LBManager::*)(float, float, bool, const Timestamp&)>(&LBManager::sendState),
+    //     "Send worker state update using session ID and session token from register call with explicit timestamp.",
+    //     py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready"), py::arg("timestamp")
+    // );
+
     /**
      * Return type containing std::unique_ptr<LoadBalancerStatusReply>
      */
@@ -306,9 +341,17 @@ PYBIND11_MODULE(e2sar_py, m) {
         py::arg("lb_id")
     );
 
+    lb_manager.def("make_ssl_options", &LBManager::makeSslOptions);
+
+    lb_manager.def("get_port_range", &LBManager::get_PortRange);
+
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
 
-    // lb_manager.def("get_lb_status", &LBManager::getLBStatus);
     /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
+
+    /// TODO: donot how to bind
+    /// - LBManager::get_WorkerStatusVector
+    /// - LBManager::get_SenderAddressVector
+    /// Datatype too complicated
 }
