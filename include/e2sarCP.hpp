@@ -158,6 +158,20 @@ namespace e2sar
         result<int> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
                               const std::vector<std::string> &senders);
+
+        /**
+         * Reserve a new load balancer with this name of duration in seconds
+         *
+         * @param lb_name LB name internal to you
+         * @param durationSeconds for how long it is needed in seconds
+         * @param senders list of sender IP addresses
+         *
+         * @return - 0 on success or error code with message on failure
+         */
+        result<int> reserveLB(const std::string &lb_name,
+                              const double &durationSeconds,
+                              const std::vector<std::string> &senders);
+
         /**
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
          * Uses admin token of the internal URI object. Note that unlike reserve it does NOT set
