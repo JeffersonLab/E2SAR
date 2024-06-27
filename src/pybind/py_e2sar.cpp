@@ -14,6 +14,17 @@ namespace py = pybind11;
 
 using namespace e2sar;
 
+// Convert outcome::result to a Python object
+template<typename T, typename E>
+py::object outcome_result_to_pyobject(outcome::result<T, E>& res) {
+    if (res) {
+        return py::cast(res.value().release());
+    } else {
+        // Handle the error case (for simplicity, converting to a string here)
+        return py::none();
+    }
+}
+
 // "e2sar_py" will be the python import module name
 PYBIND11_MODULE(e2sar_py, m) {
 
@@ -270,8 +281,34 @@ PYBIND11_MODULE(e2sar_py, m) {
         py::arg("lb_id")
     );
 
+    /**
+     * Return type containing std::unique_ptr<LoadBalancerStatusReply>
+     */
+
+    // Expose the LoadBalancerStatusReply class
+    py::class_<LoadBalancerStatusReply>(m, "LoadBalancerStatusReply")
+        .def(py::init<>());
+
+    lb_manager.def(
+        "get_lb_status",
+        [](LBManager& self){
+            auto result = self.getLBStatus();
+            return outcome_result_to_pyobject(result);
+        }
+    );
+
+    lb_manager.def(
+        "get_lb_status_by_id",
+        [](LBManager& self, const std::string & lbid){
+            auto result = self.getLBStatus(lbid);
+            return outcome_result_to_pyobject(result);
+        },
+        py::arg("lb_id")
+    );
+
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
 
     // lb_manager.def("get_lb_status", &LBManager::getLBStatus);
+    /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
 }
