@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
     // register (should internally set session token and session id)
-    res = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10);
+    res = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
 
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
@@ -168,7 +168,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
     // register (should internally set session token and session id)
-    res = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10);
+    res = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
 
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
