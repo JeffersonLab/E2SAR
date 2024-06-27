@@ -326,7 +326,7 @@ namespace e2sar
     }
 
     // register worker nodes
-    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count)
+    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor)
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -354,6 +354,10 @@ namespace e2sar
         req.set_lbid(_cpuri.get_lbId());
 
         req.set_weight(weight);
+
+        req.set_minfactor(min_factor);
+
+        req.set_maxfactor(max_factor);
 
         if (node_name.empty())
             return E2SARErrorInfo{E2SARErrorc::ParameterError, "Node name can't be empty"s};

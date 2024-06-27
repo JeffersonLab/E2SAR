@@ -101,7 +101,7 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
     }
 }
 
-result<int> registerWorker(LBManager &lbman, const std::string &node_name, const std::string &node_ip, u_int16_t node_port, float weight, u_int16_t src_cnt)
+result<int> registerWorker(LBManager &lbman, const std::string &node_name, const std::string &node_ip, u_int16_t node_port, float weight, u_int16_t src_cnt, float min_factor, float max_factor)
 {
     std::cout << "Registering a worker " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
@@ -110,7 +110,7 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
     std::cout << "   CP parameters: "
               << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
 
-    auto res = lbman.registerWorker(node_name, std::pair<ip::address, u_int16_t>(ip::make_address(node_ip), node_port), weight, src_cnt);
+    auto res = lbman.registerWorker(node_name, std::pair<ip::address, u_int16_t>(ip::make_address(node_ip), node_port), weight, src_cnt, min_factor, max_factor);
 
     if (res.has_error())
     {
@@ -253,6 +253,8 @@ int main(int argc, char **argv)
     opts("ready,r", po::value<bool>(), "worker ready state");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
+    opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
+    opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required)");
     opts("free", "free a load balancer");
@@ -278,6 +280,8 @@ int main(int argc, char **argv)
         option_dependency(vm, "register", "port");
         option_dependency(vm, "register", "weight");
         option_dependency(vm, "register", "count");
+        option_dependency(vm, "register", "minfactor");
+        option_dependency(vm, "register", "maxfactor");
         option_dependency(vm, "deregister", "session");
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
@@ -386,7 +390,10 @@ int main(int argc, char **argv)
                                     vm["address"].as<std::vector<std::string>>()[0],
                                     vm["port"].as<u_int16_t>(),
                                     vm["weight"].as<float>(),
-                                    vm["count"].as<u_int16_t>());
+                                    vm["count"].as<u_int16_t>(),
+                                    vm["minfactor"].as<float>(),
+                                    vm["maxfactor"].as<float>()
+                                    );
 
         if (int_r.has_error())
         {
