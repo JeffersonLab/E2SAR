@@ -198,6 +198,14 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(std::abs(workers[0].controlsignal() - 1.0) < DELTAD);
     std::cout << "Last Updated " << workers[0].lastupdated() << std::endl;
 
+    auto lbstatus = LBManager::asLBStatus(status_res.value());
+    BOOST_CHECK(lbstatus->senderAddresses.size() == 2);
+    BOOST_CHECK(lbstatus->senderAddresses[0] == "192.168.20.1"s);
+    BOOST_CHECK(lbstatus->workers.size() == 1);
+    BOOST_CHECK(lbstatus->workers[0].name() == "my_node"s);
+    BOOST_CHECK(std::abs(lbstatus->workers[0].fillpercent() - 0.8) < DELTAD);
+    BOOST_CHECK(std::abs(lbstatus->workers[0].controlsignal() - 1.0) < DELTAD);
+
     // unregister (should use session token and session id)
     res = lbman.deregisterWorker();
     BOOST_CHECK(!res.has_error());

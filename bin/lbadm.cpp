@@ -162,25 +162,21 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
-
-        auto addresses = LBManager::get_SenderAddressVector(res.value());
-
-        auto workers = LBManager::get_WorkerStatusVector(res.value());
+        auto lbstatus = LBManager::asLBStatus(res.value());
 
         std::cout << "Registered sender addresses: ";
-        for (auto a : addresses)
+        for (auto a : lbstatus->senderAddresses)
             std::cout << a << " "s;
         std::cout << std::endl;
 
         std::cout << "Registered workers: ";
-        for (auto w : workers)
+        for (auto w : lbstatus->workers)
         {
             std::cout << "[ name="s << w.name() << ", controlsignal="s << w.controlsignal() << ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
         }
         std::cout << std::endl;
 
-        std::cout << "LB details: expiresat=" << res.value()->expiresat() << ", currentepoch=" << res.value()->currentepoch() << ", predictedeventnum=" << res.value()->currentpredictedeventnumber() << std::endl;
+        std::cout << "LB details: expiresat=" << lbstatus->expiresAt << ", currentepoch=" << lbstatus->currentEpoch << ", predictedeventnum=" << lbstatus->currentPredictedEventNumber << std::endl;
 
         return 0;
     }
