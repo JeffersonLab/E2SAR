@@ -10,6 +10,8 @@
 
 #include <boost/pool/object_pool.hpp>
 
+#include "e2sarHeaders.hpp"
+
 using namespace boost::asio;
 namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 using namespace std::string_literals;
@@ -123,4 +125,10 @@ int main()
     pool.free(newItem);
 
     std::cout << (1 << 4) << std::endl;
+
+    std::cout << "Sync header size (expecting 28) = " << sizeof(e2sar::SyncHdr) << std::endl;
+
+    {
+        std::cout << "Empty scope executes once" << std::endl;
+    }
 }

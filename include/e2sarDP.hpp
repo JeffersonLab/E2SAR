@@ -5,8 +5,16 @@
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/pool/object_pool.hpp>
 #include <boost/thread.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_io.hpp>
+#include <boost/circular_buffer.hpp>
+#include <boost/any.hpp>
+#include <boost/asio/ip/udp.hpp>
+#include <boost/variant.hpp>
+
 #include "e2sarError.hpp"
 #include "e2sarUtil.hpp"
+#include "e2sarHeaders.hpp"
 #include "portable_endian.h"
 
 /***
@@ -15,78 +23,231 @@
 
 namespace e2sar
 {
-    using EventNum_t = u_int64_t;
     /*
-    The Segmenter class knows how to break up the provided
-    events into segments consumable by the hardware loadbalancer.
-    It relies on EventHeader and LBHeader structures to
-    segment into UDP packets and follows other LB rules while doing it.
+        The Segmenter class knows how to break up the provided
+        events into segments consumable by the hardware loadbalancer.
+        It relies on header structures to segment into UDP packets and 
+        follows other LB rules while doing it.
 
-    It runs on or next to the source of events.
+        It runs on or next to the source of events.
     */
     class Segmenter
     {
         private:
+            EjfatURI _dpuri;
+
             // Structure to hold each send-queue item
             struct EventQueueItem {
                 uint32_t bytes;
                 uint64_t tick;
                 u_int8_t *event;
-                void     *cbArg;
-                void* (*callback)(void *);
+                boost::any cbArg;
+                void* (*callback)(boost::any);
             };
 
-            /** Max size of internal queue holding events to be sent. */
+            // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE = 2047;
 
-            /** pool from which queue items are allocated as needed */
-            boost::object_pool<EventQueueItem> queueItemPool{32,QSIZE + 1};
+            // pool from which queue items are allocated as needed 
+            boost::object_pool<EventQueueItem> queueItemPool{32, QSIZE + 1};
 
-            /** Fast, lock-free, wait-free queue for single producer and single consumer. */
+            // Fast, lock-free, wait-free queue for single producer and single consumer. 
             boost::lockfree::spsc_queue<EventQueueItem*, boost::lockfree::capacity<QSIZE>> eventQueue;
 
-            /** Sync thread object */
-            boost::thread syncThread;
+            // structure that maintains send stats
+            struct SendStats {
+                /** Last time a sync message sent to CP in nanosec since epoch. */
+                uint64_t lastSyncTimeNanos;
+                /** Number of events sent since last sync message sent to CP. */
+                uint64_t eventsSinceLastSync; 
+            };
+            // event metadata fifo
+            boost::circular_buffer<SendStats> eventStatsBuffer;
+            SendStats currentPeriodStats;
 
-            /** Send thread object */
-            boost::thread sendThread;
+            //Starting event number for LB header in a UDP packet.
+            u_int64_t tick{0LL};
+
+            // id of this data source
+            const u_int16_t srcId;
+
+            // current event number
+            EventNum_t eventNum{0};
+
+            /** 
+             * This thread sends a sync header every pre-specified number of milliseconds.
+             */
+            struct SyncThreadState {
+                // owner object
+                Segmenter &seg;
+                boost::thread threadObj;
+                // period in ms
+                u_int16_t period_ms{100};
+                // pool of headers to use for sending
+                boost::object_pool<SyncHdr> syncHdrPool{32,0};
+                // connect socket flag (usually true)
+                bool connectSocket{true};
+                // sockaddr_in[6] union (use boost::get<sockaddr_in> or
+                // boost::get<sockaddr_in6> to get to the appropriate structure)
+#define GET_V4_SYNC_STRUCT(sas) boost::get<sockaddr_in>(sas)
+#define GET_V6_SYNC_STRUCT(sas) boost::get<sockaddr_in6>(sas)
+                boost::variant<sockaddr_in, sockaddr_in6> syncAddrStruct;
+                // flag that tells us we are v4 or v6
+                bool isV6{false};
+                // UDP socket
+                int socketFd{0};
+
+                inline SyncThreadState(Segmenter &s, u_int16_t time_period_ms): 
+                    seg{s}, 
+                    period_ms{time_period_ms}
+                    {}
+
+                result<int> _open();
+                result<int> _close();
+                result<int> _send(SyncHdr *hdr);
+                void _threadBody();
+            };
+            friend struct SyncThreadState;
+
+            SyncThreadState syncThreadState;
+            // lock with sync thread
+            boost::mutex syncThreadMtx;
+
+            /**
+             * This thread sends data to the LB to be distributed to different processing
+             * nodes.
+             */
+            struct SendThreadState {
+                // owner object
+                Segmenter &seg;
+                boost::thread threadObj;
+                // connect socket flag (usually true)
+                bool connectSocket{true};
+                // tuple containing v4 and v6 send address structures
+                // use boost::get<0> to get to v4 and boost::get<1> to
+                // get to v6 address struct
+#define GET_V4_SEND_STRUCT(sas) boost::get<0>(sas)
+#define GET_V6_SEND_STRUCT(sas) boost::get<1>(sas)
+                boost::tuple<sockaddr_in, sockaddr_in6> syncAddrStruct;
+
+                // UDP socket
+                int socketFd{0};
+
+                inline SendThreadState(Segmenter &s): 
+                    seg{s} {}
+                result<int> _open();
+                result<int> _close();
+                result<int> _send();
+                void _threadBody();
+            };
+            friend struct SendThreadState;
+
+            SendThreadState sendThreadState;
+            // lock with send thread
+            boost::mutex sendThreadMtx;
+
+            /** Threads keep running while this is false */
+            bool threadsStop{false};
         public:
-            Segmenter(const EjfatURI &uri);
+            /**
+             * Open and connect sync and data sockets, start sync and data threads,
+             * initializes the data event queue and allocates user-space memory pools.
+             * @param uri - EjfatURI initialized for sender with sync address and data address(es)
+             * @param srcId - id of this source for load balancer
+             * @param sync_period_ms - time in milliseconds between sync messages
+             * @param sync_periods - number of sync periods to use for averaging send rate
+             */
+            Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t sync_period_ms, u_int16_t sync_periods);
+
+            /**
+             * Don't want to be able to copy these objects normally
+             */
             Segmenter(const Segmenter &s) = delete;
+            /**
+             * Don't want to be able to copy these objects normally
+             */
             Segmenter & operator=(const Segmenter &o) = delete;
-            ~Segmenter();
+
+            /**
+             * Close the sockets, free/purge memory pools and stop the threads.
+             */
+            ~Segmenter()
+            {
+                stopThreads();
+
+                // wait to exit
+                syncThreadState.threadObj.join();
+                sendThreadState.threadObj.join();
+
+
+            }
 
             // Blocking call. Event number automatically set.
             // Any core affinity needs to be done by caller.
-            E2SARErrorc sendEvent(u_int8_t *event, size_t bytes);
+            result<int> sendEvent(u_int8_t *event, size_t bytes) noexcept;
 
             // Blocking call specifying event number.
-            E2SARErrorc sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber);
+            result<int> sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept;
 
             // Non-blocking call to place event on internal queue.
             // Event number automatically set. 
-            E2SARErrorc addToSendQueue(u_int8_t *event, size_t bytes, 
-                void* (*callback)(void *) = nullptr, 
-                void *cbArg = nullptr);
+            result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
+                void* (*callback)(boost::any) = nullptr, 
+                boost::any cbArg = nullptr) noexcept;
 
             // Non-blocking call specifying event number.
-            E2SARErrorc addToSendQueue(u_int8_t *event, size_t bytes, 
+            result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
                 uint64_t eventNumber, 
-                void* (*callback)(void *) = nullptr, 
-                void *cbArg = nullptr);
+                void* (*callback)(boost::any) = nullptr, 
+                boost::any cbArg = nullptr) noexcept;
+        private:
+            // Tell threads to stop
+            inline void stopThreads() 
+            {
+                threadsStop = true;
+            }
+
+            // Calculate the average event rate from circular buffer
+            // note that locking lives outside this function
+            inline EventRate_t eventRate(UnixTimeNano_t  currentTimeNanos)
+            {
+                // each element of circular buffer states the start of the sync period
+                // and the number of events sent during that period
+                UnixTimeNano_t  firstSyncStart{std::numeric_limits<unsigned long long>::max()};
+                EventNum_t eventTotal{0LL};
+                // walk the circular buffer
+                for(auto el: eventStatsBuffer)
+                {
+                    // find earliest time
+                    firstSyncStart = (el.lastSyncTimeNanos < firstSyncStart ? el.lastSyncTimeNanos : firstSyncStart);
+                    // add up the events
+                    eventTotal += el.eventsSinceLastSync;
+                }
+                auto timeDiff = currentTimeNanos - firstSyncStart;
+
+                // convert to Hz and return
+                return eventTotal/(timeDiff/1000000000UL);
+            }
+
+            // doesn't require locking as it looks at only srcId in segmenter, which
+            // never changes past initialization
+            inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano)
+            {
+                hdr->set(srcId, eventNum, eventRate, tnano);
+            }
     };
 
     /*
-    The Reassembler class knows how to reassemble the events back. It
-    also knows how to optionally register self as a receiving node. It relies
-    on the LBEventHeader structure to reassemble the event. It can
-    use multiple ways of reassembly:
-    - To a memory region
-    - To a shared memory
-    - To a file descriptor
-    - ...
+        The Reassembler class knows how to reassemble the events back. It
+        also knows how to optionally register self as a receiving node. It relies
+        on the LBEventHeader structure to reassemble the event. It can
+        use multiple ways of reassembly:
+        - To a memory region
+        - To a shared memory
+        - To a file descriptor
+        - ...
 
-    It runs on or next to the worker performing event processing.
+        It runs on or next to the worker performing event processing.
     */
     class Reassembler
     {
@@ -104,83 +265,6 @@ namespace e2sar
             int probeStats();
         protected:
         private:
-    };
-
-    /*
-        The Reassembly Header. You should always use the provided methods to set
-        and interrogate fields as the structure maintains Big-Endian order
-        internally.
-    */
-    constexpr u_int8_t lbVersion = 1 << 4; // shifted up by 4 bits to be in the upper nibble
-    struct LBReHdr
-    {
-        u_int8_t preamble[2] {lbVersion, 0}; // 4 bit version + reserved
-        u_int16_t dataId;   // source identifier
-        u_int32_t bufferOffset;
-        u_int32_t bufferLength;
-        EventNum_t eventNum;
-        void set(u_int16_t data_id, u_int32_t buff_off, u_int32_t buff_len, EventNum_t event_num)
-        {
-            dataId = htobe16(data_id);
-            bufferOffset = htobe32(buff_off);
-            bufferLength = htobe32(buff_len);
-            eventNum = htobe64(event_num);
-        }
-        EventNum_t get_eventNum() 
-        {
-            return be64toh(eventNum);
-        }
-        u_int32_t get_bufferLength() 
-        {
-            return be32toh(bufferLength);
-        }
-        u_int32_t get_bufferOffset()
-        {
-            return be32toh(bufferOffset);
-        }
-        u_int16_t get_dataId()
-        {
-            return be16toh(dataId);
-        }
-    };
-
-    /*
-    The Load Balancer Header. You should always use the provided methods to set
-    and interrogate fields as the structure maintains Big-Endian order
-    internally.
-    */
-
-   constexpr u_int8_t lbehVersion = 2;
-    struct LBHdr
-    {
-        char preamble[2] {'L', 'B'};
-        u_int8_t version{lbehVersion};
-        u_int8_t nextProto{0};
-        u_int16_t rsvd{0};
-        u_int16_t entropy{0};
-        EventNum_t eventNum{0L};
-        void set(u_int8_t proto, u_int16_t ent, EventNum_t event_num) 
-        {
-            nextProto = proto;
-            entropy = htobe16(ent);
-            eventNum = htobe64(event_num);
-        }
-        u_int8_t get_version() 
-        {
-            return version;
-        }
-        u_int8_t get_nextProto() 
-        {
-            return nextProto;
-        }
-        u_int16_t get_entropy()
-        {
-            return be16toh(entropy);
-        }
-        EventNum_t get_eventNum() 
-        {
-            return be64toh(eventNum);
-        }
     };
 
 
