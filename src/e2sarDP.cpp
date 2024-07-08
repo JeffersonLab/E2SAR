@@ -16,14 +16,25 @@ namespace e2sar
         syncThreadState(*this, sync_period_ms), 
         sendThreadState(*this)
     {
+        ;
+    }
+
+    result<int> Segmenter::openAndStart() noexcept
+    {
         // open and connect sync and send sockets
         auto status = syncThreadState._open();
         if (status.has_error()) 
-            throw E2SARException("Unable to open sync socket: " + status.error().message());
+        {
+            return E2SARErrorInfo{E2SARErrorc::SocketError, 
+                "Unable to open sync socket: " + status.error().message()};
+        }
 
         status = sendThreadState._open();
         if (status.has_error())
-            throw E2SARException("Unable to open data socket: " + status.error().message());
+        {
+            return E2SARErrorInfo{E2SARErrorc::SocketError,
+                "Unable to open data socket: " + status.error().message()};
+        }
 
         // start the sync thread from method
         boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
@@ -32,6 +43,8 @@ namespace e2sar
         // start the data sending thread from method
         //boost::thread sendT(&Segmenter::SendThreadState::_threadBody, &sendThreadState);
         //sendThreadState.threadObj = std::move(sendT);
+
+        return 0;
     }
 
     void Segmenter::SyncThreadState::_threadBody()
@@ -66,6 +79,7 @@ namespace e2sar
             auto until = nowT + std::chrono::milliseconds(period_ms);
             std::this_thread::sleep_until(until);
         }
+        std::cout << "Sync thread exiting " << std::endl;
     }
 
     result<int> Segmenter::SyncThreadState::_open()
@@ -77,10 +91,11 @@ namespace e2sar
         // Socket for sending sync message to CP
         if (syncAddr.value().first.is_v6()) {
             if ((socketFd = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(socketFd)};
+                seg.stats.syncErrCnt++;
+                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
 
-            sockaddr_in6 syncAddrStruct6 = {};
+            sockaddr_in6 syncAddrStruct6{};
             syncAddrStruct6.sin6_family = AF_INET6;
             syncAddrStruct6.sin6_port = htobe16(syncAddr.value().second);
             inet_pton(AF_INET6, syncAddr.value().first.to_string().c_str(), &syncAddrStruct6.sin6_addr);
@@ -91,26 +106,28 @@ namespace e2sar
                 int err = connect(socketFd, (const sockaddr *) &syncAddrStruct6, sizeof(struct sockaddr_in6));
                 if (err < 0) {
                     close(socketFd);
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(err)};
+                    seg.stats.syncErrCnt++;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
             }
         }
         else {
             if ((socketFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(socketFd)};
+                seg.stats.syncErrCnt++;
+                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
 
-            sockaddr_in syncAddrStruct4 = {};
+            sockaddr_in syncAddrStruct4{};
             syncAddrStruct4.sin_family = AF_INET;
             syncAddrStruct4.sin_port = htobe16(syncAddr.value().second);
             inet_pton(AF_INET, syncAddr.value().first.to_string().c_str(), &syncAddrStruct4.sin_addr);
             syncAddrStruct = syncAddrStruct4;
 
             if (connectSocket) {
-                int err = connect(socketFd, (const sockaddr *) &syncAddrStruct, sizeof(struct sockaddr_in));
+                int err = connect(socketFd, (const sockaddr *) &syncAddrStruct4, sizeof(struct sockaddr_in));
                 if (err < 0) {
                     close(socketFd);
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(err)};
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
             }
         }
@@ -127,14 +144,17 @@ namespace e2sar
     {
         int err;
         if (connectSocket) {
+            seg.stats.syncMsgCnt++;
             err = (int) send(socketFd, static_cast<void*>(hdr), sizeof(SyncHdr), 0);
         }
         else {
             if (isV6) {
+                seg.stats.syncMsgCnt++;
                 err = (int) sendto(socketFd, static_cast<void*>(hdr), sizeof(SyncHdr), 0, 
                     (sockaddr * ) & GET_V6_SYNC_STRUCT(syncAddrStruct), sizeof(struct sockaddr_in6));
             }
             else {
+                seg.stats.syncMsgCnt++;
                 err = (int) sendto(socketFd, static_cast<void*>(hdr), sizeof(SyncHdr), 0,  
                     (sockaddr * ) & GET_V4_SYNC_STRUCT(syncAddrStruct), sizeof(struct sockaddr_in));
             }
@@ -142,9 +162,10 @@ namespace e2sar
 
         if (err == -1)
         {
-            auto closeRes = _close();
-            return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(err)};
+            seg.stats.syncErrCnt++;
+            return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
         }
+
         return 0;
     }
 
@@ -160,6 +181,13 @@ namespace e2sar
                 SendStats sendStatsItem;
                 seg.eventStatsBuffer.push_back(sendStatsItem);
             }
+            //
+            // temporary code
+            //
+            auto nowT = std::chrono::high_resolution_clock::now();
+            // sleep approximately
+            auto until = nowT + std::chrono::milliseconds(1000);
+            std::this_thread::sleep_until(until);
         }
     }
 

@@ -12,6 +12,8 @@
 #include <boost/asio/ip/udp.hpp>
 #include <boost/variant.hpp>
 
+#include <atomic>
+
 #include "e2sarError.hpp"
 #include "e2sarUtil.hpp"
 #include "e2sarHeaders.hpp"
@@ -73,6 +75,19 @@ namespace e2sar
 
             // current event number
             EventNum_t eventNum{0};
+
+            // struct for stat information
+            struct Stats {
+                // sync messages sent
+                std::atomic<u_int64_t> syncMsgCnt{0}; 
+                // sync errors seen on send
+                std::atomic<u_int64_t> syncErrCnt{0};
+                // event datagrams sent
+                std::atomic<u_int64_t> eventDatagramsCnt{0};
+                // event datagram send errors
+                std::atomic<u_int64_t> eventDatagramsErrCnt{0};
+            };
+            Stats stats;
 
             /** 
              * This thread sends a sync header every pre-specified number of milliseconds.
@@ -178,9 +193,13 @@ namespace e2sar
                 // wait to exit
                 syncThreadState.threadObj.join();
                 sendThreadState.threadObj.join();
-
-
             }
+
+            /**
+             * Open sockets and start the threads - this marks the moment
+             * from which sync packets start being sent.
+             */
+            result<int> openAndStart() noexcept;
 
             // Blocking call. Event number automatically set.
             // Any core affinity needs to be done by caller.
@@ -200,10 +219,27 @@ namespace e2sar
                 uint64_t eventNumber, 
                 void* (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
+
+            /**
+             * Get a tuple <sync msg cnt, sync err cnt>
+             */
+            inline const boost::tuple<u_int64_t, u_int64_t> getSyncStats() const
+            {
+                return boost::make_tuple<u_int64_t, u_int64_t>(stats.syncMsgCnt, stats.syncErrCnt);
+            }
+
+            /**
+             * Get a uple <event datagrams cnt, event datagrams err cnt>
+             */
+            inline const boost::tuple<u_int64_t, u_int64_t> getSendStats() const 
+            {
+                return boost::make_tuple<u_int64_t, u_int64_t>(stats.eventDatagramsCnt, stats.eventDatagramsErrCnt);
+            }
         private:
             // Tell threads to stop
             inline void stopThreads() 
             {
+                std::cout << "Stopping threads" << std::endl;
                 threadsStop = true;
             }
 
