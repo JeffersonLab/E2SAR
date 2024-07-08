@@ -10,7 +10,7 @@ if [[ ${distro} == 'ubuntu' ]]; then
     sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb
     
     # install meson
-    pip3 install --user meson pybind11
+    pip3 install --user meson pybind11 scapy
     
     # install git-lfs
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
@@ -33,7 +33,7 @@ if [[ ${distro} == 'rocky' ]]; then
     sudo update-alternatives --set python /usr/bin/python3.9
     sudo update-alternatives --set python3 /usr/bin/python3.9
     #install meson 
-    pip3 install --user meson pybind11
+    pip3 install --user meson pybind11 scapy
 
     # install git-lfs
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | sudo bash
