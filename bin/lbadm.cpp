@@ -290,7 +290,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    if (vm.count("help"))
+    if (vm.count("help") || vm.empty())
     {
         std::cout << od << std::endl;
         return 0;
@@ -313,7 +313,7 @@ int main(int argc, char **argv)
     auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt) : EjfatURI::getFromEnv("EJFAT_URI"s, tt));
     if (uri_r.has_error())
     {
-        std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message();
+        std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message() << std::endl;
         return -1;
     }
     auto uri = uri_r.value();
@@ -430,4 +430,7 @@ int main(int argc, char **argv)
             return -1;
         }
     }
+    else
+        // print help
+        std::cout << od << std::endl;
 }
