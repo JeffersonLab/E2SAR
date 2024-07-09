@@ -1,6 +1,7 @@
 #ifndef E2SARHEADERS_HPP
 #define E2SARHEADERS_HPP
 
+#include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 
 #include "portable_endian.h"
@@ -52,9 +53,9 @@ namespace e2sar
         while(!seg.threadsStop)
         {
             // Get the current time point
-            auto nowT = std::chrono::high_resolution_clock::now();
+            auto nowT = boost::chrono::high_resolution_clock::now();
             // Convert the time point to nanoseconds since the epoch
-            auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(nowT.time_since_epoch()).count();
+            auto now = boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count();
             uint64_t currentTimeNanos = static_cast<uint64_t>(now);
                 
             // get sync header buffer
@@ -76,8 +77,8 @@ namespace e2sar
             syncHdrPool.free(hdr);
 
             // sleep approximately
-            auto until = nowT + std::chrono::milliseconds(period_ms);
-            std::this_thread::sleep_until(until);
+            auto until = nowT + boost::chrono::milliseconds(period_ms);
+            boost::this_thread::sleep_until(until);
         }
         std::cout << "Sync thread exiting " << std::endl;
     }
@@ -184,10 +185,10 @@ namespace e2sar
             //
             // temporary code
             //
-            auto nowT = std::chrono::high_resolution_clock::now();
+            auto nowT = boost::chrono::high_resolution_clock::now();
             // sleep approximately
-            auto until = nowT + std::chrono::milliseconds(1000);
-            std::this_thread::sleep_until(until);
+            auto until = nowT + boost::chrono::milliseconds(1000);
+            boost::this_thread::sleep_until(until);
         }
     }
 
