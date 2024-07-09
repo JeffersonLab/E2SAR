@@ -15,7 +15,6 @@ using namespace e2sar;
 
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
-using namespace std::chrono_literals;
 
 BOOST_AUTO_TEST_SUITE(DPSyncLiveTests)
 
@@ -48,7 +47,7 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
 
     std::cout << "Running sync test for 10 seconds" << std::endl;
     // run for 10 seconds
-    std::this_thread::sleep_for(10000ms);
+    boost::this_thread::sleep_for(boost::chrono::seconds(10));
 
     auto syncStats = seg.getSyncStats();
 
