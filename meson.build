@@ -1,4 +1,4 @@
-project('E2SAR library', 'cpp', 
+project('E2SAR', 'cpp', 
         version: '0.1', default_options : ['cpp_std=c++17'])
 
 # -Wall
