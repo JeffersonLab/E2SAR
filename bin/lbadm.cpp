@@ -66,9 +66,9 @@ result<int> reserveLB(LBManager &lbman,
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Sucess. FPGA ID is (for metrics): " << res.value() << std::endl;
 
-        std::cout << "Updated URI after reserve " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+        std::cout << "Updated URI after reserve with instance token: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
         return 0;
     }
 }
@@ -120,8 +120,8 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
     else
     {
         std::cout << "Sucess." << std::endl;
-        std::cout << "Updated URI after register " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
-        std::cout << "Session id is " << lbman.get_URI().get_sessionId() << std::endl;
+        std::cout << "Updated URI after register with session token: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+        std::cout << "Session id is: " << lbman.get_URI().get_sessionId() << std::endl;
         return 0;
     }
 }
