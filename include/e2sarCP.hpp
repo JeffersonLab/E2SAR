@@ -175,9 +175,9 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
          *
-         * @return - 0 on success or error code with message on failure
+         * @return - FPGA LB ID, for use in correlating logs/metrics
          */
-        result<int> reserveLB(const std::string &lb_name,
+        result<u_int32_t> reserveLB(const std::string &lb_name,
                               const TimeUntil &until,
                               const std::vector<std::string> &senders);
 
@@ -190,9 +190,9 @@ namespace e2sar
          * boost::posix_time::duration_from_string from string like "23:59:59.000"s
          * @param senders list of sender IP addresses
          *
-         * @return - 0 on success or error code with message on failure
+         * @return - FPGA LB ID, for use in correlating logs/metrics
          */
-        result<int> reserveLB(const std::string &lb_name,
+        result<u_int32_t> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
                               const std::vector<std::string> &senders);
         /**

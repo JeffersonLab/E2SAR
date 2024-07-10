@@ -46,9 +46,9 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest1)
 
     // call free - this will correctly use the admin token (even though instance token
     // is added by reserve call and updated URI inside with LB ID added to it
-    res = lbman.freeLB();
+    auto res1 = lbman.freeLB();
 
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 }
 
 BOOST_AUTO_TEST_CASE(LBMLiveTest2)
@@ -83,13 +83,13 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
     auto lbman1 = LBManager(uri1, false);
 
     // get lb ID from other URI object
-    res = lbman1.getLB(lbman.get_URI().get_lbId());
+    auto res1 = lbman1.getLB(lbman.get_URI().get_lbId());
 
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 
     BOOST_CHECK(lbman.get_URI().get_syncAddr().value() == lbman1.get_URI().get_syncAddr().value());
 
-    res = lbman.freeLB();
+    res1 = lbman.freeLB();
 
     BOOST_CHECK(!res.has_error());
 }
@@ -119,24 +119,24 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
     // register (should internally set session token and session id)
-    res = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
+    auto res1 = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
 
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
     BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
 
     // send state - every registered worker must do that every 100ms or be auto-deregistered
-    res = lbman.sendState(0.8, 1.0, true);
+    res1 = lbman.sendState(0.8, 1.0, true);
 
     BOOST_CHECK(!res.has_error());
 
     // unregister (should use session token and session id)
-    res = lbman.deregisterWorker();
+    res1 = lbman.deregisterWorker();
 
     BOOST_CHECK(!res.has_error());
 
     // free
-    res = lbman.freeLB();
+    res1 = lbman.freeLB();
 
     BOOST_CHECK(!res.has_error());
 }
@@ -168,7 +168,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
     // register (should internally set session token and session id)
-    res = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
+    auto res1 = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
 
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     // first 2 seconds of the state are discarded as too noisy
     for (int i = 25; i > 0; i--)
     {
-        res = lbman.sendState(0.8, 1.0, true);
+        res1 = lbman.sendState(0.8, 1.0, true);
         BOOST_CHECK(!res.has_error());
         boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
     }
@@ -207,11 +207,11 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
     BOOST_CHECK(std::abs(lbstatus->workers[0].controlsignal() - 1.0) < DELTAD);
 
     // unregister (should use session token and session id)
-    res = lbman.deregisterWorker();
+    res1 = lbman.deregisterWorker();
     BOOST_CHECK(!res.has_error());
 
     // free
-    res = lbman.freeLB();
+    res1 = lbman.freeLB();
 
     BOOST_CHECK(!res.has_error());
 }

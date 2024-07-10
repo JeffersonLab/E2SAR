@@ -80,7 +80,6 @@ namespace e2sar
             auto until = nowT + boost::chrono::milliseconds(period_ms);
             boost::this_thread::sleep_until(until);
         }
-        std::cout << "Sync thread exiting " << std::endl;
     }
 
     result<int> Segmenter::SyncThreadState::_open()
