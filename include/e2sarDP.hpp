@@ -169,10 +169,10 @@ namespace e2sar
              * initializes the data event queue and allocates user-space memory pools.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
              * @param srcId - id of this source for load balancer
-             * @param sync_period_ms - time in milliseconds between sync messages
+             * @param sync_period_ms - sync period in milliseconds - how often sync messages are sent
              * @param sync_periods - number of sync periods to use for averaging send rate
              */
-            Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t sync_period_ms, u_int16_t sync_periods);
+            Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t sync_period_ms=300, u_int16_t sync_periods=3);
 
             /**
              * Don't want to be able to copy these objects normally
@@ -229,7 +229,7 @@ namespace e2sar
             }
 
             /**
-             * Get a uple <event datagrams cnt, event datagrams err cnt>
+             * Get a tuple <event datagrams cnt, event datagrams err cnt>
              */
             inline const boost::tuple<u_int64_t, u_int64_t> getSendStats() const 
             {
@@ -239,7 +239,6 @@ namespace e2sar
             // Tell threads to stop
             inline void stopThreads() 
             {
-                std::cout << "Stopping threads" << std::endl;
                 threadsStop = true;
             }
 
