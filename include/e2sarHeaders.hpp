@@ -10,15 +10,15 @@ namespace e2sar
     using UnixTimeNano_t = u_int64_t;
     using EventRate_t = u_int32_t;
 
-    constexpr u_int8_t lbrehdrVersion = 1 << 4; // shifted up by 4 bits to be in the upper nibble
+    constexpr u_int8_t rehdrVersion = 1 << 4; // shifted up by 4 bits to be in the upper nibble
     /*
         The Reassembly Header. You should always use the provided methods to set
         and interrogate fields as the structure maintains Big-Endian order
         internally.
     */
-    struct LBReHdr
+    struct ReHdr
     {
-        u_int8_t preamble[2] {lbrehdrVersion, 0}; // 4 bit version + reserved
+        u_int8_t preamble[2] {rehdrVersion, 0}; // 4 bit version + reserved
         u_int16_t dataId{0};   // source identifier
         u_int32_t bufferOffset{0};
         u_int32_t bufferLength{0};
@@ -74,7 +74,7 @@ namespace e2sar
          * u_int32_t myBufferLength;
          * EventNum_t myEventNum;
          * 
-         * boost::tie(myDataId, myBufferOffset, myBufferLength, myEventNum) = lbrehdr.get_fields();
+         * boost::tie(myDataId, myBufferOffset, myBufferLength, myEventNum) = rehdr.get_fields();
          */
         inline const boost::tuple<u_int16_t, u_int32_t, u_int32_t, EventNum_t> get_Fields() const 
         {
