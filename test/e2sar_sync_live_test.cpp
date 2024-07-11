@@ -58,11 +58,11 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
     Segmenter seg{lbman.get_URI(), srcId, syncPeriodMS, syncPeriods};
 
-    auto res = seg.openAndStart();
+    auto res1 = seg.openAndStart();
 
-    if (res.has_error())
-        std::cout << "ERROR: " << res.error().message() << std::endl;
-    BOOST_CHECK(!res.has_error());
+    if (res1.has_error())
+        std::cout << "ERROR: " << res1.error().message() << std::endl;
+    BOOST_CHECK(!res1.has_error());
 
     std::cout << "Running sync test for 10 seconds" << std::endl;
     // run for 10 seconds
@@ -80,9 +80,9 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
 
     // call free - this will correctly use the admin token (even though instance token
     // is added by reserve call and updated URI inside with LB ID added to it
-    auto res1 = lbman.freeLB();
+    auto res2 = lbman.freeLB();
 
-    BOOST_CHECK(!res1.has_error());
+    BOOST_CHECK(!res2.has_error());
 
     // stop threads and exit
 }
