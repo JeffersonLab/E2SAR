@@ -132,6 +132,32 @@ There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which 
 
 TBD
 
+## Scapy
+
+Scapy scripts are provided for sniffing/validating and generating various kinds of UDP packets. See this [folder](scripts/scapy/) for details. Make sure Scapy is installed (`pip install scapy`) and for most tasks the scripts must be run as root (bot for sending and sniffing). 
+
+Typical uses may include (note the scripts have sane defaults for everything, but can be overridden with command line):
+
+Generate a LB+RE header packet with a specific payload. Only show it without sending (doesn't need root privilege)
+```bash
+$ ./snifgen.py -g --lbre --pld "this is payload" --show -c 1 
+```
+Generate and send a LB+RE header packet to 192.168.100.10 with a specific payload. Use default MTU of 1500.
+```bash
+$ ./snifgen.py -g --lbre --pld "this is payload" --ip "192.168.100.10" -c 1 
+```
+Generate and send a RE header packet to 192.168.100.10 with a specific payload. Use MTU of 50.
+```bash
+$ ./snifgen.py -g --re --pld "this is payload" --ip "192.168.100.10" --mtu 50 -c 1 
+```
+Listen for 10 Sync packets sent to port 18347 then exit.
+```bash
+$ ./snifgen -l -p 18347 -c 10 --sync
+```
+Listen for 10 Sync packets sent to 192.168.100.10 port 18347 then exit.
+```bash
+$ ./snifgen -l -p 18347 -c 10 --ip "192.168.100.10" --sync
+```
 ## Dealing with SSL certificate validation
 
 UDPLBd implements gRPC over TLS to support channel privacy. Only server-side certificate for UDPLBd is required - the code does not rely on SSL client-side authentication. For testing You can generate UDPLBd certificate as follows:
