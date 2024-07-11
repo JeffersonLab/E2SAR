@@ -191,6 +191,7 @@ if __name__ == "__main__":
     parser.add_argument("--srcid", action="store", default=1, type=int, help="source id for Sync packet")
     parser.add_argument("--mtu", action="store", type=int, default=1500, help="set the MTU length, so LB+RE and RE packets can be fragmented.")
     parser.add_argument("--pld", action="store", help="payload for LB+RE or RE packets. May be broken up if MTU size insufficient")
+    parser.add_argument("--iface", action="store", default="all", help="which interface should we listen on (defaults to all)")
     packet_types = parser.add_mutually_exclusive_group(required=True)
     packet_types.add_argument("--sync", action="store_true", help="listen for or generate sync packets")
     packet_types.add_argument("--lbre", action="store_true", help="listen for or generate packets with LB+RE header")
@@ -232,15 +233,27 @@ if __name__ == "__main__":
         else:
             filter=f'udp dst port {args.port}'
 
-        print(f'Looking for {args.count} packets using filter "{filter}"')
-
         if args.sync:
             # sync packets
             bind_sync_hdr(args.port)
+            packet_type = 'Sync'
         elif args.lbre:
             # lb+re packets
             bind_lb_hdr(args.port)
+            packet_type = 'LB+RE'
         elif args.re:
             bind_re_hdr(args.port)
+            packet_type = 'RE'
+
+        # Linux supports "any" shortcut interface specification, but other OSs may not, so we just list
+        # all the interfaces first
+        if args.iface == 'all':
+            interfaces = get_if_list()
+        else:
+            interfaces = args.iface
+        print(f'Looking for {args.count} {packet_type} packets using filter "{filter}" on interfaces {interfaces}')
+
         # Start sniffing for packets
-        sniff(filter=filter, prn=packet_callback, count=args.count)
+        sniff(iface=interfaces, filter=filter, prn=packet_callback, count=args.count)
+
+    print('Finished')
