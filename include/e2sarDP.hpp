@@ -82,10 +82,14 @@ namespace e2sar
                 std::atomic<u_int64_t> syncMsgCnt{0}; 
                 // sync errors seen on send
                 std::atomic<u_int64_t> syncErrCnt{0};
+                // last error code
+                std::atomic<int> lastSyncErrno{0};
                 // event datagrams sent
                 std::atomic<u_int64_t> eventDatagramsCnt{0};
                 // event datagram send errors
                 std::atomic<u_int64_t> eventDatagramsErrCnt{0};
+                // last error code
+                std::atomic<int> lastSendErrno{0};
             };
             Stats stats;
 
@@ -221,19 +225,22 @@ namespace e2sar
                 boost::any cbArg = nullptr) noexcept;
 
             /**
-             * Get a tuple <sync msg cnt, sync err cnt>
+             * Get a tuple <sync msg cnt, sync err cnt, last errno> of sync statistics
              */
-            inline const boost::tuple<u_int64_t, u_int64_t> getSyncStats() const
+            inline const boost::tuple<u_int64_t, u_int64_t, int> getSyncStats() const
             {
-                return boost::make_tuple<u_int64_t, u_int64_t>(stats.syncMsgCnt, stats.syncErrCnt);
+                return boost::make_tuple<u_int64_t, u_int64_t, int>(stats.syncMsgCnt, 
+                    stats.syncErrCnt, stats.lastSyncErrno);
             }
 
             /**
-             * Get a tuple <event datagrams cnt, event datagrams err cnt>
+             * Get a tuple <event datagrams cnt, event datagrams err cnt, last errno>
+             * of send statistics
              */
-            inline const boost::tuple<u_int64_t, u_int64_t> getSendStats() const 
+            inline const boost::tuple<u_int64_t, u_int64_t, int> getSendStats() const 
             {
-                return boost::make_tuple<u_int64_t, u_int64_t>(stats.eventDatagramsCnt, stats.eventDatagramsErrCnt);
+                return boost::make_tuple<u_int64_t, u_int64_t, int>(stats.eventDatagramsCnt, 
+                    stats.eventDatagramsErrCnt, stats.lastSendErrno);
             }
         private:
             // Tell threads to stop

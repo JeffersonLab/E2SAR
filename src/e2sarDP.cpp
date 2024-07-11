@@ -107,6 +107,7 @@ namespace e2sar
                 if (err < 0) {
                     close(socketFd);
                     seg.stats.syncErrCnt++;
+                    seg.stats.lastSendErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
             }
@@ -114,6 +115,7 @@ namespace e2sar
         else {
             if ((socketFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
                 seg.stats.syncErrCnt++;
+                seg.stats.lastSyncErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
 
@@ -163,6 +165,7 @@ namespace e2sar
         if (err == -1)
         {
             seg.stats.syncErrCnt++;
+            seg.stats.lastSyncErrno = errno;
             return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
         }
 

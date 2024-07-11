@@ -51,6 +51,10 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
 
     auto syncStats = seg.getSyncStats();
 
+    if (syncStats.get<1>() != 0) 
+    {
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+    }
     // send 10 sync messages and no errors
     BOOST_CHECK(syncStats.get<0>() == 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
