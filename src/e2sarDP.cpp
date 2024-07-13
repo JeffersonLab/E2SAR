@@ -5,8 +5,11 @@
 
 #include "e2sarDP.hpp"
 
+
 namespace e2sar 
 {
+    const boost::chrono::milliseconds Segmenter::sleepTime(10);
+
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
         u_int16_t sync_period_ms, u_int16_t sync_periods, u_int8_t nextProto, u_int16_t mtu,
         bool useV6, bool useZerocopy, bool cnct): 
@@ -209,26 +212,29 @@ namespace e2sar
         while(!seg.threadsStop)
         {
             // block to get event off the queue and send
-            seg.sendThreadCond.wait(condLock);
+            seg.sendThreadCond.wait_for(condLock, sleepTime);
 
-            // pop off eventQueue
-            EventQueueItem *item = nullptr;
-            seg.eventQueue.pop(item);
+            // try to pop off eventQueue
+            EventQueueItem *item{nullptr};
+            while(seg.eventQueue.pop(item))
+            {
+                // call send overriding event number as needed
+                auto res = _send(item->event, item->bytes, 
+                    (item->eventNum != 0 ? item->eventNum : seg.eventNum.value()));
+                // FIXME: do something with result? 
+                // maybe not - it should be taken care by lastErrno in
+                // the stats block
 
-            // override event number?
-            if (item->eventNum != 0)
-                seg.eventNum = item->eventNum;
+                // update event counter
+                seg.eventNum++;
 
-            // call send
-            auto res = _send(item->event, item->bytes);
-            // FIXME: do something with result? 
+                // call the callback
+                if (item->callback != nullptr)
+                    item->callback(item->cbArg);
 
-            // call the callback
-            if (item->callback != nullptr)
-                item->callback(item->cbArg);
-
-            // free up the item
-            seg.queueItemPool.free(item);
+                // push the item back to return queue
+                seg.returnQueue.push(item);    
+            }
         }
         auto res = _close();
     }
@@ -345,7 +351,7 @@ namespace e2sar
     }
 
     // fragment and send the event
-    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes)
+    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, EventNum_t altEventNum)
     {
         int err;
         struct iovec iov[2];
@@ -372,9 +378,6 @@ namespace e2sar
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
-        // update the event send stats
-        seg.eventNum++;
-        seg.eventsInCurrentSync++;
 
         // fragment event, update/set iov and send in a loop
         u_int8_t *curOffset = event;
@@ -386,8 +389,10 @@ namespace e2sar
             // fill out LB and RE headers
             auto hdr = lbreHdrPool.construct();
 
-            hdr->re.set(seg.srcId, curOffset - event, curLen, seg.eventNum);
-            hdr->lb.set(seg.nextProto, seg.entropy, seg.eventNum);
+            // are we overwriting the event number?
+            EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
+            hdr->re.set(seg.srcId, curOffset - event, curLen, finalEventNum);
+            hdr->lb.set(seg.nextProto, seg.entropy, finalEventNum);
 
             // update offset and length
             curOffset += curLen;
@@ -430,6 +435,8 @@ namespace e2sar
                 lbreHdrPool.free(hdr);
             } 
         }
+        // update the event send stats
+        seg.eventsInCurrentSync++;
 
         return 0;
     }
@@ -446,13 +453,15 @@ namespace e2sar
     // Any core affinity needs to be done by caller.
     result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes) noexcept
     {
-        return 0;
+        freeEventItemBacklog();
+        return sendThreadState._send(event, bytes, 0LL);
     }
 
     // Blocking call specifying event number.
     result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept
     {
-        return 0;
+        freeEventItemBacklog();
+        return sendThreadState._send(event, bytes, eventNumber);
     }
 
     // Non-blocking call to place event on internal queue.
@@ -470,6 +479,7 @@ namespace e2sar
         void* (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
+        freeEventItemBacklog();
         EventQueueItem *item = queueItemPool.construct();
         item->bytes = bytes;
         item->event = event;

@@ -52,23 +52,29 @@ namespace e2sar
             // Structure to hold each send-queue item
             struct EventQueueItem {
                 uint32_t bytes;
-                uint64_t eventNum;
+                EventNum_t eventNum;
                 u_int8_t *event;
                 void* (*callback)(boost::any);
                 boost::any cbArg;
             };
-
-            // Max size of internal queue holding events to be sent. 
-            static const size_t QSIZE = 2047;
-            // various useful header lengths
-            static const int IPHDRLEN = 20;
-            static const int UDPHDRLEN = 8;
 
             // pool from which queue items are allocated as needed 
             boost::object_pool<EventQueueItem> queueItemPool{32, QSIZE + 1};
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
             boost::lockfree::queue<EventQueueItem*> eventQueue;
+            // to avoid locing the item pool send thread puts processed events 
+            // on this queue so they can be freed opportunistically by main thread
+            boost::lockfree::queue<EventQueueItem*> returnQueue;
+
+            // Max size of internal queue holding events to be sent. 
+            static const size_t QSIZE = 2047;
+            // various useful header lengths
+            static const int IPHDRLEN = 20;
+            static const int UDPHDRLEN = 8;
+            // how long data send thread spends sleeping
+            static const boost::chrono::milliseconds sleepTime;
+
 
             // structure that maintains send stats
             struct SendStats {
@@ -185,7 +191,7 @@ namespace e2sar
                 // close sockets
                 result<int> _close();
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes);
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum);
                 // thread loop
                 void _threadBody();
             };
@@ -256,6 +262,8 @@ namespace e2sar
                 // wait to exit
                 syncThreadState.threadObj.join();
                 sendThreadState.threadObj.join();
+
+                // pool memory is implicitly freed when pool goes out of scope
             }
 
             /**
@@ -264,20 +272,40 @@ namespace e2sar
              */
             result<int> openAndStart() noexcept;
 
-            // Blocking call. Event number automatically set.
-            // Any core affinity needs to be done by caller.
+            /**
+             * Send immediately using internal event number.
+             * @param event - event buffer
+             * @param bytes - bytes length of the buffer
+             */
             result<int> sendEvent(u_int8_t *event, size_t bytes) noexcept;
 
-            // Blocking call specifying event number.
+            /**
+             * Send immediately overriding event number.
+             * @param event - event buffer
+             * @param bytes - bytes length of the buffer
+             * @param eventNumber - override the internal event number
+             */
             result<int> sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept;
 
-            // Non-blocking call to place event on internal queue.
-            // Event number automatically set. 
+            /**
+             * Add to send queue in a nonblocking fashion, using internal event number
+             * @param event - event buffer
+             * @param bytes - bytes length of the buffer
+             * @param callback - callback function to call after event is sent (non-blocking)
+             * @param cbArg - parameter for callback
+             */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
                 void* (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 
-            // Non-blocking call specifying event number.
+            /**
+             * Add to send queue in a nonblocking fashion, overriding internal event number
+             * @param event - event buffer
+             * @param bytes - bytes length of the buffer
+             * @param eventNumber - override the internal event number
+             * @param callback - callback function to call after event is sent
+             * @param cbArg - parameter for callback
+             */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
                 uint64_t eventNumber, 
                 void* (*callback)(boost::any) = nullptr, 
@@ -287,7 +315,7 @@ namespace e2sar
              * Get a tuple <sync msg cnt, sync err cnt, last errno> of sync statistics.
              * Stat structures have atomic members, no additional locking needed.
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getSyncStats() const
+            inline const boost::tuple<u_int64_t, u_int64_t, int> getSyncStats() const noexcept
             {
                 return getStats(syncStats);
             }
@@ -297,7 +325,7 @@ namespace e2sar
              * of send statistics. Stat structure have atomic members, no additional
              * locking needed
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getSendStats() const 
+            inline const boost::tuple<u_int64_t, u_int64_t, int> getSendStats() const noexcept
             {
                 return getStats(sendStats);
             }
@@ -305,7 +333,7 @@ namespace e2sar
             /**
              * Get the MTU currently in use by segmenter
              */
-            inline const u_int16_t getMTU() const 
+            inline const u_int16_t getMTU() const noexcept
             {
                 return sendThreadState.mtu;
             }
@@ -313,7 +341,7 @@ namespace e2sar
             /**
              * get the maximum payload length used by the segmenter
              */
-            inline const int getMaxPldLen() const
+            inline const int getMaxPldLen() const noexcept
             {
                 return sendThreadState.maxPldLen;
             }
@@ -332,7 +360,7 @@ namespace e2sar
 
             // Calculate the average event rate from circular buffer
             // note that locking lives outside this function, as needed.
-            inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos)
+            inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos) 
             {
                 // each element of circular buffer states the start of the sync period
                 // and the number of events sent during that period
@@ -354,10 +382,18 @@ namespace e2sar
 
             // doesn't require locking as it looks at only srcId in segmenter, which
             // never changes past initialization
-            inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano)
+            inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
                 // note that srcId is only 16 bits, but the sync field is 32-bit wide
                 hdr->set(srcId, eventNum, eventRate, tnano);
+            }
+
+            // process backlog in return queue and free event queue item blocks on it
+            inline void freeEventItemBacklog() 
+            {
+                EventQueueItem *item{nullptr};
+                while (returnQueue.pop(item))
+                    queueItemPool.free(item);
             }
     };
 
