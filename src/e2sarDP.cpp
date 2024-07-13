@@ -1,6 +1,3 @@
-#ifndef E2SARHEADERS_HPP
-#define E2SARHEADERS_HPP
-
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 
@@ -12,14 +9,14 @@ namespace e2sar
 {
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
         u_int16_t sync_period_ms, u_int16_t sync_periods, u_int8_t nextProto, u_int16_t mtu,
-        bool useV6, bool useZerocopy): 
+        bool useV6, bool useZerocopy, bool cnct): 
         dpuri{uri}, 
         srcId{sid},
         nextProto{nextProto},
         entropy{entropy},
         eventStatsBuffer{sync_periods},
-        syncThreadState(*this, sync_period_ms), 
-        sendThreadState(*this, useV6, useZerocopy, mtu)
+        syncThreadState(*this, sync_period_ms, cnct), 
+        sendThreadState(*this, useV6, useZerocopy, mtu, cnct)
     {
         ;
     }
@@ -27,14 +24,14 @@ namespace e2sar
 #if 0
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
         u_int16_t sync_period_ms, u_int16_t sync_periods, u_int8_t nextProto,
-        const std::string iface, bool useV6, bool useZerocopy): 
+        const std::string iface, bool useV6, bool useZerocopy, bool cnct): 
         dpuri{uri}, 
         eventStatsBuffer{sync_periods},
         srcId{sid},
         entropy{entropy},
         nextProto{nextProto},
-        syncThreadState(*this, sync_period_ms), 
-        sendThreadState(*this, useV6, useZerocopy, iface)
+        syncThreadState(*this, sync_period_ms, cnct), 
+        sendThreadState(*this, useV6, useZerocopy, iface, cnct)
     {
 
         // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
@@ -80,29 +77,30 @@ namespace e2sar
             // Convert the time point to nanoseconds since the epoch
             auto now = boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count();
             uint64_t currentTimeNanos = static_cast<uint64_t>(now);
+            // get sync header buffer
+            SyncHdr hdr{};
+            e2sar::EventRate_t evtRate;
 
             // push the stats onto ring buffer (except the first time) and reset
+            // locking is not needed as sync thread is the  
+            // only one interacting with the circular buffer
             if (seg.currentSyncStartNano != 0) {
                 struct SendStats statsToPush{seg.currentSyncStartNano, seg.eventsInCurrentSync};
                 seg.eventStatsBuffer.push_back(statsToPush);
             }
             seg.currentSyncStartNano = currentTimeNanos;
             seg.eventsInCurrentSync = 0;
-                
-            // get sync header buffer
-            SyncHdr hdr{};
-            e2sar::EventRate_t evtRate;
-            {
-                boost::lock_guard<boost::mutex> guard(seg.syncThreadMtx);
-                // peek at segmenter metadata fifo to calculate event rate
-                evtRate = seg.eventRate(currentTimeNanos);
-            }
+
+            // peek at segmenter metadata circular buffer to calculate event rate
+            evtRate = seg.eventRate(currentTimeNanos);
+
             // fill the sync header using a mix of current and segmenter data
             // no locking needed - we only look at one field in seg - srcId
             seg.fillSyncHdr(&hdr, evtRate, currentTimeNanos);
 
             // send it off
             auto sendRes = _send(&hdr);
+            // FIXME: do something with result?
 
             // sleep approximately
             // FIXME: we should probably check until > now after send completes
@@ -207,23 +205,30 @@ namespace e2sar
 
     void Segmenter::SendThreadState::_threadBody()
     {
+        boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
         while(!seg.threadsStop)
         {
-            // update event numbers
+            // block to get event off the queue and send
+            seg.sendThreadCond.wait(condLock);
 
-            // update the circular buffer for rate calculation
-            {
-                boost::lock_guard<boost::mutex> guard(seg.syncThreadMtx);
-                SendStats sendStatsItem;
-                seg.eventStatsBuffer.push_back(sendStatsItem);
-            }
-            //
-            // temporary code
-            //
-            auto nowT = boost::chrono::high_resolution_clock::now();
-            // sleep approximately
-            auto until = nowT + boost::chrono::milliseconds(1000);
-            boost::this_thread::sleep_until(until);
+            // pop off eventQueue
+            EventQueueItem *item = nullptr;
+            seg.eventQueue.pop(item);
+
+            // override event number?
+            if (item->eventNum != 0)
+                seg.eventNum = item->eventNum;
+
+            // call send
+            auto res = _send(item->event, item->bytes);
+            // FIXME: do something with result? 
+
+            // call the callback
+            if (item->callback != nullptr)
+                item->callback(item->cbArg);
+
+            // free up the item
+            seg.queueItemPool.free(item);
         }
         auto res = _close();
     }
@@ -336,6 +341,23 @@ namespace e2sar
 
         dataAddrStruct = boost::make_tuple<sockaddr_in, sockaddr_in6>(dataAddrStruct4, dataAddrStruct6);
 
+        return 0;
+    }
+
+    // fragment and send the event
+    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes)
+    {
+        int err;
+        struct iovec iov[2];
+        int sendSocket{0};
+        // having our own copy on the stack means we can call _send off-thread
+        struct msghdr sendhdr{};
+#ifdef ZEROCOPY_AVAILABLE
+        int flags{(useZerocopy ? MSG_ZEROCOPY: 0)};
+#else   
+        int flags{0};
+#endif
+
         // prepare msghdr
         if (connectSocket) {
             // prefill with blank
@@ -350,23 +372,6 @@ namespace e2sar
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
-
-        return 0;
-    }
-
-    // fragment and send the event
-    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes)
-    {
-        int err;
-
-        struct iovec iov[2];
-
-        int sendSocket{0};
-#ifdef ZEROCOPY_AVAILABLE
-        int flags{(useZerocopy ? MSG_ZEROCOPY: 0)};
-#else   
-        int flags{0};
-#endif
         // update the event send stats
         seg.eventNum++;
         seg.eventsInCurrentSync++;
@@ -451,22 +456,29 @@ namespace e2sar
     }
 
     // Non-blocking call to place event on internal queue.
-    // Event number automatically set. 
+    // Event number automatically set at send time
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
         void* (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
-        return 0;
+        return addToSendQueue(event, bytes, 0, callback, cbArg);
     }
 
-    // Non-blocking call specifying event number.
+    // Non-blocking call specifying explicit event number.
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
         uint64_t eventNumber, 
         void* (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
+        EventQueueItem *item = queueItemPool.construct();
+        item->bytes = bytes;
+        item->event = event;
+        item->callback = callback;
+        item->cbArg = cbArg;
+        item->eventNum = eventNumber;
+        eventQueue.push(item);
+        // wake up send thread (no need to hold the lock as queue is lock_free)
+        sendThreadCond.notify_one();
         return 0;
     }
 }
-
-#endif
