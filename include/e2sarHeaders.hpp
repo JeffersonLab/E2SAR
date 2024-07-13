@@ -16,7 +16,7 @@ namespace e2sar
         and interrogate fields as the structure maintains Big-Endian order
         internally.
     */
-    struct ReHdr
+    struct REHdr
     {
         u_int8_t preamble[2] {rehdrVersion, 0}; // 4 bit version + reserved
         u_int16_t dataId{0};   // source identifier
@@ -154,6 +154,12 @@ namespace e2sar
         {
             return boost::make_tuple(version, nextProto, get_entropy(), get_eventNum());
         }
+    } __attribute__((__packed__));
+
+    // for memory allocation purposes we need them concatenated
+    struct LBREHdr {
+        struct LBHdr lb;
+        struct REHdr re;
     } __attribute__((__packed__));
 
     constexpr u_int8_t synchdrVersion = 1;

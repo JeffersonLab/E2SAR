@@ -36,9 +36,10 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
     u_int16_t srcId = 0x05;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
+    u_int16_t entropy = 16;
 
     // create a segmenter and start the threads
-    Segmenter seg{uri, srcId, syncPeriodMS, syncPeriods};
+    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods);
 
     auto res = seg.openAndStart();
 
