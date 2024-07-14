@@ -180,7 +180,7 @@ if __name__ == "__main__":
     operations = parser.add_mutually_exclusive_group(required=True)
     operations.add_argument("-l", "--listen", action="store_true", help="listen for incoming packets and try to parse and validate them")
     operations.add_argument("-g", "--generate", action="store_true", help="generate new packets of specific types")
-    parser.add_argument("-p", "--port", action="store", help="UDP port (for -l and -g)", default=18347, type=int)
+    parser.add_argument("-p", "--port", action="store", help="UDP port (for -l and -g)", default=19522, type=int)
     parser.add_argument("-c", "--count", action="store", help="number of packet streams (if pld larger than mtu, otherwise packets) to generate or expect", default=10, type=int)
     parser.add_argument("--ip", action="store", help="IP address to which to send the packet(s) or listen from")
     parser.add_argument("--show", action="store_true", default=False, help="only show the packet without sending it (with -g)")
