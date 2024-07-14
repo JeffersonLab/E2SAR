@@ -211,7 +211,6 @@ namespace e2sar
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
              * @param srcId - id of this source for load balancer
              * @param entropy - entropy value of this sender
-             * @param nextProto -
              * @param sync_period_ms - sync period in milliseconds - how often sync messages are sent
              * @param sync_periods - number of sync periods to use for averaging send rate
              * @param mtu - use the following MTU for data (must accommodate MAC, IP, UDP, LB, RE headers
@@ -219,17 +218,18 @@ namespace e2sar
              * @param useV6 - use dataplane v6 connection (off by default)
              * @param useZerocopy - utilize Zerocopy if available
              * @param cnct - use connected sockets (default)
+             * @param nextProto -
              */
             Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy,  
-                u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int8_t nextProto=rehdrVersion,
-                u_int16_t mtu=1500, bool useV6=false, bool useZerocopy=false, bool cnct=true);
+                u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int16_t mtu=1500, 
+                bool useV6=false, bool useZerocopy=false, bool cnct=true,
+                u_int8_t nextProto=rehdrVersion);
 #if 0
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
              * @param srcId - id of this source for load balancer
              * @param entropy - entropy value of this sender
-             * @param nextProto -
              * @param sync_period_ms - sync period in milliseconds - how often sync messages are sent
              * @param sync_periods - number of sync periods to use for averaging send rate
              * @param iface - use the following interface for data.
@@ -237,10 +237,12 @@ namespace e2sar
              * @param useV6 - use dataplane v6 connection
              * @param useZerocopy - utilize Zerocopy if available
              * @param cnct - use connected sockets (default)
+             * @param nextProto -
              */
             Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy, 
-                u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int8_t nextProto=rehdrVersion,
-                std::string iface=""s, bool useV6=true, bool useZerocopy=false, bool cnct=true);
+                u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, std::string iface=""s, 
+                bool useV6=true, bool useZerocopy=false, bool cnct=true,
+                u_int8_t nextProto=rehdrVersion);
 #endif
 
             /**

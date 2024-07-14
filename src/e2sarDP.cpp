@@ -13,8 +13,8 @@ namespace e2sar
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
-        u_int16_t sync_period_ms, u_int16_t sync_periods, u_int8_t nextProto, u_int16_t mtu,
-        bool useV6, bool useZerocopy, bool cnct): 
+        u_int16_t sync_period_ms, u_int16_t sync_periods, u_int16_t mtu,
+        bool useV6, bool useZerocopy, bool cnct, u_int8_t nextProto): 
         dpuri{uri}, 
         srcId{sid},
         nextProto{nextProto},
@@ -28,13 +28,14 @@ namespace e2sar
 
 #if 0
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
-        u_int16_t sync_period_ms, u_int16_t sync_periods, u_int8_t nextProto,
-        const std::string iface, bool useV6, bool useZerocopy, bool cnct): 
+        u_int16_t sync_period_ms, u_int16_t sync_periods, const std::string iface, 
+        bool useV6, bool useZerocopy, bool cnct,
+        u_int8_t nextProto): 
         dpuri{uri}, 
-        eventStatsBuffer{sync_periods},
         srcId{sid},
-        entropy{entropy},
         nextProto{nextProto},
+        entropy{entropy},
+        eventStatsBuffer{sync_periods},
         syncThreadState(*this, sync_period_ms, cnct), 
         sendThreadState(*this, useV6, useZerocopy, iface, cnct)
     {
