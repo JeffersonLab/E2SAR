@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
         std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
-    std::cout << "Running data test for 10 seconds" << 
+    std::cout << "Running data test for 10 seconds against sync " << 
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
@@ -128,7 +128,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
         std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
-    std::cout << "Running data test for 10 seconds" << 
+    std::cout << "Running data test for 10 seconds against sync " << 
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
@@ -208,7 +208,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
         std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
-    std::cout << "Running data test for 10 seconds" << 
+    std::cout << "Running data test for 10 seconds against sync " << 
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
@@ -295,7 +295,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
         std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
-    std::cout << "Running data test for 10 seconds" << 
+    std::cout << "Running data test for 10 seconds against sync " << 
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<

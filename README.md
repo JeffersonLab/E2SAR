@@ -106,8 +106,12 @@ $ . ./setup_compile_env.sh
 $ meson setup build
 $ cd build
 $ meson compile
-$ meson test
+$ EJFAT_URI='ejfats://udplbd@192.168.0.3:18347/lb/1?sync=192.168.2.1:19020&data=10.100.100.14' meson test -C build --suite unit --timeout 0
+$ EJFAT_URI='ejfats://udplbd@192.168.0.3:18347/lb/12?sync=192.168.100.10:19020&data=192.168.101.10:18020' meson test -C build --suite unit --timeout 0
 ```
+
+The `live` test suite requires a running UDPLBd and the setting of EJFAT_URI must reflect that. `Unit` tests do not require a running UDPBLBd and the IP addresses in URI can be random.
+
 If you desire a custom installation directory you can add `--prefix=/absolute/path/to/install/root`. If you have a custom location for pkg-config scripts, you can also add `-Dpkg_config_path=/path/to/pkg-config/scripts` to the setup command. 
 
 ### Building on older systems (e.g. RHEL8)
