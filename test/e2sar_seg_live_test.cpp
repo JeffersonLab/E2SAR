@@ -1,4 +1,4 @@
-#define BOOST_TEST_MODULE DPSegTests
+#define BOOST_TEST_MODULE DPSegLiveTests
 #include <stdlib.h>
 #include <iostream>
 #include <cmath>
@@ -16,13 +16,11 @@ using namespace e2sar;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 
-BOOST_AUTO_TEST_SUITE(DPSegTests)
+BOOST_AUTO_TEST_SUITE(DPSegLiveTests)
 
-// these tests test the send thread and the sending of
-// the event messages. They generaly require external capture
-// to verify sent data. It doesn't require having UDPLBd running
-// as it takes the sync address directly from the EJFAT_URI
-BOOST_AUTO_TEST_CASE(DPSegTest1)
+// these tests test the sync thread and the sending of
+// the sync messages against live UDPLBd. 
+BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
 {
     // parse URI from env variable
     // it needs to have the sync address/port
@@ -33,27 +31,47 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
+
+    // create LBManager
+    auto lbman = LBManager(uri, false);
+
+    // reserve an LB to get sync address
+    auto duration_v = pt::duration_from_string("01");
+    std::string lbname{"mylb"};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
+
+    // call reserve
+    auto res = lbman.reserveLB(lbname, duration_v, senders);
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
+    BOOST_CHECK(lbman.get_URI().has_syncAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
+
     u_int16_t srcId = 0x05;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
 
     // create a segmenter and start the threads
-    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods);
+    // using the updated URI with sync info
+    std::cout << "Creating segmenter using returned URI: " << 
+        lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+    Segmenter seg(lbman.get_URI(), srcId, entropy, syncPeriodMS, syncPeriods);
 
-    auto res = seg.openAndStart();
+    auto res1 = seg.openAndStart();
 
-    if (res.has_error())
-        std::cout << "ERROR: " << res.error().message() << std::endl;
-    BOOST_CHECK(!res.has_error());
+    if (res1.has_error())
+        std::cout << "ERROR: " << res1.error().message() << std::endl;
+    BOOST_CHECK(!res1.has_error());
 
     std::cout << "Running data test for 10 seconds" << 
-        uri.get_syncAddr().value().first << ":" << 
-        uri.get_syncAddr().value().second << " and data " <<
-        uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        lbman.get_URI().get_syncAddr().value().first << ":" << 
+        lbman.get_URI().get_syncAddr().value().second << " and data " <<
+        lbman.get_URI().get_dataAddrv4().value().first << ":" <<
+        lbman.get_URI().get_dataAddrv4().value().second << 
         std::endl;
-
+    
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
     std::cout << "The event data is string '" << eventString << "' of length " << eventString.length() << std::endl;
     //
@@ -95,10 +113,18 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     BOOST_CHECK(sendStats.get<0>() == 5);
     BOOST_CHECK(sendStats.get<1>() == 0);
 
+    // call free - this will correctly use the admin token (even though instance token
+    // is added by reserve call and updated URI inside with LB ID added to it
+    auto res2 = lbman.freeLB();
+
+    BOOST_CHECK(!res2.has_error());
+
     // stop threads and exit
 }
 
-BOOST_AUTO_TEST_CASE(DPSegTest2)
+// these tests test the sync thread and the sending of
+// the sync messages against live UDPLBd. 
+BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
 {
     // parse URI from env variable
     // it needs to have the sync address/port
@@ -109,33 +135,53 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
+
+    // create LBManager
+    auto lbman = LBManager(uri, false);
+
+    // reserve an LB to get sync address
+    auto duration_v = pt::duration_from_string("01");
+    std::string lbname{"mylb"};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
+
+    // call reserve
+    auto res = lbman.reserveLB(lbname, duration_v, senders);
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
+    BOOST_CHECK(lbman.get_URI().has_syncAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
+
     u_int16_t srcId = 0x05;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
 
-    // create a segmenter and start the threads, send MTU is set to force
+    // create a segmenter using URI sync and data info
+    // and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
     Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
+    std::cout << "Creating segmenter using returned URI: " << 
+        lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
 
-    auto res = seg.openAndStart();
+    auto res1 = seg.openAndStart();
 
-    if (res.has_error())
-        std::cout << "ERROR: " << res.error().message() << std::endl;
-    BOOST_CHECK(!res.has_error());
+    if (res1.has_error())
+        std::cout << "ERROR: " << res1.error().message() << std::endl;
+    BOOST_CHECK(!res1.has_error());
 
-    std::cout << "Running data test for 10 seconds" << 
-        uri.get_syncAddr().value().first << ":" << 
-        uri.get_syncAddr().value().second << " and data " <<
-        uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+    std::cout << "Running data test for 10 seconds against sync " << 
+        lbman.get_URI().get_syncAddr().value().first << ":" << 
+        lbman.get_URI().get_syncAddr().value().second << " and data " <<
+        lbman.get_URI().get_dataAddrv4().value().first << ":" <<
+        lbman.get_URI().get_dataAddrv4().value().second << 
         std::endl;
-
+    
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
     std::cout << "The event data is string '" << eventString << "' of length " << eventString.length() << std::endl;
     //
-    // send one event message per 2 seconds that fits into two frames
+    // send one event message per 2 seconds that fits into a single frame
     //
     auto sendStats = seg.getSendStats();
     if (sendStats.get<1>() != 0) 
@@ -170,8 +216,14 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     // check the send stats
     std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 10);
+    BOOST_CHECK(sendStats.get<0>() == 5);
     BOOST_CHECK(sendStats.get<1>() == 0);
+    
+    // call free - this will correctly use the admin token (even though instance token
+    // is added by reserve call and updated URI inside with LB ID added to it
+    auto res2 = lbman.freeLB();
+
+    BOOST_CHECK(!res2.has_error());
 
     // stop threads and exit
 }

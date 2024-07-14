@@ -14,10 +14,9 @@ namespace e2sar
 
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
         u_int16_t sync_period_ms, u_int16_t sync_periods, u_int16_t mtu,
-        bool useV6, bool useZerocopy, bool cnct, u_int8_t nextProto): 
+        bool useV6, bool useZerocopy, bool cnct): 
         dpuri{uri}, 
         srcId{sid},
-        nextProto{nextProto},
         entropy{entropy},
         eventStatsBuffer{sync_periods},
         syncThreadState(*this, sync_period_ms, cnct), 
@@ -29,11 +28,9 @@ namespace e2sar
 #if 0
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
         u_int16_t sync_period_ms, u_int16_t sync_periods, const std::string iface, 
-        bool useV6, bool useZerocopy, bool cnct,
-        u_int8_t nextProto): 
+        bool useV6, bool useZerocopy, bool cnct): 
         dpuri{uri}, 
         srcId{sid},
-        nextProto{nextProto},
         entropy{entropy},
         eventStatsBuffer{sync_periods},
         syncThreadState(*this, sync_period_ms, cnct), 
@@ -254,7 +251,7 @@ namespace e2sar
         int zerocopy = 1;
 #endif
         // check that MTU setting was sane
-        if (mtu <= seg.TOTAL_HDR_LEN)
+        if (mtu <= TOTAL_HDR_LEN)
             return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
 
         if (useV6)
@@ -398,7 +395,7 @@ namespace e2sar
             // are we overwriting the event number?
             EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
             hdr->re.set(seg.srcId, curOffset - event, curLen, finalEventNum);
-            hdr->lb.set(seg.nextProto, seg.entropy, finalEventNum);
+            hdr->lb.set(seg.entropy, finalEventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header

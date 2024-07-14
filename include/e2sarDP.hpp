@@ -46,15 +46,11 @@ namespace e2sar
             // id of this data source. Note that in the sync msg it uses 32 bits
             // and in the RE header - 16
             const u_int16_t srcId;
-            const u_int8_t nextProto;
             const u_int16_t entropy;
 
             // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE = 2047;
-            // various useful header lengths
-            static const size_t IP_HDRLEN = 20;
-            static const size_t UDP_HDRLEN = 8;
-            static const size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
+
             // how long data send thread spends sleeping
             static const boost::chrono::milliseconds sleepTime;
 
@@ -179,12 +175,12 @@ namespace e2sar
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
-                    maxPldLen{mtu - Segmenter::TOTAL_HDR_LEN} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN} {}
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
                     mtu{NetUtil::getMTU(iface)}, iface{iface},
-                    maxPldLen{mtu - Segmenter::TOTAL_HDR_LEN} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN} {}
 
                 // open v4/v6 sockets
                 result<int> _open();
@@ -218,12 +214,10 @@ namespace e2sar
              * @param useV6 - use dataplane v6 connection (off by default)
              * @param useZerocopy - utilize Zerocopy if available
              * @param cnct - use connected sockets (default)
-             * @param nextProto -
              */
             Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy,  
                 u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int16_t mtu=1500, 
-                bool useV6=false, bool useZerocopy=false, bool cnct=true,
-                u_int8_t nextProto=rehdrVersion);
+                bool useV6=false, bool useZerocopy=false, bool cnct=true);
 #if 0
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
@@ -237,12 +231,10 @@ namespace e2sar
              * @param useV6 - use dataplane v6 connection
              * @param useZerocopy - utilize Zerocopy if available
              * @param cnct - use connected sockets (default)
-             * @param nextProto -
              */
             Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy, 
                 u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, std::string iface=""s, 
-                bool useV6=true, bool useZerocopy=false, bool cnct=true,
-                u_int8_t nextProto=rehdrVersion);
+                bool useV6=true, bool useZerocopy=false, bool cnct=true);
 #endif
 
             /**

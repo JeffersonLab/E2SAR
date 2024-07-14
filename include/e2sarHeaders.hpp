@@ -10,7 +10,8 @@ namespace e2sar
     using UnixTimeNano_t = u_int64_t;
     using EventRate_t = u_int32_t;
 
-    constexpr u_int8_t rehdrVersion = 1 << 4; // shifted up by 4 bits to be in the upper nibble
+    constexpr u_int8_t rehdrVersion = 1;
+    constexpr u_int8_t rehdrVersionNibble = rehdrVersion << 4; // shifted up by 4 bits to be in the upper nibble
     /*
         The Reassembly Header. You should always use the provided methods to set
         and interrogate fields as the structure maintains Big-Endian order
@@ -18,7 +19,7 @@ namespace e2sar
     */
     struct REHdr
     {
-        u_int8_t preamble[2] {rehdrVersion, 0}; // 4 bit version + reserved
+        u_int8_t preamble[2] {rehdrVersionNibble, 0}; // 4 bit version + reserved
         u_int16_t dataId{0};   // source identifier
         u_int32_t bufferOffset{0};
         u_int32_t bufferLength{0};
@@ -92,7 +93,7 @@ namespace e2sar
     {
         char preamble[2] {'L', 'B'};
         u_int8_t version{lbhdrVersion};
-        u_int8_t nextProto{0};
+        u_int8_t nextProto{rehdrVersion};
         u_int16_t rsvd{0};
         u_int16_t entropy{0};
         EventNum_t eventNum{0L};
@@ -100,9 +101,8 @@ namespace e2sar
         /**
          * Set all fields to network/big-endian byte order values
          */
-        inline void set(u_int8_t proto, u_int16_t ent, EventNum_t event_num) 
+        inline void set(u_int16_t ent, EventNum_t event_num) 
         {
-            nextProto = proto;
             entropy = htobe16(ent);
             eventNum = htobe64(event_num);
         }
@@ -233,6 +233,11 @@ namespace e2sar
             return boost::make_tuple(get_eventSrcId(), get_eventNumber(), get_avgEventRateHz(), get_unixTimeNano());
         }
     } __attribute__((__packed__));
+
+    // various useful header lengths
+    constexpr size_t IP_HDRLEN = 20;
+    constexpr const size_t UDP_HDRLEN = 8;
+    constexpr const size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
 }
 
 #endif

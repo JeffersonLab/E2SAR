@@ -47,7 +47,10 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
         std::cout << "ERROR: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
-    std::cout << "Running sync test for 10 seconds" << std::endl;
+    std::cout << "Running sync test for 10 seconds" << 
+        uri.get_syncAddr().value().first << ":" << 
+        uri.get_syncAddr().value().second << 
+        std::endl;
     // run for 10 seconds
     boost::this_thread::sleep_for(boost::chrono::seconds(10));
 

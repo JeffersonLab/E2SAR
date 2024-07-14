@@ -37,6 +37,11 @@ e2sar_seg_test = executable('e2sar_seg_test', 'e2sar_seg_test.cpp',
                             link_with: libe2sar,
                             dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
 
+e2sar_seg_live_test = executable('e2sar_seg_live_test', 'e2sar_seg_live_test.cpp',
+                            include_directories: inc,
+                            link_with: libe2sar,
+                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
+
 # these are standalone unit tests with no dependencies
 test('URITests', e2sar_uri_test, suite: 'unit')
 test('LBCPTests', e2sar_lbcp_test, suite: 'unit')
@@ -44,4 +49,5 @@ test('DPSyncTests', e2sar_sync_test, suite: 'unit')
 test('DPSegTests', e2sar_seg_test, suite: 'unit')
 # these tests require a live instance of control plane
 test('LBCPLiveTests', e2sar_lbcp_live_test, suite: 'live')
-test('SyncLiveTests', e2sar_sync_live_test, suite: 'live')
+test('DPSyncLiveTests', e2sar_sync_live_test, suite: 'live')
+test('DPSegLiveTests', e2sar_seg_live_test, suite: 'live')
