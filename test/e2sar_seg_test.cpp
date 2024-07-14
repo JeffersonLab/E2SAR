@@ -51,9 +51,19 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
     // send one event message per 2 seconds that fits into a single frame
+    auto sendStats = seg.getSendStats();
+    if (sendStats.get<1>() != 0) 
+    {
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+    }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
+        sendStats = seg.getSendStats();
+        if (sendStats.get<1>() != 0) 
+        {
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+        }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::seconds(2));
     }
@@ -71,11 +81,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
-    auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
-    {
-        std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
-    }
+
     // send 5 event messages and no errors
     BOOST_CHECK(sendStats.get<0>() == 5);
     BOOST_CHECK(sendStats.get<1>() == 0);

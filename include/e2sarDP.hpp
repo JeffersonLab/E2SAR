@@ -49,6 +49,15 @@ namespace e2sar
             const u_int8_t nextProto;
             const u_int16_t entropy;
 
+            // Max size of internal queue holding events to be sent. 
+            static const size_t QSIZE = 2047;
+            // various useful header lengths
+            static const size_t IP_HDRLEN = 20;
+            static const size_t UDP_HDRLEN = 8;
+            static const size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
+            // how long data send thread spends sleeping
+            static const boost::chrono::milliseconds sleepTime;
+
             // Structure to hold each send-queue item
             struct EventQueueItem {
                 uint32_t bytes;
@@ -62,20 +71,10 @@ namespace e2sar
             boost::object_pool<EventQueueItem> queueItemPool{32, QSIZE + 1};
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
-            boost::lockfree::queue<EventQueueItem*> eventQueue;
+            boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
             // to avoid locing the item pool send thread puts processed events 
             // on this queue so they can be freed opportunistically by main thread
-            boost::lockfree::queue<EventQueueItem*> returnQueue;
-
-            // Max size of internal queue holding events to be sent. 
-            static const size_t QSIZE = 2047;
-            // various useful header lengths
-            static const size_t IP_HDRLEN = 20;
-            static const size_t UDP_HDRLEN = 8;
-            static const size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
-            // how long data send thread spends sleeping
-            static const boost::chrono::milliseconds sleepTime;
-
+            boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
 
             // structure that maintains send stats
             struct SendStats {
@@ -217,13 +216,13 @@ namespace e2sar
              * @param sync_periods - number of sync periods to use for averaging send rate
              * @param mtu - use the following MTU for data (must accommodate MAC, IP, UDP, LB, RE headers
              * and payload)
-             * @param useV6 - use dataplane v6 connection
+             * @param useV6 - use dataplane v6 connection (off by default)
              * @param useZerocopy - utilize Zerocopy if available
              * @param cnct - use connected sockets (default)
              */
             Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy,  
                 u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int8_t nextProto=rehdrVersion,
-                u_int16_t mtu=1500, bool useV6=true, bool useZerocopy=false, bool cnct=true);
+                u_int16_t mtu=1500, bool useV6=false, bool useZerocopy=false, bool cnct=true);
 #if 0
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
