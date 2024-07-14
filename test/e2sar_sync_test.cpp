@@ -24,6 +24,8 @@ BOOST_AUTO_TEST_SUITE(DPSyncTests)
 // as it takes the sync address directly from the EJFAT_URI
 BOOST_AUTO_TEST_CASE(DPSyncTest1)
 {
+    std::cout << "DPSyncTest1: test sync thread sending 10 sync frames (once a second for 10 seconds)" << std::endl;
+
     // parse URI from env variable
     // it needs to have the sync address/port
     auto uri_r = EjfatURI::getFromEnv();

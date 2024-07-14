@@ -22,6 +22,8 @@ BOOST_AUTO_TEST_SUITE(DPSyncLiveTests)
 // the sync messages against live UDPLBd. 
 BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
 {
+    std::cout << "DPSyncLiveTest1: test sync thread against UDPLBd by sending 10 sync frames (once a second for 10 seconds)" << std::endl;
+
     // parse URI from env variable
     // it needs to have the sync address/port
     auto uri_r = EjfatURI::getFromEnv();
