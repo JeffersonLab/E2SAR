@@ -59,7 +59,7 @@ namespace e2sar
                 uint32_t bytes;
                 EventNum_t eventNum;
                 u_int8_t *event;
-                void* (*callback)(boost::any);
+                void (*callback)(boost::any);
                 boost::any cbArg;
             };
 
@@ -289,7 +289,7 @@ namespace e2sar
              * @param cbArg - parameter for callback
              */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
-                void* (*callback)(boost::any) = nullptr, 
+                void (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 
             /**
@@ -302,7 +302,7 @@ namespace e2sar
              */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
                 uint64_t eventNumber, 
-                void* (*callback)(boost::any) = nullptr, 
+                void (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 
             /**

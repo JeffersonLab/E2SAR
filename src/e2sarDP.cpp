@@ -470,7 +470,7 @@ namespace e2sar
     // Non-blocking call to place event on internal queue.
     // Event number automatically set at send time
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
-        void* (*callback)(boost::any), 
+        void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
         return addToSendQueue(event, bytes, 0, callback, cbArg);
@@ -479,7 +479,7 @@ namespace e2sar
     // Non-blocking call specifying explicit event number.
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
         uint64_t eventNumber, 
-        void* (*callback)(boost::any), 
+        void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
         freeEventItemBacklog();
