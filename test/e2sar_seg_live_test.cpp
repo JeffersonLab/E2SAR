@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     // and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
+    Segmenter seg(lbman.get_URI(), srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
     std::cout << "Creating segmenter using returned URI: " << 
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
 
