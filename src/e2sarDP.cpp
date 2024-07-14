@@ -8,6 +8,8 @@
 
 namespace e2sar 
 {
+    // set the sleep timer for the send thread - how long it waits on
+    // a condition for new events
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
@@ -251,8 +253,8 @@ namespace e2sar
         int zerocopy = 1;
 #endif
         // check that MTU setting was sane
-        if (mtu <= 0)
-            return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length"};
+        if (mtu <= seg.TOTAL_HDR_LEN)
+            return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
 
         if (useV6)
         {
@@ -371,10 +373,13 @@ namespace e2sar
             sendhdr.msg_namelen = 0;
         } else {
             // prefill from persistent struct
-            if (useV6)
+            if (useV6) {
+                sendSocket = socketFd6;
                 sendhdr.msg_name = (sockaddr_in *)& GET_V6_SEND_STRUCT(dataAddrStruct);
-            else
+            } else {
+                sendSocket = socketFd4;
                 sendhdr.msg_name = (sockaddr_in *)& GET_V4_SEND_STRUCT(dataAddrStruct);
+            }
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
@@ -384,6 +389,7 @@ namespace e2sar
         u_int8_t *eventEnd = event + bytes;
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
+        // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
         {
             // fill out LB and RE headers

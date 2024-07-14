@@ -70,8 +70,9 @@ namespace e2sar
             // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE = 2047;
             // various useful header lengths
-            static const int IPHDRLEN = 20;
-            static const int UDPHDRLEN = 8;
+            static const size_t IP_HDRLEN = 20;
+            static const size_t UDP_HDRLEN = 8;
+            static const size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
             // how long data send thread spends sleeping
             static const boost::chrono::milliseconds sleepTime;
 
@@ -167,7 +168,7 @@ namespace e2sar
                 const bool useZerocopy;
 
                 // transmit parameters
-                const u_int16_t mtu; // must accommodate typical IP, UDP, LB+RE headers and payload
+                const size_t mtu; // must accommodate typical IP, UDP, LB+RE headers and payload
                 const std::string iface; // outgoing interface
                 const size_t maxPldLen;
 
@@ -179,12 +180,12 @@ namespace e2sar
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
-                    maxPldLen{mtu - IPHDRLEN - UDPHDRLEN - sizeof(LBHdr) - sizeof(REHdr)} {}
+                    maxPldLen{mtu - Segmenter::TOTAL_HDR_LEN} {}
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
                     mtu{NetUtil::getMTU(iface)}, iface{iface},
-                    maxPldLen{mtu - IPHDRLEN - UDPHDRLEN - sizeof(LBHdr) - sizeof(REHdr)} {}
+                    maxPldLen{mtu - Segmenter::TOTAL_HDR_LEN} {}
 
                 // open v4/v6 sockets
                 result<int> _open();
