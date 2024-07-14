@@ -27,7 +27,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     auto uri_r = EjfatURI::getFromEnv();
 
     if (uri_r.has_error())
-        std::cout << "ERROR: " << uri_r.error().message() << std::endl;
+        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
@@ -62,10 +62,10 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     auto res1 = seg.openAndStart();
 
     if (res1.has_error())
-        std::cout << "ERROR: " << res1.error().message() << std::endl;
+        std::cout << "Error encountered opening sockets and starting threads: " << res1.error().message() << std::endl;
     BOOST_CHECK(!res1.has_error());
 
-    std::cout << "Running data test for 10 seconds" << 
+    std::cout << "Running data test for 10 seconds against sync " << 
         lbman.get_URI().get_syncAddr().value().first << ":" << 
         lbman.get_URI().get_syncAddr().value().second << " and data " <<
         lbman.get_URI().get_dataAddrv4().value().first << ":" <<
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     auto uri_r = EjfatURI::getFromEnv();
 
     if (uri_r.has_error())
-        std::cout << "ERROR: " << uri_r.error().message() << std::endl;
+        std::cout << "URI Error encountered: " << uri_r.error().message() << std::endl;
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
@@ -168,7 +168,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     auto res1 = seg.openAndStart();
 
     if (res1.has_error())
-        std::cout << "ERROR: " << res1.error().message() << std::endl;
+        std::cout << "Error encountered opening sockets and starting threads: " << res1.error().message() << std::endl;
     BOOST_CHECK(!res1.has_error());
 
     std::cout << "Running data test for 10 seconds against sync " << 

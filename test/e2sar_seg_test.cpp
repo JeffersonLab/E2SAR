@@ -29,7 +29,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     auto uri_r = EjfatURI::getFromEnv();
 
     if (uri_r.has_error())
-        std::cout << "ERROR: " << uri_r.error().message() << std::endl;
+        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
@@ -44,7 +44,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     auto res = seg.openAndStart();
 
     if (res.has_error())
-        std::cout << "ERROR: " << res.error().message() << std::endl;
+        std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
     std::cout << "Running data test for 10 seconds" << 
@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     auto uri_r = EjfatURI::getFromEnv();
 
     if (uri_r.has_error())
-        std::cout << "ERROR: " << uri_r.error().message() << std::endl;
+        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     auto res = seg.openAndStart();
 
     if (res.has_error())
-        std::cout << "ERROR: " << res.error().message() << std::endl;
+        std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
     std::cout << "Running data test for 10 seconds" << 
