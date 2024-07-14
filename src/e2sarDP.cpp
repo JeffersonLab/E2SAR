@@ -366,6 +366,7 @@ namespace e2sar
         int flags{0};
 #endif
 
+        sendSocket = (useV6 ? socketFd6 : socketFd4);
         // prepare msghdr
         if (connectSocket) {
             // prefill with blank
@@ -374,10 +375,8 @@ namespace e2sar
         } else {
             // prefill from persistent struct
             if (useV6) {
-                sendSocket = socketFd6;
                 sendhdr.msg_name = (sockaddr_in *)& GET_V6_SEND_STRUCT(dataAddrStruct);
             } else {
-                sendSocket = socketFd4;
                 sendhdr.msg_name = (sockaddr_in *)& GET_V4_SEND_STRUCT(dataAddrStruct);
             }
             // prefill - always the same
@@ -400,10 +399,6 @@ namespace e2sar
             hdr->re.set(seg.srcId, curOffset - event, curLen, finalEventNum);
             hdr->lb.set(seg.nextProto, seg.entropy, finalEventNum);
 
-            // update offset and length
-            curOffset += curLen;
-            curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
-
             // fill in iov and attach to msghdr
             // LB+RE header
             iov[0].iov_base = hdr;
@@ -413,6 +408,10 @@ namespace e2sar
             iov[1].iov_len = curLen;
             sendhdr.msg_iov = iov;
             sendhdr.msg_iovlen = 2;
+
+            // update offset and length for next segment
+            curOffset += curLen;
+            curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
 
 #ifdef ZEROCOPY_AVIALABLE
             if (useZerocopy)

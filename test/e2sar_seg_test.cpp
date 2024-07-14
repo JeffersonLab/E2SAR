@@ -50,6 +50,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     std::cout << "Running test for 10 seconds" << std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
+    std::cout << "The event data is string '" << eventString << "' of length " << eventString.length() << std::endl;
     // send one event message per 2 seconds that fits into a single frame
     auto sendStats = seg.getSendStats();
     if (sendStats.get<1>() != 0) 
@@ -77,11 +78,12 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
         std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
     }
     // send 10 sync messages and no errors
+    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
     BOOST_CHECK(syncStats.get<0>() == 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
-
+    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
     // send 5 event messages and no errors
     BOOST_CHECK(sendStats.get<0>() == 5);
     BOOST_CHECK(sendStats.get<1>() == 0);
