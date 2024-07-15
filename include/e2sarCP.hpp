@@ -205,7 +205,7 @@ namespace e2sar
          *
          * @return - 0 on success or error code with message on failure
          */
-        result<int> reserveLB(const std::string &lb_name,
+        result<u_int32_t> reserveLB(const std::string &lb_name,
                               const double &durationSeconds,
                               const std::vector<std::string> &senders);
 
