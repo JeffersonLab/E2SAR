@@ -66,9 +66,9 @@ result<int> reserveLB(LBManager &lbman,
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Sucess. FPGA ID is (for metrics): " << res.value() << std::endl;
 
-        std::cout << "Updated URI after reserve " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+        std::cout << "Updated URI after reserve with instance token: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
         return 0;
     }
 }
@@ -120,8 +120,8 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
     else
     {
         std::cout << "Sucess." << std::endl;
-        std::cout << "Updated URI after register " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
-        std::cout << "Session id is " << lbman.get_URI().get_sessionId() << std::endl;
+        std::cout << "Updated URI after register with session token: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+        std::cout << "Session id is: " << lbman.get_URI().get_sessionId() << std::endl;
         return 0;
     }
 }
@@ -162,25 +162,21 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
-
-        auto addresses = LBManager::get_SenderAddressVector(res.value());
-
-        auto workers = LBManager::get_WorkerStatusVector(res.value());
+        auto lbstatus = LBManager::asLBStatus(res.value());
 
         std::cout << "Registered sender addresses: ";
-        for (auto a : addresses)
+        for (auto a : lbstatus->senderAddresses)
             std::cout << a << " "s;
         std::cout << std::endl;
 
         std::cout << "Registered workers: ";
-        for (auto w : workers)
+        for (auto w : lbstatus->workers)
         {
             std::cout << "[ name="s << w.name() << ", controlsignal="s << w.controlsignal() << ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
         }
         std::cout << std::endl;
 
-        std::cout << "LB details: expiresat=" << res.value()->expiresat() << ", currentepoch=" << res.value()->currentepoch() << ", predictedeventnum=" << res.value()->currentpredictedeventnumber() << std::endl;
+        std::cout << "LB details: expiresat=" << lbstatus->expiresAt << ", currentepoch=" << lbstatus->currentEpoch << ", predictedeventnum=" << lbstatus->currentPredictedEventNumber << std::endl;
 
         return 0;
     }
@@ -294,7 +290,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    if (vm.count("help"))
+    if (vm.count("help") || vm.empty())
     {
         std::cout << od << std::endl;
         return 0;
@@ -317,7 +313,7 @@ int main(int argc, char **argv)
     auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt) : EjfatURI::getFromEnv("EJFAT_URI"s, tt));
     if (uri_r.has_error())
     {
-        std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message();
+        std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message() << std::endl;
         return -1;
     }
     auto uri = uri_r.value();
@@ -434,4 +430,7 @@ int main(int argc, char **argv)
             return -1;
         }
     }
+    else
+        // print help
+        std::cout << od << std::endl;
 }

@@ -30,7 +30,7 @@ using loadbalancer::VersionReply;
 namespace e2sar
 {
     // reserve load balancer
-    result<int> LBManager::reserveLB(const std::string &lb_name,
+    result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const TimeUntil &until,
                                      const std::vector<std::string> &senders)
     {
@@ -119,11 +119,11 @@ namespace e2sar
             _cpuri.set_dataAddr(a);
         }
 
-        return 0;
+        return rep.fpgalbid();
     }
 
     // reserve via duration
-    result<int> LBManager::reserveLB(const std::string &lb_name,
+    result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const boost::posix_time::time_duration &duration,
                                      const std::vector<std::string> &senders)
     {

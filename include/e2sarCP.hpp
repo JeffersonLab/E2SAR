@@ -59,6 +59,43 @@ namespace e2sar
      */
     using TimeUntil = google::protobuf::Timestamp;
 
+    /**
+     * Status of individual worker (part of getLBStatus return)
+     */
+    struct LBWorkerStatus
+    {
+        std::string name;
+        float fillPercent;
+        float controlSignal;
+        u_int32_t slotsAssigned;
+        google::protobuf::Timestamp lastUpdated;
+
+        LBWorkerStatus(const std::string &n, float fp, float cs, u_int32_t sa, google::protobuf::Timestamp lu) : name{n}, fillPercent{fp}, controlSignal{cs}, slotsAssigned{sa}, lastUpdated{lu} {}
+    };
+
+    /**
+     * Status of LB (converted to this structure from loadbalancer::LoadBalancerStatusReply)
+     */
+    struct LBStatus
+    {
+        google::protobuf::Timestamp timestamp;
+        u_int64_t currentEpoch;
+        u_int64_t currentPredictedEventNumber;
+        std::vector<WorkerStatus> workers;
+        std::vector<std::string> senderAddresses;
+        google::protobuf::Timestamp expiresAt;
+
+        /**
+         * Constructor for status struct that uses move semantics for workers and sendAddresses
+         */
+        LBStatus(google::protobuf::Timestamp ts, u_int64_t ce, u_int64_t penum, std::vector<WorkerStatus> &w, std::vector<std::string> &sa, google::protobuf::Timestamp exp):
+        timestamp{ts}, currentEpoch{ce}, currentPredictedEventNumber{penum}, expiresAt{exp}
+        {
+            workers = std::move(w);
+            senderAddresses = std::move(sa);
+        }
+    };
+
     class LBManager
     {
     private:
@@ -111,7 +148,7 @@ namespace e2sar
                     topts.set_check_call_host(false);
                     topts.set_certificate_verifier(verifier);
                     _channel = grpc::CreateChannel(addr_string, grpc::experimental::TlsCredentials(topts));
-                } 
+                }
                 else
                 {
                     // use provided SSL options
@@ -138,9 +175,9 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
          *
-         * @return - 0 on success or error code with message on failure
+         * @return - FPGA LB ID, for use in correlating logs/metrics
          */
-        result<int> reserveLB(const std::string &lb_name,
+        result<u_int32_t> reserveLB(const std::string &lb_name,
                               const TimeUntil &until,
                               const std::vector<std::string> &senders);
 
@@ -153,9 +190,9 @@ namespace e2sar
          * boost::posix_time::duration_from_string from string like "23:59:59.000"s
          * @param senders list of sender IP addresses
          *
-         * @return - 0 on success or error code with message on failure
+         * @return - FPGA LB ID, for use in correlating logs/metrics
          */
-        result<int> reserveLB(const std::string &lb_name,
+        result<u_int32_t> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
                               const std::vector<std::string> &senders);
 
@@ -219,7 +256,7 @@ namespace e2sar
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
          * slotsassigned and a lastupdated timestamp
          */
-        static inline const std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
+        static inline std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
         {
             std::vector<WorkerStatus> ret(rep->workers_size());
 
@@ -237,7 +274,7 @@ namespace e2sar
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
          */
-        static inline const std::vector<std::string> get_SenderAddressVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
+        static inline std::vector<std::string> get_SenderAddressVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
         {
             std::vector<std::string> ret(rep->senderaddresses_size());
 
@@ -247,6 +284,16 @@ namespace e2sar
                 ret[j] = *i;
             }
             return ret;
+        }
+
+        /** Helper function copies LoadBalancerStatusReply protobuf into a simpler struct */
+        static inline const std::unique_ptr<LBStatus> asLBStatus(std::unique_ptr<LoadBalancerStatusReply> &rep)
+        {
+            std::vector<std::string> addresses{get_SenderAddressVector(rep)};
+            std::vector<WorkerStatus> workers{get_WorkerStatusVector(rep)};
+            std::unique_ptr<LBStatus> pret = std::make_unique<LBStatus>(rep->timestamp(), rep->currentepoch(), rep->currentpredictedeventnumber(),
+            workers, addresses, rep->expiresat());
+            return pret;
         }
 
         /**
@@ -274,7 +321,7 @@ namespace e2sar
          * @param source_count - how many sources we can listen to (gets converted to port range [0,14])
          * @param min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
          * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
-         * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots 
+         * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
          * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
          * @return - 0 on success or an error condition
          */

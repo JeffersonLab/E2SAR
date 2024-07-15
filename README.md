@@ -106,13 +106,23 @@ $ . ./setup_compile_env.sh
 $ meson setup build
 $ cd build
 $ meson compile
-$ meson test
+$ EJFAT_URI='ejfats://udplbd@192.168.0.3:18347/lb/1?sync=192.168.2.1:19020&data=10.100.100.14' meson test -C build --suite unit --timeout 0
+$ EJFAT_URI='ejfats://udplbd@192.168.0.3:18347/lb/12?sync=192.168.100.10:19020&data=192.168.101.10:18020' meson test -C build --suite unit --timeout 0
 ```
+
+The `live` test suite requires a running UDPLBd and the setting of EJFAT_URI must reflect that. `Unit` tests do not require a running UDPBLBd and the IP addresses in URI can be random.
+
 If you desire a custom installation directory you can add `--prefix=/absolute/path/to/install/root`. If you have a custom location for pkg-config scripts, you can also add `-Dpkg_config_path=/path/to/pkg-config/scripts` to the setup command. 
 
 ### Building on older systems (e.g. RHEL8)
 
 Due to a much older g++ compiler on those systems meson produces incorrect ninja.build files. After the `setup build` step execute the following command to correct the build file: `sed -i 's/-std=c++11//g' build/build.ninja`. 
+
+## Installing and creating a distribution
+
+You can install the code after compilation by running `meson install -C build` (you can add `--dry-run` option to see where things will get installed). To set the installation destination add `--prefix /path/to/install` option to `meson setup build` command above. 
+
+To create a source distribution you can run `meson dist -C build --no-tests` (the `--no-tests` is needed because GRPC headers won't build properly when distribution is generated). 
 
 # Testing
 
@@ -126,6 +136,32 @@ There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which 
 
 TBD
 
+## Scapy
+
+Scapy scripts are provided for sniffing/validating and generating various kinds of UDP packets. See this [folder](scripts/scapy/) for details. Make sure Scapy is installed (`pip install scapy`) and for most tasks the scripts must be run as root (bot for sending and sniffing). 
+
+Typical uses may include (note the scripts have sane defaults for everything, but can be overridden with command line):
+
+Generate a LB+RE header packet with a specific payload. Only show it without sending (doesn't need root privilege)
+```bash
+$ ./snifgen.py -g --lbre --pld "this is payload" --show -c 1 
+```
+Generate and send a LB+RE header packet to 192.168.100.10 with a specific payload. Use default MTU of 1500.
+```bash
+$ ./snifgen.py -g --lbre --pld "this is payload" --ip "192.168.100.10" -c 1 
+```
+Generate and send a RE header packet to 192.168.100.10 with a specific payload. Use MTU of 50.
+```bash
+$ ./snifgen.py -g --re --pld "this is payload" --ip "192.168.100.10" --mtu 50 -c 1 
+```
+Listen for 10 Sync packets sent to port 18347 then exit.
+```bash
+$ ./snifgen -l -p 18347 -c 10 --sync
+```
+Listen for 10 Sync packets sent to 192.168.100.10 port 18347 then exit.
+```bash
+$ ./snifgen -l -p 18347 -c 10 --ip "192.168.100.10" --sync
+```
 ## Dealing with SSL certificate validation
 
 UDPLBd implements gRPC over TLS to support channel privacy. Only server-side certificate for UDPLBd is required - the code does not rely on SSL client-side authentication. For testing You can generate UDPLBd certificate as follows:

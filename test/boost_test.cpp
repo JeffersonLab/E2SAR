@@ -8,6 +8,10 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <google/protobuf/util/time_util.h>
 
+#include <boost/pool/object_pool.hpp>
+
+#include "e2sarHeaders.hpp"
+
 using namespace boost::asio;
 namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 using namespace std::string_literals;
@@ -88,4 +92,47 @@ int main()
     std::cout << "Now + 1 day is " << pt1 << std::endl;
     google::protobuf::Timestamp ts1 = google::protobuf::util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
     std::cout << ts1 << std::endl;
+
+
+    // pool tests
+
+    // object pool for queue items
+    struct qItem {
+        char preamble[2] {'L', 'B'};
+        uint32_t bytes;
+        uint64_t tick;
+        char     *event;
+        void     *cbArg;
+        void* (*callback)(void *);
+
+        qItem(): bytes{100}, tick{1000} {};
+    };
+
+    std::cout << "Item size " << sizeof(qItem) << std::endl;
+    boost::object_pool<qItem> pool{sizeof(qItem) * 10, 0};
+    std::cout << pool.get_next_size() << '\n';
+
+    auto newItem = pool.construct();
+
+    std::cout << pool.get_next_size() << '\n';
+
+    newItem->tick = 1001;
+
+    std::cout << newItem->tick << " " << newItem->bytes << std::endl;
+
+    std::cout << newItem->preamble[0] << newItem->preamble[1] << std::endl;
+
+    pool.free(newItem);
+
+    std::cout << (1 << 4) << std::endl;
+
+    std::cout << "Sync header size (expecting 28) = " << sizeof(e2sar::SyncHdr) << std::endl;
+
+    {
+        std::cout << "Empty scope executes once" << std::endl;
+    }
+
+    std::cout << "LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdr) << std::endl;
+    std::cout << "RE Hdr size (expecting 20) = " << sizeof(e2sar::REHdr) << std::endl;
+    std::cout << "LB+RE Hdr size (expecting 36) = " << sizeof(e2sar::LBREHdr) << std::endl;
 }

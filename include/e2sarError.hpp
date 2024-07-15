@@ -31,6 +31,7 @@ namespace e2sar
     Undefined = 6,
     NotFound = 7,
     RPCError = 8,
+    SocketError = 9,
   };
 
   struct E2SARErrorInfo
@@ -112,6 +113,8 @@ namespace detail
         return "file not found";
       case e2sar::E2SARErrorc::RPCError:
         return "gRPC error";
+      case e2sar::E2SARErrorc::SocketError:
+        return "socket error";
       default:
         return "unknown";
       }
