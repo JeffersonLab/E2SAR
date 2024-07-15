@@ -260,7 +260,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     // It is specifically designed to interface with Python datetime.timedelta
     lb_manager.def(
         "reserve_lb_seconds",
-        static_cast<result<int> (LBManager::*)(
+        static_cast<result<u_int32_t> (LBManager::*)(
             const std::string &,
             const double &,
             const std::vector<std::string> &

@@ -135,7 +135,7 @@ namespace e2sar
     }
 
     // reserve via duration in seconds
-    result<int> LBManager::reserveLB(const std::string &lb_name,
+    result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const double &durationSeconds,
                                      const std::vector<std::string> &senders)
     {
