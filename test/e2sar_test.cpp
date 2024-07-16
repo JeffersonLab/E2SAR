@@ -7,6 +7,7 @@ using namespace e2sar;
 int main()
 {
 
+    std::cout << "E2SAR VERSION: " << get_Version() << std::endl;
     std::string uri_string{"ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20"};
 
     try
