@@ -146,9 +146,6 @@ $ docker run --rm <username>/<repo>:latest lbadm --version -u "ejfats://udplbd@1
 ```
 (Notice that default docker network plumbing probably isn't appropriate for listening or sending packets using snifgen.py).
 
-You can also use pre-built Docker images from Docker hub:
-```
-
 ## Installing and creating a distribution
 
 You can install the code after compilation by running `meson install -C build` (you can add `--dry-run` option to see where things will get installed). To set the installation destination add `--prefix /path/to/install` option to `meson setup build` command above. 
