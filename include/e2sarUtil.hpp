@@ -36,6 +36,8 @@ namespace e2sar
         bool haveSync;
         /** Use TLS */
         bool useTls;
+        /** Use IPv6 control plane IP address if available */
+        bool preferV6;
 
         /** UDP port for event sender to send sync messages to. */
         uint16_t syncPort;
@@ -65,8 +67,13 @@ namespace e2sar
         std::string cpHost;
 
     public:
-        /** base constructor, sets instance token from string */
-        EjfatURI(const std::string &uri, TokenType tt=TokenType::admin);
+        /** base constructor, sets instance token from string
+         * @param uri - the URI string
+         * @param tt - convert to this token type (admin, instance, session)
+         * @param preferV6 - when connecting to the control plane, prefer IPv6 address
+         * (defaults to v4)
+         */
+        EjfatURI(const std::string &uri, TokenType tt=TokenType::admin, bool preferV6=false);
         /** rely on implicitly-declared copy constructor as needed */
 
         /** destructor */
@@ -255,15 +262,20 @@ namespace e2sar
 
         const std::string to_string(TokenType tt = TokenType::admin) const;
  
-        /** from environment variable */
-        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s, TokenType tt=TokenType::admin) noexcept
+        /** from environment variable
+         * @param envVar - name of environment variable containing the URI (defaults to EJFAT_URI)
+         * @param tt - token type - one of EjfatURI::TokenType::[admin, instance, session], defaults to admin
+         * @param preferV6 - if control plane host specified by name use IPv6 address, defaults to false
+        */
+        static inline result<EjfatURI> getFromEnv(const std::string &envVar = "EJFAT_URI"s, 
+            TokenType tt=TokenType::admin, bool preferV6=false) noexcept
         {
             const char *envStr = std::getenv(envVar.c_str());
             if (envStr != nullptr)
             {
                 try
                 {
-                    return EjfatURI(envStr, tt);
+                    return EjfatURI(envStr, tt, preferV6);
                 }
                 catch (const E2SARException &e)
                 {
@@ -273,12 +285,17 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::Undefined, "Environment variable "s + envVar + " not defined."s};
         }
 
-        /** from string */
-        static inline result<EjfatURI> getFromString(const std::string &uriStr, TokenType tt=TokenType::admin) noexcept
+        /** from string 
+         * @param uriStr - URI string
+         * @param tt - token type - one of EjfatURI::TokenType::[admin, instance, session], defaults to admin
+         * @param preferV6 - if control plane host specified by name use IPv6 address, defaults to false
+        */
+        static inline result<EjfatURI> getFromString(const std::string &uriStr, 
+            TokenType tt=TokenType::admin, bool preferV6=false) noexcept
         {
             try
             {
-                return EjfatURI(uriStr, tt);
+                return EjfatURI(uriStr, tt, preferV6);
             }
             catch (const E2SARException &e)
             {
@@ -286,8 +303,13 @@ namespace e2sar
             }
         }
 
-        /** from a file */
-        static inline result<EjfatURI> getFromFile(const std::string &fileName = "/tmp/ejfat_uri"s) noexcept
+        /** from a file
+         * @param filename - file containing URI string
+         * @param tt - token type - one of EjfatURI::TokenType::[admin, instance, session], defaults to admin
+         * @param preferV6 - if control plane host specified by name use IPv6 address, defaults to false
+        */
+        static inline result<EjfatURI> getFromFile(const std::string &fileName = "/tmp/ejfat_uri"s, 
+            TokenType tt=TokenType::admin, bool preferV6=false) noexcept
         {
             if (!fileName.empty())
             {
@@ -300,7 +322,7 @@ namespace e2sar
                         file.close();
                         try
                         {
-                            return EjfatURI(uriLine);
+                            return EjfatURI(uriLine, tt, preferV6);
                         }
                         catch (const E2SARException &e)
                         {

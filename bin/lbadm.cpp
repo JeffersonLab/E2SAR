@@ -49,7 +49,7 @@ result<int> reserveLB(LBManager &lbman,
     }
 
     std::cout << "Reserving a new load balancer " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << lbname << std::endl;
     std::cout << "   Allowed senders: ";
     for (auto s : senders)
@@ -77,7 +77,7 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 {
 
     std::cout << "Freeing a load balancer " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
@@ -104,7 +104,7 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 result<int> registerWorker(LBManager &lbman, const std::string &node_name, const std::string &node_ip, u_int16_t node_port, float weight, u_int16_t src_cnt, float min_factor, float max_factor)
 {
     std::cout << "Registering a worker " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
     std::cout << "   CP parameters: "
@@ -129,7 +129,7 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
 result<int> deregisterWorker(LBManager &lbman)
 {
     std::cout << "De-Registering a worker " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.deregisterWorker();
@@ -149,7 +149,7 @@ result<int> deregisterWorker(LBManager &lbman)
 result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 {
     std::cout << "Getting LB Status " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
@@ -185,7 +185,7 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready)
 {
     std::cout << "Sending Worker State " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.sendState(fill_percent, ctrl_signal, is_ready);
@@ -207,7 +207,7 @@ result<int> version(LBManager &lbman)
 {
 
     std::cout << "Getting load balancer version " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
 
     result<std::string> res{""};
 
@@ -251,6 +251,7 @@ int main(int argc, char **argv)
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
     opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
+    opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required)");
     opts("free", "free a load balancer");
@@ -290,6 +291,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    std::cout << "E2SAR Version: " << get_Version() << std::endl;
     if (vm.count("help") || vm.empty())
     {
         std::cout << od << std::endl;
@@ -309,8 +311,15 @@ int main(int argc, char **argv)
         tt = EjfatURI::TokenType::session;
     }
 
+    bool preferV6 = false;
+    if (vm.count("ipv6"))
+    {
+        preferV6 = true;
+    }
+
     std::string ejfat_uri;
-    auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt) : EjfatURI::getFromEnv("EJFAT_URI"s, tt));
+    auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt, preferV6) : 
+        EjfatURI::getFromEnv("EJFAT_URI"s, tt, preferV6));
     if (uri_r.has_error())
     {
         std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message() << std::endl;

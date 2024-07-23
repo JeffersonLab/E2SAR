@@ -27,7 +27,7 @@ std::string uri_string7{"ejfat://[2001:4860:0:2001::68]:18020/lb/36?data=[2001:4
 std::string uri_string8{"ejfats://192.188.29.6:18020/lb/36?sync=192.188.29.6:19020"};
 
 // with TLS and hostname
-std::string uri_string9{"ejfats://jlab.org:18020/lb/36?sync=192.188.29.6:19020"};
+std::string uri_string9{"ejfats://ejfat-lb.es.net:18020/lb/36?sync=192.188.29.6:19020"};
 
 BOOST_AUTO_TEST_SUITE(URITestSuite)
 
@@ -238,10 +238,22 @@ BOOST_AUTO_TEST_CASE(URITest10)
 {
     EjfatURI euri(uri_string9);
 
-    std::cout << static_cast<std::string>(euri) << std::endl;
+    std::cout << static_cast<std::string>(euri) << " " << euri.get_cpAddr().value().first << std::endl;
 
     BOOST_CHECK(euri.get_useTls());
-    BOOST_CHECK(euri.get_cpHost().value().first == "jlab.org"s);
+    BOOST_CHECK(euri.get_cpHost().value().first == "ejfat-lb.es.net"s);
+    BOOST_CHECK(euri.get_cpAddr().value().first.is_v4());
+}
+
+BOOST_AUTO_TEST_CASE(URITest11)
+{
+    EjfatURI euri(uri_string9, EjfatURI::TokenType::admin, true);
+
+   std::cout << static_cast<std::string>(euri) << " " << euri.get_cpAddr().value().first << std::endl;
+
+    BOOST_CHECK(euri.get_useTls());
+    BOOST_CHECK(euri.get_cpHost().value().first == "ejfat-lb.es.net"s);
+    BOOST_CHECK(euri.get_cpAddr().value().first.is_v6());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
