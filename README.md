@@ -118,6 +118,21 @@ If you desire a custom installation directory you can add `--prefix=/absolute/pa
 
 Due to a much older g++ compiler on those systems meson produces incorrect ninja.build files. After the `setup build` step execute the following command to correct the build file: `sed -i 's/-std=c++11//g' build/build.ninja`. 
 
+### Building a Docker version
+
+There are several Docker files in the root of the source tree. They build various versions of the system for improved portability
+
+#### Control Plane and other tools
+
+To build this docker use the following command:
+```
+$ docker build -t cli -f Dockerfile.cli .
+```
+To run e.g. `lbadm` in it you can do something like this:
+```
+docker run cli lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+```
+
 ## Installing and creating a distribution
 
 You can install the code after compilation by running `meson install -C build` (you can add `--dry-run` option to see where things will get installed). To set the installation destination add `--prefix /path/to/install` option to `meson setup build` command above. 
