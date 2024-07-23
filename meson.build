@@ -43,6 +43,7 @@ subdir('include')
 subdir('src')
 subdir('test')
 subdir('bin')
+subdir('scripts')
 
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(libraries : libe2sar,

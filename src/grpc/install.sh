@@ -11,6 +11,7 @@
 
 GRPC_INCLUDE="${DESTDIR}/${MESON_INSTALL_PREFIX}/include/grpc/"
 
+echo "Installing gRPC stub header files loadbalancer.pb.h and loadbalancer.grpc.pb.h to ${GRPC_INCLUDE}"
 mkdir -p ${GRPC_INCLUDE}
 cp "${MESON_BUILD_ROOT}/src/grpc/loadbalancer.pb.h" ${GRPC_INCLUDE}
 cp "${MESON_BUILD_ROOT}/src/grpc/loadbalancer.grpc.pb.h" ${GRPC_INCLUDE}

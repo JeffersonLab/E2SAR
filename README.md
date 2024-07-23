@@ -36,7 +36,7 @@ Overview: the build process requires multiple dependencies for tools and code (g
 Build dependences
 
 - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost protobuf`
-- Linux: see [this script](scripts/notebooks//EJFAT/LBCP-tester.ipynb) for necessary dependencies.
+- Linux: see [this script](scripts/notebooks//EJFAT/post-boot/sender.sh) for necessary dependencies.
 
 
 For python dependencies minimum Python 3.9 is required. It is recommended you create a virtual environment for Python build dependencies, then activate the venv and install pybind11 and other dependencies:
