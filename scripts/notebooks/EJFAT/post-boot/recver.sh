@@ -7,13 +7,15 @@ if [[ ${distro} == 'ubuntu' ]]; then
     echo Installing for Ubuntu
     # install missing software
     sudo apt-get -yq update
-    sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb
+    sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb docker.io
     
     # install meson
     pip3 install --user meson pybind11
     # install scapy system-wide as root needs to run it
     pip3 install scapy
-    
+
+    sudo usermod -a -G docker ubuntu
+
     # install git-lfs
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
     sudo apt-get install git-lfs
@@ -44,6 +46,15 @@ if [[ ${distro} == 'rocky' ]]; then
     sudo dnf -yq install git-lfs
     
 fi
+
+# install docker compose and buildx bits
+export DOCKER_CONFIG=$HOME/.docker
+mkdir -p ${DOCKER_CONFIG}/cli-plugins
+curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64   -o $DOCKER_CONFIG/cli-plugins/docker-compose 
+chmod +x .docker/cli-plugins/docker-compose
+
+curl -SL https://github.com/docker/buildx/releases/download/v0.14.0/buildx-v0.14.0.linux-amd64  -o $DOCKER_CONFIG/cli-plugins/docker-buildx
+chmod +x .docker/cli-plugins/docker-buildx
 
 # put cpnode in etc hosts to enable testing certificate validation
 echo "192.168.0.3 cpnode" | sudo tee -a /etc/hosts
