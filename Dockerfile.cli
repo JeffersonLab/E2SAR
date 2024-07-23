@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+
+# Control plane CLI tools for EJFAT
+#
+# This is a two-stage build, with compile and deploy stages
+FROM ubuntu:22.04 AS compile
+
+ENV DISTRO=ubuntu22
+ENV HOME=/home/ubuntu
+ENV LD_LIBRARY_PATH=$HOME/grpc-install/lib/:$HOME/boost-install/lib
+ENV PATH=$HOME/grpc-install/bin:$PATH
+
+WORKDIR /src
+
+RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb
+
+RUN pip3 install pybind11 scapy meson
+
+COPY . /src/
+
+# blow away build/ if it got copied by accident
+RUN rm -rf build/
+
+# untar boost and grpc
+RUN mkdir -p /home/ubuntu && tar -zxf /src/binary_artifacts/grpc-v1.54.1-$DISTRO.tar.gz -C /home/ubuntu && tar -zxf /src/binary_artifacts/boost-v1.85.0-$DISTRO.tar.gz -C /home/ubuntu
+
+# create a build configuration
+RUN BOOST_ROOT=$HOME/boost-install meson setup -Dpkg_config_path=$HOME/grpc-install/lib/pkgconfig/:$HOME/grpc-install/lib64/pkgconfig/ build
+
+# compile
+RUN meson compile -C build
+
+# install
+RUN meson install -C build
+
+ENTRYPOINT ["/usr/bin/lbadm"]
+
+CMD ["-h"]
