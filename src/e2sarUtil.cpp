@@ -9,6 +9,16 @@
 namespace e2sar
 {
 
+#ifndef E2SAR_VERSION
+#define E2SAR_VERSION "Unknown"
+#endif
+
+    const std::string E2SARVersion{E2SAR_VERSION};
+    const std::string& get_Version() 
+    {
+        return E2SARVersion;
+    }
+
     /**
      * <p>
      * This is a method to parse an EJFAT URI. This URI contains information which both

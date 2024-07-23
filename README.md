@@ -35,7 +35,7 @@ Overview: the build process requires multiple dependencies for tools and code (g
 
 Build dependences
 
-- MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost protoc`
+- MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost protobuf`
 - Linux: see [this script](scripts/notebooks//EJFAT/LBCP-tester.ipynb) for necessary dependencies.
 
 
