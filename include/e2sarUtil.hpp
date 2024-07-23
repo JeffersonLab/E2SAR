@@ -279,7 +279,7 @@ namespace e2sar
                 }
                 catch (const E2SARException &e)
                 {
-                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse EJFAT_URI from environment variable"s};
+                    return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse EJFAT_URI from environment variable: "s + static_cast<std::string>(e)};
                 }
             }
             return E2SARErrorInfo{E2SARErrorc::Undefined, "Environment variable "s + envVar + " not defined."s};
@@ -299,7 +299,7 @@ namespace e2sar
             }
             catch (const E2SARException &e)
             {
-                return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from string"s};
+                return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI from string: "s + static_cast<std::string>(e)};
             }
         }
 
@@ -326,7 +326,7 @@ namespace e2sar
                         }
                         catch (const E2SARException &e)
                         {
-                            return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI."s};
+                            return E2SARErrorInfo{E2SARErrorc::CaughtException, "Unable to parse URI: "s + static_cast<std::string>(e)};
                         }
                     }
                     file.close();
