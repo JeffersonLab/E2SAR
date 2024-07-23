@@ -41,6 +41,7 @@ namespace e2sar
     */
     class Segmenter
     {
+        friend class Reassembler;
         private:
             EjfatURI dpuri;
             // id of this data source. Note that in the sync msg it uses 32 bits
