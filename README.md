@@ -128,9 +128,25 @@ To build this docker use the following command:
 ```
 $ docker build -t cli -f Dockerfile.cli .
 ```
-To run e.g. `lbadm` in it you can do something like this:
+If you are building for the Docker Hub, then
 ```
-docker run cli lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+$ docker login
+$ docker build -t <username>/<repo>:<version> [-t <username>/<repo>:latest] -f Dockerfile.cli .
+$ docker push <username>/<repo>:<version>
+$ docker push <username>/<repo>:latest
+```
+To run a locally built image with e.g. `lbadm` in it you can do something like this:
+```
+$ docker run cli lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+$ docker run --rm cli snifgen.py -g --sync --ip 192.168.100.1
+```
+When running a Docker Hub version, then:
+```
+$ docker run --rm <username>/<repo>:latest lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+```
+(Notice that default docker network plumbing probably isn't appropriate for listening or sending packets using snifgen.py).
+
+You can also use pre-built Docker images from Docker hub:
 ```
 
 ## Installing and creating a distribution
