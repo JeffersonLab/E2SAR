@@ -36,7 +36,7 @@ Overview: the build process requires multiple dependencies for tools and code (g
 Build dependences
 
 - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost protobuf`
-- Linux: see [this script](scripts/notebooks//EJFAT/LBCP-tester.ipynb) for necessary dependencies.
+- Linux: see [this script](scripts/notebooks//EJFAT/post-boot/sender.sh) for necessary dependencies.
 
 
 For python dependencies minimum Python 3.9 is required. It is recommended you create a virtual environment for Python build dependencies, then activate the venv and install pybind11 and other dependencies:
@@ -117,6 +117,34 @@ If you desire a custom installation directory you can add `--prefix=/absolute/pa
 ### Building on older systems (e.g. RHEL8)
 
 Due to a much older g++ compiler on those systems meson produces incorrect ninja.build files. After the `setup build` step execute the following command to correct the build file: `sed -i 's/-std=c++11//g' build/build.ninja`. 
+
+### Building a Docker version
+
+There are several Docker files in the root of the source tree. They build various versions of the system for improved portability
+
+#### Control Plane and other tools
+
+To build this docker use the following command:
+```
+$ docker build -t cli -f Dockerfile.cli .
+```
+If you are building for the Docker Hub, then
+```
+$ docker login
+$ docker build -t <username>/<repo>:<version> [-t <username>/<repo>:latest] -f Dockerfile.cli .
+$ docker push <username>/<repo>:<version>
+$ docker push <username>/<repo>:latest
+```
+To run a locally built image with e.g. `lbadm` in it you can do something like this:
+```
+$ docker run cli lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+$ docker run --rm cli snifgen.py -g --sync --ip 192.168.100.1
+```
+When running a Docker Hub version, then:
+```
+$ docker run --rm <username>/<repo>:latest lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+```
+(Notice that default docker network plumbing probably isn't appropriate for listening or sending packets using snifgen.py).
 
 ## Installing and creating a distribution
 

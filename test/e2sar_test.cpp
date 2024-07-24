@@ -21,4 +21,11 @@ int main()
         std::cout << "Exception" << std::endl;
         std::cout << "Exception occurred: "s << std::string(e) << std::endl;
     }
+
+    std::string hostname{"ejfat-lb.es.net"};
+    auto res = resolveHost(hostname);
+    for(auto i: res.value())
+    {
+        std::cout << "Resolved to " << i << " " << (i.is_v4() ? "IPv4" : "IPv6") << std::endl;
+    }
 }

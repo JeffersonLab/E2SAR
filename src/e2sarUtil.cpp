@@ -44,7 +44,7 @@ namespace e2sar
      *
      * @param uri URI to parse.
      */
-    EjfatURI::EjfatURI(const std::string &uri, TokenType tt) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}
+    EjfatURI::EjfatURI(const std::string &uri, TokenType tt, bool pV6) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}, preferV6{pV6}
     {
 
         // parse the URI
@@ -101,8 +101,26 @@ namespace e2sar
                 auto ip_list_r = resolveHost(u.host());
                 if (!ip_list_r.has_error())
                 {
-                    // take the first IP address to assign to cpAddr
-                    cpAddr = ip_list_r.value()[0];
+                    // find the first IPv4 or IPv6 address based on preference
+                    bool assigned = false;
+                    for(auto a: ip_list_r.value())
+                    {
+                        if (preferV6 && a.is_v6())
+                        {
+                            cpAddr = a;
+                            assigned = true;
+                            break;
+                        }
+                        if (!preferV6 && a.is_v4())
+                        {
+                            cpAddr = a;
+                            assigned = true;
+                            break;
+                        }
+                    }
+                    if (!assigned)
+                        throw E2SARException("Unable to find "s + (preferV6? "IPv6": "IPv4") + 
+                            " address for host " + u.host() + " in URI"s + rawURI);
                     cpPort = cpPort_r.value();
                     cpHost = u.host();
                 }
@@ -211,7 +229,8 @@ namespace e2sar
         }
 
         return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
-               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
+               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string())  : cpHost) + ":"s +
+               std::to_string(cpPort) +
                "/"s +
                (!lbId.empty() ? "lb/"s + lbId : ""s) +
                (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +

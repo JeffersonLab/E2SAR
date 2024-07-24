@@ -1,5 +1,5 @@
 project('E2SAR', 'cpp', 
-        version: '0.1.0a1', default_options : ['cpp_std=c++17'])
+        version: '0.1.0a2', default_options : ['cpp_std=c++17'])
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
@@ -43,6 +43,7 @@ subdir('include')
 subdir('src')
 subdir('test')
 subdir('bin')
+subdir('scripts')
 
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(libraries : libe2sar,
