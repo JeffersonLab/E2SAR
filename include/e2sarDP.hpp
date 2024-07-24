@@ -44,9 +44,13 @@ namespace e2sar
         friend class Reassembler;
         private:
             EjfatURI dpuri;
-            // id of this data source. Note that in the sync msg it uses 32 bits
-            // and in the RE header - 16
-            const u_int16_t srcId;
+            // unique identifier of the originating segmentation
+            // point (e.g. a DAQ), carried in SAR header
+            const u_int16_t dataId;
+            // unique identifier of an individual LB packet transmitting
+            // host/daq, 32-bit to accommodate IP addresses more easily
+            // carried in Sync header
+            const u_int32_t eventSrcId;
             const u_int16_t entropy;
 
             // Max size of internal queue holding events to be sent. 
@@ -206,7 +210,10 @@ namespace e2sar
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
-             * @param srcId - id of this source for load balancer
+             * @param dataId - unique identifier of the originating segmentation point (e.g. a DAQ), 
+             * carried in SAR header
+             * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
+             * 32-bit to accommodate IP addresses more easily, carried in Sync header
              * @param entropy - entropy value of this sender
              * @param sync_period_ms - sync period in milliseconds - how often sync messages are sent
              * @param sync_periods - number of sync periods to use for averaging send rate
@@ -216,7 +223,7 @@ namespace e2sar
              * @param useZerocopy - utilize Zerocopy if available
              * @param cnct - use connected sockets (default)
              */
-            Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy,  
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy,  
                 u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int16_t mtu=1500, 
                 bool useV6=false, bool useZerocopy=false, bool cnct=true);
 #if 0
@@ -380,7 +387,7 @@ namespace e2sar
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
                 // note that srcId is only 16 bits, but the sync field is 32-bit wide
-                hdr->set(srcId, eventNum, eventRate, tnano);
+                hdr->set(eventSrcId, eventNum, eventRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it

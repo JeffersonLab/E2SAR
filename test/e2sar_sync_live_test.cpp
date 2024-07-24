@@ -50,7 +50,8 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
     BOOST_CHECK(lbman.get_URI().has_syncAddr());
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
-    u_int16_t srcId = 0x05;
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
@@ -59,7 +60,7 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
     // using the updated URI with sync info
     std::cout << "Creating segmenter using returned URI: " << 
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
-    Segmenter seg(lbman.get_URI(), srcId, entropy, syncPeriodMS, syncPeriods);
+    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, entropy, syncPeriodMS, syncPeriods);
 
     auto res1 = seg.openAndStart();
 

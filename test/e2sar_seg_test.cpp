@@ -34,13 +34,14 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
-    u_int16_t srcId = 0x05;
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
 
     // create a segmenter and start the threads
-    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods);
+    Segmenter seg(uri, dataId, eventSrcId, entropy, syncPeriodMS, syncPeriods);
 
     auto res = seg.openAndStart();
 
@@ -112,7 +113,8 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
-    u_int16_t srcId = 0x05;
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
@@ -120,7 +122,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     // create a segmenter and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
+    Segmenter seg(uri, dataId, eventSrcId, entropy, syncPeriodMS, syncPeriods, 64+40);
 
     auto res = seg.openAndStart();
 
@@ -192,7 +194,8 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
-    u_int16_t srcId = 0x05;
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
@@ -200,7 +203,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     // create a segmenter and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
+    Segmenter seg(uri, dataId, eventSrcId, entropy, syncPeriodMS, syncPeriods, 64+40);
 
     auto res = seg.openAndStart();
 
@@ -279,7 +282,8 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
-    u_int16_t srcId = 0x05;
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
     u_int16_t syncPeriodMS = 1000; // in ms
     u_int16_t syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
@@ -287,7 +291,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     // create a segmenter and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
+    Segmenter seg(uri, dataId, eventSrcId, entropy, syncPeriodMS, syncPeriods, 64+40);
 
     auto res = seg.openAndStart();
 

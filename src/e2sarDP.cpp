@@ -12,11 +12,12 @@ namespace e2sar
     // a condition for new events
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, u_int16_t entropy, 
         u_int16_t sync_period_ms, u_int16_t sync_periods, u_int16_t mtu,
         bool useV6, bool useZerocopy, bool cnct): 
         dpuri{uri}, 
-        srcId{sid},
+        dataId{did},
+        eventSrcId{esid},
         entropy{entropy},
         eventStatsBuffer{sync_periods},
         syncThreadState(*this, sync_period_ms, cnct), 
@@ -30,7 +31,8 @@ namespace e2sar
         u_int16_t sync_period_ms, u_int16_t sync_periods, const std::string iface, 
         bool useV6, bool useZerocopy, bool cnct): 
         dpuri{uri}, 
-        srcId{sid},
+        dataId{did},
+        eventSrcId{esid},
         entropy{entropy},
         eventStatsBuffer{sync_periods},
         syncThreadState(*this, sync_period_ms, cnct), 
@@ -394,7 +396,7 @@ namespace e2sar
 
             // are we overwriting the event number?
             EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
-            hdr->re.set(seg.srcId, curOffset - event, curLen, finalEventNum);
+            hdr->re.set(seg.dataId, curOffset - event, curLen, finalEventNum);
             hdr->lb.set(seg.entropy, finalEventNum);
 
             // fill in iov and attach to msghdr
