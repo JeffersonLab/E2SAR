@@ -282,7 +282,8 @@ int main(int argc, char **argv)
         option_dependency(vm, "deregister", "session");
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
-        option_dependency(vm, "state", "ready");    
+        option_dependency(vm, "state", "ready");
+        option_dependency(vm, "state", "session");
         conflicting_options(vm, "root", "novalidate");
     }
     catch (const std::logic_error &le)
@@ -432,6 +433,8 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
+        // remember to set session 
+        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = sendState(lbman, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
         if (int_r.has_error())
         {

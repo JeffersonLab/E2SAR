@@ -19,7 +19,11 @@ namespace e2sar
 {
     const u_int16_t DATAPLANE_PORT = 19522;
 
-    /** Structure to hold info parsed from an ejfat URI (and a little extra). */
+    /** Structure to hold info parsed from an ejfat URI (and a little extra). 
+     * The URI is of the format:
+     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
+     * More than one data= address can be specified (typically an IPv4 and IPv6)
+    */
     class EjfatURI
     {
     public:

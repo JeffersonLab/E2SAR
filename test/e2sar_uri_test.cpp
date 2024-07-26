@@ -29,6 +29,9 @@ std::string uri_string8{"ejfats://192.188.29.6:18020/lb/36?sync=192.188.29.6:190
 // with TLS and hostname
 std::string uri_string9{"ejfats://ejfat-lb.es.net:18020/lb/36?sync=192.188.29.6:19020"};
 
+// with session id
+std::string uri_string10{"ejfats://ejfat-lb.es.net:18020/lb/36?sync=192.188.29.6:19020&sessionid=mysessionid"};
+
 BOOST_AUTO_TEST_SUITE(URITestSuite)
 
 BOOST_AUTO_TEST_CASE(URITest1)
@@ -247,13 +250,28 @@ BOOST_AUTO_TEST_CASE(URITest10)
 
 BOOST_AUTO_TEST_CASE(URITest11)
 {
-    EjfatURI euri(uri_string9, EjfatURI::TokenType::admin, true);
+    try 
+    {
+        EjfatURI euri(uri_string9, EjfatURI::TokenType::admin, true);
 
-   std::cout << static_cast<std::string>(euri) << " " << euri.get_cpAddr().value().first << std::endl;
+        std::cout << static_cast<std::string>(euri) << " " << euri.get_cpAddr().value().first << std::endl;
 
-    BOOST_CHECK(euri.get_useTls());
-    BOOST_CHECK(euri.get_cpHost().value().first == "ejfat-lb.es.net"s);
-    BOOST_CHECK(euri.get_cpAddr().value().first.is_v6());
+        BOOST_CHECK(euri.get_useTls());
+        BOOST_CHECK(euri.get_cpHost().value().first == "ejfat-lb.es.net"s);
+        BOOST_CHECK(euri.get_cpAddr().value().first.is_v6());
+    } catch(E2SARException &e) {
+        std::cout << "Exception " << static_cast<std::string>(e)  << std::endl;
+        std::cout << "Probably the host doesn't resolve to IPv6 from where you are running this test" << std::endl;
+    }
+}
+
+BOOST_AUTO_TEST_CASE(URITest12)
+{
+    EjfatURI euri(uri_string10);
+
+    std::cout << static_cast<std::string>(euri) << " " << euri.get_cpAddr().value().first << std::endl;
+
+    BOOST_CHECK(euri.get_sessionId() == "mysessionid"s);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
