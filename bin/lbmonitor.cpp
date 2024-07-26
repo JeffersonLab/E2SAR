@@ -62,6 +62,7 @@ int main(int argc, char **argv)
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
+    opts("time,t", po::value<std::string>(), "specify update time in ms");
     
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, od), vm);
@@ -120,6 +121,11 @@ int main(int argc, char **argv)
         }
     }
 
+    uint64_t update_time = 5000;
+    if (vm.count("time")){
+        update_time = vm["count"].as<uint64_t>();
+    }
+
     while(true)
     {
         std::string lbid;
@@ -133,7 +139,7 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(update_time));
     }
     return 0;
 }
