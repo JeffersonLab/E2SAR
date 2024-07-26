@@ -50,19 +50,15 @@ int main(int argc, char **argv)
 {
     po::options_description od("Command-line options");
 
-    auto opts = od.add_options()("help,h", "show this help message");
+    auto opts = od.add_options()("help,h", "EJFAT LB Monitor \n EJFAT_URI must be specified in this format ejfat[s]://<token>@<cp name or ip>:<cp port>/lb/<lbid>");
 
     // parameters
-    opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
-    opts("address,a", po::value<std::string>(), "node IPv4/IPv6 address");
-    opts("name,n", po::value<std::string>(), "specify node name for registration");
-    opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
-    opts("time,t", po::value<std::string>(), "specify update time in ms");
+    opts("time,t", po::value<uint64_t>(), "specify refresh time in ms (default is 5000ms)");
     
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, od), vm);
@@ -126,11 +122,14 @@ int main(int argc, char **argv)
         update_time = vm["count"].as<uint64_t>();
     }
 
+    std::string lbid;
+    if (vm.count("lbid"))
+        lbid = vm["lbid"].as<std::string>();
+
+    std::cout << "Use Ctrl-C to stop" << std::endl;
+
     while(true)
     {
-        std::string lbid;
-        if (vm.count("lbid"))
-            lbid = vm["lbid"].as<std::string>();
 
         auto int_r = getLBStatus(lbman, lbid);
         if (int_r.has_error())
