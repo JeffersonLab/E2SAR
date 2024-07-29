@@ -80,7 +80,7 @@ namespace e2sar
 
             // fillPercent, control signal and isReady flag must be provided
             
-            reas.lbman.sendState();
+            //reas.lbman.sendState();
 
             // sleep approximately
             // FIXME: we should probably check until > now after send completes

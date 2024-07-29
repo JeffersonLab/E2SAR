@@ -94,7 +94,7 @@ namespace e2sar
                 int socketFd{0};
 
                 inline SendStateThreadState(Reassembler &r, bool v6, u_int16_t period_ms): 
-                    reas{r}, useV6{v6}, period_ms{period_ms}
+                    reas{r}, period_ms{period_ms}, useV6{v6}
                 {}
 
                 // thread loop. all important behavior is encapsulated inside LBManager
