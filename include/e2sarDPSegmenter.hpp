@@ -247,13 +247,16 @@ namespace e2sar
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
-             * @param srcId - id of this source for load balancer
+             * @param dataId - unique identifier of the originating segmentation point (e.g. a DAQ), 
+             * carried in SAR header
+             * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
+             * 32-bit to accommodate IP addresses more easily, carried in Sync header
              * @param entropy - entropy value of this sender
              * @param iface - use the following interface for data.
              * (get MTU from the interface and, if possible, set it as outgoing - available on Linux)
              * @param sflags - SegmenterFlags
              */
-            Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy, 
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy, 
                 std::string iface=""s, 
                 const SegmenterFlags &sflags=SegmenterFlags());
 #endif
