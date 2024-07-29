@@ -50,16 +50,18 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     BOOST_CHECK(lbman.get_URI().has_syncAddr());
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
-    u_int16_t srcId = 0x05;
-    u_int16_t syncPeriodMS = 1000; // in ms
-    u_int16_t syncPeriods = 5; // number of sync periods to use for sync
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
+    Segmenter::SegmenterFlags sflags;
+    sflags.syncPeriodMs= 1000; // in ms
+    sflags.syncPeriods = 5; // number of sync periods to use for sync
     u_int16_t entropy = 16;
 
     // create a segmenter and start the threads
     // using the updated URI with sync info
     std::cout << "Creating segmenter using returned URI: " << 
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
-    Segmenter seg(lbman.get_URI(), srcId, entropy, syncPeriodMS, syncPeriods);
+    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, entropy, sflags);
 
     auto res1 = seg.openAndStart();
 
@@ -156,16 +158,19 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     BOOST_CHECK(lbman.get_URI().has_syncAddr());
     BOOST_CHECK(lbman.get_URI().has_dataAddr());
 
-    u_int16_t srcId = 0x05;
-    u_int16_t syncPeriodMS = 1000; // in ms
-    u_int16_t syncPeriods = 5; // number of sync periods to use for sync
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
+    Segmenter::SegmenterFlags sflags;
+    sflags.syncPeriodMs = 500; // in ms
+    sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.mtu = 64 + 40;
     u_int16_t entropy = 16;
 
     // create a segmenter using URI sync and data info
     // and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(lbman.get_URI(), srcId, entropy, syncPeriodMS, syncPeriods, 64+40);
+    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, entropy, sflags);
     std::cout << "Creating segmenter using returned URI: " << 
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
 
@@ -175,14 +180,14 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
         std::cout << "Error encountered opening sockets and starting threads: " << res1.error().message() << std::endl;
     BOOST_CHECK(!res1.has_error());
 
-    std::cout << "Running data test for 10 seconds against sync " << 
+    std::cout << "Running data test against sync " << 
         lbman.get_URI().get_syncAddr().value().first << ":" << 
         lbman.get_URI().get_syncAddr().value().second << " and data " <<
         lbman.get_URI().get_dataAddrv4().value().first << ":" <<
         lbman.get_URI().get_dataAddrv4().value().second << 
         std::endl;
     
-    std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
+    std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 1/2 SECONDS."s};
     std::cout << "The event data is string '" << eventString << "' of length " << eventString.length() << std::endl;
     //
     // send one event message per 2 seconds that fits into a single frame
@@ -192,7 +197,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     {
         std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
     }
-    for(auto i=0; i<5;i++) {
+    for(auto i=0; i<10;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
@@ -201,7 +206,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
             std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
         }
         // sleep for a second
-        boost::this_thread::sleep_for(boost::chrono::seconds(2));
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
     }
 
     // check the sync stats

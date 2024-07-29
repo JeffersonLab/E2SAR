@@ -1,5 +1,5 @@
-#ifndef E2SARDPHPP
-#define E2SARDPHPP
+#ifndef E2SARDSEGMENTERPHPP
+#define E2SARDSEGMENTERPHPP
 
 #include <boost/asio.hpp>
 #include <boost/lockfree/queue.hpp>
@@ -25,7 +25,7 @@
 #include "portable_endian.h"
 
 /***
- * Dataplane definitions for E2SAR
+ * Dataplane definitions for E2SAR Segmenter
 */
 
 namespace e2sar
@@ -45,12 +45,13 @@ namespace e2sar
         private:
             EjfatURI dpuri;
             // unique identifier of the originating segmentation
-            // point (e.g. a DAQ), carried in SAR header
+            // point (e.g. a DAQ), carried in RE header
             const u_int16_t dataId;
             // unique identifier of an individual LB packet transmitting
             // host/daq, 32-bit to accommodate IP addresses more easily
             // carried in Sync header
             const u_int32_t eventSrcId;
+            // entropy value of this sender carried in LB header
             const u_int16_t entropy;
 
             // Max size of internal queue holding events to be sent. 
@@ -207,6 +208,29 @@ namespace e2sar
             /** Threads keep running while this is false */
             bool threadsStop{false};
         public:
+            /** 
+             * Because of the large number of constructor parameters in Segmenter
+             * we make this a structure with sane defaults
+             * dpV6 - prefer V6 dataplane {false}
+             * zeroCopy - use zeroCopy optimization {false}
+             * connectedSocket - use connected sockets {true}
+             * syncPeriodMs - sync thread period in milliseconds {300}
+             * syncPerods - number of sync periods to use for averaging reported send rate {3}
+             * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
+             * IP, UDP and LBRE headers)
+             */
+            struct SegmenterFlags 
+            {
+                bool dpV6;
+                bool zeroCopy;
+                bool connectedSocket;
+                u_int16_t syncPeriodMs;
+                u_int16_t syncPeriods;
+                u_int16_t mtu;
+
+                SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
+                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500} {}
+            };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
@@ -215,34 +239,23 @@ namespace e2sar
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
              * @param entropy - entropy value of this sender
-             * @param sync_period_ms - sync period in milliseconds - how often sync messages are sent
-             * @param sync_periods - number of sync periods to use for averaging send rate
-             * @param mtu - use the following MTU for data (must accommodate MAC, IP, UDP, LB, RE headers
-             * and payload)
-             * @param useV6 - use dataplane v6 connection (off by default)
-             * @param useZerocopy - utilize Zerocopy if available
-             * @param cnct - use connected sockets (default)
+             * @param sfalags - SegmenterFlags 
              */
             Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy,  
-                u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, u_int16_t mtu=1500, 
-                bool useV6=false, bool useZerocopy=false, bool cnct=true);
+                const SegmenterFlags &sflags=SegmenterFlags());
 #if 0
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
              * @param srcId - id of this source for load balancer
              * @param entropy - entropy value of this sender
-             * @param sync_period_ms - sync period in milliseconds - how often sync messages are sent
-             * @param sync_periods - number of sync periods to use for averaging send rate
              * @param iface - use the following interface for data.
              * (get MTU from the interface and, if possible, set it as outgoing - available on Linux)
-             * @param useV6 - use dataplane v6 connection
-             * @param useZerocopy - utilize Zerocopy if available
-             * @param cnct - use connected sockets (default)
+             * @param sflags - SegmenterFlags
              */
             Segmenter(const EjfatURI &uri, u_int16_t srcId, u_int16_t entropy, 
-                u_int16_t sync_period_ms=300, u_int16_t sync_periods=3, std::string iface=""s, 
-                bool useV6=true, bool useZerocopy=false, bool cnct=true);
+                std::string iface=""s, 
+                const SegmenterFlags &sflags=SegmenterFlags());
 #endif
 
             /**
@@ -379,7 +392,9 @@ namespace e2sar
                 auto timeDiff = currentTimeNanos - firstSyncStart;
 
                 // convert to Hz and return
-                return eventTotal/(timeDiff/1000000000UL);
+                //return (eventTotal*1000000000UL)/timeDiff;
+                // this uses floating point but is more accurate at low rates
+                return std::round(static_cast<float>(eventTotal*1000000000UL)/timeDiff);
             }
 
             // doesn't require locking as it looks at only srcId in segmenter, which
@@ -398,37 +413,5 @@ namespace e2sar
                     queueItemPool.free(item);
             }
     };
-
-    /*
-        The Reassembler class knows how to reassemble the events back. It
-        also knows how to optionally register self as a receiving node. It relies
-        on the LBEventHeader structure to reassemble the event. It can
-        use multiple ways of reassembly:
-        - To a memory region
-        - To a shared memory
-        - To a file descriptor
-        - ...
-
-        It runs on or next to the worker performing event processing.
-    */
-    class Reassembler
-    {
-
-        friend class Segmenter;
-        public:
-            Reassembler();
-            Reassembler(const Reassembler &r) = delete;
-            Reassembler & operator=(const Reassembler &o) = delete;
-            ~Reassembler();
-            
-            // Non-blocking call to get events
-            E2SARErrorc getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *srcId);
-
-            int probeStats();
-        protected:
-        private:
-    };
-
-
 }
 #endif

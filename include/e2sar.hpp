@@ -3,7 +3,8 @@
 
 #include "e2sarUtil.hpp"
 #include "e2sarCP.hpp"
-#include "e2sarDP.hpp"
+#include "e2sarDPSegmenter.hpp"
+#include "e2sarDPReassembler.hpp"
 
 namespace e2sar
 {

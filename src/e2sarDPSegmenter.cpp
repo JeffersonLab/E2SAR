@@ -3,7 +3,7 @@
 
 #include "portable_endian.h"
 
-#include "e2sarDP.hpp"
+#include "e2sarDPSegmenter.hpp"
 
 
 namespace e2sar 
@@ -13,30 +13,29 @@ namespace e2sar
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, u_int16_t entropy, 
-        u_int16_t sync_period_ms, u_int16_t sync_periods, u_int16_t mtu,
-        bool useV6, bool useZerocopy, bool cnct): 
+        const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
         eventSrcId{esid},
         entropy{entropy},
-        eventStatsBuffer{sync_periods},
-        syncThreadState(*this, sync_period_ms, cnct), 
-        sendThreadState(*this, useV6, useZerocopy, mtu, cnct)
+        eventStatsBuffer{sflags.syncPeriods},
+        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
+        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket)
     {
         ;
     }
 
 #if 0
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
-        u_int16_t sync_period_ms, u_int16_t sync_periods, const std::string iface, 
-        bool useV6, bool useZerocopy, bool cnct): 
+        const std::string iface, 
+        const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
         eventSrcId{esid},
         entropy{entropy},
-        eventStatsBuffer{sync_periods},
-        syncThreadState(*this, sync_period_ms, cnct), 
-        sendThreadState(*this, useV6, useZerocopy, iface, cnct)
+        eventStatsBuffer{sflags.syncPeriods},
+        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
+        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket)
     {
 
         // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
