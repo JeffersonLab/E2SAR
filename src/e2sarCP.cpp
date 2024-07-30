@@ -131,7 +131,7 @@ namespace e2sar
                                      const std::vector<std::string> &senders)
     {
 
-        auto pt = second_clock::local_time();
+        auto pt = second_clock::universal_time();
         auto pt1 = pt + duration;
         auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
         return reserveLB(lb_name, ts1, senders);
