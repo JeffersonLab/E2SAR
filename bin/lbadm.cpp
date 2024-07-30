@@ -78,7 +78,6 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 
     std::cout << "Freeing a load balancer " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     result<int> res{0};
@@ -105,7 +104,6 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
 {
     std::cout << "Registering a worker " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
     std::cout << "   CP parameters: "
               << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
@@ -130,7 +128,6 @@ result<int> deregisterWorker(LBManager &lbman)
 {
     std::cout << "De-Registering a worker " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.deregisterWorker();
 
@@ -150,7 +147,6 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 {
     std::cout << "Getting LB Status " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     auto res = lbman.getLBStatus(lbid);
@@ -486,7 +482,12 @@ int main(int argc, char **argv)
     }
     else if (vm.count("overview"))
     {
-
+        auto int_r = overview(lbman);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error getting overview: " << int_r.error().message() << std::endl;
+            return -1;
+        }
     }
     else
         // print help

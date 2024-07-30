@@ -363,13 +363,12 @@ namespace e2sar
         }
 
         /** Helper function copies LoadBalancerStatusReply protobuf into a simpler struct */
-        static inline const std::unique_ptr<LBStatus> asLBStatus(const LoadBalancerStatusReply &rep)
+        static inline const LBStatus asLBStatus(const LoadBalancerStatusReply &rep)
         {
             std::vector<std::string> addresses{get_SenderAddressVector(rep)};
             std::vector<WorkerStatus> workers{get_WorkerStatusVector(rep)};
-            std::unique_ptr<LBStatus> pret = std::make_unique<LBStatus>(rep.timestamp(), rep.currentepoch(), rep.currentpredictedeventnumber(),
-            workers, addresses, rep.expiresat());
-            return pret;
+            return LBStatus(rep.timestamp(), rep.currentepoch(), rep.currentpredictedeventnumber(),
+                workers, addresses, rep.expiresat());
         }
 
         /** Helper function copies OverviewReply protobuf into a simpler struct */
@@ -386,7 +385,7 @@ namespace e2sar
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
-                std::unique_ptr statusPtr = asLBStatus(i->status());
+                om[j].status = asLBStatus(i->status());
             }
             return om;
         }
@@ -405,7 +404,7 @@ namespace e2sar
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
-                std::unique_ptr statusPtr = asLBStatus(i->status());
+                om[j].status = asLBStatus(i->status());
             }
             return om;
         }
