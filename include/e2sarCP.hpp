@@ -28,6 +28,7 @@ using loadbalancer::LoadBalancer;
 
 using loadbalancer::LoadBalancerStatusReply;
 using loadbalancer::WorkerStatus;
+using loadbalancer::OverviewReply;
 
 using google::protobuf::Timestamp;
 
@@ -94,7 +95,25 @@ namespace e2sar
             workers = std::move(w);
             senderAddresses = std::move(sa);
         }
+        LBStatus() {}
     };
+
+    /**
+     * Overview - makes a list of these entries, they are simpler to traverse than the protobuf definitions
+     */
+    struct OverviewEntry
+    {
+        std::string name; // name passed in reserveLB
+        std::string lbid; // load balancer id
+        std::pair<ip::address, u_int16_t> syncAddressAndPort;
+        ip::address dataIPv4;
+        ip::address dataIPv6; 
+        u_int32_t fpgaLBId; 
+        LBStatus status; // same as in lbstatus call
+
+        OverviewEntry() {}
+    };
+    using OverviewMessage = std::vector<OverviewEntry>;
 
     class LBManager
     {
@@ -248,6 +267,15 @@ namespace e2sar
          */
         result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus();
 
+        /**
+         * Get an 'overview' of reserved load balancer instances
+         *
+         * @return - loadbalancer::OverviewReply protobuf object which itself is an array of 
+         * ReserveLoadBalancerReply and LoadBalancerStatusReply for each instance as well as the 
+         * name given to each instance in reserveLB.
+         */
+        result<std::unique_ptr<OverviewReply>> overview();
+
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
          *
@@ -260,8 +288,28 @@ namespace e2sar
         {
             std::vector<WorkerStatus> ret(rep->workers_size());
 
-            size_t j = 0;
+            size_t j{0};
             for (auto i = rep->workers().begin(); i != rep->workers().end(); ++i, j++)
+            {
+                ret[j].CopyFrom(*i);
+            }
+            return ret;
+        }
+
+        /** Helper function copies worker records into a vector
+         * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
+         *
+         * @param rep - the return of the getLBStatus() call
+         *
+         * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
+         * slotsassigned and a lastupdated timestamp
+         */
+        static inline std::vector<WorkerStatus> get_WorkerStatusVector(const LoadBalancerStatusReply &rep)
+        {
+            std::vector<WorkerStatus> ret(rep.workers_size());
+
+            size_t j{0};
+            for (auto i = rep.workers().begin(); i != rep.workers().end(); ++i, j++)
             {
                 ret[j].CopyFrom(*i);
             }
@@ -270,7 +318,7 @@ namespace e2sar
 
         /** Helper function copies sender addresses into a vector. Relies on move semantics.
          *
-         * @param rep - the return of getLBStatus() call
+         * @param rep - the referenced return of getLBStatus() call
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
          */
@@ -278,8 +326,26 @@ namespace e2sar
         {
             std::vector<std::string> ret(rep->senderaddresses_size());
 
-            size_t j = 0;
+            size_t j{0};
             for (auto i = rep->senderaddresses().begin(); i != rep->senderaddresses().end(); ++i, j++)
+            {
+                ret[j] = *i;
+            }
+            return ret;
+        }
+
+        /** Helper function copies sender addresses into a vector. Relies on move semantics.
+         *
+         * @param rep - the referenced return of getLBStatus() call
+         *
+         * @return - a vector of strings with known sender addresses communicated in the reserve call
+         */
+        static inline std::vector<std::string> get_SenderAddressVector(const LoadBalancerStatusReply &rep)
+        {
+            std::vector<std::string> ret(rep.senderaddresses_size());
+
+            size_t j{0};
+            for (auto i = rep.senderaddresses().begin(); i != rep.senderaddresses().end(); ++i, j++)
             {
                 ret[j] = *i;
             }
@@ -294,6 +360,54 @@ namespace e2sar
             std::unique_ptr<LBStatus> pret = std::make_unique<LBStatus>(rep->timestamp(), rep->currentepoch(), rep->currentpredictedeventnumber(),
             workers, addresses, rep->expiresat());
             return pret;
+        }
+
+        /** Helper function copies LoadBalancerStatusReply protobuf into a simpler struct */
+        static inline const std::unique_ptr<LBStatus> asLBStatus(const LoadBalancerStatusReply &rep)
+        {
+            std::vector<std::string> addresses{get_SenderAddressVector(rep)};
+            std::vector<WorkerStatus> workers{get_WorkerStatusVector(rep)};
+            std::unique_ptr<LBStatus> pret = std::make_unique<LBStatus>(rep.timestamp(), rep.currentepoch(), rep.currentpredictedeventnumber(),
+            workers, addresses, rep.expiresat());
+            return pret;
+        }
+
+        /** Helper function copies OverviewReply protobuf into a simpler struct */
+        static inline const OverviewMessage asOverviewMessage(std::unique_ptr<OverviewReply> &rep)
+        {
+            size_t j{0};
+            OverviewMessage om(rep.get()->loadbalancers_size());
+            for (auto i = rep->loadbalancers().begin(); i != rep->loadbalancers().end(); ++i, j++)
+            {
+                om[j].name = i->name();
+                om[j].lbid = i->reservation().lbid();
+                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipaddress());
+                om[j].syncAddressAndPort.second = i->reservation().syncudpport();
+                om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
+                om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
+                om[j].fpgaLBId = i->reservation().fpgalbid();
+                std::unique_ptr statusPtr = asLBStatus(i->status());
+            }
+            return om;
+        }
+
+        /** Helper function copies OverviewReply protobuf into a simpler struct */
+        static inline const OverviewMessage asOverviewMessage(const OverviewReply &rep)
+        {
+            size_t j{0};
+            OverviewMessage om(rep.loadbalancers_size());
+            for (auto i = rep.loadbalancers().begin(); i != rep.loadbalancers().end(); ++i, j++)
+            {
+                om[j].name = i->name();
+                om[j].lbid = i->reservation().lbid();
+                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipaddress());
+                om[j].syncAddressAndPort.second = i->reservation().syncudpport();
+                om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
+                om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
+                om[j].fpgaLBId = i->reservation().fpgalbid();
+                std::unique_ptr statusPtr = asLBStatus(i->status());
+            }
+            return om;
         }
 
         /**

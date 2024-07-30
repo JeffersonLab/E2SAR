@@ -27,6 +27,9 @@ using loadbalancer::SendStateRequest;
 using loadbalancer::VersionRequest;
 using loadbalancer::VersionReply;
 
+using loadbalancer::OverviewRequest;
+using loadbalancer::OverviewReply;
+
 namespace e2sar
 {
     // reserve load balancer
@@ -321,6 +324,40 @@ namespace e2sar
         if (!status.ok())
         {
             return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in LoadBalancerStatus(): "s + status.error_message()};
+        }
+
+        return rep;
+    }
+
+    // get overview of allocated LBs
+    result<std::unique_ptr<OverviewReply>> LBManager::overview()
+    {
+        auto rep = std::make_unique<OverviewReply>();
+
+        // we only need lb id from the URI
+        ClientContext context;
+        OverviewRequest req;
+
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // make the RPC call
+        Status status = _stub->Overview(&context, req, rep.get());
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in overview(): "s + status.error_message()};
         }
 
         return rep;

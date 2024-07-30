@@ -182,6 +182,47 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     }
 }
 
+result<int> overview(LBManager &lbman)
+{
+    std::cout << "Getting Overview " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+
+    auto res = lbman.overview();
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        auto overview = LBManager::asOverviewMessage(res.value());
+
+        for (auto r: overview) 
+        {
+            std::cout << "LB " << r.name << " ID: " << r.lbid << " FPGA LBID: " << r.fpgaLBId << std::endl;
+            std::cout << "  Registered sender addresses: ";
+            for (auto a : r.status.senderAddresses)
+                std::cout << a << " "s;
+            std::cout << std::endl;
+
+            std::cout << "  Registered workers: " << std::endl;
+            for (auto w : r.status.workers)
+            {
+                std::cout << "  [ name="s << w.name() << ", controlsignal="s << w.controlsignal() << 
+                    ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << 
+                    ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
+            }
+            std::cout << std::endl;
+
+            std::cout << "  LB details: expiresat=" << r.status.expiresAt << ", currentepoch=" << 
+                r.status.currentEpoch << ", predictedeventnum=" << 
+                r.status.currentPredictedEventNumber << std::endl;
+        }
+        return 0;
+    }
+}
+
 result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready)
 {
     std::cout << "Sending Worker State " << std::endl;
@@ -253,13 +294,14 @@ int main(int argc, char **argv)
     opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
     // commands
-    opts("reserve", "reserve a load balancer (-l, -a, -d required)");
-    opts("free", "free a load balancer");
-    opts("version", "report the version of the LB");
-    opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered");
-    opts("deregister", "deregister worker (-s required)");
-    opts("status", "get and print LB status");
-    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required)");
+    opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
+    opts("free", "free a load balancer. Uses instance or admin token.");
+    opts("version", "report the version of the LB. Uses admin token.");
+    opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
+    opts("deregister", "deregister worker (-s required). Uses instance or session token.");
+    opts("status", "get and print LB status. Uses admin token.");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses admin token.");
+    opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
 
     po::variables_map vm;
 
@@ -441,6 +483,10 @@ int main(int argc, char **argv)
             std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
             return -1;
         }
+    }
+    else if (vm.count("overview"))
+    {
+
     }
     else
         // print help

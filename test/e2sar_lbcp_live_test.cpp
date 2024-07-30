@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest2)
 
     res1 = lbman.freeLB();
 
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 }
 
 BOOST_AUTO_TEST_CASE(LBMLiveTest3)
@@ -133,19 +133,17 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest3)
     // unregister (should use session token and session id)
     res1 = lbman.deregisterWorker();
 
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 
     // free
     res1 = lbman.freeLB();
 
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 }
 
 BOOST_AUTO_TEST_CASE(LBMLiveTest4)
 {
     // reserve, register worker, get status, unregister worker, get status, free
-
-    // reserve, register worker, unregister worker, free
 
     // parse URI from env variable
     auto uri_r = EjfatURI::getFromEnv();
@@ -208,12 +206,12 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest4)
 
     // unregister (should use session token and session id)
     res1 = lbman.deregisterWorker();
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 
     // free
     res1 = lbman.freeLB();
 
-    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!res1.has_error());
 }
 
 BOOST_AUTO_TEST_CASE(LBMLiveTest5)
@@ -236,6 +234,92 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest5)
     BOOST_CHECK(!res.value().empty());
 
     std::cout << "Version string " << res.value() << std::endl;
+}
+
+BOOST_AUTO_TEST_CASE(LBMLiveTest6)
+{
+    // reserve, register worker, get status, unregister worker, get status, overview, free
+
+    // parse URI from env variable
+    auto uri_r = EjfatURI::getFromEnv();
+    BOOST_CHECK(!uri_r.has_error());
+    auto uri = uri_r.value();
+
+    // create LBManager
+    auto lbman = LBManager(uri, false);
+
+    auto duration_v = pt::duration_from_string("01");
+    std::string lbname{"mylb"};
+    std::vector<std::string> senders{"192.168.20.1"s, "192.168.20.2"s};
+
+    // call reserve
+    auto res = lbman.reserveLB(lbname, duration_v, senders);
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
+    BOOST_CHECK(lbman.get_URI().has_syncAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
+
+    // register (should internally set session token and session id)
+    auto res1 = lbman.registerWorker("my_node"s, std::pair<ip::address, u_int16_t>(ip::make_address("192.168.101.5"), 10000), 0.5, 10, 1.0, 1.0);
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_SessionToken().value().empty());
+    BOOST_CHECK(!lbman.get_URI().get_sessionId().empty());
+
+    // send state - every registered worker must do that every 100ms or be auto-deregistered after 10s of silence
+    // first 2 seconds of the state are discarded as too noisy
+    for (int i = 25; i > 0; i--)
+    {
+        res1 = lbman.sendState(0.8, 1.0, true);
+        BOOST_CHECK(!res.has_error());
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    }
+
+    // get LB status
+    auto status_res = lbman.getLBStatus();
+
+    BOOST_CHECK(!status_res.has_error());
+    auto saddrs = LBManager::get_SenderAddressVector(status_res.value());
+    BOOST_CHECK(saddrs.size() == 2);
+    BOOST_CHECK(saddrs[0] == "192.168.20.1"s);
+    auto workers = LBManager::get_WorkerStatusVector(status_res.value());
+    BOOST_CHECK(workers.size() == 1);
+    BOOST_CHECK(workers[0].name() == "my_node"s);
+#define DELTAD 0.000001
+    BOOST_CHECK(std::abs(workers[0].fillpercent() - 0.8) < DELTAD);
+    BOOST_CHECK(std::abs(workers[0].controlsignal() - 1.0) < DELTAD);
+    std::cout << "Last Updated " << workers[0].lastupdated() << std::endl;
+
+    auto lbstatus = LBManager::asLBStatus(status_res.value());
+    BOOST_CHECK(lbstatus->senderAddresses.size() == 2);
+    BOOST_CHECK(lbstatus->senderAddresses[0] == "192.168.20.1"s);
+    BOOST_CHECK(lbstatus->workers.size() == 1);
+    BOOST_CHECK(lbstatus->workers[0].name() == "my_node"s);
+    BOOST_CHECK(std::abs(lbstatus->workers[0].fillpercent() - 0.8) < DELTAD);
+    BOOST_CHECK(std::abs(lbstatus->workers[0].controlsignal() - 1.0) < DELTAD);
+
+    // overview
+    auto overview_res = lbman.overview();
+    BOOST_CHECK(!overview_res.has_error());
+
+    auto overview = LBManager::asOverviewMessage(overview_res.value());
+    BOOST_CHECK(overview[0].name == "mylb");
+    BOOST_CHECK(overview[0].status.senderAddresses.size() == 2);
+    BOOST_CHECK(overview[0].status.senderAddresses[0] == "192.168.20.1"s);
+    BOOST_CHECK(overview[0].status.workers.size() == 1);
+    BOOST_CHECK(overview[0].status.workers[0].name() == "my_node"s);
+    BOOST_CHECK(std::abs(overview[0].status.workers[0].fillpercent() - 0.8) < DELTAD);
+    BOOST_CHECK(std::abs(overview[0].status.workers[0].controlsignal() - 1.0) < DELTAD);
+    
+    // unregister (should use session token and session id)
+    res1 = lbman.deregisterWorker();
+    BOOST_CHECK(!res1.has_error());
+
+    // free
+    res1 = lbman.freeLB();
+
+    BOOST_CHECK(!res1.has_error());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
