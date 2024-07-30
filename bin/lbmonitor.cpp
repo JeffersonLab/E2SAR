@@ -64,6 +64,7 @@ int main(int argc, char **argv)
     po::store(po::parse_command_line(argc, argv, od), vm);
     po::notify(vm);
 
+    std::cout << "E2SAR Version: " << get_Version() << std::endl;
     if (vm.count("help") || vm.empty())
     {
         std::cout << od << std::endl;
