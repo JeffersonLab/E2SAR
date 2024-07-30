@@ -536,7 +536,7 @@ namespace e2sar
     result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready)
     {
         return sendState(fill_percent, control_signal, is_ready,
-                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::local_time())));
+                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())));
     }
 
     result<std::string> LBManager::version() {
