@@ -35,7 +35,8 @@ void option_dependency(const po::variables_map &vm,
 result<int> reserveLB(LBManager &lbman,
                       const std::string &lbname,
                       const std::vector<std::string> &senders,
-                      const std::string &duration)
+                      const std::string &duration,
+                      const bool suppress)
 {
     boost::posix_time::time_duration duration_v;
     try
@@ -47,15 +48,18 @@ result<int> reserveLB(LBManager &lbman,
         return E2SARErrorInfo{E2SARErrorc::ParameterError,
                               "unable to convert duration string "s + duration};
     }
+    if(!suppress)
+    {
+        std::cout << "Reserving a new load balancer " << std::endl;
+        std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+        std::cout << "   LB Name: " << lbname << std::endl;
+        std::cout << "   Allowed senders: ";
+        for (auto s : senders)
+            std::cout << s << " ";
+        std::cout << std::endl;
+        std::cout << "   Duration: " << duration_v << std::endl;    
+    }
 
-    std::cout << "Reserving a new load balancer " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << lbname << std::endl;
-    std::cout << "   Allowed senders: ";
-    for (auto s : senders)
-        std::cout << s << " ";
-    std::cout << std::endl;
-    std::cout << "   Duration: " << duration_v << std::endl;
     // attempt to reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
 
@@ -66,16 +70,21 @@ result<int> reserveLB(LBManager &lbman,
     }
     else
     {
-        std::cout << "Success. FPGA ID is (for metrics): " << res.value() << std::endl;
-
-        std::cout << "Updated URI after reserve with instance token: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+        if(!suppress)
+        {
+            std::cout << "Success. FPGA ID is (for metrics): " << res.value() << std::endl;
+            std::cout << "Updated URI after reserve with instance token: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
+        }
+        else
+        {
+            std::cout << "export " << lbman.get_URI().to_string(EjfatURI::TokenType::instance);
+        }
         return 0;
     }
 }
 
 result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 {
-
     std::cout << "Freeing a load balancer " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
@@ -100,14 +109,20 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
     }
 }
 
-result<int> registerWorker(LBManager &lbman, const std::string &node_name, const std::string &node_ip, u_int16_t node_port, float weight, u_int16_t src_cnt, float min_factor, float max_factor)
+result<int> registerWorker(LBManager &lbman, const std::string &node_name, 
+                            const std::string &node_ip, u_int16_t node_port, 
+                            float weight, u_int16_t src_cnt, float min_factor, 
+                            float max_factor, const bool suppress)
 {
-    std::cout << "Registering a worker " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
-    std::cout << "   CP parameters: "
-              << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
-
+    if(!suppress)
+    {
+        std::cout << "Registering a worker " << std::endl;
+        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+        std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
+        std::cout << "   CP parameters: "
+                << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
+    }
+    
     auto res = lbman.registerWorker(node_name, std::pair<ip::address, u_int16_t>(ip::make_address(node_ip), node_port), weight, src_cnt, min_factor, max_factor);
 
     if (res.has_error())
@@ -117,9 +132,16 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
     }
     else
     {
-        std::cout << "Success." << std::endl;
-        std::cout << "Updated URI after register with session token: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
-        std::cout << "Session id is: " << lbman.get_URI().get_sessionId() << std::endl;
+        if(!suppress)
+        {
+            std::cout << "Success." << std::endl;
+            std::cout << "Updated URI after register with session token: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
+            std::cout << "Session id is: " << lbman.get_URI().get_sessionId() << std::endl;
+        }
+        else
+        {
+            std::cout << "export " << lbman.get_URI().to_string(EjfatURI::TokenType::instance);
+        }
         return 0;
     }
 }
@@ -289,6 +311,7 @@ int main(int argc, char **argv)
     opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
     opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
+    opts("export,e", "suppresses other messages and prints out 'export EJFAT_URI=<the new uri>' returned by the LB");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
     opts("free", "free a load balancer. Uses instance or admin token.");
@@ -335,6 +358,11 @@ int main(int argc, char **argv)
     {
         std::cout << od << std::endl;
         return 0;
+    }
+
+    bool suppress = false;
+    if(vm.count("export")){
+        suppress = true;
     }
 
     // make sure the token is interpreted as the correct type, depending on the call
@@ -399,7 +427,8 @@ int main(int argc, char **argv)
         // execute command
         auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
                                vm["address"].as<std::vector<std::string>>(),
-                               vm["duration"].as<std::string>());
+                               vm["duration"].as<std::string>(),
+                               suppress);
         if (uri_r.has_error())
         {
             std::cerr << "There was an error reserving LB: " << uri_r.error().message() << std::endl;
@@ -436,7 +465,8 @@ int main(int argc, char **argv)
                                     vm["weight"].as<float>(),
                                     vm["count"].as<u_int16_t>(),
                                     vm["minfactor"].as<float>(),
-                                    vm["maxfactor"].as<float>()
+                                    vm["maxfactor"].as<float>(),
+                                    suppress
                                     );
 
         if (int_r.has_error())

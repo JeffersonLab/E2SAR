@@ -15,7 +15,7 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     std::cout << "Getting LB Status " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
-    std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
+    std::cout << "   LB ID: " << lbid << std::endl;
 
     auto res = lbman.getLBStatus(lbid);
 
@@ -46,11 +46,56 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     }
 }
 
+result<int> getLBOverview(LBManager &lbman)
+{
+    std::cout << "Getting Overview " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+
+    auto res = lbman.overview();
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        auto overview = LBManager::asOverviewMessage(res.value());
+
+        for (auto r: overview) 
+        {
+            std::cout << "LB " << r.name << " ID: " << r.lbid << " FPGA LBID: " << r.fpgaLBId << std::endl;
+            std::cout << "  Registered sender addresses: ";
+            for (auto a : r.status.senderAddresses)
+                std::cout << a << " "s;
+            std::cout << std::endl;
+
+            std::cout << "  Registered workers: " << std::endl;
+            for (auto w : r.status.workers)
+            {
+                std::cout << "  [ name="s << w.name() << ", controlsignal="s << w.controlsignal() << 
+                    ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << 
+                    ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
+            }
+            std::cout << std::endl;
+
+            std::cout << "  LB details: expiresat=" << r.status.expiresAt << ", currentepoch=" << 
+                r.status.currentEpoch << ", predictedeventnum=" << 
+                r.status.currentPredictedEventNumber << std::endl;
+        }
+        return 0;
+    }
+}
+
 int main(int argc, char **argv)
 {
     po::options_description od("Command-line options");
 
-    auto opts = od.add_options()("help,h", "EJFAT LB Monitor \n EJFAT_URI must be specified in this format ejfat[s]://<token>@<cp name or ip>:<cp port>/lb/<lbid>");
+    auto opts = od.add_options()("help,h", "EJFAT LB Monitor"
+    "This tool can be used to either check the status of a reserved LB with an instance token"
+    "or to check the overview of the LB with an admin token"
+    "If lbid is specified in EJFAT_URI/argument, it will default to status of LB"
+    "EJFAT_URI must be specified in this format ejfat[s]://<token>@<cp name or ip>:<cp port>/lb/<lbid>");
 
     // parameters
     opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
@@ -126,19 +171,31 @@ int main(int argc, char **argv)
     std::string lbid;
     if (vm.count("lbid"))
         lbid = vm["lbid"].as<std::string>();
+    else
+        lbid = lbman.get_URI().get_lbId();
 
     std::cout << "Use Ctrl-C to stop" << std::endl;
 
     while(true)
     {
-
-        auto int_r = getLBStatus(lbman, lbid);
-        if (int_r.has_error())
+        if(lbid.empty())
         {
-            std::cerr << "There was an error getting LB status: " << int_r.error().message() << std::endl;
-            return -1;
+            auto int_r = getLBOverview(lbman);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error getting LB overview: " << int_r.error().message() << std::endl;
+                return -1;
+            }
         }
-
+        else
+        {
+            auto int_r = getLBStatus(lbman, lbid);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error getting LB status: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
         boost::this_thread::sleep_for(boost::chrono::milliseconds(update_time));
     }
     return 0;
