@@ -77,7 +77,7 @@ result<int> reserveLB(LBManager &lbman,
         }
         else
         {
-            std::cout << "export " << lbman.get_URI().to_string(EjfatURI::TokenType::instance);
+            std::cout << "export EJFAT_URI='" << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << "'\n";
         }
         return 0;
     }
@@ -140,7 +140,7 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name,
         }
         else
         {
-            std::cout << "export " << lbman.get_URI().to_string(EjfatURI::TokenType::instance);
+            std::cout << "export EJFAT_URI='" << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << "'\n";
         }
         return 0;
     }
