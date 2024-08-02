@@ -353,18 +353,20 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    std::cout << "E2SAR Version: " << get_Version() << std::endl;
+    bool suppress = false;
+    if(vm.count("export")){
+        suppress = true;
+    }
+
+    if(!suppress)
+        std::cout << "E2SAR Version: " << get_Version() << std::endl;
     if (vm.count("help") || vm.empty())
     {
         std::cout << od << std::endl;
         return 0;
     }
 
-    bool suppress = false;
-    if(vm.count("export")){
-        suppress = true;
-    }
-
+    
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::admin};
     if (vm.count("reserve") || vm.count("free") || vm.count("status") || vm.count("version")) 
