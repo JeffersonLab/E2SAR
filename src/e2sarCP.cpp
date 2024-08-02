@@ -27,6 +27,9 @@ using loadbalancer::SendStateRequest;
 using loadbalancer::VersionRequest;
 using loadbalancer::VersionReply;
 
+using loadbalancer::OverviewRequest;
+using loadbalancer::OverviewReply;
+
 namespace e2sar
 {
     // reserve load balancer
@@ -128,7 +131,7 @@ namespace e2sar
                                      const std::vector<std::string> &senders)
     {
 
-        auto pt = second_clock::local_time();
+        auto pt = second_clock::universal_time();
         auto pt1 = pt + duration;
         auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
         return reserveLB(lb_name, ts1, senders);
@@ -326,6 +329,40 @@ namespace e2sar
         return rep;
     }
 
+    // get overview of allocated LBs
+    result<std::unique_ptr<OverviewReply>> LBManager::overview()
+    {
+        auto rep = std::make_unique<OverviewReply>();
+
+        // we only need lb id from the URI
+        ClientContext context;
+        OverviewRequest req;
+
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_AdminToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // make the RPC call
+        Status status = _stub->Overview(&context, req, rep.get());
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in overview(): "s + status.error_message()};
+        }
+
+        return rep;
+    }
+
     result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus()
     {
         if (_cpuri.get_lbId().empty())
@@ -499,7 +536,7 @@ namespace e2sar
     result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready)
     {
         return sendState(fill_percent, control_signal, is_ready,
-                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::local_time())));
+                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())));
     }
 
     result<std::string> LBManager::version() {

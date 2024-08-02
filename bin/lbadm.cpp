@@ -66,7 +66,7 @@ result<int> reserveLB(LBManager &lbman,
     }
     else
     {
-        std::cout << "Sucess. FPGA ID is (for metrics): " << res.value() << std::endl;
+        std::cout << "Success. FPGA ID is (for metrics): " << res.value() << std::endl;
 
         std::cout << "Updated URI after reserve with instance token: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
         return 0;
@@ -78,7 +78,6 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 
     std::cout << "Freeing a load balancer " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     result<int> res{0};
@@ -96,7 +95,7 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Success." << std::endl;
         return 0;
     }
 }
@@ -105,7 +104,6 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
 {
     std::cout << "Registering a worker " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
     std::cout << "   CP parameters: "
               << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
@@ -119,7 +117,7 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name, const
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Success." << std::endl;
         std::cout << "Updated URI after register with session token: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << std::endl;
         std::cout << "Session id is: " << lbman.get_URI().get_sessionId() << std::endl;
         return 0;
@@ -130,7 +128,6 @@ result<int> deregisterWorker(LBManager &lbman)
 {
     std::cout << "De-Registering a worker " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.deregisterWorker();
 
@@ -141,7 +138,7 @@ result<int> deregisterWorker(LBManager &lbman)
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Success." << std::endl;
         return 0;
     }
 }
@@ -150,7 +147,6 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 {
     std::cout << "Getting LB Status " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
-    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     auto res = lbman.getLBStatus(lbid);
@@ -182,6 +178,47 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     }
 }
 
+result<int> overview(LBManager &lbman)
+{
+    std::cout << "Getting Overview " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+
+    auto res = lbman.overview();
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        auto overview = LBManager::asOverviewMessage(res.value());
+
+        for (auto r: overview) 
+        {
+            std::cout << "LB " << r.name << " ID: " << r.lbid << " FPGA LBID: " << r.fpgaLBId << std::endl;
+            std::cout << "  Registered sender addresses: ";
+            for (auto a : r.status.senderAddresses)
+                std::cout << a << " "s;
+            std::cout << std::endl;
+
+            std::cout << "  Registered workers: " << std::endl;
+            for (auto w : r.status.workers)
+            {
+                std::cout << "  [ name="s << w.name() << ", controlsignal="s << w.controlsignal() << 
+                    ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << 
+                    ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
+            }
+            std::cout << std::endl;
+
+            std::cout << "  LB details: expiresat=" << r.status.expiresAt << ", currentepoch=" << 
+                r.status.currentEpoch << ", predictedeventnum=" << 
+                r.status.currentPredictedEventNumber << std::endl;
+        }
+        return 0;
+    }
+}
+
 result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready)
 {
     std::cout << "Sending Worker State " << std::endl;
@@ -197,7 +234,7 @@ result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, b
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Success." << std::endl;
 
         return 0;
     }
@@ -220,7 +257,7 @@ result<int> version(LBManager &lbman)
     }
     else
     {
-        std::cout << "Sucess." << std::endl;
+        std::cout << "Success." << std::endl;
         std::cout << "Reported version: " << res.value() << std::endl;
         return 0;
     }
@@ -253,13 +290,14 @@ int main(int argc, char **argv)
     opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
     // commands
-    opts("reserve", "reserve a load balancer (-l, -a, -d required)");
-    opts("free", "free a load balancer");
-    opts("version", "report the version of the LB");
-    opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered");
-    opts("deregister", "deregister worker (-s required)");
-    opts("status", "get and print LB status");
-    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required)");
+    opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
+    opts("free", "free a load balancer. Uses instance or admin token.");
+    opts("version", "report the version of the LB. Uses admin token.");
+    opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
+    opts("deregister", "deregister worker (-s required). Uses instance or session token.");
+    opts("status", "get and print LB status. Uses admin token.");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses admin token.");
+    opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
 
     po::variables_map vm;
 
@@ -282,7 +320,8 @@ int main(int argc, char **argv)
         option_dependency(vm, "deregister", "session");
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
-        option_dependency(vm, "state", "ready");    
+        option_dependency(vm, "state", "ready");
+        option_dependency(vm, "state", "session");
         conflicting_options(vm, "root", "novalidate");
     }
     catch (const std::logic_error &le)
@@ -432,10 +471,21 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
+        // remember to set session 
+        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = sendState(lbman, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("overview"))
+    {
+        auto int_r = overview(lbman);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error getting overview: " << int_r.error().message() << std::endl;
             return -1;
         }
     }

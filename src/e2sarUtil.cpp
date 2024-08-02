@@ -44,7 +44,9 @@ namespace e2sar
      *
      * @param uri URI to parse.
      */
-    EjfatURI::EjfatURI(const std::string &uri, TokenType tt, bool pV6) : rawURI{uri}, haveDatav4{false}, haveDatav6{false}, haveSync(false), useTls{false}, preferV6{pV6}
+    EjfatURI::EjfatURI(const std::string &uri, TokenType tt, bool pV6) : 
+        rawURI{uri}, haveDatav4{false}, haveDatav6{false}, 
+        haveSync(false), useTls{false}, preferV6{pV6}
     {
 
         // parse the URI
@@ -52,7 +54,7 @@ namespace e2sar
 
         if (!r)
         {
-            throw E2SARException("Unable to parse the provided URL "s + rawURI);
+            throw E2SARException("Unable to parse the provided URI "s + rawURI);
         }
 
         boost::url_view u = r.value();
@@ -66,7 +68,7 @@ namespace e2sar
             useTls = true;
         }
         else
-            throw E2SARException("Invalid EJFAT URL scheme: "s + std::string(u.scheme()) + " in URI"s + rawURI);
+            throw E2SARException("Invalid EJFAT URL scheme: "s + std::string(u.scheme()) + " in URI "s + rawURI);
 
         if (u.userinfo().length() > 0)
         {
@@ -120,16 +122,16 @@ namespace e2sar
                     }
                     if (!assigned)
                         throw E2SARException("Unable to find "s + (preferV6? "IPv6": "IPv4") + 
-                            " address for host " + u.host() + " in URI"s + rawURI);
+                            " address for host " + u.host() + " in URI "s + rawURI);
                     cpPort = cpPort_r.value();
                     cpHost = u.host();
                 }
                 else
-                    throw E2SARException("Unable to resolve host name to IP address in URL "s + u.host() +
+                    throw E2SARException("Unable to resolve host name to IP address in URI "s + u.host() +
                                          " due to "s + ip_list_r.error().message());
             }
             else
-                throw E2SARException("Unable to parse CP address and/or port in URL "s + rawURI);
+                throw E2SARException("Unable to parse CP address and/or port in URI "s + rawURI);
         }
 
         // extract the lb ID
@@ -142,34 +144,43 @@ namespace e2sar
         // deal with the query portion
         for (auto param : u.params())
         {
-            result<std::pair<ip::address, u_int16_t>> r = string_tuple_to_ip_and_port(param.value);
-            if (r)
+            if (!param.key.compare("sessionid"s))
             {
-                std::pair<ip::address, int> p = r.value();
-                if (!param.key.compare("sync"s))
+                sessionId = param.value;
+                continue;
+            }
+            else 
+            {
+                // sync or data
+                result<std::pair<ip::address, u_int16_t>> r = string_tuple_to_ip_and_port(param.value);
+                if (r)
                 {
-                    haveSync = true;
-                    syncAddr = p.first;
-                    syncPort = p.second;
-                }
-                else if (!param.key.compare("data"s))
-                {
-                    if (p.first.is_v4())
+                    std::pair<ip::address, int> p = r.value();
+                    if (!param.key.compare("sync"s))
                     {
-                        haveDatav4 = true;
-                        dataAddrv4 = p.first;
+                        haveSync = true;
+                        syncAddr = p.first;
+                        syncPort = p.second;
+                    }
+                    else if (!param.key.compare("data"s))
+                    {
+                        if (p.first.is_v4())
+                        {
+                            haveDatav4 = true;
+                            dataAddrv4 = p.first;
+                        }
+                        else
+                        {
+                            haveDatav6 = true;
+                            dataAddrv6 = p.first;
+                        }
                     }
                     else
-                    {
-                        haveDatav6 = true;
-                        dataAddrv6 = p.first;
-                    }
+                        throw E2SARException("Unknown parameter "s + param.key + " in URI "s + rawURI);
                 }
                 else
-                    throw E2SARException("Unknown parameter "s + param.key + " in URL "s + rawURI);
+                    throw E2SARException("Unable to parse "s + param.key + " address in URI "s + rawURI);
             }
-            else
-                throw E2SARException("Unable to parse "s + param.key + " address in URL"s + rawURI);
         }
     }
 
@@ -193,7 +204,8 @@ namespace e2sar
                (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
                (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
                (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
-               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
+               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
+               (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
     }
 
     bool operator==(const EjfatURI &u1, const EjfatURI &u2)
@@ -237,6 +249,7 @@ namespace e2sar
                (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
                (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
                (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
-               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s);
+               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
+               (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
     }
 }

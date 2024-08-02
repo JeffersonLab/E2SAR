@@ -236,8 +236,8 @@ namespace e2sar
 
     // various useful header lengths
     constexpr size_t IP_HDRLEN = 20;
-    constexpr const size_t UDP_HDRLEN = 8;
-    constexpr const size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
+    constexpr size_t UDP_HDRLEN = 8;
+    constexpr size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
 }
 
 #endif
