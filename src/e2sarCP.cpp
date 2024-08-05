@@ -30,12 +30,18 @@ using loadbalancer::VersionReply;
 using loadbalancer::OverviewRequest;
 using loadbalancer::OverviewReply;
 
+using loadbalancer::AddSendersRequest;
+using loadbalancer::AddSendersReply;
+
+using loadbalancer::RemoveSendersRequest;
+using loadbalancer::RemoveSendersReply;
+
 namespace e2sar
 {
     // reserve load balancer
     result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const TimeUntil &until,
-                                     const std::vector<std::string> &senders)
+                                     const std::vector<std::string> &senders) noexcept 
     {
 
         ClientContext context;
@@ -128,7 +134,7 @@ namespace e2sar
     // reserve via duration
     result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const boost::posix_time::time_duration &duration,
-                                     const std::vector<std::string> &senders)
+                                     const std::vector<std::string> &senders) noexcept 
     {
 
         auto pt = second_clock::universal_time();
@@ -140,7 +146,7 @@ namespace e2sar
     // reserve via duration in seconds
     result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const double &durationSeconds,
-                                     const std::vector<std::string> &senders)
+                                     const std::vector<std::string> &senders) noexcept 
     {
         /// NOTE: this static casting may lose time accuracy, but should be accepted
         boost::posix_time::time_duration duration = boost::posix_time::seconds(static_cast<long>(durationSeconds));
@@ -149,7 +155,7 @@ namespace e2sar
 
 
     // free previously allocated lb using explicit lb id
-    result<int> LBManager::freeLB(const std::string &lbid) 
+    result<int> LBManager::freeLB(const std::string &lbid) noexcept 
     {
 
         // we only need lb id from the URI
@@ -188,7 +194,7 @@ namespace e2sar
     }
 
     // free load balancer using the URI
-    result<int> LBManager::freeLB()
+    result<int> LBManager::freeLB() noexcept 
     {
 
         if (_cpuri.get_lbId().empty())
@@ -200,7 +206,7 @@ namespace e2sar
     }
 
     // get load balancer info using lbid in the URI
-    result<int> LBManager::getLB()
+    result<int> LBManager::getLB() noexcept 
     {
 
         if (_cpuri.get_lbId().empty())
@@ -213,7 +219,7 @@ namespace e2sar
 
     // get load balancer info using lbid provided externally, in this case the URI only needs
     // to contain the admin token and CP address/port
-    result<int> LBManager::getLB(const std::string &lbid)
+    result<int> LBManager::getLB(const std::string &lbid) noexcept 
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -289,7 +295,7 @@ namespace e2sar
     }
 
     // get LB Status
-    result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus(const std::string &lbid)
+    result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus(const std::string &lbid) noexcept 
     {
         auto rep = std::make_unique<LoadBalancerStatusReply>();
 
@@ -330,7 +336,7 @@ namespace e2sar
     }
 
     // get overview of allocated LBs
-    result<std::unique_ptr<OverviewReply>> LBManager::overview()
+    result<std::unique_ptr<OverviewReply>> LBManager::overview() noexcept 
     {
         auto rep = std::make_unique<OverviewReply>();
 
@@ -363,7 +369,7 @@ namespace e2sar
         return rep;
     }
 
-    result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus()
+    result<std::unique_ptr<LoadBalancerStatusReply>> LBManager::getLBStatus() noexcept
     {
         if (_cpuri.get_lbId().empty())
         {
@@ -374,7 +380,7 @@ namespace e2sar
     }
 
     // register worker nodes
-    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor)
+    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor) noexcept 
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -441,7 +447,7 @@ namespace e2sar
     }
 
     // deregister worker
-    result<int> LBManager::deregisterWorker()
+    result<int> LBManager::deregisterWorker() noexcept 
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -481,7 +487,7 @@ namespace e2sar
     }
 
     // send worker queue state with explicit timestamp
-    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts)
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts) noexcept 
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -533,13 +539,13 @@ namespace e2sar
     }
 
     // send worker queue state with using local time
-    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready)
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready) noexcept 
     {
         return sendState(fill_percent, control_signal, is_ready,
                          util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())));
     }
 
-    result<boost::tuple<std::string, std::string, std::string>> LBManager::version() {
+    result<boost::tuple<std::string, std::string, std::string>> LBManager::version() noexcept {
        // we only need lb id from the URI
         ClientContext context;
         VersionRequest req;
@@ -570,8 +576,107 @@ namespace e2sar
         return boost::make_tuple<std::string, std::string, std::string>(rep.commit(), rep.build(), rep.compattag());
     }
 
-    // get updated statistics
-    result<int> probeStats();
+    result<int> LBManager::addSenders(const std::vector<std::string>& senders) noexcept
+    {
+        // we only need lb id from the URI
+        ClientContext context;
+        AddSendersRequest req;
+        AddSendersReply rep;
+
+        // NOTE: This uses instance token
+        auto instanceToken = _cpuri.get_InstanceToken();
+        if (!instanceToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_InstanceToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + instanceToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available in the URI"s};
+
+        if (_cpuri.get_lbId().empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
+
+        req.set_lbid(_cpuri.get_lbId());
+
+        // add sender IP addresses, but check they are valid
+        for (auto s : senders)
+        {
+            try
+            {
+                ip::make_address(s);
+            }
+            catch (...)
+            {
+                return E2SARErrorInfo{E2SARErrorc::ParameterError, "Invalid sender IP addresses"s};
+            }
+            req.add_senderaddresses(s);
+        }
+
+        // make the RPC call
+        Status status = _stub->AddSenders(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in AddSenders(): "s + status.error_message()};
+        }
+        return 0;
+    }
+
+    result<int> LBManager::removeSenders(const std::vector<std::string>& senders) noexcept
+    {
+        // we only need lb id from the URI
+        ClientContext context;
+        RemoveSendersRequest req;
+        RemoveSendersReply rep;
+
+        // NOTE: This uses instance token
+        auto instanceToken = _cpuri.get_InstanceToken();
+        if (!instanceToken.has_error())
+        {
+#if TOKEN_IN_BODY
+            // set bearer token in body (the old way)
+            req.set_token(_cpuri.get_InstanceToken());
+#else
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + instanceToken.value());
+#endif
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available in the URI"s};
+
+        if (_cpuri.get_lbId().empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "LB ID not avialable - have you reserved it previously?"s};
+
+        req.set_lbid(_cpuri.get_lbId());
+
+        // add sender IP addresses, but check they are valid
+        for (auto s : senders)
+        {
+            try
+            {
+                ip::make_address(s);
+            }
+            catch (...)
+            {
+                return E2SARErrorInfo{E2SARErrorc::ParameterError, "Invalid sender IP addresses"s};
+            }
+            req.add_senderaddresses(s);
+        }
+
+        // make the RPC call
+        Status status = _stub->RemoveSenders(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in RemoveSenders(): "s + status.error_message()};
+        }
+        return 0;
+    }
 
     /**
      * modified from

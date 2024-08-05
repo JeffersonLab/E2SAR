@@ -254,8 +254,6 @@ PYBIND11_MODULE(e2sar_py, m) {
 
     lb_manager.def("get_version", &LBManager::version);
 
-    lb_manager.def_property_readonly("is_reserved", &LBManager::isReserved);
-
     // Bind LBManager::reserveLB to use duration in seconds
     // It is specifically designed to interface with Python datetime.timedelta
     lb_manager.def(
@@ -299,8 +297,6 @@ PYBIND11_MODULE(e2sar_py, m) {
     lb_manager.def("register_worker", &LBManager::registerWorker);
     lb_manager.def("deregister_worker", &LBManager::deregisterWorker);
 
-    lb_manager.def("prob_stats", &LBManager::probeStats);
-
     lb_manager.def(
         "send_state",
         static_cast<result<int> (LBManager::*)(float, float, bool)>(&LBManager::sendState),
@@ -343,7 +339,7 @@ PYBIND11_MODULE(e2sar_py, m) {
 
     lb_manager.def("make_ssl_options", &LBManager::makeSslOptions);
 
-    lb_manager.def("get_port_range", &LBManager::get_PortRange);
+    lb_manager.def("get_port_range", &get_PortRange);
 
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);

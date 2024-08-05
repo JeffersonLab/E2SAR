@@ -54,8 +54,7 @@ result<int> reserveLB(LBManager &lbman,
         std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
         std::cout << "   LB Name: " << lbname << std::endl;
         std::cout << "   Allowed senders: ";
-        for (auto s : senders)
-            std::cout << s << " ";
+        std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
         std::cout << std::endl;
         std::cout << "   Duration: " << duration_v << std::endl;    
     }
@@ -262,6 +261,54 @@ result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, b
     }
 }
 
+result<int> removeSenders(LBManager &lbman, const std::vector<std::string>& senders)
+{
+    std::cout << "Removing senders to CP " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   Sender list: ";
+    std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
+
+
+    auto res = lbman.removeSenders(senders);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        std::cout << "Success." << std::endl;
+
+        return 0;
+    }
+}
+
+result<int> addSenders(LBManager &lbman, const std::vector<std::string>& senders)
+{
+    std::cout << "Adding senders to CP " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   Sender list: ";
+    std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
+
+
+    auto res = lbman.addSenders(senders);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        std::cout << "Success." << std::endl;
+
+        return 0;
+    }
+}
+
 result<int> version(LBManager &lbman)
 {
 
@@ -322,6 +369,9 @@ int main(int argc, char **argv)
     opts("status", "get and print LB status. Uses admin token.");
     opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses admin token.");
     opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
+    opts("addsenders","add 'safe' sender IP addresses to CP. Uses instance token.");
+    opts("removesenders","remove 'safe' sender IP addresses from CP. Uses instance token.");
+
 
     po::variables_map vm;
 
@@ -347,6 +397,8 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "ready");
         option_dependency(vm, "state", "session");
         conflicting_options(vm, "root", "novalidate");
+        option_dependency(vm,"addsenders", "address");
+        option_dependency(vm,"removesenders", "address");
     }
     catch (const std::logic_error &le)
     {
@@ -519,6 +571,24 @@ int main(int argc, char **argv)
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting overview: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("addsenders"))
+    {
+        auto int_r = addSenders(lbman, vm["address"].as<std::vector<std::string>>());
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error adding senders: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("removesenders"))
+    {
+        auto int_r = removeSenders(lbman, vm["address"].as<std::vector<std::string>>());
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error removing senders: " << int_r.error().message() << std::endl;
             return -1;
         }
     }
