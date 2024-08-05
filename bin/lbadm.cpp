@@ -369,8 +369,8 @@ int main(int argc, char **argv)
     opts("status", "get and print LB status. Uses admin token.");
     opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses admin token.");
     opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
-    opts("addsenders","add 'safe' sender IP addresses to CP. Uses instance token.");
-    opts("removesenders","remove 'safe' sender IP addresses from CP. Uses instance token.");
+    opts("addsenders","add 'safe' sender IP addresses to CP (one or more -a required). Uses instance token.");
+    opts("removesenders","remove 'safe' sender IP addresses from CP (one or more -a required). Uses instance token.");
 
 
     po::variables_map vm;
