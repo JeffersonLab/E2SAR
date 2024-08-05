@@ -325,7 +325,7 @@ result<int> version(LBManager &lbman)
     else
     {
         std::cout << "Success." << std::endl;
-        std::cout << "Reported version: " << 
+        std::cout << "Reported version: " << std::endl <<
             "\tCommit: " << res.value().get<0>() << std::endl << 
             "\tBuild: " << res.value().get<1>() << std::endl <<
             "\tCompatTag: " << res.value().get<2>() << std::endl;
