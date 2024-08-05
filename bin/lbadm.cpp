@@ -268,9 +268,7 @@ result<int> version(LBManager &lbman)
     std::cout << "Getting load balancer version " << std::endl;
     std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
 
-    result<std::string> res{""};
-
-    res = lbman.version();
+    auto res = lbman.version();
 
     if (res.has_error())
     {
@@ -280,7 +278,10 @@ result<int> version(LBManager &lbman)
     else
     {
         std::cout << "Success." << std::endl;
-        std::cout << "Reported version: " << res.value() << std::endl;
+        std::cout << "Reported version: " << 
+            "\tCommit: " << res.value().get<0>() << std::endl << 
+            "\tBuild: " << res.value().get<1>() << std::endl <<
+            "\tCompatTag: " << res.value().get<2>() << std::endl;
         return 0;
     }
 }

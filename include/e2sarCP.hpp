@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <boost/asio.hpp>
+#include <boost/tuple/tuple.hpp>
 
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
@@ -119,7 +120,6 @@ namespace e2sar
     {
     private:
         EjfatURI _cpuri;
-        bool _state_reserved;
         std::unique_ptr<LoadBalancer::Stub> _stub;
         std::shared_ptr<grpc::Channel> _channel;
 
@@ -135,7 +135,7 @@ namespace e2sar
          * use of SSL/TLS is governed by the URI scheme ('ejfat' vs 'ejfats')
          */
         LBManager(const EjfatURI &cpuri, bool validateServer = true,
-                  grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri), _state_reserved(false)
+                  grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri)
         {
 
             auto cp_host_r = cpuri.get_cpHost();
@@ -181,13 +181,6 @@ namespace e2sar
             _stub = LoadBalancer::NewStub(_channel);
         }
 
-        /**
-         * Is the load balancer reserved (set by reserveLB, unset when newly created or after freeLB)
-         */
-        inline bool isReserved() const
-        {
-            return _state_reserved;
-        }
         /**
          * Reserve a new load balancer with this name until specified time
          *
@@ -472,9 +465,9 @@ namespace e2sar
         /**
          * Get the version of the load balancer (the commit string)
          *
-         * @return the commit string
+         * @return the result with commit string, build tag and compatTag in
          */
-        result<std::string> version();
+        result<boost::tuple<std::string, std::string, std::string>> version();
 
         // get updated statistics
         result<int> probeStats();
@@ -521,48 +514,41 @@ namespace e2sar
          */
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
             std::string_view pem_root_certs);
-
-        /**
-         * Method to map max # of data sources a backend will see to
-         * the corressponding PortRange (enum) value in loadbalancer.proto.
-         *
-         * @param sourceCount max # of data sources backend will see.
-         * @return corressponding PortRange.
-         */
-        static inline int get_PortRange(int source_count) noexcept
-        {
-            // Based on the proto file enum for the load balancer, seen below,
-            // map the max # of sources a backend will see to the PortRange value.
-            // This is necessay to provide the control plane when registering.
-
-            // Handle edge cases
-            if (source_count < 2)
-            {
-                return 0;
-            }
-            else if (source_count > 16384)
-            {
-                return 14;
-            }
-
-            int maxCount = 2;
-            int iteration = 1;
-
-            while (source_count > maxCount)
-            {
-                iteration++;
-                maxCount <<= 1;
-            }
-
-            return iteration;
-        }
     };
 
-    /*
-    Sync packet sent by segmenter to LB periodically.
-    */
-    struct LBSyncPkt
+    /**
+     * Method to map max # of data sources a backend will see to
+     * the corressponding PortRange (enum) value in loadbalancer.proto.
+     *
+     * @param sourceCount max # of data sources backend will see.
+     * @return corressponding PortRange.
+     */
+    static inline int get_PortRange(int source_count) noexcept
     {
-    };
+        // Based on the proto file enum for the load balancer, seen below,
+        // map the max # of sources a backend will see to the PortRange value.
+        // This is necessay to provide the control plane when registering.
+
+        // Handle edge cases
+        if (source_count < 2)
+        {
+            return 0;
+        }
+        else if (source_count > 16384)
+        {
+            return 14;
+        }
+
+        int maxCount = 2;
+        int iteration = 1;
+
+        while (source_count > maxCount)
+        {
+            iteration++;
+            maxCount <<= 1;
+        }
+
+        return iteration;
+    }
 }
 #endif

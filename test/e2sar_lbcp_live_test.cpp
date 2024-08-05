@@ -231,7 +231,9 @@ BOOST_AUTO_TEST_CASE(LBMLiveTest5)
 
     BOOST_CHECK(!res.has_error());
 
-    BOOST_CHECK(!res.value().empty());
+    BOOST_CHECK(!res.value().get<0>().empty());
+    BOOST_CHECK(!res.value().get<1>().empty());
+    BOOST_CHECK(!res.value().get<2>().empty());
 
     std::cout << "Version string " << res.value() << std::endl;
 }

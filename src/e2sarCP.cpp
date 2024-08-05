@@ -325,7 +325,7 @@ namespace e2sar
         {
             return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in LoadBalancerStatus(): "s + status.error_message()};
         }
-
+        
         return rep;
     }
 
@@ -539,7 +539,7 @@ namespace e2sar
                          util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())));
     }
 
-    result<std::string> LBManager::version() {
+    result<boost::tuple<std::string, std::string, std::string>> LBManager::version() {
        // we only need lb id from the URI
         ClientContext context;
         VersionRequest req;
@@ -567,7 +567,7 @@ namespace e2sar
         {
             return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in Version(): "s + status.error_message()};
         }
-        return rep.commit();
+        return boost::make_tuple<std::string, std::string, std::string>(rep.commit(), rep.build(), rep.compattag());
     }
 
     // get updated statistics
