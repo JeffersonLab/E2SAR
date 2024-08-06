@@ -367,7 +367,7 @@ int main(int argc, char **argv)
     opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
     opts("deregister", "deregister worker (-s required). Uses instance or session token.");
     opts("status", "get and print LB status. Uses admin token.");
-    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses admin token.");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses session token.");
     opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
     opts("addsenders","add 'safe' sender IP addresses to CP (one or more -a required). Uses instance token.");
     opts("removesenders","remove 'safe' sender IP addresses from CP (one or more -a required). Uses instance token.");
@@ -395,7 +395,6 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
-        option_dependency(vm, "state", "session");
         conflicting_options(vm, "root", "novalidate");
         option_dependency(vm,"addsenders", "address");
         option_dependency(vm,"removesenders", "address");
