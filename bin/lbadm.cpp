@@ -353,7 +353,7 @@ int main(int argc, char **argv)
     opts("session,s", po::value<std::string>(), "session id from 'register' call");
     opts("queue,q", po::value<float>(), "queue fill");
     opts("ctrl,t", po::value<float>(), "control signal value");
-    opts("ready,r", po::value<bool>(), "worker ready state");
+    opts("ready,r", po::value<bool>(), "worker ready state (1 or 0)");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
