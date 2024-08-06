@@ -352,7 +352,7 @@ int main(int argc, char **argv)
     opts("count,c", po::value<u_int16_t>(), "node source count");
     opts("session,s", po::value<std::string>(), "session id from 'register' call");
     opts("queue,q", po::value<float>(), "queue fill");
-    opts("ctrl,c", po::value<float>(), "control signal value");
+    opts("ctrl,t", po::value<float>(), "control signal value");
     opts("ready,r", po::value<bool>(), "worker ready state");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
@@ -447,6 +447,15 @@ int main(int argc, char **argv)
         return -1;
     }
     auto uri = uri_r.value();
+
+    // remember to override session if provided
+    if (vm.count("session")) 
+        uri.set_sessionId(vm["session"].as<std::string>());
+
+    // remember to override lbid if provided
+    if (vm.count("lbid")) 
+        uri.set_lbId(vm["lbid"].as<std::string>());
+
     auto lbman = LBManager(uri);
 
     if (vm.count("root") && !uri.get_useTls())
@@ -555,8 +564,6 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
-        // remember to set session 
-        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = sendState(lbman, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
         if (int_r.has_error())
         {
