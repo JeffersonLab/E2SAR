@@ -342,7 +342,7 @@ int main(int argc, char **argv)
 
     // parameters
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
-    opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
+    opts("lbid,i", po::value<std::string>(), "override/provide id of the loadbalancer");
     opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address, can be used multiple times for 'reserve' call");
     opts("duration,d", po::value<std::string>(), "specify duration as '[hh[:mm[:ss]]]'");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
@@ -350,7 +350,7 @@ int main(int argc, char **argv)
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
     opts("weight,w", po::value<float>(), "node weight");
     opts("count,c", po::value<u_int16_t>(), "node source count");
-    opts("session,s", po::value<std::string>(), "session id from 'register' call");
+    opts("session,s", po::value<std::string>(), "override/provide session id");
     opts("queue,q", po::value<float>(), "queue fill");
     opts("ctrl,t", po::value<float>(), "control signal value");
     opts("ready,r", po::value<bool>(), "worker ready state (1 or 0)");
