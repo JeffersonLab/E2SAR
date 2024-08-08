@@ -1,5 +1,5 @@
 project('E2SAR', 'cpp', 
-        version: '0.1.0a5', default_options : ['cpp_std=c++17'])
+        version: '0.1.0a6', default_options : ['cpp_std=c++17'])
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 

@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <boost/asio.hpp>
+#include <boost/tuple/tuple.hpp>
 
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
@@ -119,7 +120,6 @@ namespace e2sar
     {
     private:
         EjfatURI _cpuri;
-        bool _state_reserved;
         std::unique_ptr<LoadBalancer::Stub> _stub;
         std::shared_ptr<grpc::Channel> _channel;
 
@@ -135,7 +135,7 @@ namespace e2sar
          * use of SSL/TLS is governed by the URI scheme ('ejfat' vs 'ejfats')
          */
         LBManager(const EjfatURI &cpuri, bool validateServer = true,
-                  grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri), _state_reserved(false)
+                  grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri)
         {
 
             auto cp_host_r = cpuri.get_cpHost();
@@ -182,13 +182,6 @@ namespace e2sar
         }
 
         /**
-         * Is the load balancer reserved (set by reserveLB, unset when newly created or after freeLB)
-         */
-        inline bool isReserved() const
-        {
-            return _state_reserved;
-        }
-        /**
          * Reserve a new load balancer with this name until specified time
          *
          * @param lb_name LB name internal to you
@@ -198,7 +191,7 @@ namespace e2sar
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const TimeUntil &until,
-                              const std::vector<std::string> &senders);
+                              const std::vector<std::string> &senders) noexcept;
 
         /**
          * Reserve a new load balancer with this name until specified time. It sets the intstance
@@ -213,7 +206,7 @@ namespace e2sar
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
-                              const std::vector<std::string> &senders);
+                              const std::vector<std::string> &senders) noexcept;
 
         /**
          * Reserve a new load balancer with this name of duration in seconds
@@ -226,7 +219,7 @@ namespace e2sar
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const double &durationSeconds,
-                              const std::vector<std::string> &senders);
+                              const std::vector<std::string> &senders) noexcept;
 
         /**
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
@@ -237,12 +230,12 @@ namespace e2sar
          * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
          * @return - 0 on success or error code with message on failure
          */
-        result<int> getLB(const std::string &lbid);
+        result<int> getLB(const std::string &lbid) noexcept;
         /**
          * Get load balancer info using lb id in the URI object
          * @return - 0 on success or error code with message on failure
          */
-        result<int> getLB();
+        result<int> getLB() noexcept;
 
         /**
          * Get load balancer status including list of workers, sender IP addresses.
@@ -254,7 +247,7 @@ namespace e2sar
          * and workers. For each worker you get name, fill percent, controlsignal, slotsassigned and
          * timestamp last updated.
          */
-        result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus(const std::string &lbid);
+        result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus(const std::string &lbid) noexcept;
 
         /**
          * Get load balancer status including list of workers, sender IP addresses etc
@@ -265,7 +258,7 @@ namespace e2sar
          * and workers. For each worker you get name, fill percent, controlsignal, slotsassigned and
          * timestamp last updated.
          */
-        result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus();
+        result<std::unique_ptr<LoadBalancerStatusReply>> getLBStatus() noexcept;
 
         /**
          * Get an 'overview' of reserved load balancer instances
@@ -274,7 +267,20 @@ namespace e2sar
          * ReserveLoadBalancerReply and LoadBalancerStatusReply for each instance as well as the 
          * name given to each instance in reserveLB.
          */
-        result<std::unique_ptr<OverviewReply>> overview();
+        result<std::unique_ptr<OverviewReply>> overview() noexcept;
+
+        /**
+         * Add 'safe' sender addresses to CP to allow these sender to send data to the LB
+         * 
+         * @param sender_list - list of sender addresses
+         */
+        result<int> addSenders(const std::vector<std::string>& senders) noexcept;
+
+        /**
+         * Remove 'safe' sender addresses from CP to disallow these senders to send data
+         * to the LB
+         */
+        result<int> removeSenders(const std::vector<std::string>& senders) noexcept;
 
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
@@ -284,7 +290,7 @@ namespace e2sar
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
          * slotsassigned and a lastupdated timestamp
          */
-        static inline std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
+        static inline std::vector<WorkerStatus> get_WorkerStatusVector(std::unique_ptr<LoadBalancerStatusReply> &rep) noexcept
         {
             std::vector<WorkerStatus> ret(rep->workers_size());
 
@@ -304,7 +310,7 @@ namespace e2sar
          * @return - a vector of WorkerStatus objects with fields like name, fillpercent, controlsignal,
          * slotsassigned and a lastupdated timestamp
          */
-        static inline std::vector<WorkerStatus> get_WorkerStatusVector(const LoadBalancerStatusReply &rep)
+        static inline std::vector<WorkerStatus> get_WorkerStatusVector(const LoadBalancerStatusReply &rep) noexcept
         {
             std::vector<WorkerStatus> ret(rep.workers_size());
 
@@ -322,7 +328,7 @@ namespace e2sar
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
          */
-        static inline std::vector<std::string> get_SenderAddressVector(std::unique_ptr<LoadBalancerStatusReply> &rep)
+        static inline std::vector<std::string> get_SenderAddressVector(std::unique_ptr<LoadBalancerStatusReply> &rep) noexcept
         {
             std::vector<std::string> ret(rep->senderaddresses_size());
 
@@ -340,7 +346,7 @@ namespace e2sar
          *
          * @return - a vector of strings with known sender addresses communicated in the reserve call
          */
-        static inline std::vector<std::string> get_SenderAddressVector(const LoadBalancerStatusReply &rep)
+        static inline std::vector<std::string> get_SenderAddressVector(const LoadBalancerStatusReply &rep) noexcept
         {
             std::vector<std::string> ret(rep.senderaddresses_size());
 
@@ -353,7 +359,7 @@ namespace e2sar
         }
 
         /** Helper function copies LoadBalancerStatusReply protobuf into a simpler struct */
-        static inline const std::unique_ptr<LBStatus> asLBStatus(std::unique_ptr<LoadBalancerStatusReply> &rep)
+        static inline const std::unique_ptr<LBStatus> asLBStatus(std::unique_ptr<LoadBalancerStatusReply> &rep) noexcept
         {
             std::vector<std::string> addresses{get_SenderAddressVector(rep)};
             std::vector<WorkerStatus> workers{get_WorkerStatusVector(rep)};
@@ -363,7 +369,7 @@ namespace e2sar
         }
 
         /** Helper function copies LoadBalancerStatusReply protobuf into a simpler struct */
-        static inline const LBStatus asLBStatus(const LoadBalancerStatusReply &rep)
+        static inline const LBStatus asLBStatus(const LoadBalancerStatusReply &rep) noexcept
         {
             std::vector<std::string> addresses{get_SenderAddressVector(rep)};
             std::vector<WorkerStatus> workers{get_WorkerStatusVector(rep)};
@@ -372,7 +378,7 @@ namespace e2sar
         }
 
         /** Helper function copies OverviewReply protobuf into a simpler struct */
-        static inline const OverviewMessage asOverviewMessage(std::unique_ptr<OverviewReply> &rep)
+        static inline const OverviewMessage asOverviewMessage(std::unique_ptr<OverviewReply> &rep) noexcept
         {
             size_t j{0};
             OverviewMessage om(rep.get()->loadbalancers_size());
@@ -391,7 +397,7 @@ namespace e2sar
         }
 
         /** Helper function copies OverviewReply protobuf into a simpler struct */
-        static inline const OverviewMessage asOverviewMessage(const OverviewReply &rep)
+        static inline const OverviewMessage asOverviewMessage(const OverviewReply &rep) noexcept
         {
             size_t j{0};
             OverviewMessage om(rep.loadbalancers_size());
@@ -415,12 +421,13 @@ namespace e2sar
          * cp address and admin token
          * @return - 0 on success or error code with message on failure
          */
-        result<int> freeLB(const std::string &lbid);
+        result<int> freeLB(const std::string &lbid) noexcept;
         /**
-         * Free previously reserved load balancer. Uses admin token.
+         * Free previously reserved load balancer. Uses admin token and uses LB ID obtained
+         * from reserve call on the same LBManager object.
          * @return - 0 on success or error code with message on failure
          */
-        result<int> freeLB();
+        result<int> freeLB() noexcept;
 
         /**
          * Register a workernode/backend with an allocated loadbalancer. Note that this call uses
@@ -438,14 +445,14 @@ namespace e2sar
          * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
          * @return - 0 on success or an error condition
          */
-        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor);
+        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor) noexcept;
 
         /**
          * Deregister worker using session ID and session token from the register call
          *
          * @return - 0 on success or an error condition
          */
-        result<int> deregisterWorker();
+        result<int> deregisterWorker() noexcept;
 
         /**
          * Send worker state update using session ID and session token from register call. Automatically
@@ -455,7 +462,7 @@ namespace e2sar
          * @param control_signal - change to data rate
          * @param is_ready - if true, worker ready to accept more data, else not ready
          */
-        result<int> sendState(float fill_percent, float control_signal, bool is_ready);
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready) noexcept;
 
         /**
          * Send worker state update using session ID and session token from register call. Allows to explicitly
@@ -467,22 +474,19 @@ namespace e2sar
          * @param ts - google::protobuf::Timestamp timestamp for this message (if you want to explicitly not
          * use localtime)
          */
-        result<int> sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts);
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts) noexcept;
 
         /**
          * Get the version of the load balancer (the commit string)
          *
-         * @return the commit string
+         * @return the result with commit string, build tag and compatTag in
          */
-        result<std::string> version();
-
-        // get updated statistics
-        result<int> probeStats();
+        result<boost::tuple<std::string, std::string, std::string>> version() noexcept;
 
         /**
          * Get the internal URI object.
          */
-        inline const EjfatURI &get_URI() const { return _cpuri; }
+        inline const EjfatURI &get_URI() const noexcept { return _cpuri; }
 
         /**
          * Generate gRPC-compliant custom SSL Options object with the following parameters,
@@ -521,48 +525,41 @@ namespace e2sar
          */
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
             std::string_view pem_root_certs);
-
-        /**
-         * Method to map max # of data sources a backend will see to
-         * the corressponding PortRange (enum) value in loadbalancer.proto.
-         *
-         * @param sourceCount max # of data sources backend will see.
-         * @return corressponding PortRange.
-         */
-        static inline int get_PortRange(int source_count) noexcept
-        {
-            // Based on the proto file enum for the load balancer, seen below,
-            // map the max # of sources a backend will see to the PortRange value.
-            // This is necessay to provide the control plane when registering.
-
-            // Handle edge cases
-            if (source_count < 2)
-            {
-                return 0;
-            }
-            else if (source_count > 16384)
-            {
-                return 14;
-            }
-
-            int maxCount = 2;
-            int iteration = 1;
-
-            while (source_count > maxCount)
-            {
-                iteration++;
-                maxCount <<= 1;
-            }
-
-            return iteration;
-        }
     };
 
-    /*
-    Sync packet sent by segmenter to LB periodically.
-    */
-    struct LBSyncPkt
+    /**
+     * Method to map max # of data sources a backend will see to
+     * the corressponding PortRange (enum) value in loadbalancer.proto.
+     *
+     * @param sourceCount max # of data sources backend will see.
+     * @return corressponding PortRange.
+     */
+    static inline int get_PortRange(int source_count) noexcept
     {
-    };
+        // Based on the proto file enum for the load balancer, seen below,
+        // map the max # of sources a backend will see to the PortRange value.
+        // This is necessay to provide the control plane when registering.
+
+        // Handle edge cases
+        if (source_count < 2)
+        {
+            return 0;
+        }
+        else if (source_count > 16384)
+        {
+            return 14;
+        }
+
+        int maxCount = 2;
+        int iteration = 1;
+
+        while (source_count > maxCount)
+        {
+            iteration++;
+            maxCount <<= 1;
+        }
+
+        return iteration;
+    }
 }
 #endif

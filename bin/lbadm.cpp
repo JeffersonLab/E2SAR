@@ -54,8 +54,7 @@ result<int> reserveLB(LBManager &lbman,
         std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
         std::cout << "   LB Name: " << lbname << std::endl;
         std::cout << "   Allowed senders: ";
-        for (auto s : senders)
-            std::cout << s << " ";
+        std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
         std::cout << std::endl;
         std::cout << "   Duration: " << duration_v << std::endl;    
     }
@@ -262,15 +261,16 @@ result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, b
     }
 }
 
-result<int> version(LBManager &lbman)
+result<int> removeSenders(LBManager &lbman, const std::vector<std::string>& senders)
 {
+    std::cout << "Removing senders to CP " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   Sender list: ";
+    std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
 
-    std::cout << "Getting load balancer version " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
 
-    result<std::string> res{""};
-
-    res = lbman.version();
+    auto res = lbman.removeSenders(senders);
 
     if (res.has_error())
     {
@@ -280,7 +280,55 @@ result<int> version(LBManager &lbman)
     else
     {
         std::cout << "Success." << std::endl;
-        std::cout << "Reported version: " << res.value() << std::endl;
+
+        return 0;
+    }
+}
+
+result<int> addSenders(LBManager &lbman, const std::vector<std::string>& senders)
+{
+    std::cout << "Adding senders to CP " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   Sender list: ";
+    std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
+
+
+    auto res = lbman.addSenders(senders);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        std::cout << "Success." << std::endl;
+
+        return 0;
+    }
+}
+
+result<int> version(LBManager &lbman)
+{
+
+    std::cout << "Getting load balancer version " << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+
+    auto res = lbman.version();
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to Load Balancer CP, error "s + res.error().message()};
+    }
+    else
+    {
+        std::cout << "Success." << std::endl;
+        std::cout << "Reported version: " << std::endl <<
+            "\tCommit: " << res.value().get<0>() << std::endl << 
+            "\tBuild: " << res.value().get<1>() << std::endl <<
+            "\tCompatTag: " << res.value().get<2>() << std::endl;
         return 0;
     }
 }
@@ -294,7 +342,7 @@ int main(int argc, char **argv)
 
     // parameters
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
-    opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
+    opts("lbid,i", po::value<std::string>(), "override/provide id of the loadbalancer");
     opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address, can be used multiple times for 'reserve' call");
     opts("duration,d", po::value<std::string>(), "specify duration as '[hh[:mm[:ss]]]'");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
@@ -302,10 +350,10 @@ int main(int argc, char **argv)
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
     opts("weight,w", po::value<float>(), "node weight");
     opts("count,c", po::value<u_int16_t>(), "node source count");
-    opts("session,s", po::value<std::string>(), "session id from 'register' call");
+    opts("session,s", po::value<std::string>(), "override/provide session id");
     opts("queue,q", po::value<float>(), "queue fill");
-    opts("ctrl,c", po::value<float>(), "control signal value");
-    opts("ready,r", po::value<bool>(), "worker ready state");
+    opts("ctrl,t", po::value<float>(), "control signal value");
+    opts("ready,r", po::value<bool>(), "worker ready state (1 or 0)");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
@@ -315,12 +363,15 @@ int main(int argc, char **argv)
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
     opts("free", "free a load balancer. Uses instance or admin token.");
-    opts("version", "report the version of the LB. Uses admin token.");
+    opts("version", "report the version of the LB. Uses admin or instance token.");
     opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
-    opts("deregister", "deregister worker (-s required). Uses instance or session token.");
-    opts("status", "get and print LB status. Uses admin token.");
-    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses admin token.");
+    opts("deregister", "deregister worker. Uses instance or session token.");
+    opts("status", "get and print LB status. Uses admin or instance token.");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses session token.");
     opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
+    opts("addsenders","add 'safe' sender IP addresses to CP (one or more -a required). Uses instance token.");
+    opts("removesenders","remove 'safe' sender IP addresses from CP (one or more -a required). Uses instance token.");
+
 
     po::variables_map vm;
 
@@ -340,12 +391,12 @@ int main(int argc, char **argv)
         option_dependency(vm, "register", "count");
         option_dependency(vm, "register", "minfactor");
         option_dependency(vm, "register", "maxfactor");
-        option_dependency(vm, "deregister", "session");
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
-        option_dependency(vm, "state", "session");
         conflicting_options(vm, "root", "novalidate");
+        option_dependency(vm,"addsenders", "address");
+        option_dependency(vm,"removesenders", "address");
     }
     catch (const std::logic_error &le)
     {
@@ -395,6 +446,15 @@ int main(int argc, char **argv)
         return -1;
     }
     auto uri = uri_r.value();
+
+    // remember to override session if provided
+    if (vm.count("session")) 
+        uri.set_sessionId(vm["session"].as<std::string>());
+
+    // remember to override lbid if provided
+    if (vm.count("lbid")) 
+        uri.set_lbId(vm["lbid"].as<std::string>());
+
     auto lbman = LBManager(uri);
 
     if (vm.count("root") && !uri.get_useTls())
@@ -479,8 +539,6 @@ int main(int argc, char **argv)
     }
     else if (vm.count("deregister"))
     {
-        // remember to set session 
-        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = deregisterWorker(lbman);
         if (int_r.has_error())
         {
@@ -503,8 +561,6 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
-        // remember to set session 
-        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = sendState(lbman, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
         if (int_r.has_error())
         {
@@ -518,6 +574,24 @@ int main(int argc, char **argv)
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting overview: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("addsenders"))
+    {
+        auto int_r = addSenders(lbman, vm["address"].as<std::vector<std::string>>());
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error adding senders: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("removesenders"))
+    {
+        auto int_r = removeSenders(lbman, vm["address"].as<std::vector<std::string>>());
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error removing senders: " << int_r.error().message() << std::endl;
             return -1;
         }
     }
