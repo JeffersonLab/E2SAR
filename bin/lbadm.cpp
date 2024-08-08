@@ -391,7 +391,6 @@ int main(int argc, char **argv)
         option_dependency(vm, "register", "count");
         option_dependency(vm, "register", "minfactor");
         option_dependency(vm, "register", "maxfactor");
-        option_dependency(vm, "deregister", "session");
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
