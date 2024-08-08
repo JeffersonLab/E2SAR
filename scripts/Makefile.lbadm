@@ -1,0 +1,97 @@
+# This makefile captures the lbadm commands needed to reserve, free and query load blaancers from the control plane.
+# It is a work in progress, and will hopefully improve as we tidy up the workflow.
+#
+#  Known limitations :
+#    1. the script uses ifconfig which works on mac OS.  Linux will need a different solution.
+#    2. the script needs to be copied and customized to the users's local environment.
+#
+#  Yatish Kumar
+#  Aug 2024
+# ----------------------------------------------------------------------------------------------------------------------------
+
+
+# --------------------------CUSTOMIZE HERE -----------------------------------------------------------------------------------
+
+# --------select one of several ways to invoke lbadm  -------------------------------------------------
+
+E2SAR = /Users/yak/Projects/gnu-radio/E2SAR
+LBADM = $(E2SAR)/build/bin/lbadm
+
+# LBADM = docker run --rm  ibaldin/e2sar:latest lbadm
+# LBADM = lbadm
+
+#---------tricky way to find your own IP address to register with the LB Control Plane -----------------
+
+MY_IP    ?= $(shell ifconfig | grep 198.128 | awk '{print $$2}' )
+MY_NAME  ?= $(shell hostname)
+
+#---------make sure your ADMIN URI is either in an env variable or read it from a secrets file ---------
+# Just don't code it directly into a script or check it into git. 
+# EJFAT ADMIN URI contains the secret key, hostname and port of the LB we want to use.
+# This is provided by your EJFAT service provider
+
+EJFAT_ADMIN_URI ?= $(EJFAT_URI_BETA)
+#EJFAT_ADMIN_URI ?= $(EJFAT_URI_STABLE)
+
+#---------file names to store temporary keys -----------------------------------------------------------
+
+URI_DIR = ./EJFAT_URI
+
+INSTANCE_URI_FILENAME ?= $(URI_DIR)/instance_URI
+SESSION_URI_FILENAME  ?= $(URI_DIR)/session_URI
+
+EJFAT_INSTANCE_URI ?= $(shell source $(INSTANCE_URI_FILENAME) ; echo $$EJFAT_URI)
+EJFAT_SESSION_URI ?= $(shell source $(SESSION_URI_FILENAME) ; echo $$EJFAT_URI)
+
+# ------------------------DO NOT CUSTOMIZE BELOW THIS LINE.  UNLESS YOU REALLY NEED TO ---------------------------------------
+
+SHELL = bash
+
+overview : 
+	$(LBADM) -v -u "$(EJFAT_ADMIN_URI)"  --overview
+
+free :
+	$(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --free 
+
+reserve :
+	echo "My IP address is $(MY_IP)"
+	mkdir -p $(URI_DIR)
+	$(LBADM) -v -u "$(EJFAT_ADMIN_URI)"  --reserve  -d 06:05:00 --lbname yk_testing -a $(MY_IP) --export > $(INSTANCE_URI_FILENAME)
+
+register :
+	echo "My IP address is $(MY_IP)"
+	mkdir -p $(URI_DIR)
+	$(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --register --name "$(MY_NAME):9999" --address $(MY_IP)  --port 9999 --weight 0 --count 1 --minfactor 0 --maxfactor 0  --export > $(SESSION_URI_FILENAME).9999
+	$(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --register --name "$(MY_NAME):9998" --address $(MY_IP)  --port 9998 --weight 0 --count 1 --minfactor 0 --maxfactor 0  --export > $(SESSION_URI_FILENAME).9998
+
+deregister :
+	echo "My IP address is $(MY_IP)"
+	mkdir -p $(URI_DIR)
+	@( source $(SESSION_URI_FILENAME).9999 ; $(LBADM) -v  -u "$$EJFAT_URI" --deregister )
+	@( source $(SESSION_URI_FILENAME).9998 ; $(LBADM) -v  -u "$$EJFAT_URI" --deregister )
+
+
+EJFAT_SESSION_URI_9999 = $(shell source $(SESSION_URI_FILENAME).9999 ; echo $$EJFAT_URI)
+EJFAT_SESSION_URI_9998 = $(shell source $(SESSION_URI_FILENAME).9998 ; echo $$EJFAT_URI)
+
+state :
+	$(LBADM) -v -u "$(EJFAT_SESSION_URI_9999)" --state --queue 0 --ctrl 0 --ready 1
+	$(LBADM) -v -u "$(EJFAT_SESSION_URI_9998)" --state --queue 0 --ctrl 0 --ready 1
+
+heartbeat :
+	@(while true; \
+	   do \
+              echo -n  "Heartbeat: "; date ; \
+	      make state ; \
+              /bin/sleep 0.5; \
+           done \
+          )
+
+help :
+	$(LBADM) --help
+
+version :
+	$(LBADM) -v -u "$(EJFAT_ADMIN_URI)"  --version
+
+force_free :
+	$(LBADM) -v -u "$(EJFAT_ADMIN_URI)/$(FORCE_LBID)"  --free
