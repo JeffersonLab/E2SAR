@@ -539,8 +539,6 @@ int main(int argc, char **argv)
     }
     else if (vm.count("deregister"))
     {
-        // remember to set session 
-        uri.set_sessionId(vm["session"].as<std::string>());
         auto int_r = deregisterWorker(lbman);
         if (int_r.has_error())
         {
