@@ -49,7 +49,9 @@ class REPacket(Packet):
     fields_desc = [
         BitField('version', 1, 4),
         BitField('rsvd', 0, 4),
-        XByteField('rsvd2', 0),
+        #XByteField('rsvd2', 0),
+        BitField('rsvd2', 0, 7),
+        BitField('lastSegment', 0, 1),
         ShortField('dataId', 0),
         IntField('bufferOffset', 0),
         IntField('bufferLength', 0),
@@ -98,6 +100,8 @@ def genLBREPkt(ip_addr: str, udp_port: int, entropy: int, dataId: int, eventNumb
         segment_offset = segment_end
         segment_end += max_segment_len
         segment_end = segment_end if segment_end < len(payload) else len(payload)
+        if segment_offset >= len(payload):
+            custom_pkt[REPacket].lastSegment = 1
         custom_pkts.append(custom_pkt)
     return custom_pkts
 
@@ -119,6 +123,8 @@ def genREPkt(ip_addr: str, udp_port: int, dataId: int, eventNumber: int, payload
         segment_offset = segment_end
         segment_end += max_segment_len
         segment_end = segment_end if segment_end < len(payload) else len(payload)
+        if segment_offset >= len(payload):
+            custom_pkt[REPacket].lastSegment = 1
         custom_pkts.append(custom_pkt)
     return custom_pkts
 
