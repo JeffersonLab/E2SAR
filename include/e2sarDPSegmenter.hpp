@@ -18,7 +18,6 @@
 
 #include <atomic>
 
-#include "e2sarError.hpp"
 #include "e2sarUtil.hpp"
 #include "e2sarHeaders.hpp"
 #include "e2sarNetUtil.hpp"
@@ -55,7 +54,7 @@ namespace e2sar
             const u_int16_t entropy;
 
             // Max size of internal queue holding events to be sent. 
-            static const size_t QSIZE = 2047;
+            static const size_t QSIZE{2047};
 
             // how long data send thread spends sleeping
             static const boost::chrono::milliseconds sleepTime;
@@ -74,22 +73,22 @@ namespace e2sar
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
-            // to avoid locing the item pool send thread puts processed events 
+            // to avoid locking the item pool send thread puts processed events 
             // on this queue so they can be freed opportunistically by main thread
             boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
 
             // structure that maintains send stats
             struct SendStats {
                 // Last time a sync message sent to CP in nanosec since epoch.
-                u_int64_t lastSyncTimeNanos;
+                UnixTimeNano_t lastSyncTimeNanos;
                 // Number of events sent since last sync message sent to CP. 
-                u_int64_t eventsSinceLastSync; 
+                EventNum_t eventsSinceLastSync; 
             };
             // event metadata fifo to keep track of stats
             boost::circular_buffer<SendStats> eventStatsBuffer;
             // keep these atomic, as they are accessed by Sync, Send (and maybe main) thread
-            boost::atomic<u_int64_t> currentSyncStartNano{0};
-            boost::atomic<u_int64_t> eventsInCurrentSync{0};
+            boost::atomic<UnixTimeNano_t> currentSyncStartNano{0};
+            boost::atomic<EventNum_t> eventsInCurrentSync{0};
 
             // current event number
             boost::atomic<EventNum_t> eventNum{0};
@@ -214,8 +213,8 @@ namespace e2sar
              * dpV6 - prefer V6 dataplane {false}
              * zeroCopy - use zeroCopy optimization {false}
              * connectedSocket - use connected sockets {true}
-             * syncPeriodMs - sync thread period in milliseconds {300}
-             * syncPerods - number of sync periods to use for averaging reported send rate {3}
+             * syncPeriodMs - sync thread period in milliseconds {1000}
+             * syncPerods - number of sync periods to use for averaging reported send rate {2}
              * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
              * IP, UDP and LBRE headers)
              */
@@ -380,19 +379,15 @@ namespace e2sar
             // note that locking lives outside this function, as needed.
             inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos) 
             {
-                // each element of circular buffer states the start of the sync period
-                // and the number of events sent during that period
-                UnixTimeNano_t  firstSyncStart{std::numeric_limits<unsigned long long>::max()};
                 EventNum_t eventTotal{0LL};
                 // walk the circular buffer
                 for(auto el: eventStatsBuffer)
                 {
-                    // find earliest time
-                    firstSyncStart = (el.lastSyncTimeNanos < firstSyncStart ? el.lastSyncTimeNanos : firstSyncStart);
                     // add up the events
                     eventTotal += el.eventsSinceLastSync;
                 }
-                auto timeDiff = currentTimeNanos - firstSyncStart;
+                auto timeDiff = currentTimeNanos - 
+                    eventStatsBuffer.begin()->lastSyncTimeNanos;
 
                 // convert to Hz and return
                 //return (eventTotal*1000000000UL)/timeDiff;

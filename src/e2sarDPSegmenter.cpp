@@ -80,7 +80,7 @@ namespace e2sar
             auto nowT = boost::chrono::high_resolution_clock::now();
             // Convert the time point to nanoseconds since the epoch
             auto now = boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count();
-            uint64_t currentTimeNanos = static_cast<uint64_t>(now);
+            UnixTimeNano_t currentTimeNanos = static_cast<UnixTimeNano_t>(now);
             // get sync header buffer
             SyncHdr hdr{};
             e2sar::EventRate_t evtRate;
@@ -395,7 +395,8 @@ namespace e2sar
 
             // are we overwriting the event number?
             EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
-            hdr->re.set(seg.dataId, curOffset - event, curLen, finalEventNum);
+            // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
+            hdr->re.set(seg.dataId, curOffset - event, bytes, finalEventNum);
             hdr->lb.set(seg.entropy, finalEventNum);
 
             // fill in iov and attach to msghdr
