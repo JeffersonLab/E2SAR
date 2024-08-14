@@ -47,7 +47,7 @@ subdir('scripts')
 
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(libraries : libe2sar,
-                 version : '0.1',
+                 version : meson.project_version(),
                  name : 'libe2sar',
                  filebase : 'e2sar',
                  description : 'E2SAR: EJ-FAT Event Segmentation And Reassembly library')
