@@ -8,6 +8,7 @@ namespace e2sar
 {
     using EventNum_t = u_int64_t;
     using UnixTimeNano_t = u_int64_t;
+    using UnixTimeMicro_t = u_int64_t;
     using EventRate_t = u_int32_t;
 
     constexpr u_int8_t rehdrVersion = 1;
@@ -66,6 +67,22 @@ namespace e2sar
         inline u_int16_t get_dataId() const
         {
             return be16toh(dataId);
+        }
+
+        /**
+         * set last segment bit (use second octet of the preamble, first bit)
+         */
+        inline void set_lastSegment()
+        {
+            preamble[1] |= 0x01;
+        }
+
+        /**
+         * Check last segment bit (use second octet of the premable, first bit)
+         */
+        inline bool get_lastSegment() const
+        {
+            return preamble[1] & 0x01;
         }
 
         /**
