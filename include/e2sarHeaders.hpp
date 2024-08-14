@@ -23,7 +23,7 @@ namespace e2sar
         u_int8_t preamble[2] {rehdrVersionNibble, 0}; // 4 bit version + reserved
         u_int16_t dataId{0};   // source identifier
         u_int32_t bufferOffset{0};
-        u_int32_t bufferLength{0};
+        u_int32_t bufferLength{0}; // this is event length, not the length of the buffer being sent
         EventNum_t eventNum{0};
 
         /**
@@ -67,22 +67,6 @@ namespace e2sar
         inline u_int16_t get_dataId() const
         {
             return be16toh(dataId);
-        }
-
-        /**
-         * set last segment bit (use second octet of the preamble, first bit)
-         */
-        inline void set_lastSegment()
-        {
-            preamble[1] |= 0x01;
-        }
-
-        /**
-         * Check last segment bit (use second octet of the premable, first bit)
-         */
-        inline bool get_lastSegment() const
-        {
-            return preamble[1] & 0x01;
         }
 
         /**
