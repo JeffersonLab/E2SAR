@@ -1,9 +1,13 @@
 #include <iostream>
 #include <system_error>
 #include <ctime>
+#include <sys/select.h>
 #include <boost/asio.hpp>
 #include <boost/outcome.hpp>
 #include <boost/url.hpp>
+#include <boost/heap/priority_queue.hpp>
+#include <boost/pool/pool.hpp>
+#include <boost/pool/object_pool.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <google/protobuf/util/time_util.h>
@@ -15,6 +19,22 @@
 using namespace boost::asio;
 namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 using namespace std::string_literals;
+
+void funcRef(const std::vector<int> &v)
+{
+    std::cout << "Ref" << std::endl;
+    for(auto a: v)
+        std::cout << a << " ";
+    std::cout << std::endl;
+}
+
+void funcMv(std::vector<int> &&v)
+{
+    std::cout << "Move" << std::endl;
+    for(auto a: v)
+        std::cout << a << " ";
+    std::cout << std::endl;
+}
 
 int main()
 {
@@ -135,4 +155,107 @@ int main()
     std::cout << "LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdr) << std::endl;
     std::cout << "RE Hdr size (expecting 20) = " << sizeof(e2sar::REHdr) << std::endl;
     std::cout << "LB+RE Hdr size (expecting 36) = " << sizeof(e2sar::LBREHdr) << std::endl;
+
+
+    // test allocating N ports to M threads
+    std::vector<int> ports{1,2,3,4};
+    std::cout << "Assignable ports" << std::endl;
+    for(auto i: ports)
+        std::cout << i  << " ";
+    std::cout << std::endl;
+
+    int threads{3};
+
+    std::vector<std::list<int>> ptt(threads); 
+
+    for(int i=0;i<ports.size();)
+    {
+        for(int j=0;j<threads && i<ports.size();i++,j++)
+        {
+            ptt[j].push_back(ports[i]);
+        }
+    }
+
+    std::cout << "Assigned ports to threads: " << std::endl;
+    int t{0};
+    for(auto l: ptt)
+    {
+        std::cout << "Thread " << t++ << ": " << std::endl;
+        for(auto e: l)
+            std::cout << e << " ";
+        std::cout << std::endl;
+    }
+
+    std::list<std::unique_ptr<int>> recvThreadState(5);
+    std::cout << "Allocated size is (5) " << recvThreadState.size() << std::endl;
+
+    // testing passing vectors
+    std::cout << "Passing vectors " << std::endl;
+    std::vector<int> va{1,2,3};
+    std::vector<int> vb{2,3,4};
+
+    funcRef(va);
+    for(auto a: va)
+        std::cout << a << " ";
+    std::cout << std::endl;
+
+    funcMv(std::move(vb));
+    for(auto a: vb)
+        std::cout << a << " ";
+    std::cout << std::endl;
+
+    // testing fd_set copy constructor
+    fd_set fdSet{};
+
+    FD_SET(0, &fdSet);
+    FD_SET(2, &fdSet);
+
+    fd_set newSet{fdSet};
+
+    std::cout << "old set " << FD_ISSET(0, &fdSet) << " " << FD_ISSET(1, &fdSet) << " " << FD_ISSET(2, &fdSet) << std::endl;
+    std::cout << "new set " << FD_ISSET(0, &newSet) << " " << FD_ISSET(1, &newSet) << " " << FD_ISSET(2, &newSet) << std::endl;
+
+    // test priority queue for custom events
+
+    struct Event {
+        int len;
+        int offset;
+    };
+
+    struct EventComparator {
+        bool operator() (const Event &l, const Event &r) const {
+            return l.offset > r.offset;
+        }
+    };
+
+    Event e1{5, 0};
+    Event e2{3, 5};
+    Event e3{2, 8};
+
+    boost::heap::priority_queue<Event, boost::heap::compare<EventComparator>> pq;
+
+    pq.push(e2);
+    pq.push(e3);
+    pq.push(e1);
+
+    std::cout << "Priority queue" << std::endl;
+    for(; !pq.empty(); pq.pop())
+        std::cout << "Event len " << pq.top().len << " offset " << pq.top().offset << std::endl;
+
+    
+    // test boost pool array allocation
+    boost::pool<> bufpool(20);
+
+    auto ar1 = static_cast<char*>(bufpool.malloc());
+    auto ar2 = static_cast<char*>(bufpool.malloc());
+
+    std::strcpy(ar1, "Hello world!");
+    std::strcpy(ar2, "I have come to help!");
+
+    std::cout << "Ar1 " << ar1 << std::endl;
+    std::cout << "Ar2 " << ar2 << std::endl;
+
+    bufpool.free(ar1);
+    bufpool.free(ar2);
 }
+
