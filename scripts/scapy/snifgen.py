@@ -49,12 +49,10 @@ class REPacket(Packet):
     fields_desc = [
         BitField('version', 1, 4),
         BitField('rsvd', 0, 4),
-        #XByteField('rsvd2', 0),
-        BitField('rsvd2', 0, 7),
-        BitField('lastSegment', 0, 1),
+        XByteField('rsvd2', 0),
         ShortField('dataId', 0),
         IntField('bufferOffset', 0),
-        IntField('bufferLength', 0),
+        IntField('bufferLength', 0), # note this is Event Length
         LongField('eventNumber', 0),
         StrLenField('pld', '', length_from=lambda p: p.bufferLength)
     ] 
@@ -95,13 +93,11 @@ def genLBREPkt(ip_addr: str, udp_port: int, entropy: int, dataId: int, eventNumb
             LBPacket(entropy=entropy, eventNumber=eventNumber)/\
             REPacket(dataId=dataId, 
                     bufferOffset=segment_offset, 
-                    bufferLength=segment_end - segment_offset,
+                    bufferLength=len(payload),
                     eventNumber=eventNumber, pld=payload[segment_offset:segment_end])
         segment_offset = segment_end
         segment_end += max_segment_len
         segment_end = segment_end if segment_end < len(payload) else len(payload)
-        if segment_offset >= len(payload):
-            custom_pkt[REPacket].lastSegment = 1
         custom_pkts.append(custom_pkt)
     return custom_pkts
 
@@ -117,14 +113,13 @@ def genREPkt(ip_addr: str, udp_port: int, dataId: int, eventNumber: int, payload
     segment_end = len(payload) if len(payload) < max_segment_len else max_segment_len
     while segment_offset < len(payload):
         custom_pkt = IP(dst=ip_addr)/UDP(dport=udp_port)/\
-            REPacket(dataId=dataId, bufferOffset=segment_offset, bufferLength=segment_end - segment_offset, 
+            REPacket(dataId=dataId, bufferOffset=segment_offset, 
+                    bufferLength=len(payload), 
                     eventNumber=eventNumber, 
                     pld=payload[segment_offset:segment_end])
         segment_offset = segment_end
         segment_end += max_segment_len
         segment_end = segment_end if segment_end < len(payload) else len(payload)
-        if segment_offset >= len(payload):
-            custom_pkt[REPacket].lastSegment = 1
         custom_pkts.append(custom_pkt)
     return custom_pkts
 
