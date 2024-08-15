@@ -1,34 +1,37 @@
-/*
-  Python bindings for class e2sar.
-
-  Created by xmei@jlab.org on Mar/19/2024
+/**
+ * Python bindings for the E2SAR library.
+ * Created by xmei@jlab.org on Mar/19/2024
+ *
+ * Pybind11 guides:
+ * 1. Built-in type conversion:
+ *  https://pybind11.readthedocs.io/en/stable/advanced/cast/overview.html#list-of-all-builtin-conversions
+ * 2. Export C++ variables:
+ *  https://pybind11.readthedocs.io/en/stable/basics.html#exporting-variables
 */
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h> // For std::string conversion
 #include <pybind11/functional.h>
 
-#include "e2sarCP.hpp"
- 
+#include "e2sar.hpp"
+
 namespace py = pybind11;
 
 using namespace e2sar;
 
-// Convert outcome::result to a Python object
-template<typename T, typename E>
-py::object outcome_result_to_pyobject(outcome::result<T, E>& res) {
-    if (res) {
-        return py::cast(res.value().release());
-    } else {
-        // Handle the error case (for simplicity, converting to a string here)
-        return py::none();
-    }
-}
+/// TODO: better bindings for the result<> type. May try to connect with Python try... except... @xmei
+void initBindingResultType(pybind11::module_ &m);
+
+void init_e2sarCP(pybind11::module_ &m);    // in a submodule "ControlPlane"
+void init_e2sarUtil(pybind11::module_ &m);  // in the main module
 
 // "e2sar_py" will be the python import module name
 PYBIND11_MODULE(e2sar_py, m) {
 
-    m.doc() = "Python bindings for the e2sar namesapce.";
+    m.doc() = "Python bindings for the E2SAR library.";
+
+    // Bind the get_Version method
+    m.def("__version__", &get_Version);
 
     /**
      * Bind the E2SARErrorc enum class
@@ -66,7 +69,32 @@ PYBIND11_MODULE(e2sar_py, m) {
             return addr.to_string();
         });
 
-    /** 
+    /**
+     * Register grpc::SslCredentialsOptions.
+     * The dependency chain of e2sar::LBManager.
+     */
+    py::class_<grpc::SslCredentialsOptions>(m, "SslCredentialsOptions")
+        .def(py::init<>());
+
+    // For all the returning datatype of result<...>
+    initBindingResultType(m);
+
+    /**
+     * Bind the e2sar::EjfatURI class etc
+     */
+    init_e2sarUtil(m);
+
+    /**
+     * TODO: fix this statement.
+     * Bind the e2sar::LBManager class to the Python e2sar_py.lbManager.lb_manager class.
+     * e2sar_py.lbManager is a submodule.
+     */
+    init_e2sarCP(m);
+}
+
+void initBindingResultType(pybind11::module_ &m)
+{
+    /**
      * Bind the result type containing std::string
      */
     py::class_<outcome::result<std::string, E2SARErrorInfo>>(m, "E2SARResultString")
@@ -82,7 +110,7 @@ PYBIND11_MODULE(e2sar_py, m) {
             else
                 throw std::runtime_error("No error present");
         });
-  
+
     /**
      * Binding the result type containing std::pair<std::string, uint16_t>
      */
@@ -168,186 +196,4 @@ PYBIND11_MODULE(e2sar_py, m) {
             else
                 throw std::runtime_error("No error present");
         });
-
-    /**
-     * Bind the e2sar::EjfatURI class.
-     */
-
-    /// NOTE: Do not use py::class_<EjfatURI> EjfatURI(m, "EjfatURI").
-    ///       This will cause trouble for the classes depend on it!
-    py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
-
-    py::enum_<EjfatURI::TokenType>(ejfat_uri, "TokenType")
-        .value("admin", EjfatURI::TokenType::admin)
-        .value("instance", EjfatURI::TokenType::instance)
-        .value("session", EjfatURI::TokenType::session)
-        .export_values();
-
-    // Constructor
-    ejfat_uri.def(
-        py::init<const std::string &, EjfatURI::TokenType>(),
-        py::arg("uri"), py::arg("tt") = EjfatURI::TokenType::admin,
-        "Set instance token from string"
-        );
-  
-    ejfat_uri.def("get_use_tls", &EjfatURI::get_useTls);
-
-    // Private variables and their get/set methods are dealt with class_::def_property()
-    // Ref: https://pybind11.readthedocs.io/en/stable/classes.html#instance-and-static-fields
-    ejfat_uri.def_property("lb_name", &EjfatURI::get_lbName, &EjfatURI::set_lbName);
-    ejfat_uri.def_property("lb_id", &EjfatURI::get_lbId, &EjfatURI::set_lbId);
-    ejfat_uri.def_property("session_id", &EjfatURI::get_sessionId, &EjfatURI::set_sessionId);
-
-    ejfat_uri.def("set_instance_token", &EjfatURI::set_InstanceToken);
-    ejfat_uri.def("set_session_token", &EjfatURI::set_SessionToken);
-
-    ejfat_uri.def("set_sync_addr", &EjfatURI::set_syncAddr);
-    ejfat_uri.def("set_data_addr", &EjfatURI::set_dataAddr);
-
-    ejfat_uri.def("has_data_addr_v4", &EjfatURI::has_dataAddrv4);
-    ejfat_uri.def("has_data_addr_v6", &EjfatURI::has_dataAddrv6);
-
-    ejfat_uri.def("has_data_addr", &EjfatURI::has_dataAddr);
-    ejfat_uri.def("has_sync_addr", &EjfatURI::has_syncAddr);
-
-    // Return types of result<std::string>.
-    ejfat_uri.def("get_instance_token", &EjfatURI::get_InstanceToken);
-    ejfat_uri.def("get_session_token", &EjfatURI::get_SessionToken);
-    ejfat_uri.def("get_admin_token", &EjfatURI::get_AdminToken);
-
-    // Return types of result<std::pair<ip::address, u_int16_t>>.
-    ejfat_uri.def("get_cp_addr", &EjfatURI::get_cpAddr);
-    ejfat_uri.def("get_data_addr_v4", &EjfatURI::get_dataAddrv4);
-    ejfat_uri.def("get_data_addr_v6", &EjfatURI::get_dataAddrv6);
-    ejfat_uri.def("get_sync_addr", &EjfatURI::get_syncAddr);
-
-    // Return type of result<std::pair<std::string, u_int16_t>>.
-    ejfat_uri.def("get_cp_host", &EjfatURI::get_cpHost);
-
-    ///TODO: not tested with Python.
-    ejfat_uri.def(
-        "to_string", &EjfatURI::to_string,
-        py::arg("tt") = EjfatURI::TokenType::admin
-        );
-    // Return type of result<EjfatURI>.
-    ejfat_uri.def_static("get_from_env", &EjfatURI::getFromEnv);
-    ejfat_uri.def_static("get_from_string", &EjfatURI::getFromString);
-    ejfat_uri.def_static("get_from_file", &EjfatURI::getFromFile);
-
-    /**
-     * Register grpc::SslCredentialsOptions.
-     * The dependency chain of e2sar::LBManager.
-     */
-    py::class_<grpc::SslCredentialsOptions>(m, "SslCredentialsOptions")
-        .def(py::init<>());
-
-    /**
-     * Bind the LBManager
-     */
-    py::class_<LBManager> lb_manager(m, "LBManager");
-    
-    // Constructor
-    lb_manager.def(
-        py::init<const EjfatURI &, bool &, grpc::SslCredentialsOptions>(),
-        py::arg("cpuri"), py::arg("validate_server") = true, py::arg("opts") = grpc::SslCredentialsOptions()
-        );
-
-    lb_manager.def("get_version", &LBManager::version);
-
-    // Bind LBManager::reserveLB to use duration in seconds
-    // It is specifically designed to interface with Python datetime.timedelta
-    lb_manager.def(
-        "reserve_lb_seconds",
-        static_cast<result<u_int32_t> (LBManager::*)(
-            const std::string &,
-            const double &,
-            const std::vector<std::string> &
-            )>(&LBManager::reserveLB),
-        py::arg("lb_id"), py::arg("seconds"), py::arg("senders")
-    );
-
-    /// NOTE: Bindings for overloaded methods.
-    ///       Ref: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
-    lb_manager.def(
-        "get_lb",
-        static_cast<result<int> (LBManager::*)()>(&LBManager::getLB)
-    );
-
-    lb_manager.def(
-        "get_lb_by_id",
-        static_cast<result<int> (LBManager::*)(
-            const std::string &
-        )>(&LBManager::getLB),
-        py::arg("lb_id")
-    );
-
-    lb_manager.def(
-        "free_lb",
-        static_cast<result<int> (LBManager::*)()>(&LBManager::freeLB)
-    );
-
-    lb_manager.def(
-        "free_lb_by_id",
-        static_cast<result<int> (LBManager::*)(
-            const std::string &
-        )>(&LBManager::freeLB),
-        py::arg("lb_id")
-    );
-
-    lb_manager.def("register_worker", &LBManager::registerWorker);
-    lb_manager.def("deregister_worker", &LBManager::deregisterWorker);
-
-    lb_manager.def(
-        "send_state",
-        static_cast<result<int> (LBManager::*)(float, float, bool)>(&LBManager::sendState),
-        "Send worker state update using session ID and session token from register call.",
-        py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready")
-    );
-
-    /// TODO: type cast between C++ google::protobuf::Timestamp between Python datetime package
-    // lb_manager.def(
-    //     "send_state_with_timestamp",
-    //     static_cast<result<int> (LBManager::*)(float, float, bool, const Timestamp&)>(&LBManager::sendState),
-    //     "Send worker state update using session ID and session token from register call with explicit timestamp.",
-    //     py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready"), py::arg("timestamp")
-    // );
-
-    /**
-     * Return type containing std::unique_ptr<LoadBalancerStatusReply>
-     */
-
-    // Expose the LoadBalancerStatusReply class
-    py::class_<LoadBalancerStatusReply>(m, "LoadBalancerStatusReply")
-        .def(py::init<>());
-
-    lb_manager.def(
-        "get_lb_status",
-        [](LBManager& self){
-            auto result = self.getLBStatus();
-            return outcome_result_to_pyobject(result);
-        }
-    );
-
-    lb_manager.def(
-        "get_lb_status_by_id",
-        [](LBManager& self, const std::string & lbid){
-            auto result = self.getLBStatus(lbid);
-            return outcome_result_to_pyobject(result);
-        },
-        py::arg("lb_id")
-    );
-
-    lb_manager.def("make_ssl_options", &LBManager::makeSslOptions);
-
-    lb_manager.def("get_port_range", &get_PortRange);
-
-    // Return an EjfatURI object.
-    lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
-
-    /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
-
-    /// TODO: donot how to bind
-    /// - LBManager::get_WorkerStatusVector
-    /// - LBManager::get_SenderAddressVector
-    /// Datatype too complicated
 }
