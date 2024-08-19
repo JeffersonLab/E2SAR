@@ -140,6 +140,8 @@ namespace e2sar
                     eventQueueDepth++;
                 else 
                     recvStats.enqueueLoss++; // event lost, queue was full
+                // queue is lock free so we don't lock
+                recvThreadCond.notify_all();
             }
             // pop event off the event queue
             inline EventQueueItem* dequeue() noexcept
@@ -232,6 +234,12 @@ namespace e2sar
             const bool withLBHeader;
             const int eventTimeout_ms; // how long we allow events to linger 'in progress' before we give up
 
+            // lock with recv thread
+            boost::mutex recvThreadMtx;
+            // condition variable for recv thread queue
+            boost::condition_variable recvThreadCond;
+            boost::unique_lock<boost::mutex> condLock;
+
             /**
              * Use port range and starting port to assign UDP ports to threads evenly
              */
@@ -276,7 +284,7 @@ namespace e2sar
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
              * dpV6 - prefer IPv6 dataplane {false}
-             * cpV6 - use IPv6 address is cp node specified by name and has IPv4 and IPv6 resolution {false}
+             * cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
              * startSendStateThread - whether to run sendState thread reporting queue occupancy {true}
              * period_ms - period of the send state thread in milliseconds {100}
              * epoch_ms - period of one epoch in milliseconds {1000}
@@ -378,14 +386,32 @@ namespace e2sar
              */
             result<int> getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId);
 
-#if 0
             /**
              * Blocking variant of getEvent() with same parameter semantics
+             * @param event - event buffer
+             * @param bytes - size of the event in the buffer
+             * @param eventNum - the assembled event number
+             * @param dataId - dataId from the reassembly header identifying the DAQ
+             * @return - result structure, check has_error() method or value() which is 0
              */
             result<int> recvEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId);
-#endif
 
-            int getEventStats();
+            /**
+             * Get a tuple representing all the stats:
+             *  EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  EventNum_t eventSuccess; // events successfully processed
+             *  int lastErrno; 
+             *  int grpcErrCnt; 
+             *  int dataErrCnt; 
+             *  E2SARErrorc lastE2SARError; 
+             */
+            inline const boost::tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const
+            {
+                return boost::make_tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc>(
+                    recvStats.enqueueLoss, recvStats.eventSuccess,
+                    recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
+                    recvStats.lastE2SARError);
+            }
         protected:
         private:
             void stopThreads() 

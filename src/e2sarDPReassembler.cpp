@@ -46,6 +46,7 @@ namespace e2sar
         numRecvPorts{static_cast<size_t>(2^portRange)},
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
+        condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
         startSendStateThread{rflags.startSendStateThread}
     {
@@ -71,6 +72,7 @@ namespace e2sar
         numRecvPorts{static_cast<size_t>(2^portRange)},
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
+        condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
         startSendStateThread{rflags.startSendStateThread}
     {
@@ -437,6 +439,26 @@ namespace e2sar
 
     result<int> Reassembler::getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId) 
     {
+        auto eventItem = dequeue();
+
+        if (eventItem == nullptr)
+            return -1;
+
+        *event = eventItem->event;
+        *bytes = eventItem->bytes;
+        *eventNum = eventItem->eventNum;
+        *dataId = eventItem->dataId;
+
+        // just rely on its locking
+        delete eventItem;
+
+        return 0;
+    }
+
+    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId) 
+    {
+        recvThreadCond.wait(condLock);
+        
         auto eventItem = dequeue();
 
         if (eventItem == nullptr)
