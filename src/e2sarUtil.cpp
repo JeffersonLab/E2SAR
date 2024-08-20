@@ -21,25 +21,32 @@ namespace e2sar
 
     /**
      * <p>
-     * This is a method to parse an EJFAT URI. This URI contains information which both
-     * an event sender and event consumer can use to interact with the LB and CP.
+     * This is a class to maintain EJFAT URI. This URI contains information which both
+     * an event sender and event consumer can use to interact with the LB and CP as well
+     * as to send/receive packets in the dataplane. Different parts of the URI are used
+     * for different purposes in different contexts.
      * </p></p>
      * The URI is of the format:
-     * ejfat://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>:<data_port>][&sync=<sync_host>:<sync_port>]].
+     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/[lb/<lb_id>][?[data=<data_host>][&sync=<sync_host>:<sync_port>][&sessionid=<session id>]].
      * </p><p>
-     * The token is optional and is the instance token with which a consumer can
-     * register with the control plane. If the instance token is not available,
-     * the administration token can be used to register. A sender will not need
-     * either token. The cp_host and cp_port are the host and port used to talk
-     * to the control plane. They are exactly the host and port used to reserve an LB.
+     * The token could be administrative, instance or session, depending on the context
+     * of the call. Constructor allows you to specify which token is in the URI string.
      * </p><p>
-     * The data_host & data_port are the IP address and UDP port to send events/data to.
-     * They are optional and not used by the consumer. Likewise the sync_host & sync_port
-     * are the IP address and UDP port to which the sender send sync messages.
-     * They're also optional and not used by the consumer.
+     * Load balancer ID can be specified if known (after the LB is reserved).
+     * </p><p>
+     * The data_host is the IP address to send events/data to.
+     * Likewise the sync_host & sync_port are the IP address and UDP port to which the sender 
+     * sends sync messages.
+     * </p><p>
+     * Session id is used primarily for unregistering worker nodes and sending worker node
+     * queue state.
      * </p><p>
      * Addresses may be either ipV6 or ipV4, and a distinction is made between them.
-     * IPv6 address is surrounded with square brackets [] which are stripped off.
+     * IPv6 address is surrounded with square brackets [] which are stripped off, as needed.
+     * </p><p>
+     * More information on the interpretation of different URI fields can be found in
+     * https://github.com/JeffersonLab/E2SAR/wiki/Integration
+     * 
      * </p>
      *
      * @param uri URI to parse.
