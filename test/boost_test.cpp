@@ -149,17 +149,18 @@ int main()
     std::cout << "Sync header size (expecting 28) = " << sizeof(e2sar::SyncHdr) << std::endl;
 
     {
-        std::cout << "Empty scope executes once" << std::endl;
+        std::cout << "  Empty scope executes once" << std::endl;
     }
 
-    std::cout << "LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdr) << std::endl;
-    std::cout << "RE Hdr size (expecting 20) = " << sizeof(e2sar::REHdr) << std::endl;
-    std::cout << "LB+RE Hdr size (expecting 36) = " << sizeof(e2sar::LBREHdr) << std::endl;
+    std::cout << "  LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdr) << std::endl;
+    std::cout << "  RE Hdr size (expecting 20) = " << sizeof(e2sar::REHdr) << std::endl;
+    std::cout << "  LB+RE Hdr size (expecting 36) = " << sizeof(e2sar::LBREHdr) << std::endl;
 
 
     // test allocating N ports to M threads
     std::vector<int> ports{1,2,3,4};
-    std::cout << "Assignable ports" << std::endl;
+    std::cout << "Assignable ports: " << std::endl;
+    std::cout << "  ";
     for(auto i: ports)
         std::cout << i  << " ";
     std::cout << std::endl;
@@ -180,14 +181,30 @@ int main()
     int t{0};
     for(auto l: ptt)
     {
-        std::cout << "Thread " << t++ << ": " << std::endl;
+        std::cout << "  Thread " << t++ << ": " << std::endl;
         for(auto e: l)
             std::cout << e << " ";
         std::cout << std::endl;
     }
 
     std::list<std::unique_ptr<int>> recvThreadState(5);
-    std::cout << "Allocated size is (5) " << recvThreadState.size() << std::endl;
+    std::cout << "Testing list: allocated size is (5) " << recvThreadState.size() << std::endl;
+
+    // testing dealing with portRange
+    std::cout << "Testing portRange:" << std::endl;
+    int portRange{3};
+    size_t numPorts{static_cast<size_t>(2 << (portRange - 1))};
+    u_int16_t startPort{1850};
+    size_t numThreads{3};
+
+    std::cout << "  Allocating " << numPorts << " ports from portRange " << portRange << " to " << numThreads << " threads" << std::endl;
+    for(int i=0; i<numPorts;)
+    {
+        for(int j=0; i<numPorts && j<numThreads; i++, j++)
+        {
+            std::cout << "  Assigning port " << startPort + i << " to thread " << j << std::endl;
+        } 
+    }
 
     // testing passing vectors
     std::cout << "Passing vectors " << std::endl;
@@ -196,15 +213,16 @@ int main()
 
     funcRef(va);
     for(auto a: va)
-        std::cout << a << " ";
+        std::cout << "  " << a << " ";
     std::cout << std::endl;
 
     funcMv(std::move(vb));
     for(auto a: vb)
-        std::cout << a << " ";
+        std::cout << "  " << a << " ";
     std::cout << std::endl;
 
     // testing fd_set copy constructor
+    std::cout << "Testing fdset" << std::endl;
     fd_set fdSet{};
 
     FD_SET(0, &fdSet);
@@ -212,11 +230,11 @@ int main()
 
     fd_set newSet{fdSet};
 
-    std::cout << "old set " << FD_ISSET(0, &fdSet) << " " << FD_ISSET(1, &fdSet) << " " << FD_ISSET(2, &fdSet) << std::endl;
-    std::cout << "new set " << FD_ISSET(0, &newSet) << " " << FD_ISSET(1, &newSet) << " " << FD_ISSET(2, &newSet) << std::endl;
+    std::cout << "  old set " << FD_ISSET(0, &fdSet) << " " << FD_ISSET(1, &fdSet) << " " << FD_ISSET(2, &fdSet) << std::endl;
+    std::cout << "  new set " << FD_ISSET(0, &newSet) << " " << FD_ISSET(1, &newSet) << " " << FD_ISSET(2, &newSet) << std::endl;
 
     // test priority queue for custom events
-
+    std::cout << "Priority queue" << std::endl;
     struct Event {
         int len;
         int offset;
@@ -238,12 +256,12 @@ int main()
     pq.push(e3);
     pq.push(e1);
 
-    std::cout << "Priority queue" << std::endl;
     for(; !pq.empty(); pq.pop())
-        std::cout << "Event len " << pq.top().len << " offset " << pq.top().offset << std::endl;
+        std::cout << "  Event len " << pq.top().len << " offset " << pq.top().offset << std::endl;
 
     
     // test boost pool array allocation
+    std::cout << "Test pool allocation" << std::endl;
     boost::pool<> bufpool(20);
 
     auto ar1 = static_cast<char*>(bufpool.malloc());
@@ -252,10 +270,18 @@ int main()
     std::strcpy(ar1, "Hello world!");
     std::strcpy(ar2, "I have come to help!");
 
-    std::cout << "Ar1 " << ar1 << std::endl;
-    std::cout << "Ar2 " << ar2 << std::endl;
+    std::cout << "  Ar1 " << ar1 << std::endl;
+    std::cout << "  Ar2 " << ar2 << std::endl;
 
     bufpool.free(ar1);
     bufpool.free(ar2);
+
+    std::cout << "Test array of lists" << std::endl;
+
+    std::vector<std::list<int>> portsToThreads;
+
+    portsToThreads.emplace(portsToThreads.end());
+
+    portsToThreads[0].push_back(1);
 }
 
