@@ -274,4 +274,16 @@ BOOST_AUTO_TEST_CASE(URITest12)
     BOOST_CHECK(euri.get_sessionId() == "mysessionid"s);
 }
 
+
+BOOST_AUTO_TEST_CASE(PortRangeTest)
+{
+    int portRange{12};
+    size_t numPorts{static_cast<size_t>(2 << (portRange - 1))};
+
+    std::cout << "Port range is " << get_PortRange(numPorts) << std::endl;
+
+    BOOST_CHECK(get_PortRange(numPorts) == portRange);
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()
