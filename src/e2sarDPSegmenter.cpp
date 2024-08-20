@@ -20,7 +20,8 @@ namespace e2sar
         entropy{entropy},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket)
+        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
+        useCP{sflags.useCP}
     {
         ;
     }
@@ -35,7 +36,8 @@ namespace e2sar
         entropy{entropy},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket)
+        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
+        useCP{sflags.useCP}
     {
 
         // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
@@ -46,24 +48,27 @@ namespace e2sar
 
     result<int> Segmenter::openAndStart() noexcept
     {
-        // open and connect sync and send sockets
-        auto status = syncThreadState._open();
-        if (status.has_error()) 
+        if (useCP)
         {
-            return E2SARErrorInfo{E2SARErrorc::SocketError, 
-                "Unable to open sync socket: " + status.error().message()};
+            // open and connect sync socket
+            auto status = syncThreadState._open();
+            if (status.has_error()) 
+            {
+                return E2SARErrorInfo{E2SARErrorc::SocketError, 
+                    "Unable to open sync socket: " + status.error().message()};
+            }
+            // start the sync thread from method
+            boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
+            syncThreadState.threadObj = std::move(syncT);
         }
 
-        status = sendThreadState._open();
+        // open and connect send socket
+        auto status = sendThreadState._open();
         if (status.has_error())
         {
             return E2SARErrorInfo{E2SARErrorc::SocketError,
                 "Unable to open data socket: " + status.error().message()};
         }
-
-        // start the sync thread from method
-        boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
-        syncThreadState.threadObj = std::move(syncT);
 
         // start the data sending thread from method
         boost::thread sendT(&Segmenter::SendThreadState::_threadBody, &sendThreadState);

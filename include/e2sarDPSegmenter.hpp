@@ -203,7 +203,9 @@ namespace e2sar
             boost::mutex sendThreadMtx;
             // condition variable for send thread
             boost::condition_variable sendThreadCond;
-
+            // use control plane (can be disabled for debugging)
+            bool useCP;
+            
             /** Threads keep running while this is false */
             bool threadsStop{false};
         public:
@@ -213,6 +215,7 @@ namespace e2sar
              * dpV6 - prefer V6 dataplane {false}
              * zeroCopy - use zeroCopy optimization {false}
              * connectedSocket - use connected sockets {true}
+             * useCP - use control plane to send Sync packets {true}
              * syncPeriodMs - sync thread period in milliseconds {1000}
              * syncPerods - number of sync periods to use for averaging reported send rate {2}
              * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
@@ -223,12 +226,13 @@ namespace e2sar
                 bool dpV6;
                 bool zeroCopy;
                 bool connectedSocket;
+                bool useCP;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500} {}
+                    useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500} {}
             };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
