@@ -32,8 +32,6 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     BOOST_CHECK(!uri_r.has_error());
 
     auto uri = uri_r.value();
-    u_int16_t dataId = 0x0505;
-    u_int32_t eventSrcId = 0x11223344;
 
     Reassembler::ReassemblerFlags rflags;
     rflags.validateCert = false;

@@ -174,6 +174,8 @@ namespace e2sar
 
             // global thread stop signal
             bool threadsStop{false};
+            // have we registered a worker
+            bool registeredWorker{false};
             /**
              * This thread receives data, reassembles into events and puts them onto the 
              * event queue for getEvent()
@@ -226,8 +228,9 @@ namespace e2sar
 
             // receive related parameters
             const std::vector<int> cpuCoreList;
-            const int dataPort;
-            const int portRange;
+            const ip::address dataIP; // converted to address from string
+            const int dataPort; // starting receive port
+            const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
             const size_t numRecvPorts;
             std::vector<std::list<int>> portsToThreads;
@@ -279,24 +282,25 @@ namespace e2sar
             };
             friend struct sendStateThreadState;
             SendStateThreadState sendStateThreadState;
-            bool startSendStateThread; // for debugging we may not want to have it running
+            bool useCP; // for debugging we may not want to have CP running
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
              * dpV6 - prefer IPv6 dataplane {false}
              * cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
-             * startSendStateThread - whether to run sendState thread reporting queue occupancy {true}
+             * useCP - whether to use the control plane (sendState, registerWorker) {true}
              * period_ms - period of the send state thread in milliseconds {100}
              * epoch_ms - period of one epoch in milliseconds {1000}
              * Ki, Kp, Kd - PID gains (integral, proportional and derivative) {0., 0., 0.}
              * setPoint - setPoint queue occupied percentage to which to drive the PID controller {0.0}
              * validateCert - validate control plane TLS certificate {true}
-             * dataPort -  starting data port number
+             * dataIPString - IP address we will listen on {127.0.0.1}
+             * dataPort -  starting data port number {19522}
              * portRange - 2^portRange (0<=portRange<=14) listening ports will be open starting from dataPort. If -1, 
              * then the number of ports matches either the number of CPU cores or the number of threads. Normally
              * this value is calculated based on the number of cores or threads requested, but
-             * it can be overridden here. Use with caution.
-             * withLBHeader - expect LB header to be included (mainly for testing, as LB strips it off in
+             * it can be overridden here. Use with caution. {-1}
+             * withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
              * normal operation) {false}
              * eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              */
@@ -304,18 +308,19 @@ namespace e2sar
             {
                 bool dpV6;
                 bool cpV6;
-                bool startSendStateThread;
+                bool useCP;
                 u_int16_t period_ms;
                 bool validateCert;
                 float Ki, Kp, Kd, setPoint;
                 u_int32_t epoch_ms;
+                std::string dataIPString;
                 int dataPort;
                 int portRange; 
                 bool withLBHeader;
                 int eventTimeout_ms;
-                ReassemblerFlags(): dpV6{false}, cpV6{false}, startSendStateThread{true}, 
+                ReassemblerFlags(): dpV6{false}, cpV6{false}, useCP{true}, 
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
-                    epoch_ms{1000}, dataPort{DATAPLANE_PORT}, 
+                    epoch_ms{1000}, dataIPString{"127.0.0.1"}, dataPort{DATAPLANE_PORT}, 
                     portRange{-1}, withLBHeader{false}, eventTimeout_ms{500} {}
             };
             /**
@@ -324,7 +329,7 @@ namespace e2sar
              * NIC on the target system. The number of started receive threads will match
              * the number of cores on the list. For the started receive threads affinity will be 
              * set to these cores. 
-             * @param uri - EjfatURI with session token and session id and dataplane addresses
+             * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
              * @param cpuCoreList - list of core identifiers to be used for receive threads
              * @param rflags - optional ReassemblerFlags structure with additional flags
              */
@@ -333,7 +338,7 @@ namespace e2sar
             /**
              * Create a reassembler object to run on a specified number of receive threads
              * without taking into account thread-to-CPU and CPU-to-NUMA affinity.
-             * @param uri - EjfatURI with session token and session id and dataplane addresses
+             * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
              * @param numRecvThreads - number of threads 
              * @param rflags - optional ReassemblerFlags structure with additional flags
              */
@@ -343,30 +348,38 @@ namespace e2sar
             Reassembler & operator=(const Reassembler &o) = delete;
             ~Reassembler()
             {
+                if (useCP && registeredWorker)
+                    auto res = lbman.deregisterWorker();
+
                 stopThreads();
 
                 // wait to exit
-                //recvThreadState.threadObj.join();
-                sendStateThreadState.threadObj.join();
+                if (useCP)
+                    sendStateThreadState.threadObj.join();
+
+                for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
+                    i->threadObj.join();
 
                 // pool memory is implicitly freed when pool goes out of scope
             }
             
             /**
-             * Register a worker with the control plane (same as LBManager.registerWorker)
-             * @param node_name - name of the node (can be FQDN)
-             * @param node_ip_port - a pair of ip::address and u_int16_t starting UDP port on which it listens
+             * Register a worker with the control plane 
+             * @param node_name - name of this node (any unique string)
              * @param weight - weight given to this node in terms of processing power
-             * @param source_count - how many sources we can listen to (gets converted to port range [0,14])
              * @param min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
              * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
              * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
              * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
              * @return - 0 on success or an error condition
              */
-            result<int> registerWorker(const std::string &node_name, 
-                std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, 
-                float min_factor, float max_factor) noexcept;
+            result<int> registerWorker(const std::string &node_name, float weight, float min_factor, float max_factor) noexcept;
+
+            /**
+             * Deregister this worker
+             * @return - 0 on success or an error condition 
+             */ 
+            result<int> deregisterWorker() noexcept;
 
             /**
              * Open sockets and start the threads - this marks the moment
@@ -384,7 +397,7 @@ namespace e2sar
              * @return - result structure, check has_error() method or value() which is 0
              * on success and -1 if the queue was empty.
              */
-            result<int> getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId);
+            result<int> getEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId);
 
             /**
              * Blocking variant of getEvent() with same parameter semantics
@@ -394,7 +407,7 @@ namespace e2sar
              * @param dataId - dataId from the reassembly header identifying the DAQ
              * @return - result structure, check has_error() method or value() which is 0
              */
-            result<int> recvEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId);
+            result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId);
 
             /**
              * Get a tuple representing all the stats:

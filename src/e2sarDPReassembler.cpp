@@ -40,15 +40,17 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{cpuCoreList}, 
+        dataIP{ip::make_address(rflags.dataIPString)},
         dataPort{rflags.dataPort},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
-        numRecvPorts{static_cast<size_t>(2^portRange)},
+        numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
+        portsToThreads(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
-        startSendStateThread{rflags.startSendStateThread}
+        useCP{rflags.useCP}
     {
         // note if the user chooses to override portRange in rflags, 
         // we can end up in a silly situation where the number of receive ports is smaller
@@ -66,15 +68,17 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{std::vector<int>()}, // no core list given
+        dataIP{ip::make_address(rflags.dataIPString)},
         dataPort{rflags.dataPort},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
-        numRecvPorts{static_cast<size_t>(2^portRange)},
+        numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
+        portsToThreads(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
-        startSendStateThread{rflags.startSendStateThread}
+        useCP{rflags.useCP}
     {
         // note if the user chooses to override portRange in rflags, 
         // we can end up in a silly situation where the number of receive ports is smaller
@@ -89,6 +93,7 @@ namespace e2sar
         {
             std::vector<int> portVec = std::vector<int>(portsToThreads[i].begin(), 
                 portsToThreads[i].end());
+
             // this constructor uses move semantics for port vector (not for cpu list tho)
             auto it = recvThreadState.emplace(recvThreadState.end(), *this, dpV6,
                 std::move(portVec), cpuCoreList);
@@ -107,7 +112,7 @@ namespace e2sar
         }
 
         // open is not needed for this thread because gRPC
-        if (startSendStateThread)
+        if (useCP)
         {
             // start sendstate thread
             boost::thread sendstateT(&Reassembler::SendStateThreadState::_threadBody, 
@@ -152,7 +157,7 @@ namespace e2sar
                 ssize_t nbytes = recvfrom(fd, recvBuffer, RECV_BUFFER_SIZE, 0,
                     (struct sockaddr*)&client_addr, &client_addr_len);
 
-                if (nbytes < 1) {
+                if (nbytes == -1) {
                     reas.recvStats.dataErrCnt++;
                     reas.recvStats.lastErrno = errno;
                     continue;
@@ -307,7 +312,7 @@ namespace e2sar
         for(auto port: udpPorts)
         {
             int socketFd;
-            // Socket for sending data messages to LB, one for each port
+            // Socket for receiving data messages from LB, one for each port
             if (dataAddr.value().first.is_v6()) {
                 if ((socketFd = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
                     reas.recvStats.dataErrCnt++;
@@ -429,12 +434,28 @@ namespace e2sar
         }
     }
 
-    result<int> Reassembler::registerWorker(const std::string &node_name, 
-        std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, 
+    result<int> Reassembler::registerWorker(const std::string &node_name, float weight, 
         float min_factor, float max_factor) noexcept 
     {
-        return lbman.registerWorker(node_name, node_ip_port, weight, source_count, 
-            min_factor, max_factor);
+        if (useCP)
+        {
+            registeredWorker = true;
+            return lbman.registerWorker(node_name, std::make_pair(dataIP, dataPort), weight, numRecvPorts, 
+                min_factor, max_factor);
+        }
+        return 0;
+    }
+
+    result<int> Reassembler::deregisterWorker() noexcept
+    {
+        if (registeredWorker)
+        {
+            registeredWorker = false;
+            return lbman.deregisterWorker();
+        } else
+            if (useCP)
+                return E2SARErrorInfo{E2SARErrorc::LogicError, "Attempting to unregister a worker when it hasn't been registered."};
+        return 0;
     }
 
     result<int> Reassembler::getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId) 
@@ -455,10 +476,10 @@ namespace e2sar
         return 0;
     }
 
-    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId) 
+    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) 
     {
         recvThreadCond.wait(condLock);
-        
+
         auto eventItem = dequeue();
 
         if (eventItem == nullptr)
