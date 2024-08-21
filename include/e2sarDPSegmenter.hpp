@@ -52,6 +52,9 @@ namespace e2sar
             // carried in Sync header
             const u_int32_t eventSrcId;
 
+            // number of send sockets we will be using (to help randomize LAG ports on FPGAs)
+            const size_t numSendSockets;
+
             // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE{2047};
 
@@ -156,12 +159,6 @@ namespace e2sar
                 boost::thread threadObj;
                 // connect socket flag (usually true)
                 const bool connectSocket{true};
-                // tuple containing v4 and v6 send address structures
-                // use boost::get<0> to get to v4 and boost::get<1> to
-                // get to v6 address struct
-#define GET_V4_SEND_STRUCT(sas) boost::get<0>(sas)
-#define GET_V6_SEND_STRUCT(sas) boost::get<1>(sas)
-                boost::tuple<sockaddr_in, sockaddr_in6> dataAddrStruct;
 
                 // flags
                 const bool useV6;
@@ -172,9 +169,16 @@ namespace e2sar
                 const std::string iface; // outgoing interface
                 const size_t maxPldLen;
 
-                // UDP sockets
-                int socketFd4{0};
-                int socketFd6{0};
+                // UDP sockets and matching sockaddr structures (local and remote)
+                // <socket fd, local address, remote address>
+#define GET_FD(sas, i) boost::get<0>(sas[i])
+#define GET_LOCAL_SEND_STRUCT(sas,i) boost::get<1>(sas[i])
+#define GET_REMOTE_SEND_STRUCT(sas, i) boost::get<2>(sas[i])
+                std::vector<boost::tuple<int, sockaddr_in, sockaddr_in>> socketFd4;
+                std::vector<boost::tuple<int, sockaddr_in6, sockaddr_in6>> socketFd6;
+                // we RR through these FDs
+                size_t roundRobinIndex{0};
+
                 // pool of LB+RE headers for sending
                 boost::object_pool<LBREHdr> lbreHdrPool{32,0};
 
@@ -183,15 +187,19 @@ namespace e2sar
                 // event guaranteeing the same destination UDP port for all of them
                 boost::random::ranlux24_base ranlux;
                 boost::random::uniform_int_distribution<> randDist{0, std::numeric_limits<u_int16_t>::max()};
+                // to get random port numbers we skip low numbered privileged ports
+                boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
-                    maxPldLen{mtu - TOTAL_HDR_LEN}, ranlux{static_cast<u_int32_t>(std::time(0))} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
+                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} {}
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
                     mtu{NetUtil::getMTU(iface)}, iface{iface},
-                    maxPldLen{mtu - TOTAL_HDR_LEN}, ranlux{static_cast<u_int32_t>(std::time(0))} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
+                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} {}
 
                 // open v4/v6 sockets
                 result<int> _open();
@@ -226,6 +234,8 @@ namespace e2sar
              * syncPerods - number of sync periods to use for averaging reported send rate {2}
              * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
              * IP, UDP and LBRE headers)
+             * numSendSockets - number of sockets/source ports we will be sending data from. The
+             * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              */
             struct SegmenterFlags 
             {
@@ -236,9 +246,11 @@ namespace e2sar
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
+                size_t numSendSockets;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500} {}
+                    useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    numSendSockets{4} {}
             };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
