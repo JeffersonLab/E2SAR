@@ -300,6 +300,9 @@ namespace e2sar
 
                 if (dataPort < 1024)
                     throw E2SARException("Base receive port in the privileged range (<1024)");
+
+                if (portRange > 14)
+                    throw E2SARException("Port range out of bounds: [0, 14]");
             }
         public:
             /**

@@ -353,16 +353,17 @@ namespace e2sar
                 localAddrStruct4.sin_family = AF_INET;
                 localAddrStruct4.sin_addr.s_addr = htobe16(INADDR_ANY); // Bind to any local address
 
+                u_int16_t randomPort{0};
                 while(!done && (numTries > 0)) 
                 {
                     // get random source port
-                    u_int16_t randomPort = portDist(ranlux);
+                    randomPort = portDist(ranlux);
 
                     // open and bind a socket to this port (try)
                     if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
                         seg.sendStats.errCnt++;
                         seg.sendStats.lastErrno = errno;
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to open socket: "s + strerror(errno)};
                     }
 
                     localAddrStruct4.sin_port = htobe16(randomPort); // Set the source port
@@ -380,7 +381,7 @@ namespace e2sar
                     // failed to bind socket after N tries
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to bind: "s + strerror(errno)};
                 }
 
                 // set SO_ZEROCOPY if needed
@@ -412,7 +413,7 @@ namespace e2sar
                         seg.sendStats.errCnt++;
                         seg.sendStats.lastErrno = errno;
                         close(fd);
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to connect: "s + strerror(errno)};
                     }
                 }
                 *i = boost::make_tuple<int, sockaddr_in, sockaddr_in>(fd, localAddrStruct4, dataAddrStruct4);

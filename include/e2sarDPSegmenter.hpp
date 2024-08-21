@@ -12,6 +12,7 @@
 #include <boost/asio/ip/udp.hpp>
 #include <boost/variant.hpp>
 #include <boost/random.hpp>
+#include <boost/chrono.hpp>
 
 #ifdef NETLINK_AVAILABLE
 #include <linux/rtnetlink.h>
@@ -193,13 +194,23 @@ namespace e2sar
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
                     maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
-                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} {}
+                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
+                {
+                    // this way every segmenter send thread has a unique PRNG sequence
+                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
+                }
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
                     mtu{NetUtil::getMTU(iface)}, iface{iface},
                     maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
-                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} {}
+                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
+                {
+                    // this way every segmenter send thread has a unique PRNG sequence
+                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
+                }
 
                 // open v4/v6 sockets
                 result<int> _open();
@@ -248,7 +259,7 @@ namespace e2sar
              * syncPeriodMs - sync thread period in milliseconds {1000}
              * syncPerods - number of sync periods to use for averaging reported send rate {2}
              * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
-             * IP, UDP and LBRE headers)
+             * IP, UDP and LBRE headers) {1500}
              * numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              */
