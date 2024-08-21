@@ -220,6 +220,21 @@ namespace e2sar
             // use control plane (can be disabled for debugging)
             bool useCP;
 
+            /**
+             * Check the sanity of constructor parameters
+             */
+            inline void sanityChecks()
+            {
+                if (numSendSockets > 128)
+                    throw E2SARException("Too many sending sockets threads requested, limit 128");
+
+                if (syncThreadState.period_ms > 10000)
+                    throw E2SARException("Sync period too long, limit 10s");
+
+                if (sendThreadState.mtu > 9000)
+                    throw E2SARException("MTU set too long, limit 9000");
+            }
+
             /** Threads keep running while this is false */
             bool threadsStop{false};
         public:

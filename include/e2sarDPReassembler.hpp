@@ -172,8 +172,6 @@ namespace e2sar
             };
             boost::circular_buffer<PIDSample> pidSampleBuffer;
 
-            // global thread stop signal
-            bool threadsStop{false};
             // have we registered a worker
             bool registeredWorker{false};
             /**
@@ -283,6 +281,26 @@ namespace e2sar
             friend struct sendStateThreadState;
             SendStateThreadState sendStateThreadState;
             bool useCP; // for debugging we may not want to have CP running
+            // global thread stop signal
+            bool threadsStop{false};
+
+            /**
+             * Check the sanity of constructor parameters
+             */
+            inline void sanityChecks()
+            {
+                if (numRecvThreads > 128)
+                    throw E2SARException("Too many reassembly threads requested, limit 128");
+
+                if (numRecvPorts > (2 << 13))
+                    throw E2SARException("Too many receive ports reqiuested, limit 2^14");
+
+                if (eventTimeout_ms > 5000)
+                    throw E2SARException("Event timeout exception unreasonably long, limit 5s");
+
+                if (dataPort < 1024)
+                    throw E2SARException("Base receive port in the privileged range (<1024)");
+            }
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults

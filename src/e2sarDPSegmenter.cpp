@@ -23,7 +23,7 @@ namespace e2sar
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
         useCP{sflags.useCP}
     {
-        ;
+        sanityChecks();
     }
 
 #if 0
@@ -42,7 +42,7 @@ namespace e2sar
 
         // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
         // set maxPldLen
-        ;
+        sanityChecks();
     }
 #endif
 
