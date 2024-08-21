@@ -25,20 +25,22 @@ BOOST_AUTO_TEST_SUITE(DPSegTests)
 BOOST_AUTO_TEST_CASE(DPSegTest1)
 {
     std::cout << "DPSegTest1: test segmenter (and sync thread) by sending 5 events via event queue with default MTU" << std::endl;
-    // parse URI from env variable
-    // it needs to have the sync address/port
-    auto uri_r = EjfatURI::getFromEnv();
 
-    if (uri_r.has_error())
-        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
-    BOOST_CHECK(!uri_r.has_error());
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    EjfatURI uri(segUriString);
 
-    auto uri = uri_r.value();
     u_int16_t dataId = 0x0505;
     u_int32_t eventSrcId = 0x11223344;
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+
+    std::cout << "Running data test for 10 seconds against sync " << 
+        uri.get_syncAddr().value().first << ":" << 
+        uri.get_syncAddr().value().second << " and data " <<
+        uri.get_dataAddrv4().value().first << ":" <<
+        uri.get_dataAddrv4().value().second << 
+        std::endl;
 
     // create a segmenter and start the threads
     Segmenter seg(uri, dataId, eventSrcId, sflags);
@@ -48,13 +50,6 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     if (res.has_error())
         std::cout << "Error encountered opening sockets and starting threads: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
-
-    std::cout << "Running data test for 10 seconds against sync " << 
-        uri.get_syncAddr().value().first << ":" << 
-        uri.get_syncAddr().value().second << " and data " <<
-        uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
-        std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
     std::cout << "The event data is string '" << eventString << "' of length " << eventString.length() << std::endl;
@@ -104,15 +99,9 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
 {
     std::cout << "DPSegTest2: test segmenter (and sync thread) by sending 5 events via event queue with small MTU so 10 frames are sent" << std::endl;
 
-    // parse URI from env variable
-    // it needs to have the sync address/port
-    auto uri_r = EjfatURI::getFromEnv();
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    EjfatURI uri(segUriString);
 
-    if (uri_r.has_error())
-        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
-    BOOST_CHECK(!uri_r.has_error());
-
-    auto uri = uri_r.value();
     u_int16_t dataId = 0x0505;
     u_int32_t eventSrcId = 0x11223344;
     Segmenter::SegmenterFlags sflags;
@@ -186,15 +175,9 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
 {
     std::cout << "DPSegTest3: test segmenter (and sync thread) by sending 5 events via sendEvent() with small MTU so 10 frames are sent" << std::endl;
 
-    // parse URI from env variable
-    // it needs to have the sync address/port
-    auto uri_r = EjfatURI::getFromEnv();
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    EjfatURI uri(segUriString);
 
-    if (uri_r.has_error())
-        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
-    BOOST_CHECK(!uri_r.has_error());
-
-    auto uri = uri_r.value();
     u_int16_t dataId = 0x0505;
     u_int32_t eventSrcId = 0x11223344;
     Segmenter::SegmenterFlags sflags;
@@ -275,15 +258,9 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
 {
     std::cout << "DPSegTest4: test segmenter (and sync thread) by sending 5 events via event queue with callbacks and default MTU so 5 frames are sent" << std::endl;
 
-    // parse URI from env variable
-    // it needs to have the sync address/port
-    auto uri_r = EjfatURI::getFromEnv();
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    EjfatURI uri(segUriString);
 
-    if (uri_r.has_error())
-        std::cout << "URI Error: " << uri_r.error().message() << std::endl;
-    BOOST_CHECK(!uri_r.has_error());
-
-    auto uri = uri_r.value();
     u_int16_t dataId = 0x0505;
     u_int32_t eventSrcId = 0x11223344;
     Segmenter::SegmenterFlags sflags;
@@ -354,6 +331,5 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
 
     // stop threads and exit
 }
-
 
 BOOST_AUTO_TEST_SUITE_END()

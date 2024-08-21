@@ -26,15 +26,9 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
 {
     std::cout << "DPSyncTest1: test sync thread sending 10 sync frames (once a second for 10 seconds)" << std::endl;
 
-    // parse URI from env variable
-    // it needs to have the sync address/port
-    auto uri_r = EjfatURI::getFromEnv();
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=10.251.100.122:12345&data=10.250.100.123"};
+    EjfatURI uri(segUriString);
 
-    if (uri_r.has_error())
-        std::cout << "ERROR: " << uri_r.error().message() << std::endl;
-    BOOST_CHECK(!uri_r.has_error());
-
-    auto uri = uri_r.value();
     u_int16_t dataId = 0x0505;
     u_int32_t eventSrcId = 0x11223344;
     Segmenter::SegmenterFlags sflags;
