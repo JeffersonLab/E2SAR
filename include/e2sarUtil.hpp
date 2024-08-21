@@ -452,5 +452,21 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to convert "s + host_name + " to ip address"s};
         }
     }
+
+    // to support unordered maps of pairs
+    struct pair_hash {
+        std::size_t operator()(const std::pair<u_int64_t, u_int16_t>& p) const {
+            u_int64_t hash1 = p.first;
+            u_int64_t tmp = p.second;
+            u_int64_t hash2 = tmp | tmp << 16 | tmp << 32 | tmp << 48;
+            return hash1 ^ hash2;  // Combine the two hashes
+        }
+    };
+
+    struct pair_equal {
+        bool operator()(const std::pair<u_int64_t, u_int16_t>& lhs, const std::pair<u_int64_t, u_int16_t>& rhs) const {
+            return lhs.first == rhs.first && lhs.second == rhs.second;
+        }
+    };
 };
 #endif

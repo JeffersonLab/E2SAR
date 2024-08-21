@@ -198,9 +198,13 @@ namespace e2sar
                 // object pool from which receive frames come from
                 // template parameter is allocator
                 boost::pool<> recvBufferPool{RECV_BUFFER_SIZE};
-                // map from event number to event queue item
-                // for those items that are in assembly
-                boost::unordered_map<EventNum_t, EventQueueItem*> eventsInProgress;
+                // map from <event number, data id> to event queue item
+                // for those items that are in assembly. Note that event
+                // is uniquely identified by <event number, data id> and
+                // so long as the entropy doesn't change while the event
+                // segments are transmitted, they are guarangeed to go
+                // to the same port
+                boost::unordered_map<std::pair<EventNum_t, u_int16_t>, EventQueueItem*, pair_hash, pair_equal> eventsInProgress;
 
                 // CPU core ids
                 std::vector<int> cpuCoreList;

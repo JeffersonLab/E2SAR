@@ -186,14 +186,14 @@ namespace e2sar
                     // new event - start a new event item and new event buffer 
                     // since this is done by many threads, can't use object_pool easily
                     item = new EventQueueItem(rehdr);
-                    // add to in progress map
-                    eventsInProgress[rehdr->get_eventNum()] = item;
+                    // add to in progress map based on <event number, data id> tuple
+                    eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                 } else 
                 {
-                    // try to locate in the in progress map
-                    auto it = eventsInProgress.find(rehdr->get_eventNum());
+                    // try to locate the event in the in progress map
+                    auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
                     if (it != eventsInProgress.end()) 
-                        item = eventsInProgress[rehdr->get_eventNum()];
+                        item = it->second;
                     else
                     {
                         // out of order delivery and we haven't seen this event
@@ -201,7 +201,7 @@ namespace e2sar
                         // on out-of-order queue
                         item = new EventQueueItem(rehdr);
                         // add to in progress map
-                        eventsInProgress[rehdr->get_eventNum()] = item;
+                        eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                         // add segment into event out-of-order queue
                         item->oodQueue.push(Segment(recvBuffer, nbytes));
                         // done for now
@@ -209,8 +209,8 @@ namespace e2sar
                     }
                 }
 
-                // copy it into event buffer 
-                // if it is in sequence OR attach to out of order priority queue.
+                // copy segment into event buffer if it is in sequence OR 
+                // attach to out of order priority queue.
                 // note that with or without LB header, our REhdr should be set now
                 if (item->curEnd == rehdr->get_bufferOffset())
                 {
@@ -266,7 +266,7 @@ namespace e2sar
                     }
 
                     // remove this item from in progress map
-                    eventsInProgress.erase(item->eventNum);
+                    eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
 
                     // queue it up for the user to receive
                     reas.enqueue(item);

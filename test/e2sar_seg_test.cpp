@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), 
-            eventString.length(), 0, &fakeCB, &parameter);
+            eventString.length(), 0, 0, 0, &fakeCB, &parameter);
         parameter++;
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();

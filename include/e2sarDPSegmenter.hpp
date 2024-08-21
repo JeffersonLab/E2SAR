@@ -46,7 +46,8 @@ namespace e2sar
         private:
             EjfatURI dpuri;
             // unique identifier of the originating segmentation
-            // point (e.g. a DAQ), carried in RE header
+            // point (e.g. a DAQ), carried in RE header (could be persistent
+            // as set here, or specified per event buffer)
             const u_int16_t dataId;
             // unique identifier of an individual LB packet transmitting
             // host/daq, 32-bit to accommodate IP addresses more easily
@@ -66,6 +67,7 @@ namespace e2sar
             struct EventQueueItem {
                 uint32_t bytes;
                 EventNum_t eventNum;
+                u_int16_t dataId;
                 u_int8_t *event;
                 u_int16_t entropy;  // optional per event entropy
                 void (*callback)(boost::any);
@@ -217,7 +219,7 @@ namespace e2sar
                 // close sockets
                 result<int> _close();
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t entropy);
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, u_int16_t entropy);
                 // thread loop
                 void _threadBody();
             };
@@ -336,46 +338,28 @@ namespace e2sar
             result<int> openAndStart() noexcept;
 
             /**
-             * Send immediately using internal event number.
-             * @param event - event buffer
-             * @param bytes - bytes length of the buffer
-             * @param entropy - optional event entropy value (random will be generated otherwise)
-             */
-            result<int> sendEvent(u_int8_t *event, size_t bytes, u_int16_t entropy=0) noexcept;
-
-            /**
              * Send immediately overriding event number.
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
-             * @param eventNumber - override the internal event number
+             * @param eventNumber - optionally override the internal event number
+             * @param dataId - optionally override the dataId
              * @param entropy - optional event entropy value (random will be generated otherwise)
              */
-            result<int> sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber, 
-                u_int16_t entropy=0) noexcept;
-
-            /**
-             * Add to send queue in a nonblocking fashion, using internal event number
-             * @param event - event buffer
-             * @param bytes - bytes length of the buffer
-             * @param entropy - optional event entropy value (random will be generated otherwise)
-             * @param callback - callback function to call after event is sent (non-blocking)
-             * @param cbArg - parameter for callback
-             */
-            result<int> addToSendQueue(u_int8_t *event, size_t bytes, u_int16_t entropy=0,
-                void (*callback)(boost::any) = nullptr, 
-                boost::any cbArg = nullptr) noexcept;
+            result<int> sendEvent(u_int8_t *event, size_t bytes, EventNum_t _eventNumber=0LL, 
+                u_int16_t _dataId=0, u_int16_t _entropy=0) noexcept;
 
             /**
              * Add to send queue in a nonblocking fashion, overriding internal event number
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
-             * @param eventNumber - override the internal event number
+             * @param eventNum - optionally override the internal event number
+             * @param dataId - optionally override the dataId
              * @param entropy - optional event entropy value (random will be generated otherwise)
-             * @param callback - callback function to call after event is sent
-             * @param cbArg - parameter for callback
+             * @param callback - optional callback function to call after event is sent
+             * @param cbArg - optional parameter for callback
              */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
-                uint64_t eventNumber, u_int16_t entropy=0,
+                EventNum_t _eventNum=0LL, u_int16_t _dataId = 0, u_int16_t entropy=0,
                 void (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 

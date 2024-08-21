@@ -226,14 +226,11 @@ namespace e2sar
             {
                 // call send overriding event number as needed
                 auto res = _send(item->event, item->bytes, 
-                    (item->eventNum != 0 ? item->eventNum : seg.eventNum.value()),
+                    item->eventNum, item->dataId,
                     item->entropy);
                 // FIXME: do something with result? 
                 // maybe not - it should be taken care by lastErrno in
                 // the stats block
-
-                // update event counter
-                seg.eventNum++;
 
                 // call the callback
                 if (item->callback != nullptr)
@@ -425,7 +422,7 @@ namespace e2sar
 
     // fragment and send the event
     result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
-        EventNum_t altEventNum, u_int16_t entropy)
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy)
     {
         int err;
         struct iovec iov[2];
@@ -473,11 +470,9 @@ namespace e2sar
             // fill out LB and RE headers
             auto hdr = lbreHdrPool.construct();
 
-            // are we overwriting the event number?
-            EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
-            hdr->re.set(seg.dataId, curOffset - event, bytes, finalEventNum);
-            hdr->lb.set(entropy, finalEventNum);
+            hdr->re.set(dataId, curOffset - event, bytes, eventNum);
+            hdr->lb.set(entropy, eventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -536,34 +531,21 @@ namespace e2sar
         return 0;
     }
 
-    // Blocking call. Event number automatically set.
-    // Any core affinity needs to be done by caller.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, u_int16_t entropy) noexcept
-    {
-        freeEventItemBacklog();
-        return sendThreadState._send(event, bytes, 0LL, entropy);
-    }
-
     // Blocking call specifying event number.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber, 
-        u_int16_t entropy) noexcept
+    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, 
+        EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) noexcept
     {
         freeEventItemBacklog();
-        return sendThreadState._send(event, bytes, eventNumber, entropy);
-    }
-
-    // Non-blocking call to place event on internal queue.
-    // Event number automatically set at send time
-    result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, u_int16_t entropy,
-        void (*callback)(boost::any), 
-        boost::any cbArg) noexcept
-    {
-        return addToSendQueue(event, bytes, 0LL, entropy, callback, cbArg);
+        // use specified event number and dataId
+        return sendThreadState._send(event, bytes, 
+            (_eventNum == 0 ? eventNum++ : _eventNum), 
+            (_dataId  == 0 ? dataId : _dataId), 
+            entropy);
     }
 
     // Non-blocking call specifying explicit event number.
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
-        uint64_t eventNumber, u_int16_t entropy,
+        EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy,
         void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
@@ -574,7 +556,8 @@ namespace e2sar
         item->entropy = entropy;
         item->callback = callback;
         item->cbArg = cbArg;
-        item->eventNum = eventNumber;
+        item->eventNum = (_eventNum == 0 ? eventNum++ : _eventNum);
+        item->dataId = (_dataId  == 0 ? dataId : _dataId);
         eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
         sendThreadCond.notify_one();
