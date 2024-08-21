@@ -39,10 +39,9 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
-    u_int16_t entropy = 16;
 
     // create a segmenter and start the threads
-    Segmenter seg(uri, dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(uri, dataId, eventSrcId, sflags);
 
     auto res = seg.openAndStart();
 
@@ -120,12 +119,11 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
     sflags.mtu = 64 + 40;
-    u_int16_t entropy = 16;
 
     // create a segmenter and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(uri, dataId, eventSrcId, sflags);
 
     auto res = seg.openAndStart();
 
@@ -203,12 +201,11 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
     sflags.mtu = 64 + 40;
-    u_int16_t entropy = 16;
 
     // create a segmenter and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(uri, dataId, eventSrcId, sflags);
 
     auto res = seg.openAndStart();
 
@@ -293,12 +290,11 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
     sflags.mtu = 64 + 40;
-    u_int16_t entropy = 16;
 
     // create a segmenter and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(uri, dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(uri, dataId, eventSrcId, sflags);
 
     auto res = seg.openAndStart();
 
@@ -325,7 +321,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), 
-            eventString.length(), &fakeCB, &parameter);
+            eventString.length(), 0, &fakeCB, &parameter);
         parameter++;
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();

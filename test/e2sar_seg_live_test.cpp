@@ -55,13 +55,12 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs= 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
-    u_int16_t entropy = 16;
 
     // create a segmenter and start the threads
     // using the updated URI with sync info
     std::cout << "Creating segmenter using returned URI: " << 
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
-    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, sflags);
 
     auto res1 = seg.openAndStart();
 
@@ -164,13 +163,12 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     sflags.syncPeriodMs = 500; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
     sflags.mtu = 64 + 40;
-    u_int16_t entropy = 16;
 
     // create a segmenter using URI sync and data info
     // and start the threads, send MTU is set to force
     // breaking up event payload into multiple frames
     // 64 is the length of all headers (IP, UDP, LB, RE)
-    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(lbman.get_URI(), dataId, eventSrcId, sflags);
     std::cout << "Creating segmenter using returned URI: " << 
         lbman.get_URI().to_string(EjfatURI::TokenType::instance) << std::endl;
 

@@ -11,6 +11,7 @@
 #include <boost/any.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/variant.hpp>
+#include <boost/random.hpp>
 
 #ifdef NETLINK_AVAILABLE
 #include <linux/rtnetlink.h>
@@ -50,8 +51,6 @@ namespace e2sar
             // host/daq, 32-bit to accommodate IP addresses more easily
             // carried in Sync header
             const u_int32_t eventSrcId;
-            // entropy value of this sender carried in LB header
-            const u_int16_t entropy;
 
             // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE{2047};
@@ -64,6 +63,7 @@ namespace e2sar
                 uint32_t bytes;
                 EventNum_t eventNum;
                 u_int8_t *event;
+                u_int16_t entropy;  // optional per event entropy
                 void (*callback)(boost::any);
                 boost::any cbArg;
             };
@@ -178,21 +178,27 @@ namespace e2sar
                 // pool of LB+RE headers for sending
                 boost::object_pool<LBREHdr> lbreHdrPool{32,0};
 
+                // fast random number generator to create entropy values for events
+                // this entropy value is held the same for all packets of a given
+                // event guaranteeing the same destination UDP port for all of them
+                boost::random::ranlux24_base ranlux;
+                boost::random::uniform_int_distribution<> randDist{0, std::numeric_limits<u_int16_t>::max()};
+
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
-                    maxPldLen{mtu - TOTAL_HDR_LEN} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN}, ranlux{static_cast<u_int32_t>(std::time(0))} {}
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
                     mtu{NetUtil::getMTU(iface)}, iface{iface},
-                    maxPldLen{mtu - TOTAL_HDR_LEN} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN}, ranlux{static_cast<u_int32_t>(std::time(0))} {}
 
                 // open v4/v6 sockets
                 result<int> _open();
                 // close sockets
                 result<int> _close();
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum);
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t entropy);
                 // thread loop
                 void _threadBody();
             };
@@ -205,7 +211,7 @@ namespace e2sar
             boost::condition_variable sendThreadCond;
             // use control plane (can be disabled for debugging)
             bool useCP;
-            
+
             /** Threads keep running while this is false */
             bool threadsStop{false};
         public:
@@ -241,10 +247,9 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param entropy - entropy value of this sender
              * @param sfalags - SegmenterFlags 
              */
-            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy,  
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId,  
                 const SegmenterFlags &sflags=SegmenterFlags());
 #if 0
             /**
@@ -254,12 +259,11 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param entropy - entropy value of this sender
              * @param iface - use the following interface for data.
              * (get MTU from the interface and, if possible, set it as outgoing - available on Linux)
              * @param sflags - SegmenterFlags
              */
-            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy, 
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, 
                 std::string iface=""s, 
                 const SegmenterFlags &sflags=SegmenterFlags());
 #endif
@@ -297,25 +301,29 @@ namespace e2sar
              * Send immediately using internal event number.
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
+             * @param entropy - optional event entropy value (random will be generated otherwise)
              */
-            result<int> sendEvent(u_int8_t *event, size_t bytes) noexcept;
+            result<int> sendEvent(u_int8_t *event, size_t bytes, u_int16_t entropy=0) noexcept;
 
             /**
              * Send immediately overriding event number.
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
              * @param eventNumber - override the internal event number
+             * @param entropy - optional event entropy value (random will be generated otherwise)
              */
-            result<int> sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept;
+            result<int> sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber, 
+                u_int16_t entropy=0) noexcept;
 
             /**
              * Add to send queue in a nonblocking fashion, using internal event number
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
+             * @param entropy - optional event entropy value (random will be generated otherwise)
              * @param callback - callback function to call after event is sent (non-blocking)
              * @param cbArg - parameter for callback
              */
-            result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
+            result<int> addToSendQueue(u_int8_t *event, size_t bytes, u_int16_t entropy=0,
                 void (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 
@@ -324,11 +332,12 @@ namespace e2sar
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
              * @param eventNumber - override the internal event number
+             * @param entropy - optional event entropy value (random will be generated otherwise)
              * @param callback - callback function to call after event is sent
              * @param cbArg - parameter for callback
              */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
-                uint64_t eventNumber, 
+                uint64_t eventNumber, u_int16_t entropy=0,
                 void (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 

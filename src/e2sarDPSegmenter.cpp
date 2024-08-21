@@ -12,12 +12,11 @@ namespace e2sar
     // a condition for new events
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, u_int16_t entropy, 
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid,  
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
         eventSrcId{esid},
-        entropy{entropy},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
@@ -27,13 +26,12 @@ namespace e2sar
     }
 
 #if 0
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, 
         const std::string iface, 
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
         eventSrcId{esid},
-        entropy{entropy},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
@@ -226,7 +224,8 @@ namespace e2sar
             {
                 // call send overriding event number as needed
                 auto res = _send(item->event, item->bytes, 
-                    (item->eventNum != 0 ? item->eventNum : seg.eventNum.value()));
+                    (item->eventNum != 0 ? item->eventNum : seg.eventNum.value()),
+                    item->entropy);
                 // FIXME: do something with result? 
                 // maybe not - it should be taken care by lastErrno in
                 // the stats block
@@ -357,7 +356,8 @@ namespace e2sar
     }
 
     // fragment and send the event
-    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, EventNum_t altEventNum)
+    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
+        EventNum_t altEventNum, u_int16_t entropy)
     {
         int err;
         struct iovec iov[2];
@@ -369,6 +369,9 @@ namespace e2sar
 #else   
         int flags{0};
 #endif
+        // new random entropy generated for each event, unless user specified it
+        if (entropy == 0)
+            entropy = randDist(ranlux);
 
         sendSocket = (useV6 ? socketFd6 : socketFd4);
         // prepare msghdr
@@ -402,7 +405,7 @@ namespace e2sar
             EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(seg.dataId, curOffset - event, bytes, finalEventNum);
-            hdr->lb.set(seg.entropy, finalEventNum);
+            hdr->lb.set(entropy, finalEventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -461,31 +464,32 @@ namespace e2sar
 
     // Blocking call. Event number automatically set.
     // Any core affinity needs to be done by caller.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes) noexcept
+    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, u_int16_t entropy) noexcept
     {
         freeEventItemBacklog();
-        return sendThreadState._send(event, bytes, 0LL);
+        return sendThreadState._send(event, bytes, 0LL, entropy);
     }
 
     // Blocking call specifying event number.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept
+    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber, 
+        u_int16_t entropy) noexcept
     {
         freeEventItemBacklog();
-        return sendThreadState._send(event, bytes, eventNumber);
+        return sendThreadState._send(event, bytes, eventNumber, entropy);
     }
 
     // Non-blocking call to place event on internal queue.
     // Event number automatically set at send time
-    result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
+    result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, u_int16_t entropy,
         void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
-        return addToSendQueue(event, bytes, 0, callback, cbArg);
+        return addToSendQueue(event, bytes, 0LL, entropy, callback, cbArg);
     }
 
     // Non-blocking call specifying explicit event number.
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
-        uint64_t eventNumber, 
+        uint64_t eventNumber, u_int16_t entropy,
         void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
@@ -493,6 +497,7 @@ namespace e2sar
         EventQueueItem *item = queueItemPool.construct();
         item->bytes = bytes;
         item->event = event;
+        item->entropy = entropy;
         item->callback = callback;
         item->cbArg = cbArg;
         item->eventNum = eventNumber;

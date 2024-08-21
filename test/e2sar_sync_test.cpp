@@ -37,13 +37,12 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
     auto uri = uri_r.value();
     u_int16_t dataId = 0x0505;
     u_int32_t eventSrcId = 0x11223344;
-    u_int16_t entropy = 16;
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
 
     // create a segmenter and start the threads
-    Segmenter seg(uri, dataId, eventSrcId, entropy, sflags);
+    Segmenter seg(uri, dataId, eventSrcId, sflags);
 
     auto res = seg.openAndStart();
 
