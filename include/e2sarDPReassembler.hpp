@@ -397,7 +397,7 @@ namespace e2sar
              * @return - result structure, check has_error() method or value() which is 0
              * on success and -1 if the queue was empty.
              */
-            result<int> getEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId);
+            result<int> getEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) noexcept;
 
             /**
              * Blocking variant of getEvent() with same parameter semantics
@@ -407,7 +407,7 @@ namespace e2sar
              * @param dataId - dataId from the reassembly header identifying the DAQ
              * @return - result structure, check has_error() method or value() which is 0
              */
-            result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId);
+            result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) noexcept;
 
             /**
              * Get a tuple representing all the stats:
@@ -418,12 +418,37 @@ namespace e2sar
              *  int dataErrCnt; 
              *  E2SARErrorc lastE2SARError; 
              */
-            inline const boost::tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const
+            inline const boost::tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const noexcept
             {
                 return boost::make_tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc>(
                     recvStats.enqueueLoss, recvStats.eventSuccess,
                     recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
                     recvStats.lastE2SARError);
+            }
+
+            /**
+             * Get the number of threads this Reassembler is using
+             */
+            inline const size_t get_numRecvThreads() const noexcept
+            {
+                return numRecvThreads;
+            }
+
+            /**
+             * Get the ports this reassembler is listening on, returned as a pair <start port, end port>
+             */
+            inline const std::pair<int, int> get_recvPorts() const noexcept
+            {
+                return std::make_pair(dataPort, dataPort + numRecvPorts - 1);
+            }
+
+            /**
+             * Get the port range that will be communicated to CP (this is either specified explicitly
+             * as part of ReassemblerFlags or computed from the number of cores or threads requested)
+             */
+            inline const int get_portRange() const noexcept
+            {
+                return portRange;
             }
         protected:
         private:

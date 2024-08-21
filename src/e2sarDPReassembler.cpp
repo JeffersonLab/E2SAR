@@ -458,7 +458,7 @@ namespace e2sar
         return 0;
     }
 
-    result<int> Reassembler::getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId) 
+    result<int> Reassembler::getEvent(uint8_t **event, size_t *bytes, uint64_t* eventNum, uint16_t *dataId) noexcept
     {
         auto eventItem = dequeue();
 
@@ -476,7 +476,7 @@ namespace e2sar
         return 0;
     }
 
-    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) 
+    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) noexcept
     {
         recvThreadCond.wait(condLock);
 
