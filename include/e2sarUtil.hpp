@@ -21,8 +21,9 @@ namespace e2sar
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). 
      * The URI is of the format:
-     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
-     * More than one data= address can be specified (typically an IPv4 and IPv6)
+     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>[:<data_port>]][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
+     * More than one data= address can be specified (typically an IPv4 and IPv6). For data
+     * the port is optional and defaults to 19522, however for testing/debugging can be overridden
     */
     class EjfatURI
     {
@@ -44,9 +45,11 @@ namespace e2sar
         bool preferV6;
 
         /** UDP port for event sender to send sync messages to. */
-        uint16_t syncPort;
+        u_int16_t syncPort;
         /** TCP port for grpc communications with CP. */
-        uint16_t cpPort;
+        u_int16_t cpPort;
+        /** Dataplane port (normally defaults to DATAPLANE_POR) */
+        u_int16_t dataPort;
 
         /** String given by user, during registration, to label an LB instance. */
         std::string lbName;
@@ -239,7 +242,7 @@ namespace e2sar
         inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv4() const noexcept
         {
             if (haveDatav4)
-                return std::pair<ip::address, u_int16_t>(dataAddrv4, DATAPLANE_PORT);
+                return std::pair<ip::address, u_int16_t>(dataAddrv4, dataPort);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 
@@ -247,7 +250,7 @@ namespace e2sar
         inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv6() const noexcept
         {
             if (haveDatav6)
-                return std::pair<ip::address, u_int16_t>(dataAddrv6, DATAPLANE_PORT);
+                return std::pair<ip::address, u_int16_t>(dataAddrv6, dataPort);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 

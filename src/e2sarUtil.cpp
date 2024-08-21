@@ -181,6 +181,7 @@ namespace e2sar
                             haveDatav6 = true;
                             dataAddrv6 = p.first;
                         }
+                        dataPort = (p.second == 0 ? DATAPLANE_PORT : p.second);
                     }
                     else
                         throw E2SARException("Unknown parameter "s + param.key + " in URI "s + rawURI);
