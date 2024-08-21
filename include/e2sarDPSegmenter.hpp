@@ -392,6 +392,9 @@ namespace e2sar
             // note that locking lives outside this function, as needed.
             inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos) 
             {
+                // no rate to report
+                if (eventStatsBuffer.size() == 0)
+                    return 1;
                 EventNum_t eventTotal{0LL};
                 // walk the circular buffer
                 for(auto el: eventStatsBuffer)
