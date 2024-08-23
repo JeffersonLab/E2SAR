@@ -1,3 +1,6 @@
 [submodule "udplbd"]
 	path = udplbd
 	url = git@github.com:/esnet/udplbd.git
+[submodule "docs"]
+	path = docs
+	url = git@github.com:JeffersonLab/E2SAR-doc.git
