@@ -305,6 +305,7 @@ namespace e2sar
                 // set SO_ZEROCOPY on Linux
                 if (useZerocopy) {
     #ifdef ZEROCOPY_AVAILABLE
+                    int zerocopy = 1;
                     int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
                     if (errz < 0) {
                         close(fd);

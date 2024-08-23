@@ -11,6 +11,7 @@ endif
 zccode = '''
 #include<sys/socket.h>
 int fd = 0;
+int zerocopy = 1;
 int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy)); }
 '''
 
