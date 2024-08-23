@@ -296,6 +296,19 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
             BOOST_CHECK(reas.get_recvPorts().second == 20545);
             BOOST_CHECK(reas.get_portRange() == 10);
         }
+        {
+            // 4 threads with low portRange override
+            rflags.portRange = 1;
+            Reassembler reas(reasUri, 4, rflags);
+
+            std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
+                reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
+                std::endl;         
+            BOOST_CHECK(reas.get_numRecvThreads() == 4);
+            BOOST_CHECK(reas.get_recvPorts().first == 19522);
+            BOOST_CHECK(reas.get_recvPorts().second == 19523);
+            BOOST_CHECK(reas.get_portRange() == 1);
+        }
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
