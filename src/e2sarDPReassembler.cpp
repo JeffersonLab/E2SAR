@@ -35,13 +35,13 @@ namespace e2sar
         const ReassemblerFlags &rflags):
         dpuri(uri),
         lbman(dpuri, rflags.validateCert),
-        dpV6{rflags.dpV6},
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{cpuCoreList}, 
-        dataIP{ip::make_address(rflags.dataIPString)},
-        dataPort{rflags.dataPort},
+        dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)},
+        dataPort{(rflags.dpV6 ? uri.get_dataAddrv6().value().second : uri.get_dataAddrv4().value().second)},
+        dpV6{rflags.dpV6},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
@@ -64,13 +64,13 @@ namespace e2sar
         const ReassemblerFlags &rflags):
         dpuri(uri),
         lbman(dpuri, rflags.validateCert),
-        dpV6{rflags.dpV6},
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{std::vector<int>()}, // no core list given
-        dataIP{ip::make_address(rflags.dataIPString)},
-        dataPort{rflags.dataPort},
+        dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)},
+        dataPort{(rflags.dpV6 ? uri.get_dataAddrv6().value().second : uri.get_dataAddrv4().value().second)},
+        dpV6{rflags.dpV6},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
@@ -97,7 +97,7 @@ namespace e2sar
                 portsToThreads[i].end());
 
             // this constructor uses move semantics for port vector (not for cpu list tho)
-            auto it = recvThreadState.emplace(recvThreadState.end(), *this, dpV6,
+            auto it = recvThreadState.emplace(recvThreadState.end(), *this, 
                 std::move(portVec), cpuCoreList);
 
             // open the sockets for all ports for this thread
@@ -302,12 +302,6 @@ namespace e2sar
 
     result<int> Reassembler::RecvThreadState::_open()
     {
-        // get appropriate IP address to talk to
-        auto dataAddr = (reas.dpV6 ? reas.dpuri.get_dataAddrv6() : reas.dpuri.get_dataAddrv4());
-            
-        if (dataAddr.has_error())
-            return dataAddr.error();
-
         sockets.clear();
         FD_ZERO(&fdSet);
         maxFdPlusOne = 0;
@@ -316,7 +310,7 @@ namespace e2sar
         {
             int socketFd;
             // Socket for receiving data messages from LB, one for each port
-            if (dataAddr.value().first.is_v6()) {
+            if (reas.dataIP.is_v6()) {
                 if ((socketFd = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
                     reas.recvStats.dataErrCnt++;
                     reas.recvStats.lastErrno = errno;
@@ -326,7 +320,7 @@ namespace e2sar
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
                 dataAddrStruct6.sin6_port = htobe16(port);
-                inet_pton(AF_INET6, dataAddr.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
+                inet_pton(AF_INET6, reas.dataIP.to_string().c_str(), &dataAddrStruct6.sin6_addr);
 
                 int err = bind(socketFd, (const sockaddr *) &dataAddrStruct6, sizeof(struct sockaddr_in6));
                 if (err < 0) {
@@ -346,7 +340,7 @@ namespace e2sar
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
                 dataAddrStruct4.sin_port = htobe16(port);
-                inet_pton(AF_INET, dataAddr.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
+                inet_pton(AF_INET, reas.dataIP.to_string().c_str(), &dataAddrStruct4.sin_addr);
 
                 int err = bind(socketFd, (const sockaddr *) &dataAddrStruct4, sizeof(struct sockaddr_in));
                 if (err < 0) {

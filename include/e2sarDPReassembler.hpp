@@ -51,7 +51,6 @@ namespace e2sar
         private:
             EjfatURI dpuri;
             LBManager lbman;
-            bool dpV6;
 
             // Segementer queue state - we use lockfree queue
             // and an associated atomic variable that reflects
@@ -183,9 +182,6 @@ namespace e2sar
                 Reassembler &reas;
                 boost::thread threadObj;
 
-                // flags
-                const bool useV6;
-
                 // timers
                 struct timeval sleep_tv;
 
@@ -210,9 +206,9 @@ namespace e2sar
                 std::vector<int> cpuCoreList;
 
                 // this constructor deliberately uses move semantics for uports
-                inline RecvThreadState(Reassembler &r, bool v6, std::vector<int> &&uports, 
+                inline RecvThreadState(Reassembler &r, std::vector<int> &&uports, 
                     const std::vector<int> &ccl): 
-                    reas{r}, useV6{v6}, udpPorts{uports}, cpuCoreList{ccl}
+                    reas{r}, udpPorts{uports}, cpuCoreList{ccl}
                 {
                     sleep_tv.tv_sec = 0;
                     sleep_tv.tv_usec = 10000; // 10 msec max
@@ -230,8 +226,9 @@ namespace e2sar
 
             // receive related parameters
             const std::vector<int> cpuCoreList;
-            const ip::address dataIP; // converted to address from string
-            const int dataPort; // starting receive port
+            const ip::address dataIP; // from URI
+            const u_int16_t dataPort; // starting receive port from URI
+            const bool dpV6; // prefer V6 over v4 address from URI
             const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
             const size_t numRecvPorts;
@@ -311,7 +308,7 @@ namespace e2sar
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
-             * dpV6 - prefer IPv6 dataplane {false}
+             * dpV6 - prefer the IPv6 address/port in the URI data address
              * cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
              * useCP - whether to use the control plane (sendState, registerWorker) {true}
              * period_ms - period of the send state thread in milliseconds {100}
@@ -319,8 +316,6 @@ namespace e2sar
              * Ki, Kp, Kd - PID gains (integral, proportional and derivative) {0., 0., 0.}
              * setPoint - setPoint queue occupied percentage to which to drive the PID controller {0.0}
              * validateCert - validate control plane TLS certificate {true}
-             * dataIPString - IP address we will listen on {127.0.0.1}
-             * dataPort -  starting data port number {19522}
              * portRange - 2^portRange (0<=portRange<=14) listening ports will be open starting from dataPort. If -1, 
              * then the number of ports matches either the number of CPU cores or the number of threads. Normally
              * this value is calculated based on the number of cores or threads requested, but
@@ -338,15 +333,12 @@ namespace e2sar
                 bool validateCert;
                 float Ki, Kp, Kd, setPoint;
                 u_int32_t epoch_ms;
-                std::string dataIPString;
-                int dataPort;
                 int portRange; 
                 bool withLBHeader;
                 int eventTimeout_ms;
-                ReassemblerFlags(): dpV6{false}, cpV6{false}, useCP{true}, 
+                ReassemblerFlags(): cpV6{false}, useCP{true}, 
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
-                    epoch_ms{1000}, dataIPString{"127.0.0.1"}, dataPort{DATAPLANE_PORT}, 
-                    portRange{-1}, withLBHeader{false}, eventTimeout_ms{500} {}
+                    epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500} {}
             };
             /**
              * Create a reassembler object to run receive on a specific set of CPU cores

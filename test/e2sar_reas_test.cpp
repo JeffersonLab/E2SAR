@@ -49,8 +49,6 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.dataIPString = "127.0.0.1";
-        rflags.dataPort = 19522; // this is a standard LB port
         rflags.withLBHeader = true; // LB header will be attached since there is no LB
 
         Reassembler reas(reasUri, 1, rflags);
@@ -157,8 +155,6 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.dataIPString = "127.0.0.1";
-        rflags.dataPort = 19522; // this is a standard LB port
         rflags.withLBHeader = true; // LB header will be attached since there is no LB
 
         Reassembler reas(reasUri, 1, rflags);
@@ -247,9 +243,6 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
 
         // create reassembler with no control plane
         Reassembler::ReassemblerFlags rflags;
-
-        rflags.dataIPString = "127.0.0.1";
-        rflags.dataPort = 19522; // this is a standard LB port
 
         {
             // one thread
@@ -351,8 +344,6 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.dataIPString = "127.0.0.1";
-        rflags.dataPort = 19522; // this is a standard LB port
         rflags.withLBHeader = true; // LB header will be attached since there is no LB
         rflags.portRange = 2;
 
