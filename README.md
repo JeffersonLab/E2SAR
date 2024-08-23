@@ -1,5 +1,5 @@
 # E2SAR
-The internal dev repo of E2SAR - a C++ library and associated Python binding that support segmentation/reassembly (SAR) and control plane functionality of EJ-FAT project.
+A C++ library and associated Python binding that supports segmentation/reassembly (SAR) and control plane functionality of EJ-FAT project.
 
 ## Documentation Scope
 
