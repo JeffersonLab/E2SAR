@@ -1,8 +1,17 @@
 #ifndef E2SARDPNETUTILHPP
 #define E2SARDPNETUTILHPP
 
+#ifdef NETLINK_CAPABLE
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/asio/ip/udp.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_io.hpp>
+
+#include "e2sarError.hpp"
 
 using namespace boost::asio;
 
@@ -28,7 +37,7 @@ namespace e2sar
          */
         static inline result<boost::tuple<std::string, u_int16_t>> getInterfaceAndMTU(const std::string &ipaddr) 
         {
-            return getInterfaceAndMTU(ip::make_address(ip_addr));
+            return getInterfaceAndMTU(ip::make_address(ipaddr));
         }
         /**
          * Get the outgoing interface and its MTU for a given IPv4 or IPv6

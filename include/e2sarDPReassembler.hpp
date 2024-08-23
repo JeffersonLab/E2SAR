@@ -22,7 +22,6 @@
 #endif
 
 #ifdef AFFINITY_AVAILABLE
-#define _GNU_SOURCE
 #include <sched.h>
 #include <unistd.h>
 #endif
@@ -488,7 +487,7 @@ namespace e2sar
 
                 for(auto core: cpuCoreList)
                     CPU_SET(core, &set);
-                if (sched_setaffinity(0, sizeof(set), &set)) == -1)
+                if (sched_setaffinity(0, sizeof(set), &set) == -1)
                     throw E2SARException("Unable to set core affinity.");
 #endif
             }

@@ -83,7 +83,6 @@ namespace e2sar
         useCP{rflags.useCP}
     {
         sanityChecks();
-        setAffinity();
         // note if the user chooses to override portRange in rflags, 
         // we can end up in a silly situation where the number of receive ports is smaller
         // than the number of receive threads, but we handle it

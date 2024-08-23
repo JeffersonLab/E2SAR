@@ -45,7 +45,7 @@ namespace e2sar
         struct rtattr *rta = (struct rtattr *)(((char *)&req) + NLMSG_ALIGN(req.nlh.nlmsg_len));
         rta->rta_type = RTA_DST;
         rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
-        inet_pton(AF_INET, dest_ip, RTA_DATA(rta));
+        inet_pton(AF_INET, addr.to_string().c_str(), RTA_DATA(rta));
         req.nlh.nlmsg_len = NLMSG_ALIGN(req.nlh.nlmsg_len) + rta->rta_len;
 
         sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
@@ -68,7 +68,7 @@ namespace e2sar
             if (nlh->nlmsg_type == NLMSG_ERROR) 
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
 
-            struct rtmsg *rtm = NLMSG_DATA(nlh);
+            struct rtmsg *rtm = reinterpret_cast<struct rtmsg*>(NLMSG_DATA(nlh));
             struct rtattr *rta = RTM_RTA(rtm);
             int rta_len = RTM_PAYLOAD(nlh);
 
