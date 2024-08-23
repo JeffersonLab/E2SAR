@@ -1,6 +1,23 @@
 project('E2SAR', 'cpp', 
         version: '0.1.0a6', default_options : ['cpp_std=c++17'])
 
+compiler = meson.get_compiler('cpp')
+
+
+if compiler.has_header('linux/netlink.h')
+        add_project_arguments('-DNETLINK_CAPABLE', language: ['cpp'])
+endif
+
+zccode = '''
+#include<sys/socket.h>
+int fd = 0;
+int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy)); }
+'''
+
+if compiler.compiles(zccode, name: 'ZC check')
+        add_project_arguments('-DZEROCOPY_AVAILABLE', language: ['cpp'])
+endif
+
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
 # -Wall
