@@ -254,9 +254,9 @@ namespace e2sar
             inline void assignPortsToThreads()
             {
                 // O(numRecvPorts)
-                for(int i=0; i<numRecvPorts;)
+                for(size_t i=0; i<numRecvPorts;)
                 {
-                    for(int j=0; i<numRecvPorts && j<numRecvThreads; i++, j++)
+                    for(size_t j=0; i<numRecvPorts && j<numRecvThreads; i++, j++)
                     {
                         portsToThreads[j].push_back(dataPort + i);
                     } 

@@ -182,13 +182,13 @@ int main()
         std::cout << i  << " ";
     std::cout << std::endl;
 
-    int threads{3};
+    size_t threads{3};
 
     std::vector<std::list<int>> ptt(threads); 
 
-    for(int i=0;i<ports.size();)
+    for(size_t i=0;i<ports.size();)
     {
-        for(int j=0;j<threads && i<ports.size();i++,j++)
+        for(size_t j=0;j<threads && i<ports.size();i++,j++)
         {
             ptt[j].push_back(ports[i]);
         }
@@ -215,9 +215,9 @@ int main()
     size_t numThreads{3};
 
     std::cout << "  Allocating " << numPorts << " ports from portRange " << portRange << " to " << numThreads << " threads" << std::endl;
-    for(int i=0; i<numPorts;)
+    for(size_t i=0; i<numPorts;)
     {
-        for(int j=0; i<numPorts && j<numThreads; i++, j++)
+        for(size_t j=0; i<numPorts && j<numThreads; i++, j++)
         {
             std::cout << "  Assigning port " << startPort + i << " to thread " << j << std::endl;
         } 

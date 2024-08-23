@@ -93,7 +93,7 @@ namespace e2sar
 
     result<int> Reassembler::openAndStart() noexcept
     {
-        for(int i=0; i<numRecvThreads; i++)
+        for(size_t i=0; i<numRecvThreads; i++)
         {
             std::vector<int> portVec = std::vector<int>(portsToThreads[i].begin(), 
                 portsToThreads[i].end());
