@@ -313,7 +313,7 @@ namespace e2sar
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
-             * - dpV6 - prefer the IPv6 address/port in the URI data address
+             * - dpV6 - prefer the IPv6 address/port in the URI data address. Reassembler will bind to IPv6 instead of IPv4 address. {false}
              * - cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
              * - useCP - whether to use the control plane (sendState, registerWorker) {true}
              * - period_ms - period of the send state thread in milliseconds {100}
@@ -326,7 +326,7 @@ namespace e2sar
              * this value is calculated based on the number of cores or threads requested, but
              * it can be overridden here. Use with caution. {-1}
              * - withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
-             * - normal operation) {false}
+             * normal operation) {false}
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              */
             struct ReassemblerFlags 
@@ -407,6 +407,7 @@ namespace e2sar
              * Open sockets and start the threads - this marks the moment
              * from which we are listening for incoming packets, assembling
              * them into event buffers and putting them into the queue.
+             * @return - 0 on success, otherwise error condition
              */
             result<int> openAndStart() noexcept;
 
@@ -433,12 +434,12 @@ namespace e2sar
 
             /**
              * Get a tuple representing all the stats:
-             *  EventNum_t enqueueLoss;  // number of events received and lost on enqueue
-             *  EventNum_t eventSuccess; // events successfully processed
-             *  int lastErrno; 
-             *  int grpcErrCnt; 
-             *  int dataErrCnt; 
-             *  E2SARErrorc lastE2SARError; 
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
              */
             inline const boost::tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const noexcept
             {

@@ -14,10 +14,6 @@
 #include <boost/random.hpp>
 #include <boost/chrono.hpp>
 
-#ifdef NETLINK_AVAILABLE
-#include <linux/rtnetlink.h>
-#endif
-
 #include <atomic>
 
 #include "e2sarUtil.hpp"
@@ -31,7 +27,6 @@
 
 namespace e2sar
 {
-
     /*
         The Segmenter class knows how to break up the provided
         events into segments consumable by the hardware loadbalancer.
@@ -254,10 +249,10 @@ namespace e2sar
             /** 
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
-             * - dpV6 - prefer V6 dataplane {false}
-             * - zeroCopy - use zeroCopy optimization {false}
+             * - dpV6 - prefer V6 dataplane if the URI specifies both data=<ipv4>&data=<ipv6> addresses {false}
+             * - zeroCopy - use zeroCopy send optimization {false}
              * - connectedSocket - use connected sockets {true}
-             * - useCP - use control plane to send Sync packets {true}
+             * - useCP - enable control plane to send Sync packets {true}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
@@ -334,6 +329,7 @@ namespace e2sar
             /**
              * Open sockets and start the threads - this marks the moment
              * from which sync packets start being sent.
+             * @return - 0 on success, otherwise error condition
              */
             result<int> openAndStart() noexcept;
 
@@ -344,6 +340,7 @@ namespace e2sar
              * @param eventNumber - optionally override the internal event number
              * @param dataId - optionally override the dataId
              * @param entropy - optional event entropy value (random will be generated otherwise)
+             * @return - 0 on success, otherwise error condition
              */
             result<int> sendEvent(u_int8_t *event, size_t bytes, EventNum_t _eventNumber=0LL, 
                 u_int16_t _dataId=0, u_int16_t _entropy=0) noexcept;
@@ -357,6 +354,7 @@ namespace e2sar
              * @param entropy - optional event entropy value (random will be generated otherwise)
              * @param callback - optional callback function to call after event is sent
              * @param cbArg - optional parameter for callback
+             * @return - 0 on success, otherwise error condition
              */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
                 EventNum_t _eventNum=0LL, u_int16_t _dataId = 0, u_int16_t entropy=0,
