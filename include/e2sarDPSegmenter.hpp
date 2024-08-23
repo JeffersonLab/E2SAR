@@ -254,20 +254,20 @@ namespace e2sar
             /** 
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
-             * dpV6 - prefer V6 dataplane {false}
-             * zeroCopy - use zeroCopy optimization {false}
-             * connectedSocket - use connected sockets {true}
-             * useCP - use control plane to send Sync packets {true}
-             * syncPeriodMs - sync thread period in milliseconds {1000}
-             * syncPerods - number of sync periods to use for averaging reported send rate {2}
-             * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
+             * - dpV6 - prefer V6 dataplane {false}
+             * - zeroCopy - use zeroCopy optimization {false}
+             * - connectedSocket - use connected sockets {true}
+             * - useCP - use control plane to send Sync packets {true}
+             * - syncPeriodMs - sync thread period in milliseconds {1000}
+             * - syncPerods - number of sync periods to use for averaging reported send rate {2}
+             * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
              * IP, UDP and LBRE headers) {1500}
-             * numSendSockets - number of sockets/source ports we will be sending data from. The
+             * - numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              */
             struct SegmenterFlags 
             {
-                bool dpV6;
+                bool dpV6; 
                 bool zeroCopy;
                 bool connectedSocket;
                 bool useCP;

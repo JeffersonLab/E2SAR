@@ -81,7 +81,6 @@ namespace e2sar
          * (defaults to v4)
          */
         EjfatURI(const std::string &uri, TokenType tt=TokenType::admin, bool preferV6=false);
-        /** rely on implicitly-declared copy constructor as needed */
 
         /** destructor */
         ~EjfatURI() {}

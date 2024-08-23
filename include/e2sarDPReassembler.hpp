@@ -21,6 +21,12 @@
 #include <linux/rtnetlink.h>
 #endif
 
+#ifdef AFFINITY_AVAILABLE
+#define _GNU_SOURCE
+#include <sched.h>
+#include <unistd.h>
+#endif
+
 #include <atomic>
 
 #include "e2sarError.hpp"
@@ -308,21 +314,21 @@ namespace e2sar
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
-             * dpV6 - prefer the IPv6 address/port in the URI data address
-             * cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
-             * useCP - whether to use the control plane (sendState, registerWorker) {true}
-             * period_ms - period of the send state thread in milliseconds {100}
-             * epoch_ms - period of one epoch in milliseconds {1000}
-             * Ki, Kp, Kd - PID gains (integral, proportional and derivative) {0., 0., 0.}
-             * setPoint - setPoint queue occupied percentage to which to drive the PID controller {0.0}
-             * validateCert - validate control plane TLS certificate {true}
-             * portRange - 2^portRange (0<=portRange<=14) listening ports will be open starting from dataPort. If -1, 
+             * - dpV6 - prefer the IPv6 address/port in the URI data address
+             * - cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
+             * - useCP - whether to use the control plane (sendState, registerWorker) {true}
+             * - period_ms - period of the send state thread in milliseconds {100}
+             * - epoch_ms - period of one epoch in milliseconds {1000}
+             * - Ki, Kp, Kd - PID gains (integral, proportional and derivative) {0., 0., 0.}
+             * - setPoint - setPoint queue occupied percentage to which to drive the PID controller {0.0}
+             * - validateCert - validate control plane TLS certificate {true}
+             * - portRange - 2^portRange (0<=portRange<=14) listening ports will be open starting from dataPort. If -1, 
              * then the number of ports matches either the number of CPU cores or the number of threads. Normally
              * this value is calculated based on the number of cores or threads requested, but
              * it can be overridden here. Use with caution. {-1}
-             * withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
-             * normal operation) {false}
-             * eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
+             * - withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
+             * - normal operation) {false}
+             * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              */
             struct ReassemblerFlags 
             {
@@ -472,6 +478,19 @@ namespace e2sar
             void stopThreads() 
             {
                 threadsStop = true;
+            }
+            void setAffinity()
+            {
+#ifdef AFFINITY_AVAILABLE
+                // set this process affinity to the indicated set of cores
+                cpu_set_t set;
+                CPU_ZERO(&set);
+
+                for(auto core: cpuCoreList)
+                    CPU_SET(core, &set);
+                if (sched_setaffinity(0, sizeof(set), &set)) == -1)
+                    throw E2SARException("Unable to set core affinity.");
+#endif
             }
 
     };

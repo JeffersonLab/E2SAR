@@ -186,6 +186,7 @@ namespace e2sar
          *
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
+         * @param senders list of sender IP addresses
          *
          * @return - FPGA LB ID, for use in correlating logs/metrics
          */

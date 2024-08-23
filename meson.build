@@ -19,6 +19,18 @@ if compiler.compiles(zccode, name: 'ZC check')
         add_project_arguments('-DZEROCOPY_AVAILABLE', language: ['cpp'])
 endif
 
+affcode = '''
+#define _GNU_SOURCE
+#include <sched.h>
+#include <unistd.h>
+cpu_set_t set;
+sched_setaffinity(getpid(), sizeof(set), &set);
+'''
+
+if compiler.compiles(affcode, name: 'CPU Affinity check')
+        add_project_arguments('-DAFFINITY_AVAILABLE', language: ['cpp'])
+endif
+
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
 # -Wall
