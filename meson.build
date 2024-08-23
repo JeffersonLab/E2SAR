@@ -10,9 +10,10 @@ endif
 
 zccode = '''
 #include<sys/socket.h>
+void f() {
 int fd = 0;
 int zerocopy = 1;
-int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy)); }
+int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));}
 '''
 
 if compiler.compiles(zccode, name: 'ZC check')
@@ -23,13 +24,15 @@ affcode = '''
 #define _GNU_SOURCE
 #include <sched.h>
 #include <unistd.h>
+void f() {
 cpu_set_t set;
-sched_setaffinity(getpid(), sizeof(set), &set);
+sched_setaffinity(getpid(), sizeof(set), &set); }
 '''
 
 if compiler.compiles(affcode, name: 'CPU Affinity check')
         add_project_arguments('-DAFFINITY_AVAILABLE', language: ['cpp'])
 endif
+
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
