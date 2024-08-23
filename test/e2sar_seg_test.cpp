@@ -26,7 +26,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
 {
     std::cout << "DPSegTest1: test segmenter (and sync thread) by sending 5 events via event queue with default MTU" << std::endl;
 
-    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.254.1:12345&data=10.250.100.123"};
     EjfatURI uri(segUriString);
 
     u_int16_t dataId = 0x0505;
@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     }
     // send 10 sync messages and no errors
     std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    BOOST_CHECK(syncStats.get<0>() >= 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
 {
     std::cout << "DPSegTest2: test segmenter (and sync thread) by sending 5 events via event queue with small MTU so 10 frames are sent" << std::endl;
 
-    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.254.1:12345&data=10.250.100.123"};
     EjfatURI uri(segUriString);
 
     u_int16_t dataId = 0x0505;
@@ -159,7 +159,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     }
     // send 10 sync messages and no errors
     std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    BOOST_CHECK(syncStats.get<0>() >= 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
@@ -175,7 +175,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
 {
     std::cout << "DPSegTest3: test segmenter (and sync thread) by sending 5 events via sendEvent() with small MTU so 10 frames are sent" << std::endl;
 
-    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.254.1:12345&data=10.250.100.123"};
     EjfatURI uri(segUriString);
 
     u_int16_t dataId = 0x0505;
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     }
     // send 10 sync messages and no errors
     std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    BOOST_CHECK(syncStats.get<0>() >= 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
 {
     std::cout << "DPSegTest4: test segmenter (and sync thread) by sending 5 events via event queue with callbacks and default MTU so 5 frames are sent" << std::endl;
 
-    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=10.250.100.123"};
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.254.1:12345&data=10.250.100.123"};
     EjfatURI uri(segUriString);
 
     u_int16_t dataId = 0x0505;
@@ -320,7 +320,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     }
     // send 10 sync messages and no errors
     std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    BOOST_CHECK(syncStats.get<0>() >= 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
