@@ -308,7 +308,8 @@ namespace e2sar
         if (dataAddr.has_error())
             return dataAddr.error();
 
-        FD_ZERO(&sockets);
+        sockets.clear();
+        FD_ZERO(&fdSet);
         maxFdPlusOne = 0;
         // open socket on each of the ports
         for(auto port: udpPorts)

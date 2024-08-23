@@ -434,7 +434,7 @@ namespace e2sar
 #else   
         int flags{0};
 #endif
-        // new random entropy generated for each event, unless user specified it
+        // new random entropy generated for each event buffer, unless user specified it
         if (entropy == 0)
             entropy = randDist(ranlux);
 
