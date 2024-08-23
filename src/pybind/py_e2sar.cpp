@@ -20,18 +20,31 @@ namespace py = pybind11;
 using namespace e2sar;
 
 /// TODO: better bindings for the result<> type. May try to connect with Python try... except... @xmei
-void initBindingResultType(pybind11::module_ &m);
+void initBindingResultType(py::module_ &m);
 
-void init_e2sarCP(pybind11::module_ &m);    // in a submodule "ControlPlane"
-void init_e2sarUtil(pybind11::module_ &m);  // in the main module
 
-// "e2sar_py" will be the python import module name
+void init_e2sarCP(py::module_ &m);    // in a submodule "ControlPlane"
+void init_e2sarUtil(py::module_ &m);  // in the main module
+void init_e2sarHeaders(py::module_ &m);  // in the main module
+// void init_e2sarDP(pybind11::module_ &m);    // in a submodule "DataPlane"
+
+// "e2sar_py" will be the python module name using in "import xxx"
 PYBIND11_MODULE(e2sar_py, m) {
 
     m.doc() = "Python bindings for the E2SAR library.";
 
+    // Constants belong to the top module
+    m.attr("_dp_port") = py::int_(DATAPLANE_PORT);
+    m.attr("_iphdr_len") = py::int_(IP_HDRLEN);
+    m.attr("_udphdr_len") = py::int_(UDP_HDRLEN);
+    m.attr("_total_hdr_len") = py::int_(TOTAL_HDR_LEN);
+    m.attr("_rehdr_version") = py::int_(rehdrVersion);
+    m.attr("_rehdr_version_nibble") = py::int_(rehdrVersionNibble);
+    m.attr("_lbhdr_version") = py::int_(lbhdrVersion);
+    m.attr("_synchdr_version") = py::int_(synchdrVersion);
+
     // Bind the get_Version method
-    m.def("__version__", &get_Version);
+    m.def("get_version", &get_Version);
 
     /**
      * Bind the E2SARErrorc enum class
@@ -79,9 +92,8 @@ PYBIND11_MODULE(e2sar_py, m) {
     // For all the returning datatype of result<...>
     initBindingResultType(m);
 
-    /**
-     * Bind the e2sar::EjfatURI class etc
-     */
+    init_e2sarHeaders(m);
+
     init_e2sarUtil(m);
 
     /**

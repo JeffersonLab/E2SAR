@@ -8,9 +8,6 @@ using namespace e2sar;
 
 void init_e2sarUtil(py::module_ &m) {
 
-    // Bind the constant
-    m.attr("DATAPLANE_PORT") = DATAPLANE_PORT;
-
     // Bind the EjfatURI class in the main module
     py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
 

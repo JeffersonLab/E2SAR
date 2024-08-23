@@ -4,6 +4,7 @@ pybind11_module_name = 'e2sar_py'
 pybind11_src = [
     'py_e2sar.cpp',
     'py_e2sarCP.cpp',
+    'py_e2sarHeaders.cpp',
     'py_e2sarUtil.cpp'
     ]
 

@@ -1,13 +1,12 @@
-/**
- * Create a Python submodule named "xxx".
- * TODO: find the submodule name.
- * Created by xmei@jlab.org on Aug/15/24.
-*/
-
 #include <pybind11/pybind11.h>
 
 #include "e2sarUtil.hpp"
 #include "e2sarCP.hpp"
+
+/**
+ * Create a Python submodule named "ControlPlane".
+ * Created by xmei@jlab.org on Aug/15/24.
+*/
 
 namespace py = pybind11;
 using namespace e2sar;
