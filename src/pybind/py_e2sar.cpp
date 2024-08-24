@@ -46,9 +46,9 @@ PYBIND11_MODULE(e2sar_py, m) {
     // Bind the get_Version method
     m.def("get_version", &get_Version);
 
-    /**
-     * Bind the E2SARErrorc enum class
-     */
+    /// TODO: try bind the E2SARErrorc enum class to submodule "ErrorCode" to make the top module looks nicer.
+    // py::module_ e2sar_ec = m.def_submodule("ErrorCode", "E2SAR ErrorCode submodule");
+
     py::enum_<E2SARErrorc>(m, "E2SARErrorc")
         .value("NoError", E2SARErrorc::NoError)
         .value("CaughtException", E2SARErrorc::CaughtException)
@@ -96,11 +96,6 @@ PYBIND11_MODULE(e2sar_py, m) {
 
     init_e2sarUtil(m);
 
-    /**
-     * TODO: fix this statement.
-     * Bind the e2sar::LBManager class to the Python e2sar_py.lbManager.lb_manager class.
-     * e2sar_py.lbManager is a submodule.
-     */
     init_e2sarCP(m);
 }
 
@@ -185,6 +180,23 @@ void initBindingResultType(pybind11::module_ &m)
                 throw std::runtime_error(res.error().message());
         })
         .def("error", [](const outcome::result<int, E2SARErrorInfo> &res) {
+            if (!res)
+                return res.error();
+            else
+                throw std::runtime_error("No error present");
+        });
+
+    /**
+     * Bind the result type containing uint32_t.
+     */
+    py::class_<outcome::result<u_int32_t, E2SARErrorInfo>>(m, "E2SARResultUInit32")
+        .def("value", [](const outcome::result<u_int32_t, E2SARErrorInfo> &res) {
+            if (res)
+                return res.value();
+            else
+                throw std::runtime_error(res.error().message());
+        })
+        .def("error", [](const outcome::result<u_int32_t, E2SARErrorInfo> &res) {
             if (!res)
                 return res.error();
             else

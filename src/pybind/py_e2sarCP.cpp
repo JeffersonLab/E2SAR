@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "e2sarUtil.hpp"
 #include "e2sarCP.hpp"
@@ -75,7 +76,12 @@ void init_e2sarCP(py::module_ &m) {
     print([worker.name for worker in status.workers])
     */
 
-    // Binding the LBManager class as "LBManager" in the submodule "ControlPlane"
+    /**
+     * Binding the LBManager class as "LBManager" in the submodule "ControlPlane".
+     * This has never been test in Python with a real or a mock LB.
+     *
+     * TODO: Python mock LB test
+     */
     py::class_<LBManager> lb_manager(e2sarCP, "LBManager");
 
     // Constructor
