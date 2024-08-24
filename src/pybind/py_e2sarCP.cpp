@@ -1,13 +1,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/chrono.h>
+#include <google/protobuf/timestamp.pb.h>
 
 #include "e2sarUtil.hpp"
 #include "e2sarCP.hpp"
-
-/**
- * Create a Python submodule named "ControlPlane".
- * Created by xmei@jlab.org on Aug/15/24.
-*/
 
 namespace py = pybind11;
 using namespace e2sar;
@@ -23,6 +20,22 @@ py::object outcome_result_to_pyobject(outcome::result<T, E>& res) {
     }
 }
 
+// Function to convert C++ Timestamp to Python Timestamp
+py::object convert_timestamp_to_python(const google::protobuf::Timestamp& ts) {
+    py::module_ protobuf = py::module_::import("google.protobuf.timestamp_pb2");
+    py::object py_timestamp = protobuf.attr("Timestamp")();
+    py_timestamp.attr("seconds") = ts.seconds();
+    py_timestamp.attr("nanos") = ts.nanos();
+    return py_timestamp;
+}
+
+// Function to convert Python Timestamp to C++ Timestamp
+google::protobuf::Timestamp convert_timestamp_to_cpp(py::object py_timestamp) {
+    google::protobuf::Timestamp ts;
+    ts.set_seconds(py_timestamp.attr("seconds").cast<int64_t>());
+    ts.set_nanos(py_timestamp.attr("nanos").cast<int32_t>());
+    return ts;
+}
 
 void init_e2sarCP(py::module_ &m) {
     // Define the submodule "ControlPlane"
@@ -32,17 +45,31 @@ void init_e2sarCP(py::module_ &m) {
     py::class_<LoadBalancerStatusReply>(e2sarCP, "LoadBalancerStatusReply")
         .def(py::init<>());
 
-    // Bind LBWorkerStatus
-    /// TODO: check with Python tests
+    py::class_<google::protobuf::Timestamp>(m, "Timestamp")
+        .def(py::init<>())
+        .def("get_seconds", &google::protobuf::Timestamp::seconds)
+        .def("get_nanos", &google::protobuf::Timestamp::nanos)
+        .def("set_seconds", &google::protobuf::Timestamp::set_seconds)
+        .def("set_nanos", &google::protobuf::Timestamp::set_nanos);
+
     py::class_<LBWorkerStatus>(e2sarCP, "LBWorkerStatus")
-        // Binding the constructor with parameters
-        .def(
-            py::init<const std::string&, float, float, uint32_t, google::protobuf::Timestamp>(),
+        .def(py::init<const std::string&, float, float, int, const google::protobuf::Timestamp&>(),
             py::arg("name"),
-            py::arg("fill_percentage"),
+            py::arg("fill_percent"),
             py::arg("control_signal"),
             py::arg("slots_assigned"),
-            py::arg("last_updated")
+            py::arg("last_updated"))
+        .def_readwrite("name", &LBWorkerStatus::name)
+        .def_readwrite("fill_percent", &LBWorkerStatus::fillPercent)
+        .def_readwrite("control_signal", &LBWorkerStatus::controlSignal)
+        .def_readwrite("slots_assigned", &LBWorkerStatus::slotsAssigned)
+        .def_property("last_updated",
+            [](const LBWorkerStatus &self) {
+                return convert_timestamp_to_python(self.lastUpdated); // Access the member directly
+            },
+            [](LBWorkerStatus &self, py::object py_timestamp) {
+                self.lastUpdated = convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
+            }
         );
 
     // Bind LBStatus
@@ -50,31 +77,6 @@ void init_e2sarCP(py::module_ &m) {
     py::class_<LBStatus>(e2sarCP, "LBStatus")
         /// TODO: No binding for method with move()
         .def(py::init<>());
-
-    /* Python code for LBWorkerStatus and LBStatus objects.
-    // NOTE: delete in the future.
-    import example
-    from google.protobuf.timestamp_pb2 import Timestamp
-
-    # Create a Timestamp object
-    timestamp = Timestamp()
-    timestamp.GetCurrentTime()
-
-    # Create LBWorkerStatus objects
-    worker1 = example.LBWorkerStatus("Worker1", 75.5, 0.9, 10, timestamp)
-    worker2 = example.LBWorkerStatus("Worker2", 80.2, 1.1, 15, timestamp)
-
-    workers = [worker1, worker2]
-    sender_addresses = ["address1", "address2"]
-
-    # Create an LBStatus object
-    status = example.LBStatus(timestamp, 1234, 5678, workers, sender_addresses, timestamp)
-
-    # Access members
-    print(status.currentEpoch)
-    print(status.senderAddresses)
-    print([worker.name for worker in status.workers])
-    */
 
     /**
      * Binding the LBManager class as "LBManager" in the submodule "ControlPlane".
