@@ -22,11 +22,10 @@ using namespace e2sar;
 /// TODO: better bindings for the result<> type. May try to connect with Python try... except... @xmei
 void initBindingResultType(py::module_ &m);
 
-
 void init_e2sarCP(py::module_ &m);    // in a submodule "ControlPlane"
 void init_e2sarUtil(py::module_ &m);  // in the main module
 void init_e2sarHeaders(py::module_ &m);  // in the main module
-// void init_e2sarDP(pybind11::module_ &m);    // in a submodule "DataPlane"
+void init_e2sarDP(pybind11::module_ &m);    // in a submodule "DataPlane"
 
 // "e2sar_py" will be the python module name using in "import xxx"
 PYBIND11_MODULE(e2sar_py, m) {
@@ -46,8 +45,8 @@ PYBIND11_MODULE(e2sar_py, m) {
     // Bind the get_Version method
     m.def("get_version", &get_Version);
 
-    /// TODO: try bind the E2SARErrorc enum class to submodule "ErrorCode" to make the top module looks nicer.
-    // py::module_ e2sar_ec = m.def_submodule("ErrorCode", "E2SAR ErrorCode submodule");
+    /// TODO: try bind the E2SARErrorc enum class to submodule "e2sarError" to make the top module looks nicer.
+    // py::module_ e2sar_ec = m.def_submodule("e2sarError", "E2SAR e2sarError submodule");
 
     py::enum_<E2SARErrorc>(m, "E2SARErrorc")
         .value("NoError", E2SARErrorc::NoError)
@@ -59,6 +58,9 @@ PYBIND11_MODULE(e2sar_py, m) {
         .value("Undefined", E2SARErrorc::Undefined)
         .value("NotFound", E2SARErrorc::NotFound)
         .value("RPCError", E2SARErrorc::RPCError)
+        .value("SocketError", E2SARErrorc::SocketError)
+        .value("MemoryError", E2SARErrorc::MemoryError)
+        .value("LogicError", E2SARErrorc::LogicError)
         .export_values();
 
     /**
@@ -97,6 +99,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     init_e2sarUtil(m);
 
     init_e2sarCP(m);
+    init_e2sarDP(m);
 }
 
 void initBindingResultType(pybind11::module_ &m)

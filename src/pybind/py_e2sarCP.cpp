@@ -9,7 +9,7 @@
 namespace py = pybind11;
 using namespace e2sar;
 
-// Convert outcome::result to a Python object
+// Convert outcome::result to a Python object. It's for unique_ptr situations.
 template<typename T, typename E>
 py::object outcome_result_to_pyobject(outcome::result<T, E>& res) {
     if (res) {

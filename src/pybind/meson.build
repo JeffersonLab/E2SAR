@@ -4,6 +4,7 @@ pybind11_module_name = 'e2sar_py'
 pybind11_src = [
     'py_e2sar.cpp',
     'py_e2sarCP.cpp',
+    'py_e2sarDP.cpp',
     'py_e2sarHeaders.cpp',
     'py_e2sarUtil.cpp'
     ]
@@ -25,7 +26,8 @@ pybind11_inc = include_directories(pybind11_include_dir)
 py_install.extension_module(pybind11_module_name,
     sources: pybind11_src,
     include_directories: [inc, pybind11_inc],
-    dependencies: [py_install.dependency(), boost_dep, grpc_dep, protobuf_dep],
+    dependencies: [py_install.dependency(),
+        boost_dep, grpc_dep, protobuf_dep, thread_dep],
     link_language: 'cpp',
     override_options: [
         'cpp_rtti=true'
