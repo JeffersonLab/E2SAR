@@ -82,6 +82,10 @@ namespace e2sar
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
         useCP{rflags.useCP}
     {
+        // std::cout << "Starting Reassembler constructor" << std::endl;
+        // std::cout << "Number of recv threads: " << numRecvThreads << std::endl;
+        // std::cout << "rflags.withLBHeader: " << rflags.withLBHeader << std::endl;
+
         sanityChecks();
         // note if the user chooses to override portRange in rflags, 
         // we can end up in a silly situation where the number of receive ports is smaller
