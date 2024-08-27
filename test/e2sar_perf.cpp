@@ -100,7 +100,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // initialize a pool of memory buffers  we will be sending (mostly filled with random data)
     evtBufferPool = new boost::pool<>{eventBufSize};
 
-    for(auto evt = 0; evt < numEvents; evt++)
+    for(size_t evt = 0; evt < numEvents; evt++)
     {
         // Get the current time point
         auto nowT = boost::chrono::high_resolution_clock::now();

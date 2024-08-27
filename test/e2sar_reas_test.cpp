@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         {
             auto recvres = reas.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
             if (recvres.has_error())
-                std::cout << "Error encountered receiving event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered receiving event frames " << std::endl;
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
             else
@@ -231,7 +231,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         {
             auto recvres = reas.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
             if (recvres.has_error())
-                std::cout << "Error encountered receiving event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered receiving event frames" << std::endl;
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
             else
@@ -548,7 +548,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         {
             auto recvres = reas.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
             if (recvres.has_error())
-                std::cout << "Error encountered receiving event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered receiving event frames" << std::endl;
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
             else
