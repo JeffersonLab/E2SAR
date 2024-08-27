@@ -47,6 +47,9 @@ For python dependencies minimum Python 3.9 is required. It is recommended you cr
 $ python3 -m venv /path/to/e2sar/venv
 $ . /path/to/e2sar/venv/bin/activate
 $ pip install pybind11
+
+# To bridge the C++ google::protobuf datatypes, install the Python protobuf package
+$ pip install protobuf
 ```
 Continue using the venv when compiling and testing e2sar. PSA: you can get out of the venv by running `deactivate` from inside the venv. 
 
