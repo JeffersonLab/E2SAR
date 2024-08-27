@@ -423,7 +423,7 @@ int main(int argc, char **argv)
     if (vm.count("reserve") || vm.count("free") || vm.count("status") || vm.count("version")) 
     {
         tt = EjfatURI::TokenType::admin;
-    } else if (vm.count("register")) 
+    } else if (vm.count("register") || vm.count("addsenders") || vm.count("removesenders")) 
     {
         tt = EjfatURI::TokenType::instance;
     } else if (vm.count("deregister") || vm.count("state"))
