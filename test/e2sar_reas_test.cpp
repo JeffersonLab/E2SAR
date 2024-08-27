@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
 
         Reassembler reas(reasUri, 1, rflags);
 
-        std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
+        std::cout << "This reassembler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
             reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
             std::endl;
 
@@ -119,9 +119,26 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        // This is not an exception object, this is because of this line in Reassembler constructor:
+        // dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)}
+        // if data address is messed up in the URI it will produce E2SARErrorInfo object with code and message
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
@@ -225,9 +242,23 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
@@ -312,9 +343,23 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
@@ -514,9 +559,23 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
