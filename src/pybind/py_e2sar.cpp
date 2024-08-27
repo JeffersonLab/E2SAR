@@ -67,9 +67,13 @@ PYBIND11_MODULE(e2sar_py, m) {
      * Bind the E2SARErrorInfo class
      */
     py::class_<E2SARErrorInfo>(m, "E2SARErrorInfo")
-        .def(py::init<E2SARErrorc, std::string>())
-        .def("code", &E2SARErrorInfo::code)
-        .def("message", &E2SARErrorInfo::message);
+        .def_property_readonly("get_code", &E2SARErrorInfo::code)
+        .def_property_readonly("get_message", &E2SARErrorInfo::message)
+        .def(
+            "__repr__", [](const E2SARErrorInfo &err) {
+                return "<E2SARErrorInfo(code=" + std::to_string(static_cast<int>(err.code())) +
+                ", message='" + err.message() + "')>";
+            });
 
     /**
      * Bind "IPAddress" class for future usage
@@ -176,17 +180,18 @@ void initBindingResultType(pybind11::module_ &m)
      * Bind the result type containing int.
      */
     py::class_<outcome::result<int, E2SARErrorInfo>>(m, "E2SARResultInt")
-        .def("value", [](const outcome::result<int, E2SARErrorInfo> &res) {
-            if (res)
-                return res.value();
-            else
-                throw std::runtime_error(res.error().message());
-        })
-        .def("error", [](const outcome::result<int, E2SARErrorInfo> &res) {
-            if (!res)
+        .def("value", [](const result<int> &res) { return res.value(); })
+        .def("error", [](const result<int> &res) -> E2SARErrorInfo {
+            if (!res) {
                 return res.error();
-            else
-                throw std::runtime_error("No error present");
+            }
+            throw std::runtime_error("No error present");
+        })
+        .def("has_error", [](const result<int> &res) {
+            return !res.has_value();
+        })
+        .def("has_value", [](const result<int> &res) {
+            return res.has_value();
         });
 
     /**
@@ -224,3 +229,29 @@ void initBindingResultType(pybind11::module_ &m)
                 throw std::runtime_error("No error present");
         });
 }
+
+/// TODO: look into templated result<> bindings
+// template <typename T>
+// void bind_result(py::module &m, const std::string &name) {
+//     py::class_<result<T>>(m, name.c_str())
+//         .def("value", [](const result<T> &res) { return res.value(); })
+//         .def("error", [](const result<T> &res) -> E2SARErrorInfo {
+//             if (!res) {
+//                 return res.error();
+//             }
+//             throw std::runtime_error("No error present in result");
+//         })
+//         .def("has_error", [](const result<T> &res) {
+//             return !res.has_value();
+//         })
+//         .def("has_value", [](const result<T> &res) {
+//             return res.has_value();
+//         });
+// }
+
+// PYBIND11_MODULE(your_module, m) {
+//     // Bind specific result types
+//     bind_result<int>(m, "ResultInt");
+//     bind_result<std::string>(m, "ResultString");
+//     bind_result<EjfatURI>(m, "ResultEjfatURI");
+// }

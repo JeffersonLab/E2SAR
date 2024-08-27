@@ -91,15 +91,15 @@ void init_e2sarDP_segmenter(py::module_ &m)
     // Return type of result<int>
     seg.def("OpenAndStart", &Segmenter::openAndStart);
 
-    // Invoke type contains py::bytes
+    // Send method related to callback. Have to define corresponding wrapper function.
     seg.def("addToSendQueue",
-        [](e2sar::Segmenter& seg, py::bytes event, size_t bytes,
+        [](e2sar::Segmenter& seg, py::buffer py_buf, size_t bytes,
         int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
         py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
 
             // Convert py::bytes to uint8_t*
-            std::string event_str = event;
-            uint8_t* event_ptr = reinterpret_cast<uint8_t*>(event_str.data());
+            py::buffer_info buf_info = py_buf.request();
+            uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
 
             // Convert Python callback to std::function (if provided)
             std::function<void(boost::any)> c_callback = nullptr;
@@ -117,7 +117,7 @@ void init_e2sarDP_segmenter(py::module_ &m)
             }
 
             // Call the wrapper function
-            return addToSendQueueWrapper(seg, event_ptr, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
+            return addToSendQueueWrapper(seg, data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
         },
         "Call Segmenter::addToSendQueue.",
         py::arg("event"),
@@ -164,4 +164,53 @@ void init_e2sarDP_reassembler(py::module_ &m)
         py::arg("uri"),  // must-have arg when init
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
+
+    // Recv events part
+    reas.def("getEvent",
+        [](Reassembler& self,
+        py::list& recv_bytes, py::list& py_eventNum, py::list& py_dataId  // py::list are mutable
+        ) -> int {
+            u_int8_t *eventBuf{nullptr};
+            size_t eventLen = 0;
+            EventNum_t eventNum = 0;
+            u_int16_t recDataId = 0;
+
+            auto recvres = self.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
+
+            if (recvres.has_error())
+                std::cout << "Error encountered receiving event frames: "
+                << recvres.error().message() << std::endl;
+            if (recvres.value() == -1)
+                std::cout << "No message received, continuing" << std::endl;
+            else
+                // // Received event
+                // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
+                //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
+
+            // Convert eventBuf to a Python bytes object and update the Python list with it
+            recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
+
+            // Update the Python lists with the new values
+            py_eventNum[0] = py::cast(eventNum);
+            py_dataId[0] = py::cast(recDataId);
+
+            return recvres.value();
+    },
+    "Get an event from the Reassembler.",
+    py::arg("recv_bytes_list"),
+    py::arg("eventNum"),
+    py::arg("dataId")
+    );
+
+    // Return type of result<int>
+    reas.def("OpenAndStart", &Reassembler::openAndStart);
+    reas.def("registerWorker", &Reassembler::registerWorker);
+    reas.def("deregisterWorker", &Reassembler::deregisterWorker);
+
+    // Return type of boost::tuple<>
+    reas.def("getStats", [](const Reassembler& reasObj) {
+            auto stats = reasObj.getStats();
+            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
+                                    boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats));
+        });
 }
