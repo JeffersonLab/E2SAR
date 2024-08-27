@@ -401,17 +401,18 @@ namespace e2sar
             {
                 return sendThreadState.maxPldLen;
             }
+            /*
+            * Tell threads to stop
+            */ 
+            inline void stopThreads() 
+            {
+                threadsStop = true;
+            }
         private:
             inline const boost::tuple<u_int64_t, u_int64_t, int> getStats(const AtomicStats &s) const
             {
                 return boost::make_tuple<u_int64_t, u_int64_t, int>(s.msgCnt, 
                     s.errCnt, s.lastErrno);
-            }
-
-            // Tell threads to stop
-            inline void stopThreads() 
-            {
-                threadsStop = true;
             }
 
             // Calculate the average event rate from circular buffer
