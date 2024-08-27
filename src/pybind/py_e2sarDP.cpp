@@ -32,6 +32,25 @@ void print_type(const T& param) {
 namespace py = pybind11;
 using namespace e2sar;
 
+result<int> addToSendQueueWrapper(e2sar::Segmenter& seg, uint8_t *event, size_t bytes, 
+                                  int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
+                                  std::function<void(boost::any)> callback,
+                                  boost::any cbArg) noexcept {
+    // If callback is provided, wrap it in a lambda
+    void (*c_callback)(boost::any) = nullptr;
+    if (callback) {
+        // Use a static function to store the lambda
+        static std::function<void(boost::any)> static_callback;
+        static_callback = callback;
+        c_callback = [](boost::any arg) {
+            static_callback(arg);
+        };
+    }
+
+    // Call the actual addToSendQueue method
+    return seg.addToSendQueue(event, bytes, _eventNum, _dataId, entropy, c_callback, cbArg);
+}
+
 void init_e2sarDP_reassembler(py::module_ &m);
 void init_e2sarDP_segmenter(py::module_ &m);
 
@@ -61,7 +80,8 @@ void init_e2sarDP_segmenter(py::module_ &m)
         .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets);
 
     // Constructor
-    seg.def(py::init<const EjfatURI &, u_int16_t, u_int32_t, const Segmenter::SegmenterFlags &>(),
+    seg.def(
+        py::init<const EjfatURI &, u_int16_t, u_int32_t, const Segmenter::SegmenterFlags &>(),
         "Init the Segmenter object.",
         py::arg("uri"),  // must-have args when init
         py::arg("data_id"),
@@ -74,22 +94,39 @@ void init_e2sarDP_segmenter(py::module_ &m)
     // Invoke type contains py::bytes
     seg.def("addToSendQueue",
         [](e2sar::Segmenter& seg, py::bytes event, size_t bytes,
-        int64_t _eventNum, uint16_t _dataId, uint16_t entropy) -> result<int> {
+        int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
+        py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
+
             // Convert py::bytes to uint8_t*
             std::string event_str = event;
             uint8_t* event_ptr = reinterpret_cast<uint8_t*>(event_str.data());
-            // std::cout << "  Sending context:\n\t" << event_str.data() << std::endl;
 
-            // Call the actual C++ function on the seg instance
-            return seg.addToSendQueue(
-                event_ptr, bytes, _eventNum, _dataId, entropy, nullptr, nullptr);
-            },
-        "Call Segmenter::addToSendQueue without callback or cbArg.",
+            // Convert Python callback to std::function (if provided)
+            std::function<void(boost::any)> c_callback = nullptr;
+            if (!callback.is_none()) {
+                c_callback = [callback](boost::any arg) {
+                    // Invoke the Python callback with the provided argument
+                    callback(arg);
+                };
+            }
+
+            // Wrap the Python cbArg in boost::any (if provided)
+            boost::any c_cbArg = nullptr;
+            if (!cbArg.is_none()) {
+                c_cbArg = cbArg;
+            }
+
+            // Call the wrapper function
+            return addToSendQueueWrapper(seg, event_ptr, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
+        },
+        "Call Segmenter::addToSendQueue.",
         py::arg("event"),
         py::arg("bytes"),
         py::arg("_eventNum") = 0LL,
         py::arg("_dataId") = 0,
-        py::arg("entropy") = 0
+        py::arg("entropy") = 0,
+        py::arg("callback") = py::none(),
+        py::arg("cbArg") = py::none()
     );
 
     // Return type of boost::tuple<>
@@ -120,37 +157,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
         .def_readwrite("withLBHeader", &Reassembler::ReassemblerFlags::withLBHeader)
         .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms);
 
-    /// TODO: constructor bindings can compile but cannot work on the Python end
     // Constructor
-    reas.def(py::init([](
-        const EjfatURI &uri, size_t numRecvThreads, const Reassembler::ReassemblerFlags &rflags) {
-        try {
-            std::cout << "Received Python objects for uri and rflags" << std::endl;
-            print_type(uri);
-            print_type(numRecvThreads);
-            print_type(rflags);
-
-            return std::make_unique<Reassembler>(uri, numRecvThreads, rflags);
-
-        } catch (const std::exception &e) {
-            throw std::runtime_error(std::string("Error in Reassembler constructor: ") + e.what());
-        } catch (...) {
-            throw std::runtime_error("Some other exception in Reassembler constructor.");
-        }
-        }),
+    reas.def(
+        py::init<const EjfatURI &, size_t, const Reassembler::ReassemblerFlags &>(),
         "Init the Reassembler object with number of recv threads.",
         py::arg("uri"),  // must-have arg when init
         py::arg("num_recv_threads") = (size_t)1,
-        py::arg("rflags") = Reassembler::ReassemblerFlags());
-
-    // Custom method to create an instance using the second constructor
-    reas.def_static("from_thread_num",
-        [](const EjfatURI &uri, size_t numRecvThreads = 1,
-            const Reassembler::ReassemblerFlags &rflags = e2sar::Reassembler::ReassemblerFlags()) {
-            return e2sar::Reassembler(uri, numRecvThreads, rflags);
-        },
-        "Init the Reassembler object with number of recv threads.",
-        py::arg("uri"),
-        py::arg("thread_num") = 1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 }
