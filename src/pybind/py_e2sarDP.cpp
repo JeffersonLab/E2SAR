@@ -167,9 +167,8 @@ void init_e2sarDP_reassembler(py::module_ &m)
 
     // Recv events part
     reas.def("getEvent",
-        [](Reassembler& self,
-        py::list& recv_bytes, py::list& py_eventNum, py::list& py_dataId  // py::list are mutable
-        ) -> int {
+        [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes
+        ) -> py::tuple {
             u_int8_t *eventBuf{nullptr};
             size_t eventLen = 0;
             EventNum_t eventNum = 0;
@@ -177,33 +176,33 @@ void init_e2sarDP_reassembler(py::module_ &m)
 
             auto recvres = self.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
 
-            if (recvres.has_error())
+            if (recvres.has_error()) {
                 std::cout << "Error encountered receiving event frames: "
-                << recvres.error().message() << std::endl;
+                    << recvres.error().message() << std::endl;
+                return py::make_tuple((int)-2, eventLen, eventNum, recDataId);
+            }
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
-            else
+            else {
                 // // Received event
                 // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
                 //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
 
-            // Convert eventBuf to a Python bytes object and update the Python list with it
-            recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
+                // Convert eventBuf to a Python bytes object and update the Python list with it
+                recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
+            }
 
-            // Update the Python lists with the new values
-            py_eventNum[0] = py::cast(eventNum);
-            py_dataId[0] = py::cast(recDataId);
+            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
 
-            return recvres.value();
     },
-    "Get an event from the Reassembler.",
-    py::arg("recv_bytes_list"),
-    py::arg("eventNum"),
-    py::arg("dataId")
+    "Get an event from the Reassembler. Use py::list[None] to accept the data.",
+    py::arg("recv_bytes_list")
     );
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
+
+    /// TODO: to be test
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
 
