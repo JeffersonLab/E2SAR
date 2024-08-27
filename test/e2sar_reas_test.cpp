@@ -115,6 +115,22 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
                 std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen << " with event number " << eventNum << " and data id " << recDataId << std::endl;
         }
 
+        auto recvStats = reas.getStats();
+        /*
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
+        */
+        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
+        BOOST_CHECK(recvStats.get<1>() == 5); // all succeeded
+        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+
         // stop threads and exit
     }
     catch (E2SARException &ee) {
@@ -237,6 +253,21 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
             else
                 std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen << " with event number " << eventNum << " and data id " << recDataId << std::endl;
         }
+        auto recvStats = reas.getStats();
+        /*
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
+        */
+        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
+        BOOST_CHECK(recvStats.get<1>() == 5); // all succeeded
+        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
 
         // stop threads and exit
     }
@@ -554,6 +585,22 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
             else
                 std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen << " with event number " << eventNum << " and data id " << recDataId << std::endl;
         }
+
+        auto recvStats = reas.getStats();
+        /*
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
+        */
+        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
+        BOOST_CHECK(recvStats.get<1>() == 20); // all succeeded
+        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
 
         // stop threads and exit
     }
