@@ -309,6 +309,9 @@ namespace e2sar
 
                 if (portRange > 14)
                     throw E2SARException("Port range out of bounds: [0, 14]");
+
+                if (!dpuri.has_dataAddr())
+                    throw E2SARException("Data address not present in the URI");
             }
         public:
             /**
@@ -341,7 +344,7 @@ namespace e2sar
                 int portRange; 
                 bool withLBHeader;
                 int eventTimeout_ms;
-                ReassemblerFlags(): cpV6{false}, useCP{true}, 
+                ReassemblerFlags(): dpV6{false}, cpV6{false}, useCP{true}, 
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500} {}
             };

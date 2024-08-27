@@ -241,6 +241,12 @@ namespace e2sar
 
                 if (sendThreadState.mtu > 9000)
                     throw E2SARException("MTU set too long, limit 9000");
+
+                if (!dpuri.has_syncAddr())
+                    throw E2SARException("Sync address not present in the URI");
+
+                if (!dpuri.has_dataAddr())
+                    throw E2SARException("Data address is not present in the URI");
             }
 
             /** Threads keep running while this is false */
