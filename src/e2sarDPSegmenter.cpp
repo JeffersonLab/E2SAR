@@ -443,6 +443,7 @@ namespace e2sar
         if (roundRobinIndex == socketFd4.size())
             roundRobinIndex = 0;
 
+        // randomize source port using round robin
         sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
         // prepare msghdr
         if (connectSocket) {

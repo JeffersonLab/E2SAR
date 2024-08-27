@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
 
         Reassembler reas(reasUri, 1, rflags);
 
-        std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
+        std::cout << "This reassembler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
             reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
             std::endl;
 
@@ -108,20 +108,53 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         {
             auto recvres = reas.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
             if (recvres.has_error())
-                std::cout << "Error encountered receiving event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered receiving event frames " << std::endl;
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
             else
                 std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen << " with event number " << eventNum << " and data id " << recDataId << std::endl;
         }
 
+        auto recvStats = reas.getStats();
+        /*
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
+        */
+        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
+        BOOST_CHECK(recvStats.get<1>() == 5); // all succeeded
+        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+
         // stop threads and exit
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        // This is not an exception object, this is because of this line in Reassembler constructor:
+        // dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)}
+        // if data address is messed up in the URI it will produce E2SARErrorInfo object with code and message
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
@@ -214,20 +247,49 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         {
             auto recvres = reas.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
             if (recvres.has_error())
-                std::cout << "Error encountered receiving event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered receiving event frames" << std::endl;
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
             else
                 std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen << " with event number " << eventNum << " and data id " << recDataId << std::endl;
         }
+        auto recvStats = reas.getStats();
+        /*
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
+        */
+        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
+        BOOST_CHECK(recvStats.get<1>() == 5); // all succeeded
+        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
 
         // stop threads and exit
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
@@ -312,9 +374,23 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 
@@ -503,20 +579,50 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         {
             auto recvres = reas.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
             if (recvres.has_error())
-                std::cout << "Error encountered receiving event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered receiving event frames" << std::endl;
             if (recvres.value() == -1)
                 std::cout << "No message received, continuing" << std::endl;
             else
                 std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen << " with event number " << eventNum << " and data id " << recDataId << std::endl;
         }
 
+        auto recvStats = reas.getStats();
+        /*
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; 
+             *  - int grpcErrCnt; 
+             *  - int dataErrCnt; 
+             *  - E2SARErrorc lastE2SARError; 
+        */
+        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
+        BOOST_CHECK(recvStats.get<1>() == 20); // all succeeded
+        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+
         // stop threads and exit
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::exception &e) {
+        std::cout << "STD:EXCEPTION encountered " << typeid(e).name() << ": " << e.what() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (std::error_code &e) {
+        std::cout << "STD ERROR CODE " << e.value() << " category " << e.category().name() << " with message " << e.message() << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (boost::exception &e) {
+        std::cout << "BOOST:EXCEPTION encountered " << typeid(e).name() << ": " << *boost::get_error_info<boost::throw_function>(e) << std::endl;
+        BOOST_CHECK(false);
     }
     catch (...) {
         std::cout << "Some other exception" << std::endl;
+        BOOST_CHECK(false);
     }
 }
 

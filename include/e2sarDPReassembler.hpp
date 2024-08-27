@@ -240,6 +240,7 @@ namespace e2sar
             std::vector<std::list<int>> portsToThreads;
             const bool withLBHeader;
             const int eventTimeout_ms; // how long we allow events to linger 'in progress' before we give up
+            const int recvWaitTimeout_ms{10}; // how long we wait on condition variable before we come up for air
 
             // lock with recv thread
             boost::mutex recvThreadMtx;
@@ -476,12 +477,16 @@ namespace e2sar
             {
                 return portRange;
             }
-        protected:
-        private:
+            /**
+             * Tell threads to stop. Also causes recvEvent to exit with (-1) 
+             */
             void stopThreads() 
             {
                 threadsStop = true;
             }
+        protected:
+        private:
+
             void setAffinity()
             {
 #ifdef AFFINITY_AVAILABLE

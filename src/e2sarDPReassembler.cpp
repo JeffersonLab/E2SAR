@@ -137,6 +137,26 @@ namespace e2sar
             // do select/wait on open sockets
             auto select_retval = select(maxFdPlusOne, &curSet, NULL, NULL, &sleep_tv);
 
+            // this is garbage collection
+            // sweep the map of in progress events and see if any should be given up on
+            // because we waited too long
+            auto nowT = boost::chrono::steady_clock::now();
+            for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
+                auto inWaiting = nowT - it->second->firstSegment;
+                auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
+                if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
+                    // deallocate event (ood queue and event buffer)
+                    it->second->cleanup(recvBufferPool);
+                    delete it->second->event;
+                    // deallocate queue item
+                    delete it->second;
+                    it = eventsInProgress.erase(it);  // erase returns the next element (or end())
+                    reas.recvStats.enqueueLoss++;
+                } else {
+                    ++it;  // Just advance the iterator if no deletion
+                }
+            }
+
             if (select_retval == -1)
             {
                 reas.recvStats.dataErrCnt++;
@@ -274,25 +294,6 @@ namespace e2sar
 
                     // update statistics
                     reas.recvStats.eventSuccess++;
-                }
-
-                // sweep the map of in progress events and see if any should be given up on
-                // because we waited too long
-                auto nowT = boost::chrono::steady_clock::now();
-                for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
-                    auto inWaiting = nowT - it->second->firstSegment;
-                    auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
-                    if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
-                        // deallocate event (ood queue and event buffer)
-                        it->second->cleanup(recvBufferPool);
-                        delete it->second->event;
-                        // deallocate queue item
-                        delete it->second;
-                        it = eventsInProgress.erase(it);  // erase returns the next element (or end())
-                        reas.recvStats.enqueueLoss++;
-                    } else {
-                        ++it;  // Just advance the iterator if no deletion
-                    }
                 }
             }
         }
@@ -476,13 +477,16 @@ namespace e2sar
 
     result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) noexcept
     {
-        recvThreadCond.wait(condLock);
 
         auto eventItem = dequeue();
 
+        while (eventItem == nullptr && !threadsStop)
+        {
+            recvThreadCond.wait_for(condLock, boost::chrono::milliseconds(recvWaitTimeout_ms));
+            eventItem = dequeue();
+        }
         if (eventItem == nullptr)
             return -1;
-
         *event = eventItem->event;
         *bytes = eventItem->bytes;
         *eventNum = eventItem->eventNum;
@@ -490,7 +494,6 @@ namespace e2sar
 
         // just rely on its locking
         delete eventItem;
-
         return 0;
     }
 }
