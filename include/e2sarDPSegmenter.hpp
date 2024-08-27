@@ -397,7 +397,7 @@ namespace e2sar
             /**
              * get the maximum payload length used by the segmenter
              */
-            inline const int getMaxPldLen() const noexcept
+            inline const size_t getMaxPldLen() const noexcept
             {
                 return sendThreadState.maxPldLen;
             }
