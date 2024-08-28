@@ -448,7 +448,6 @@ namespace e2sar
             // never changes past initialization
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
-                // note that srcId is only 16 bits, but the sync field is 32-bit wide
                 hdr->set(eventSrcId, eventNum, eventRate, tnano);
             }
 

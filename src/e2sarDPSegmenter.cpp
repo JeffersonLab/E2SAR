@@ -95,11 +95,13 @@ namespace e2sar
             // locking is not needed as sync thread is the  
             // only one interacting with the circular buffer
             if (seg.currentSyncStartNano != 0) {
-                struct SendStats statsToPush{seg.currentSyncStartNano, seg.eventsInCurrentSync};
+                struct SendStats statsToPush{seg.currentSyncStartNano.exchange(currentTimeNanos), 
+                    seg.eventsInCurrentSync.exchange(0)};
                 seg.eventStatsBuffer.push_back(statsToPush);
+            } else {
+                // just the first time (eventsInCurrentSync already initialized to 0)
+                seg.currentSyncStartNano = currentTimeNanos;
             }
-            seg.currentSyncStartNano = currentTimeNanos;
-            seg.eventsInCurrentSync = 0;
 
             // peek at segmenter metadata circular buffer to calculate event rate
             evtRate = seg.eventRate(currentTimeNanos);
@@ -556,9 +558,14 @@ namespace e2sar
         EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) noexcept
     {
         freeEventItemBacklog();
+        // reset local event number to override
+        if (_eventNum != 0)
+            eventNum.exchange(_eventNum);
+
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
-            (_eventNum == 0 ? eventNum++ : _eventNum), 
+        // continue incrementing
+            eventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
             entropy);
     }
@@ -570,13 +577,17 @@ namespace e2sar
         boost::any cbArg) noexcept
     {
         freeEventItemBacklog();
+        // reset local event number to override
+        if (_eventNum != 0)
+            eventNum.exchange(_eventNum);
         EventQueueItem *item = queueItemPool.construct();
         item->bytes = bytes;
         item->event = event;
         item->entropy = entropy;
         item->callback = callback;
         item->cbArg = cbArg;
-        item->eventNum = (_eventNum == 0 ? eventNum++ : _eventNum);
+        // continue incrementing 
+        item->eventNum = eventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
         eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
