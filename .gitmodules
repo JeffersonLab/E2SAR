@@ -4,3 +4,6 @@
 [submodule "docs"]
 	path = docs
 	url = git@github.com:JeffersonLab/E2SAR-doc.git
+[submodule "wiki"]
+	path = wiki
+	url = git@github.com:JeffersonLab/E2SAR.wiki.git

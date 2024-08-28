@@ -53,9 +53,11 @@ $ pip install protobuf
 ```
 Continue using the venv when compiling and testing e2sar. PSA: you can get out of the venv by running `deactivate` from inside the venv. 
 
+The other two large dependencies are the C++ Boost library and gRPC library. For some common distributions we have pre-compiled installation trees stored [under this directory](binary_artifacts/). Note that you must have git-lfs installed to access them. In many cases they m ay need to be built from scratch using instructions provided below.
+
 #### Installing gRPC from source
 
-gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source
+gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source. 
 
 ##### MacOS
 - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
@@ -203,6 +205,39 @@ Reported version: 1fb5d83f0186298f99a57f7d4df4177871e8524f
 If using a private CA, the `-o` option should be used to point to the CA certificate, assuming the server certificate contains the chain to the CA. Note also that you must specify EJFAT_URI using a hostname, not IP address if using certificate validation. When using `-v` option, IP addresses can be used.
 
 See [lbadm](bin/lbadm.cpp) code on how the two options are implemented and used. Programmatically it is possible to supply client-side certs to E2SAR, however UDPLBd does not validate them. See [LBManager constructor](src/e2sarCP.cpp) for how that can be done.
+
+# Generating Documentation
+
+## Doxygen
+
+A [Doxygen configuration file](Doxyfile) is provided with the distribution. It will update the documentation under docs/ which is a submodule - a separate public repo just for the documentation. Once updated, to make the documentation go live on [GitHub pages site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html) you can do as follows from E2SAR root (this assumes you have installed Doxygen 1.12.0 or later):
+```bash
+$ doxygen Doxyfile 
+$ cd docs
+$ git add .
+$ git commit -S -m "Update to the documentation"
+$ git push origin main
+$ cd ..
+$ git add docs
+$ git commit -S -m "Link docs/ commit to this commit of E2SAR"
+$ git push origin <appropriate E2SAR branch>
+```
+
+## Wiki
+
+The [Wiki](https://github.com/JeffersonLab/E2SAR/wiki) is also a submodule of the project (but is a separate repository) under wiki/. You can update it by doing the following:
+```bash
+$ cd wiki/
+$ vi <one or more of the .md pages>
+$ git add .
+$ git commit -S -m "Wiki update"
+$ git push origin master
+$ cd ..
+$ git add wiki
+$ git commit -S -m "Link wiki commit to this commit of E2SAR"
+$ git push origin <appropriate E2SAR branch>
+```
+Note that wiki uses `master` as its main branch, while docs/ and main E2SAR repo use `main`. 
 
 # Related information
 
