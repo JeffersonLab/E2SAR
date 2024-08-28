@@ -18,6 +18,7 @@ namespace e2sar
         dataId{did},
         eventSrcId{esid},
         numSendSockets{sflags.numSendSockets},
+        sndSocketBufSize{sflags.sndSocketBufSize},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
@@ -302,9 +303,17 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
 
+                // set sndBufSize
+                if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &seg.sndSocketBufSize, sizeof(seg.sndSocketBufSize)) < 0) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                
                 // set SO_ZEROCOPY on Linux
                 if (useZerocopy) {
-    #ifdef ZEROCOPY_AVAILABLE
+#ifdef ZEROCOPY_AVAILABLE
                     int zerocopy = 1;
                     int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
                     if (errz < 0) {
@@ -313,12 +322,12 @@ namespace e2sar
                         seg.sendStats.lastErrno = errno;
                         return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                     }
-    #else
+#else
                     close(fd);
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
-    #endif
+#endif
                 }
 
                 sockaddr_in6 dataAddrStruct6{};
@@ -380,6 +389,14 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to bind: "s + strerror(errno)};
+                }
+
+                // set sndBufSize
+                if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &seg.sndSocketBufSize, sizeof(seg.sndSocketBufSize)) < 0) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
 
                 // set SO_ZEROCOPY if needed

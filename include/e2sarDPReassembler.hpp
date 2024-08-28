@@ -241,6 +241,8 @@ namespace e2sar
             const bool withLBHeader;
             const int eventTimeout_ms; // how long we allow events to linger 'in progress' before we give up
             const int recvWaitTimeout_ms{10}; // how long we wait on condition variable before we come up for air
+            // recv socket buffer size for setsockop
+            const int rcvSocketBufSize;
 
             // lock with recv thread
             boost::mutex recvThreadMtx;
@@ -332,6 +334,8 @@ namespace e2sar
              * - withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
              * normal operation) {false}
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
+             * - rcvSocketBufSize - socket buffer size for receiving set via SO_RCVBUF setsockopt. Note
+             * that this requires systemwide max set via sysctl (net.core.rmem_max) to be higher. {3MB}
              */
             struct ReassemblerFlags 
             {
@@ -345,9 +349,11 @@ namespace e2sar
                 int portRange; 
                 bool withLBHeader;
                 int eventTimeout_ms;
+                int rcvSocketBufSize; 
                 ReassemblerFlags(): dpV6{false}, cpV6{false}, useCP{true}, 
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
-                    epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500} {}
+                    epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
+                    rcvSocketBufSize{1024*1024*3} {}
             };
             /**
              * Create a reassembler object to run receive on a specific set of CPU cores

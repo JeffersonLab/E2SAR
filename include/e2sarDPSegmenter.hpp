@@ -52,6 +52,9 @@ namespace e2sar
             // number of send sockets we will be using (to help randomize LAG ports on FPGAs)
             const size_t numSendSockets;
 
+            // send socket buffer size for setsockop
+            const int sndSocketBufSize;
+
             // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE{2047};
 
@@ -265,6 +268,8 @@ namespace e2sar
              * IP, UDP and LBRE headers) {1500}
              * - numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
+             * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
+             * that this requires systemwide max set via sysctl (net.core.wmem_max) to be higher. {3MB}
              */
             struct SegmenterFlags 
             {
@@ -276,10 +281,11 @@ namespace e2sar
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
                 size_t numSendSockets;
+                int sndSocketBufSize;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
                     useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4} {}
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
             };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.

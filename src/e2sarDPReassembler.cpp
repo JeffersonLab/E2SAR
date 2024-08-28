@@ -48,6 +48,7 @@ namespace e2sar
         portsToThreads(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
+        rcvSocketBufSize{rflags.rcvSocketBufSize},
         condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
         useCP{rflags.useCP}
@@ -78,6 +79,7 @@ namespace e2sar
         portsToThreads(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
+        rcvSocketBufSize{rflags.rcvSocketBufSize},
         condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
         useCP{rflags.useCP}
@@ -319,6 +321,14 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
 
+                // set recv socket buffer size
+                if (setsockopt(socketFd, SOL_SOCKET, SO_RCVBUF, &reas.rcvSocketBufSize, sizeof(reas.rcvSocketBufSize)) < 0) {
+                    close(socketFd);
+                    reas.recvStats.dataErrCnt++;
+                    reas.recvStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
                 dataAddrStruct6.sin6_port = htobe16(port);
@@ -339,6 +349,14 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
 
+                // set recv socket buffer size
+                if (setsockopt(socketFd, SOL_SOCKET, SO_RCVBUF, &reas.rcvSocketBufSize, sizeof(reas.rcvSocketBufSize)) < 0) {
+                    close(socketFd);
+                    reas.recvStats.dataErrCnt++;
+                    reas.recvStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
                 dataAddrStruct4.sin_port = htobe16(port);
