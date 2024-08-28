@@ -219,6 +219,7 @@ int main(int argc, char **argv)
     u_int16_t dataId;
     size_t numThreads;
     float rateGbps;
+    int sockBufSize;
 
     // parameters
     opts("send,s", "send traffic");
@@ -234,6 +235,7 @@ int main(int argc, char **argv)
     opts("threads,t", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
+    opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
 
     po::variables_map vm;
 
@@ -287,6 +289,8 @@ int main(int argc, char **argv)
             Segmenter::SegmenterFlags sflags;
             sflags.useCP = false; // turn off CP sync
             sflags.mtu = mtu;
+            sflags.sndSocketBufSize = sockBufSize;
+
             try {
                 Segmenter seg(uri, dataId, eventSourceId, sflags);
                 segPtr = &seg;
@@ -304,6 +308,7 @@ int main(int argc, char **argv)
 
             rflags.useCP = false; // turn off CP gRPC
             rflags.withLBHeader = true; // no LB
+            rflags.rcvSocketBufSize = sockBufSize;
             try {
                 Reassembler reas(uri, numThreads, rflags);
                 reasPtr = &reas;
