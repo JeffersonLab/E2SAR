@@ -505,6 +505,8 @@ namespace e2sar
                 if (sched_setaffinity(0, sizeof(set), &set) == -1)
                     throw E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
                 return 0;
+#else
+                return -1;
 #endif
             }
 

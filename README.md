@@ -5,7 +5,7 @@ A C++ library and associated Python binding that supports segmentation/reassembl
 
 This documentation is primarily targeted at E2SAR developers and contributors. 
 
-Documentation for E2SAR adopters is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki).
+Documentation for E2SAR adopters is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html).
 
 ## Checking out the code
 
@@ -13,12 +13,9 @@ Documentation for E2SAR adopters is contained in the [wiki](https://github.com/J
 
 All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
-Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to initialize the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb), then run `git submodule update` to get the code:
+Clone the project as shown below, to include the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb) as well as wiki/ and docs/ (which are separate repos maintaining doxygen documentation and the wiki):
 ```bash
-$ git clone git@github.com:JeffersonLab/E2SAR.git  # use -b if you want a specific branch
-$ cd E2SAR
-$ git submodule init
-$ git submodule update
+$ git clone --recurse-submodules --depth 1  # use -b if you want a specific branch
 ```
 
 If you want to update to the latest udplbd then also execute `git submodule update`. Note that you may need the correct branch of this project and as of this writing the is the `develop` branch and not `main`. You can do that by:
@@ -60,6 +57,7 @@ The other two large dependencies are the C++ Boost library and gRPC library. For
 gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source. 
 
 ##### MacOS
+
 - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
 - Use the following command to build:
 ```bash

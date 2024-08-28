@@ -50,12 +50,7 @@ e2sar_reas_live_test = executable('e2sar_reas_live_test', 'e2sar_reas_live_test.
 e2sar_reas_test = executable('e2sar_reas_test', 'e2sar_reas_test.cpp',
                             include_directories: inc,
                             link_with: libe2sar,
-                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
-
-e2sar_perf = executable('e2sar_perf', 'e2sar_perf.cpp',
-                            include_directories: inc,
-                            link_with: libe2sar,
-                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])            
+                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])        
 
 # these are standalone unit tests with no dependencies
 test('URITests', e2sar_uri_test, suite: 'unit')
@@ -68,5 +63,4 @@ test('LBCPLiveTests', e2sar_lbcp_live_test, suite: 'live')
 test('DPSyncLiveTests', e2sar_sync_live_test, suite: 'live')
 test('DPSegLiveTests', e2sar_seg_live_test, suite: 'live')
 test('DPReasLiveTests', e2sar_reas_live_test, suite: 'live')
-# these are manual test programs
-test('PerfTests', e2sar_perf, suite: 'manual')
+
