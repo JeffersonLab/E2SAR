@@ -495,15 +495,22 @@ namespace e2sar
         return 0;
     }
 
-    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) noexcept
+    result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId, u_int64_t wait_ms) noexcept
     {
+        auto nowT = boost::chrono::steady_clock::now();
+        boost::chrono::steady_clock::time_point nextTimeT;
+        bool overtime = false;
 
         auto eventItem = dequeue();
 
-        while (eventItem == nullptr && !threadsStop)
+        while (eventItem == nullptr && !threadsStop && !overtime)
         {
             recvThreadCond.wait_for(condLock, boost::chrono::milliseconds(recvWaitTimeout_ms));
             eventItem = dequeue();
+            nextTimeT = boost::chrono::steady_clock::now();
+
+            if ((wait_ms != 0) && (nextTimeT - nowT > boost::chrono::milliseconds(wait_ms))) 
+                overtime = true;
         }
         if (eventItem == nullptr)
             return -1;

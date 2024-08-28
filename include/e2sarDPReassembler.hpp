@@ -438,9 +438,10 @@ namespace e2sar
              * @param bytes - size of the event in the buffer
              * @param eventNum - the assembled event number
              * @param dataId - dataId from the reassembly header identifying the DAQ
+             * @param wait_ms - how long to block before giving up, defaults to 0 - forever
              * @return - result structure, check has_error() method or value() which is 0
              */
-            result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId) noexcept;
+            result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId, u_int64_t wait_ms=0) noexcept;
 
             /**
              * Get a tuple representing all the stats:

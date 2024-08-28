@@ -137,7 +137,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     return 0;
 }
 
-result<int> recvEvents(Reassembler &r) {
+result<int> recvEvents(Reassembler &r, int durationSec) {
 
     std::cout << "Receiving on ports " << r.get_recvPorts().first << ":" << r.get_recvPorts().second << std::endl;
 
@@ -153,12 +153,23 @@ result<int> recvEvents(Reassembler &r) {
     // to help print large integers
     std::cout.imbue(std::locale(""));
 
+    auto nowT = boost::chrono::steady_clock::now();
+
     // receive loop
     while(true)
     {
-        auto getEvtRes = r.recvEvent(&evtBuf, &evtSize, &evtNum, &dataId);
+        auto getEvtRes = r.recvEvent(&evtBuf, &evtSize, &evtNum, &dataId, 1000);
+
+        auto nextTimeT = boost::chrono::steady_clock::now();
+
+        if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(durationSec)))
+            break;
+
         if (getEvtRes.has_error())
             return getEvtRes;
+
+        if (getEvtRes.value() == -1)
+            continue;
 
         if (memcmp(evtBuf, eventPldStart.c_str(), eventPldStart.size() - 1))
             return E2SARErrorInfo{E2SARErrorc::MemoryError, "Payload start does not match expected"};
@@ -217,6 +228,7 @@ int main(int argc, char **argv)
     size_t numThreads;
     float rateGbps;
     int sockBufSize;
+    int durationSec;
 
     // parameters
     opts("send,s", "send traffic");
@@ -233,6 +245,7 @@ int main(int argc, char **argv)
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
+    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is presses)");
 
     po::variables_map vm;
 
@@ -310,7 +323,7 @@ int main(int argc, char **argv)
                 Reassembler reas(uri, numThreads, rflags);
                 reasPtr = &reas;
                 boost::thread statT(&recvStatsThread, &reas);
-                auto res = recvEvents(reas);
+                auto res = recvEvents(reas, durationSec);
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
