@@ -166,9 +166,6 @@ result<int> recvEvents(Reassembler &r) {
         if (memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
             return E2SARErrorInfo{E2SARErrorc::MemoryError, "Payload end doesn't match expected"};
 
-        std::cout << "Received event #" << evtNum << " of size " << evtSize << 
-            " with data id " << dataId << std::endl;
-
         delete evtBuf;
     }
     std::cout << "Completed" << std::endl;
