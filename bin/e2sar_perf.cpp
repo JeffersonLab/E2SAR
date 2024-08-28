@@ -163,7 +163,10 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
         auto nextTimeT = boost::chrono::steady_clock::now();
 
         if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(durationSec)))
+        {
+            ctrlCHandler(0);
             break;
+        }
 
         if (getEvtRes.has_error())
             return getEvtRes;
