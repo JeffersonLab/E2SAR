@@ -54,7 +54,9 @@ namespace e2sar
         useCP{rflags.useCP}
     {
         sanityChecks();
-        setAffinity();
+        auto afres = setAffinity();
+        if (afres.has_error())
+            throw E2SARException(afres.error().message());
         // note if the user chooses to override portRange in rflags, 
         // we can end up in a silly situation where the number of receive ports is smaller
         // than the number of receive threads, but we handle it
@@ -356,7 +358,7 @@ namespace e2sar
                     reas.recvStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-                
+
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
                 dataAddrStruct4.sin_port = htobe16(port);

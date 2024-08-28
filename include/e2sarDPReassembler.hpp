@@ -493,7 +493,7 @@ namespace e2sar
         protected:
         private:
 
-            void setAffinity()
+            result<int> setAffinity()
             {
 #ifdef AFFINITY_AVAILABLE
                 // set this process affinity to the indicated set of cores
@@ -503,7 +503,8 @@ namespace e2sar
                 for(auto core: cpuCoreList)
                     CPU_SET(core, &set);
                 if (sched_setaffinity(0, sizeof(set), &set) == -1)
-                    throw E2SARException("Unable to set core affinity.");
+                    throw E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
+                return 0;
 #endif
             }
 

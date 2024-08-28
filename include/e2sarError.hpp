@@ -33,7 +33,8 @@ namespace e2sar
     RPCError = 8,
     SocketError = 9,
     MemoryError = 10,
-    LogicError = 11
+    LogicError = 11,
+    SystemError = 12
   };
 
   struct E2SARErrorInfo
@@ -121,6 +122,8 @@ namespace detail
         return "memory error";
       case e2sar::E2SARErrorc::LogicError:
         return "logic error";
+      case e2sar::E2SARErrorc::SystemError:
+        return "system error";
       default:
         return "unknown";
       }
