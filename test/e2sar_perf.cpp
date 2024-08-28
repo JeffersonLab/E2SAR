@@ -21,6 +21,8 @@ using namespace e2sar;
 
 // prepare a pool
 boost::pool<> *evtBufferPool;
+// to avoid locking the pool we use the return queue
+boost::lockfree::queue<u_int8_t*> returnBufferQueue{10000};
 
 // event payload
 auto eventPldStart = "This is a start of event payload"s;
@@ -69,7 +71,7 @@ void option_dependency(const po::variables_map &vm,
 void freeBuffer(boost::any a) 
 {
     auto p = boost::any_cast<u_int8_t*>(a);
-    evtBufferPool->free(p);
+    returnBufferQueue.push(p);
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
@@ -122,6 +124,10 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             return E2SARErrorInfo{E2SARErrorc::LogicError, 
                 "Clock overrun, either event buffer length too short or requested sending rate too high"};
         }
+        // free the backlog of empty buffers
+        u_int8_t *item{nullptr};
+        while (returnBufferQueue.pop(item))
+            evtBufferPool->free(item);
         boost::this_thread::sleep_until(until);
     }
     auto stats = s.getSendStats();
