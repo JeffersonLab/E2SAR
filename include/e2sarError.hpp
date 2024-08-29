@@ -32,6 +32,9 @@ namespace e2sar
     NotFound = 7,
     RPCError = 8,
     SocketError = 9,
+    MemoryError = 10,
+    LogicError = 11,
+    SystemError = 12
   };
 
   struct E2SARErrorInfo
@@ -115,6 +118,12 @@ namespace detail
         return "gRPC error";
       case e2sar::E2SARErrorc::SocketError:
         return "socket error";
+      case e2sar::E2SARErrorc::MemoryError:
+        return "memory error";
+      case e2sar::E2SARErrorc::LogicError:
+        return "logic error";
+      case e2sar::E2SARErrorc::SystemError:
+        return "system error";
       default:
         return "unknown";
       }

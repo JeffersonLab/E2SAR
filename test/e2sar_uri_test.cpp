@@ -32,6 +32,9 @@ std::string uri_string9{"ejfats://ejfat-lb.es.net:18020/lb/36?sync=192.188.29.6:
 // with session id
 std::string uri_string10{"ejfats://ejfat-lb.es.net:18020/lb/36?sync=192.188.29.6:19020&sessionid=mysessionid"};
 
+// with custom data port
+std::string uri_string11{"ejfat://192.188.29.6:18020/lb/36?data=192.188.29.6:19020"};
+
 BOOST_AUTO_TEST_SUITE(URITestSuite)
 
 BOOST_AUTO_TEST_CASE(URITest1)
@@ -273,5 +276,27 @@ BOOST_AUTO_TEST_CASE(URITest12)
 
     BOOST_CHECK(euri.get_sessionId() == "mysessionid"s);
 }
+
+
+BOOST_AUTO_TEST_CASE(PortRangeTest)
+{
+    int portRange{12};
+    size_t numPorts{static_cast<size_t>(2 << (portRange - 1))};
+
+    std::cout << "Port range is " << get_PortRange(numPorts) << std::endl;
+
+    BOOST_CHECK(get_PortRange(numPorts) == portRange);
+}
+
+BOOST_AUTO_TEST_CASE(URITest13)
+{
+    EjfatURI euri(uri_string11);
+
+    std::cout << static_cast<std::string>(euri) << " Dataplane address with custom port:" << euri.get_dataAddrv4().value().first <<
+        ":" << euri.get_dataAddrv4().value().second << std::endl;
+
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == 19020);
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()

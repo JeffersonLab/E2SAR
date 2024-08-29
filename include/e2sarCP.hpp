@@ -186,6 +186,7 @@ namespace e2sar
          *
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
+         * @param senders list of sender IP addresses
          *
          * @return - FPGA LB ID, for use in correlating logs/metrics
          */
@@ -509,9 +510,9 @@ namespace e2sar
         /**
          * Generate gRPC-compliant custom SSL Options object with the following parameters,
          * where any parameter can be empty
-         * @param pem_root_certs    The file name containing the PEM encoding of the server root certificate.
-         * @param pem_private_key   The file name containing the PEM encoding of the client's private key.
-         * @param pem_cert_chain    The file name containing the PEM encoding of the client's certificate chain.
+         * @param pem_root_certs  - The file name containing the PEM encoding of the server root certificate.
+         * @param pem_private_key - The file name containing the PEM encoding of the client's private key.
+         * @param pem_cert_chain  - The file name containing the PEM encoding of the client's certificate chain.
          *
          * @return outcome for grpc::SslCredentialsOptions object with parameters filled in
          */
@@ -521,7 +522,8 @@ namespace e2sar
             std::string_view pem_cert_chain);
 
         /**
-         * Generate gRPC-compliant custom SSL Options object with just the server root cert
+         * Generate gRPC-compliant custom SSL Options object with just the server root cert 
+         * @param pem_root_certs - The file name containing the PEM encoding of the server root certificate.
          */
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
             std::string_view pem_root_certs);

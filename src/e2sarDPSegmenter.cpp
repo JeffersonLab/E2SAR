@@ -12,58 +12,64 @@ namespace e2sar
     // a condition for new events
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, u_int16_t entropy, 
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid,  
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
         eventSrcId{esid},
-        entropy{entropy},
+        numSendSockets{sflags.numSendSockets},
+        sndSocketBufSize{sflags.sndSocketBufSize},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket)
+        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
+        useCP{sflags.useCP}
     {
-        ;
+        sanityChecks();
     }
 
 #if 0
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, u_int16_t entropy, 
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, 
         const std::string iface, 
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
         eventSrcId{esid},
-        entropy{entropy},
+        numSendSockets{sflags.numSendSockets},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket)
+        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
+        useCP{sflags.useCP}
     {
 
         // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
         // set maxPldLen
-        ;
+        sanityChecks();
     }
 #endif
 
     result<int> Segmenter::openAndStart() noexcept
     {
-        // open and connect sync and send sockets
-        auto status = syncThreadState._open();
-        if (status.has_error()) 
+        if (useCP)
         {
-            return E2SARErrorInfo{E2SARErrorc::SocketError, 
-                "Unable to open sync socket: " + status.error().message()};
+            // open and connect sync socket
+            auto status = syncThreadState._open();
+            if (status.has_error()) 
+            {
+                return E2SARErrorInfo{E2SARErrorc::SocketError, 
+                    "Unable to open sync socket: " + status.error().message()};
+            }
+            // start the sync thread from method
+            boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
+            syncThreadState.threadObj = std::move(syncT);
         }
 
-        status = sendThreadState._open();
+        // open and connect send sockets
+        auto status = sendThreadState._open();
         if (status.has_error())
         {
             return E2SARErrorInfo{E2SARErrorc::SocketError,
                 "Unable to open data socket: " + status.error().message()};
         }
-
-        // start the sync thread from method
-        boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
-        syncThreadState.threadObj = std::move(syncT);
 
         // start the data sending thread from method
         boost::thread sendT(&Segmenter::SendThreadState::_threadBody, &sendThreadState);
@@ -80,7 +86,7 @@ namespace e2sar
             auto nowT = boost::chrono::high_resolution_clock::now();
             // Convert the time point to nanoseconds since the epoch
             auto now = boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count();
-            uint64_t currentTimeNanos = static_cast<uint64_t>(now);
+            UnixTimeNano_t currentTimeNanos = static_cast<UnixTimeNano_t>(now);
             // get sync header buffer
             SyncHdr hdr{};
             e2sar::EventRate_t evtRate;
@@ -89,11 +95,13 @@ namespace e2sar
             // locking is not needed as sync thread is the  
             // only one interacting with the circular buffer
             if (seg.currentSyncStartNano != 0) {
-                struct SendStats statsToPush{seg.currentSyncStartNano, seg.eventsInCurrentSync};
+                struct SendStats statsToPush{seg.currentSyncStartNano.exchange(currentTimeNanos), 
+                    seg.eventsInCurrentSync.exchange(0)};
                 seg.eventStatsBuffer.push_back(statsToPush);
+            } else {
+                // just the first time (eventsInCurrentSync already initialized to 0)
+                seg.currentSyncStartNano = currentTimeNanos;
             }
-            seg.currentSyncStartNano = currentTimeNanos;
-            seg.eventsInCurrentSync = 0;
 
             // peek at segmenter metadata circular buffer to calculate event rate
             evtRate = seg.eventRate(currentTimeNanos);
@@ -221,13 +229,11 @@ namespace e2sar
             {
                 // call send overriding event number as needed
                 auto res = _send(item->event, item->bytes, 
-                    (item->eventNum != 0 ? item->eventNum : seg.eventNum.value()));
+                    item->eventNum, item->dataId,
+                    item->entropy);
                 // FIXME: do something with result? 
                 // maybe not - it should be taken care by lastErrno in
                 // the stats block
-
-                // update event counter
-                seg.eventNum++;
 
                 // call the callback
                 if (item->callback != nullptr)
@@ -244,10 +250,7 @@ namespace e2sar
     {
 
         // Open v4 and v6 sockets for sending data message via DP
-        //
-        // First v6
-        //
-        sockaddr_in6 dataAddrStruct6{};
+
 #ifdef ZEROCOPY_AVIALABLE
         int zerocopy = 1;
 #endif
@@ -255,104 +258,192 @@ namespace e2sar
         if (mtu <= TOTAL_HDR_LEN)
             return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
 
-        if (useV6)
+        // create numSendSocket bound sockets either v6 or v4. With each socket
+        // we save the sockaddr structure in case they are of not connected variety
+        // so we can use in sendmsg
+        if (useV6) 
         {
             auto dataAddr6 = seg.dpuri.get_dataAddrv6();
             if (dataAddr6.has_error())
                 return dataAddr6.error();
+            for(auto i = socketFd6.begin(); i != socketFd6.end(); ++i) 
+            {
+                int fd{0};
+                bool done{false};
+                int numTries{5};
+                sockaddr_in6 localAddrStruct6{};
+                localAddrStruct6.sin6_family = AF_INET6;
+                localAddrStruct6.sin6_addr = in6addr_any; // Bind to any local address
 
-            if ((socketFd6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = errno;
-                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-            }
+                while(!done && (numTries > 0)) 
+                {
+                    // get random source port
+                    u_int16_t randomPort = portDist(ranlux);
 
-            // set SO_ZEROCOPY on Linux
-            if (useZerocopy) {
-#ifdef ZEROCOPY_AVAILABLE
-                int errz = setsockopt(socketFd6, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
-                if (errz < 0) {
-                    close(socketFd6);
+                    // open and bind a socket to this port (try)
+                    if ((fd = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = errno;
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                    }
+
+                    localAddrStruct6.sin6_port = htobe16(randomPort); // Set the source port
+
+                    if (bind(fd, (struct sockaddr *)&localAddrStruct6, sizeof(localAddrStruct6)) < 0) {
+                        close(fd);
+                        numTries--;
+                        // try another port
+                        continue;
+                    }
+                    done = true;
+                }
+                if (!done)
+                {
+                    // failed to bind socket after N tries
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-#else
-                close(socketFd6);
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = errno;
-                return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
-#endif
-            }
 
-            dataAddrStruct6.sin6_family = AF_INET6;
-            dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
-            inet_pton(AF_INET6, dataAddr6.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
-
-            if (connectSocket) {
-                int err = connect(socketFd6, (const sockaddr *) &dataAddrStruct6, sizeof(struct sockaddr_in6));
-                if (err < 0) {
-                    close(socketFd6);
+                // set sndBufSize
+                if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &seg.sndSocketBufSize, sizeof(seg.sndSocketBufSize)) < 0) {
+                    close(fd);
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-            }
-        }
-
-        //
-        // the v4 (always)
-        //
-        auto dataAddr4 = seg.dpuri.get_dataAddrv4();
-        if (dataAddr4.has_error())
-            return dataAddr4.error();
-
-        if ((socketFd4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-            seg.sendStats.errCnt++;
-            seg.sendStats.lastErrno = errno;
-            return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-        }
-
-        // set SO_ZEROCOPY if needed
-        if (useZerocopy) {
+                
+                // set SO_ZEROCOPY on Linux
+                if (useZerocopy) {
 #ifdef ZEROCOPY_AVAILABLE
-            int errz = setsockopt(socketFd4, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
-            if (errz < 0) {
-                close(socketFd4);
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = errno;
-                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-            }
+                    int zerocopy = 1;
+                    int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
+                    if (errz < 0) {
+                        close(fd);
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = errno;
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                    }
 #else
-            close(socketFd4);
-            seg.sendStats.errCnt++;
-            seg.sendStats.lastErrno = errno;
-            return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
 #endif
-        }
+                }
 
-        sockaddr_in dataAddrStruct4{};
-        dataAddrStruct4.sin_family = AF_INET;
-        dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
-        inet_pton(AF_INET, dataAddr4.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
+                sockaddr_in6 dataAddrStruct6{};
+                dataAddrStruct6.sin6_family = AF_INET6;
+                dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
+                inet_pton(AF_INET6, dataAddr6.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
 
-        if (connectSocket) {
-            int err = connect(socketFd4, (const sockaddr *) &dataAddrStruct4, sizeof(struct sockaddr_in));
-            if (err < 0) {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = errno;
-                close(socketFd4);
-                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                if (connectSocket) {
+                    int err = connect(fd, (const sockaddr *) &dataAddrStruct6, sizeof(struct sockaddr_in6));
+                    if (err < 0) {
+                        close(fd);
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = errno;
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                    }
+                }
+                *i = boost::make_tuple<int, sockaddr_in6, sockaddr_in6>(fd, localAddrStruct6, dataAddrStruct6);
+            }
+        } else 
+        {
+            auto dataAddr4 = seg.dpuri.get_dataAddrv4();
+            if (dataAddr4.has_error())
+                return dataAddr4.error();
+            for(auto i = socketFd4.begin(); i != socketFd4.end(); ++i) 
+            {
+                int fd{0};
+                bool done{false};
+                int numTries{5};
+                sockaddr_in localAddrStruct4{};
+                localAddrStruct4.sin_family = AF_INET;
+                localAddrStruct4.sin_addr.s_addr = htobe16(INADDR_ANY); // Bind to any local address
+
+                u_int16_t randomPort{0};
+                while(!done && (numTries > 0)) 
+                {
+                    // get random source port
+                    randomPort = portDist(ranlux);
+
+                    // open and bind a socket to this port (try)
+                    if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = errno;
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to open socket: "s + strerror(errno)};
+                    }
+
+                    localAddrStruct4.sin_port = htobe16(randomPort); // Set the source port
+
+                    if (bind(fd, (struct sockaddr *)&localAddrStruct4, sizeof(localAddrStruct4)) < 0) {
+                        close(fd);
+                        numTries--;
+                        // try another port
+                        continue;
+                    }
+                    done = true;
+                }
+                if (!done)
+                {
+                    // failed to bind socket after N tries
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to bind: "s + strerror(errno)};
+                }
+
+                // set sndBufSize
+                if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &seg.sndSocketBufSize, sizeof(seg.sndSocketBufSize)) < 0) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+
+                // set SO_ZEROCOPY if needed
+                if (useZerocopy) {
+#ifdef ZEROCOPY_AVAILABLE
+                   int zerocopy = 1;
+                    int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
+                    if (errz < 0) {
+                        close(fd);
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = errno;
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                    }
+#else
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
+#endif
+                }
+
+                sockaddr_in dataAddrStruct4{};
+                dataAddrStruct4.sin_family = AF_INET;
+                dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+                inet_pton(AF_INET, dataAddr4.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
+
+                if (connectSocket) {
+                    int err = connect(fd, (const sockaddr *) &dataAddrStruct4, sizeof(struct sockaddr_in));
+                    if (err < 0) {
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = errno;
+                        close(fd);
+                        return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to connect: "s + strerror(errno)};
+                    }
+                }
+                *i = boost::make_tuple<int, sockaddr_in, sockaddr_in>(fd, localAddrStruct4, dataAddrStruct4);
             }
         }
-
-        dataAddrStruct = boost::make_tuple<sockaddr_in, sockaddr_in6>(dataAddrStruct4, dataAddrStruct6);
 
         return 0;
     }
 
     // fragment and send the event
-    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, EventNum_t altEventNum)
+    result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy)
     {
         int err;
         struct iovec iov[2];
@@ -364,8 +455,15 @@ namespace e2sar
 #else   
         int flags{0};
 #endif
+        // new random entropy generated for each event buffer, unless user specified it
+        if (entropy == 0)
+            entropy = randDist(ranlux);
 
-        sendSocket = (useV6 ? socketFd6 : socketFd4);
+        if (roundRobinIndex == socketFd4.size())
+            roundRobinIndex = 0;
+
+        // randomize source port using round robin
+        sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
         // prepare msghdr
         if (connectSocket) {
             // prefill with blank
@@ -374,13 +472,14 @@ namespace e2sar
         } else {
             // prefill from persistent struct
             if (useV6) {
-                sendhdr.msg_name = (sockaddr_in *)& GET_V6_SEND_STRUCT(dataAddrStruct);
+                sendhdr.msg_name = (sockaddr_in *)& GET_REMOTE_SEND_STRUCT(socketFd6, roundRobinIndex);
             } else {
-                sendhdr.msg_name = (sockaddr_in *)& GET_V4_SEND_STRUCT(dataAddrStruct);
+                sendhdr.msg_name = (sockaddr_in *)& GET_REMOTE_SEND_STRUCT(socketFd4, roundRobinIndex);
             }
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
+        roundRobinIndex++;
 
         // fragment event, update/set iov and send in a loop
         u_int8_t *curOffset = event;
@@ -393,10 +492,9 @@ namespace e2sar
             // fill out LB and RE headers
             auto hdr = lbreHdrPool.construct();
 
-            // are we overwriting the event number?
-            EventNum_t finalEventNum = (altEventNum == 0LL ? seg.eventNum.value() : altEventNum);
-            hdr->re.set(seg.dataId, curOffset - event, curLen, finalEventNum);
-            hdr->lb.set(seg.entropy, finalEventNum);
+            // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
+            hdr->re.set(dataId, curOffset - event, bytes, eventNum);
+            hdr->lb.set(entropy, eventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -447,49 +545,50 @@ namespace e2sar
 
     result<int> Segmenter::SendThreadState::_close()
     {
-        close(socketFd4);
+        for(auto f: socketFd4)
+            close(f.get<0>());
         if (useV6)
-            close(socketFd6);
+            for (auto f: socketFd6)
+                close(f.get<0>());
         return 0;
     }
 
-    // Blocking call. Event number automatically set.
-    // Any core affinity needs to be done by caller.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes) noexcept
-    {
-        freeEventItemBacklog();
-        return sendThreadState._send(event, bytes, 0LL);
-    }
-
     // Blocking call specifying event number.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept
+    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, 
+        EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) noexcept
     {
         freeEventItemBacklog();
-        return sendThreadState._send(event, bytes, eventNumber);
-    }
+        // reset local event number to override
+        if (_eventNum != 0)
+            eventNum.exchange(_eventNum);
 
-    // Non-blocking call to place event on internal queue.
-    // Event number automatically set at send time
-    result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
-        void (*callback)(boost::any), 
-        boost::any cbArg) noexcept
-    {
-        return addToSendQueue(event, bytes, 0, callback, cbArg);
+        // use specified event number and dataId
+        return sendThreadState._send(event, bytes, 
+        // continue incrementing
+            eventNum++, 
+            (_dataId  == 0 ? dataId : _dataId), 
+            entropy);
     }
 
     // Non-blocking call specifying explicit event number.
     result<int> Segmenter::addToSendQueue(u_int8_t *event, size_t bytes, 
-        uint64_t eventNumber, 
+        EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy,
         void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
         freeEventItemBacklog();
+        // reset local event number to override
+        if (_eventNum != 0)
+            eventNum.exchange(_eventNum);
         EventQueueItem *item = queueItemPool.construct();
         item->bytes = bytes;
         item->event = event;
+        item->entropy = entropy;
         item->callback = callback;
         item->cbArg = cbArg;
-        item->eventNum = eventNumber;
+        // continue incrementing 
+        item->eventNum = eventNum++;
+        item->dataId = (_dataId  == 0 ? dataId : _dataId);
         eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
         sendThreadCond.notify_one();

@@ -21,8 +21,9 @@ namespace e2sar
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). 
      * The URI is of the format:
-     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
-     * More than one data= address can be specified (typically an IPv4 and IPv6)
+     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>[:<data_port>]][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
+     * More than one data= address can be specified (typically an IPv4 and IPv6). For data
+     * the port is optional and defaults to 19522, however for testing/debugging can be overridden
     */
     class EjfatURI
     {
@@ -44,9 +45,11 @@ namespace e2sar
         bool preferV6;
 
         /** UDP port for event sender to send sync messages to. */
-        uint16_t syncPort;
+        u_int16_t syncPort;
         /** TCP port for grpc communications with CP. */
-        uint16_t cpPort;
+        u_int16_t cpPort;
+        /** Dataplane port (normally defaults to DATAPLANE_POR) */
+        u_int16_t dataPort;
 
         /** String given by user, during registration, to label an LB instance. */
         std::string lbName;
@@ -78,7 +81,6 @@ namespace e2sar
          * (defaults to v4)
          */
         EjfatURI(const std::string &uri, TokenType tt=TokenType::admin, bool preferV6=false);
-        /** rely on implicitly-declared copy constructor as needed */
 
         /** destructor */
         ~EjfatURI() {}
@@ -239,7 +241,7 @@ namespace e2sar
         inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv4() const noexcept
         {
             if (haveDatav4)
-                return std::pair<ip::address, u_int16_t>(dataAddrv4, DATAPLANE_PORT);
+                return std::pair<ip::address, u_int16_t>(dataAddrv4, dataPort);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 
@@ -247,7 +249,7 @@ namespace e2sar
         inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv6() const noexcept
         {
             if (haveDatav6)
-                return std::pair<ip::address, u_int16_t>(dataAddrv6, DATAPLANE_PORT);
+                return std::pair<ip::address, u_int16_t>(dataAddrv6, dataPort);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 
@@ -449,5 +451,21 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to convert "s + host_name + " to ip address"s};
         }
     }
+
+    // to support unordered maps of pairs
+    struct pair_hash {
+        std::size_t operator()(const std::pair<u_int64_t, u_int16_t>& p) const {
+            u_int64_t hash1 = p.first;
+            u_int64_t tmp = p.second;
+            u_int64_t hash2 = tmp | tmp << 16 | tmp << 32 | tmp << 48;
+            return hash1 ^ hash2;  // Combine the two hashes
+        }
+    };
+
+    struct pair_equal {
+        bool operator()(const std::pair<u_int64_t, u_int16_t>& lhs, const std::pair<u_int64_t, u_int16_t>& rhs) const {
+            return lhs.first == rhs.first && lhs.second == rhs.second;
+        }
+    };
 };
 #endif

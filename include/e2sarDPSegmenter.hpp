@@ -11,14 +11,11 @@
 #include <boost/any.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/variant.hpp>
-
-#ifdef NETLINK_AVAILABLE
-#include <linux/rtnetlink.h>
-#endif
+#include <boost/random.hpp>
+#include <boost/chrono.hpp>
 
 #include <atomic>
 
-#include "e2sarError.hpp"
 #include "e2sarUtil.hpp"
 #include "e2sarHeaders.hpp"
 #include "e2sarNetUtil.hpp"
@@ -30,7 +27,6 @@
 
 namespace e2sar
 {
-
     /*
         The Segmenter class knows how to break up the provided
         events into segments consumable by the hardware loadbalancer.
@@ -45,17 +41,22 @@ namespace e2sar
         private:
             EjfatURI dpuri;
             // unique identifier of the originating segmentation
-            // point (e.g. a DAQ), carried in RE header
+            // point (e.g. a DAQ), carried in RE header (could be persistent
+            // as set here, or specified per event buffer)
             const u_int16_t dataId;
             // unique identifier of an individual LB packet transmitting
             // host/daq, 32-bit to accommodate IP addresses more easily
             // carried in Sync header
             const u_int32_t eventSrcId;
-            // entropy value of this sender carried in LB header
-            const u_int16_t entropy;
+
+            // number of send sockets we will be using (to help randomize LAG ports on FPGAs)
+            const size_t numSendSockets;
+
+            // send socket buffer size for setsockop
+            const int sndSocketBufSize;
 
             // Max size of internal queue holding events to be sent. 
-            static const size_t QSIZE = 2047;
+            static const size_t QSIZE{2047};
 
             // how long data send thread spends sleeping
             static const boost::chrono::milliseconds sleepTime;
@@ -64,7 +65,9 @@ namespace e2sar
             struct EventQueueItem {
                 uint32_t bytes;
                 EventNum_t eventNum;
+                u_int16_t dataId;
                 u_int8_t *event;
+                u_int16_t entropy;  // optional per event entropy
                 void (*callback)(boost::any);
                 boost::any cbArg;
             };
@@ -74,22 +77,22 @@ namespace e2sar
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
-            // to avoid locing the item pool send thread puts processed events 
+            // to avoid locking the item pool send thread puts processed events 
             // on this queue so they can be freed opportunistically by main thread
             boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
 
             // structure that maintains send stats
             struct SendStats {
                 // Last time a sync message sent to CP in nanosec since epoch.
-                u_int64_t lastSyncTimeNanos;
+                UnixTimeNano_t lastSyncTimeNanos;
                 // Number of events sent since last sync message sent to CP. 
-                u_int64_t eventsSinceLastSync; 
+                EventNum_t eventsSinceLastSync; 
             };
             // event metadata fifo to keep track of stats
             boost::circular_buffer<SendStats> eventStatsBuffer;
             // keep these atomic, as they are accessed by Sync, Send (and maybe main) thread
-            boost::atomic<u_int64_t> currentSyncStartNano{0};
-            boost::atomic<u_int64_t> eventsInCurrentSync{0};
+            boost::atomic<UnixTimeNano_t> currentSyncStartNano{0};
+            boost::atomic<EventNum_t> eventsInCurrentSync{0};
 
             // current event number
             boost::atomic<EventNum_t> eventNum{0};
@@ -157,12 +160,6 @@ namespace e2sar
                 boost::thread threadObj;
                 // connect socket flag (usually true)
                 const bool connectSocket{true};
-                // tuple containing v4 and v6 send address structures
-                // use boost::get<0> to get to v4 and boost::get<1> to
-                // get to v6 address struct
-#define GET_V4_SEND_STRUCT(sas) boost::get<0>(sas)
-#define GET_V6_SEND_STRUCT(sas) boost::get<1>(sas)
-                boost::tuple<sockaddr_in, sockaddr_in6> dataAddrStruct;
 
                 // flags
                 const bool useV6;
@@ -173,27 +170,54 @@ namespace e2sar
                 const std::string iface; // outgoing interface
                 const size_t maxPldLen;
 
-                // UDP sockets
-                int socketFd4{0};
-                int socketFd6{0};
+                // UDP sockets and matching sockaddr structures (local and remote)
+                // <socket fd, local address, remote address>
+#define GET_FD(sas, i) boost::get<0>(sas[i])
+#define GET_LOCAL_SEND_STRUCT(sas,i) boost::get<1>(sas[i])
+#define GET_REMOTE_SEND_STRUCT(sas, i) boost::get<2>(sas[i])
+                std::vector<boost::tuple<int, sockaddr_in, sockaddr_in>> socketFd4;
+                std::vector<boost::tuple<int, sockaddr_in6, sockaddr_in6>> socketFd6;
+                // we RR through these FDs
+                size_t roundRobinIndex{0};
+
                 // pool of LB+RE headers for sending
                 boost::object_pool<LBREHdr> lbreHdrPool{32,0};
 
+                // fast random number generator to create entropy values for events
+                // this entropy value is held the same for all packets of a given
+                // event guaranteeing the same destination UDP port for all of them
+                boost::random::ranlux24_base ranlux;
+                boost::random::uniform_int_distribution<> randDist{0, std::numeric_limits<u_int16_t>::max()};
+                // to get random port numbers we skip low numbered privileged ports
+                boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
+
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
-                    maxPldLen{mtu - TOTAL_HDR_LEN} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
+                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
+                {
+                    // this way every segmenter send thread has a unique PRNG sequence
+                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
+                }
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
                     mtu{NetUtil::getMTU(iface)}, iface{iface},
-                    maxPldLen{mtu - TOTAL_HDR_LEN} {}
+                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
+                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
+                {
+                    // this way every segmenter send thread has a unique PRNG sequence
+                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
+                }
 
                 // open v4/v6 sockets
                 result<int> _open();
                 // close sockets
                 result<int> _close();
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum);
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, u_int16_t entropy);
                 // thread loop
                 void _threadBody();
             };
@@ -204,6 +228,29 @@ namespace e2sar
             boost::mutex sendThreadMtx;
             // condition variable for send thread
             boost::condition_variable sendThreadCond;
+            // use control plane (can be disabled for debugging)
+            bool useCP;
+
+            /**
+             * Check the sanity of constructor parameters
+             */
+            inline void sanityChecks()
+            {
+                if (numSendSockets > 128)
+                    throw E2SARException("Too many sending sockets threads requested, limit 128");
+
+                if (syncThreadState.period_ms > 10000)
+                    throw E2SARException("Sync period too long, limit 10s");
+
+                if (sendThreadState.mtu > 9000)
+                    throw E2SARException("MTU set too long, limit 9000");
+
+                if (!dpuri.has_syncAddr())
+                    throw E2SARException("Sync address not present in the URI");
+
+                if (!dpuri.has_dataAddr())
+                    throw E2SARException("Data address is not present in the URI");
+            }
 
             /** Threads keep running while this is false */
             bool threadsStop{false};
@@ -211,25 +258,34 @@ namespace e2sar
             /** 
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
-             * dpV6 - prefer V6 dataplane {false}
-             * zeroCopy - use zeroCopy optimization {false}
-             * connectedSocket - use connected sockets {true}
-             * syncPeriodMs - sync thread period in milliseconds {300}
-             * syncPerods - number of sync periods to use for averaging reported send rate {3}
-             * mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
-             * IP, UDP and LBRE headers)
+             * - dpV6 - prefer V6 dataplane if the URI specifies both data=<ipv4>&data=<ipv6> addresses {false}
+             * - zeroCopy - use zeroCopy send optimization {false}
+             * - connectedSocket - use connected sockets {true}
+             * - useCP - enable control plane to send Sync packets {true}
+             * - syncPeriodMs - sync thread period in milliseconds {1000}
+             * - syncPerods - number of sync periods to use for averaging reported send rate {2}
+             * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
+             * IP, UDP and LBRE headers) {1500}
+             * - numSendSockets - number of sockets/source ports we will be sending data from. The
+             * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
+             * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
+             * that this requires systemwide max set via sysctl (net.core.wmem_max) to be higher. {3MB}
              */
             struct SegmenterFlags 
             {
-                bool dpV6;
+                bool dpV6; 
                 bool zeroCopy;
                 bool connectedSocket;
+                bool useCP;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
+                size_t numSendSockets;
+                int sndSocketBufSize;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500} {}
+                    useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
             };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
@@ -238,10 +294,9 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param entropy - entropy value of this sender
              * @param sfalags - SegmenterFlags 
              */
-            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy,  
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId,  
                 const SegmenterFlags &sflags=SegmenterFlags());
 #if 0
             /**
@@ -251,12 +306,11 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param entropy - entropy value of this sender
              * @param iface - use the following interface for data.
              * (get MTU from the interface and, if possible, set it as outgoing - available on Linux)
              * @param sflags - SegmenterFlags
              */
-            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, u_int16_t entropy, 
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, 
                 std::string iface=""s, 
                 const SegmenterFlags &sflags=SegmenterFlags());
 #endif
@@ -287,45 +341,35 @@ namespace e2sar
             /**
              * Open sockets and start the threads - this marks the moment
              * from which sync packets start being sent.
+             * @return - 0 on success, otherwise error condition
              */
             result<int> openAndStart() noexcept;
-
-            /**
-             * Send immediately using internal event number.
-             * @param event - event buffer
-             * @param bytes - bytes length of the buffer
-             */
-            result<int> sendEvent(u_int8_t *event, size_t bytes) noexcept;
 
             /**
              * Send immediately overriding event number.
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
-             * @param eventNumber - override the internal event number
+             * @param eventNumber - optionally override the internal event number
+             * @param dataId - optionally override the dataId
+             * @param entropy - optional event entropy value (random will be generated otherwise)
+             * @return - 0 on success, otherwise error condition
              */
-            result<int> sendEvent(u_int8_t *event, size_t bytes, uint64_t eventNumber) noexcept;
-
-            /**
-             * Add to send queue in a nonblocking fashion, using internal event number
-             * @param event - event buffer
-             * @param bytes - bytes length of the buffer
-             * @param callback - callback function to call after event is sent (non-blocking)
-             * @param cbArg - parameter for callback
-             */
-            result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
-                void (*callback)(boost::any) = nullptr, 
-                boost::any cbArg = nullptr) noexcept;
+            result<int> sendEvent(u_int8_t *event, size_t bytes, EventNum_t _eventNumber=0LL, 
+                u_int16_t _dataId=0, u_int16_t _entropy=0) noexcept;
 
             /**
              * Add to send queue in a nonblocking fashion, overriding internal event number
              * @param event - event buffer
              * @param bytes - bytes length of the buffer
-             * @param eventNumber - override the internal event number
-             * @param callback - callback function to call after event is sent
-             * @param cbArg - parameter for callback
+             * @param eventNum - optionally override the internal event number
+             * @param dataId - optionally override the dataId
+             * @param entropy - optional event entropy value (random will be generated otherwise)
+             * @param callback - optional callback function to call after event is sent
+             * @param cbArg - optional parameter for callback
+             * @return - 0 on success, otherwise error condition
              */
             result<int> addToSendQueue(u_int8_t *event, size_t bytes, 
-                uint64_t eventNumber, 
+                EventNum_t _eventNum=0LL, u_int16_t _dataId = 0, u_int16_t entropy=0,
                 void (*callback)(boost::any) = nullptr, 
                 boost::any cbArg = nullptr) noexcept;
 
@@ -359,9 +403,16 @@ namespace e2sar
             /**
              * get the maximum payload length used by the segmenter
              */
-            inline const int getMaxPldLen() const noexcept
+            inline const size_t getMaxPldLen() const noexcept
             {
                 return sendThreadState.maxPldLen;
+            }
+            /*
+            * Tell threads to stop
+            */ 
+            inline void stopThreads() 
+            {
+                threadsStop = true;
             }
         private:
             inline const boost::tuple<u_int64_t, u_int64_t, int> getStats(const AtomicStats &s) const
@@ -370,29 +421,22 @@ namespace e2sar
                     s.errCnt, s.lastErrno);
             }
 
-            // Tell threads to stop
-            inline void stopThreads() 
-            {
-                threadsStop = true;
-            }
-
             // Calculate the average event rate from circular buffer
             // note that locking lives outside this function, as needed.
             inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos) 
             {
-                // each element of circular buffer states the start of the sync period
-                // and the number of events sent during that period
-                UnixTimeNano_t  firstSyncStart{std::numeric_limits<unsigned long long>::max()};
+                // no rate to report
+                if (eventStatsBuffer.size() == 0)
+                    return 1;
                 EventNum_t eventTotal{0LL};
                 // walk the circular buffer
                 for(auto el: eventStatsBuffer)
                 {
-                    // find earliest time
-                    firstSyncStart = (el.lastSyncTimeNanos < firstSyncStart ? el.lastSyncTimeNanos : firstSyncStart);
                     // add up the events
                     eventTotal += el.eventsSinceLastSync;
                 }
-                auto timeDiff = currentTimeNanos - firstSyncStart;
+                auto timeDiff = currentTimeNanos - 
+                    eventStatsBuffer.begin()->lastSyncTimeNanos;
 
                 // convert to Hz and return
                 //return (eventTotal*1000000000UL)/timeDiff;
@@ -404,7 +448,6 @@ namespace e2sar
             // never changes past initialization
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
-                // note that srcId is only 16 bits, but the sync field is 32-bit wide
                 hdr->set(eventSrcId, eventNum, eventRate, tnano);
             }
 

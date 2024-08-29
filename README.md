@@ -1,9 +1,11 @@
 # E2SAR
-The internal dev repo of E2SAR - a C++ library and associated Python binding that support segmentation/reassembly (SAR) and control plane functionality of EJ-FAT project.
+A C++ library and associated Python binding that supports segmentation/reassembly (SAR) and control plane functionality of EJ-FAT project.
 
-## Documentation
+## Documentation Scope
 
-Documentation is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki).
+This documentation is primarily targeted at E2SAR developers and contributors. 
+
+Documentation for E2SAR adopters is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html).
 
 ## Checking out the code
 
@@ -11,12 +13,9 @@ Documentation is contained in the [wiki](https://github.com/JeffersonLab/E2SAR/w
 
 All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
-Clone the project as usual, then `cd` into the cloned directory and execute `git submodule init` to initialize the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb), then run `git submodule update` to get the code:
+Clone the project as shown below, to include the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb) as well as wiki/ and docs/ (which are separate repos maintaining doxygen documentation and the wiki):
 ```bash
-$ git clone git@github.com:JeffersonLab/E2SAR.git  # use -b if you want a specific branch
-$ cd E2SAR
-$ git submodule init
-$ git submodule update
+$ git clone --recurse-submodules --depth 1  # use -b if you want a specific branch
 ```
 
 If you want to update to the latest udplbd then also execute `git submodule update`. Note that you may need the correct branch of this project and as of this writing the is the `develop` branch and not `main`. You can do that by:
@@ -45,14 +44,20 @@ For python dependencies minimum Python 3.9 is required. It is recommended you cr
 $ python3 -m venv /path/to/e2sar/venv
 $ . /path/to/e2sar/venv/bin/activate
 $ pip install pybind11
+
+# To bridge the C++ google::protobuf datatypes, install the Python protobuf package
+$ pip install protobuf
 ```
 Continue using the venv when compiling and testing e2sar. PSA: you can get out of the venv by running `deactivate` from inside the venv. 
 
+The other two large dependencies are the C++ Boost library and gRPC library. For some common distributions we have pre-compiled installation trees stored [under this directory](binary_artifacts/). Note that you must have git-lfs installed to access them. In many cases they m ay need to be built from scratch using instructions provided below.
+
 #### Installing gRPC from source
 
-gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source
+gRPC versions available in binary are frequently too far behind what is used in the [UDPLBd code](https://github.com/esnet/udplbd/blob/main/go.mod). As a result it is likely necessary to build gRPC from source. 
 
 ##### MacOS
+
 - Follow instructions in [this page](https://grpc.io/docs/languages/cpp/quickstart/) using appropriate version tag/branch that matches UDPLBd dependencies.
 - Use the following command to build:
 ```bash
@@ -198,6 +203,39 @@ Reported version: 1fb5d83f0186298f99a57f7d4df4177871e8524f
 If using a private CA, the `-o` option should be used to point to the CA certificate, assuming the server certificate contains the chain to the CA. Note also that you must specify EJFAT_URI using a hostname, not IP address if using certificate validation. When using `-v` option, IP addresses can be used.
 
 See [lbadm](bin/lbadm.cpp) code on how the two options are implemented and used. Programmatically it is possible to supply client-side certs to E2SAR, however UDPLBd does not validate them. See [LBManager constructor](src/e2sarCP.cpp) for how that can be done.
+
+# Generating Documentation
+
+## Doxygen
+
+A [Doxygen configuration file](Doxyfile) is provided with the distribution. It will update the documentation under docs/ which is a submodule - a separate public repo just for the documentation. Once updated, to make the documentation go live on [GitHub pages site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html) you can do as follows from E2SAR root (this assumes you have installed Doxygen 1.12.0 or later):
+```bash
+$ doxygen Doxyfile 
+$ cd docs
+$ git add .
+$ git commit -S -m "Update to the documentation"
+$ git push origin main
+$ cd ..
+$ git add docs
+$ git commit -S -m "Link docs/ commit to this commit of E2SAR"
+$ git push origin <appropriate E2SAR branch>
+```
+
+## Wiki
+
+The [Wiki](https://github.com/JeffersonLab/E2SAR/wiki) is also a submodule of the project (but is a separate repository) under wiki/. You can update it by doing the following:
+```bash
+$ cd wiki/
+$ vi <one or more of the .md pages>
+$ git add .
+$ git commit -S -m "Wiki update"
+$ git push origin master
+$ cd ..
+$ git add wiki
+$ git commit -S -m "Link wiki commit to this commit of E2SAR"
+$ git push origin <appropriate E2SAR branch>
+```
+Note that wiki uses `master` as its main branch, while docs/ and main E2SAR repo use `main`. 
 
 # Related information
 

@@ -8,6 +8,7 @@ namespace e2sar
 {
     using EventNum_t = u_int64_t;
     using UnixTimeNano_t = u_int64_t;
+    using UnixTimeMicro_t = u_int64_t;
     using EventRate_t = u_int32_t;
 
     constexpr u_int8_t rehdrVersion = 1;
@@ -22,7 +23,7 @@ namespace e2sar
         u_int8_t preamble[2] {rehdrVersionNibble, 0}; // 4 bit version + reserved
         u_int16_t dataId{0};   // source identifier
         u_int32_t bufferOffset{0};
-        u_int32_t bufferLength{0};
+        u_int32_t bufferLength{0}; // this is event length, not the length of the buffer being sent
         EventNum_t eventNum{0};
 
         /**

@@ -28,4 +28,5 @@ int main()
     {
         std::cout << "Resolved to " << i << " " << (i.is_v4() ? "IPv4" : "IPv6") << std::endl;
     }
+
 }

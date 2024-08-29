@@ -1,5 +1,38 @@
 project('E2SAR', 'cpp', 
-        version: '0.1.0a6', default_options : ['cpp_std=c++17'])
+        version: '0.1.0b1', default_options : ['cpp_std=c++17'])
+
+compiler = meson.get_compiler('cpp')
+
+
+if compiler.has_header('linux/netlink.h')
+        add_project_arguments('-DNETLINK_CAPABLE', language: ['cpp'])
+endif
+
+zccode = '''
+#include<sys/socket.h>
+void f() {
+int fd = 0;
+int zerocopy = 1;
+int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));}
+'''
+
+if compiler.compiles(zccode, name: 'ZC check')
+        add_project_arguments('-DZEROCOPY_AVAILABLE', language: ['cpp'])
+endif
+
+affcode = '''
+#define _GNU_SOURCE
+#include <sched.h>
+#include <unistd.h>
+void f() {
+cpu_set_t set;
+sched_setaffinity(getpid(), sizeof(set), &set); }
+'''
+
+if compiler.compiles(affcode, name: 'CPU Affinity check')
+        add_project_arguments('-DAFFINITY_AVAILABLE', language: ['cpp'])
+endif
+
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
@@ -47,7 +80,7 @@ subdir('scripts')
 
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(libraries : libe2sar,
-                 version : '0.1',
+                 version : meson.project_version(),
                  name : 'libe2sar',
                  filebase : 'e2sar',
                  description : 'E2SAR: EJ-FAT Event Segmentation And Reassembly library')
