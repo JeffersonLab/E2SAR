@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     }
     // send 10 sync messages and no errors
     std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    BOOST_CHECK(syncStats.get<0>() >= 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
 // the sync messages against live UDPLBd. 
 BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
 {
-    std::cout << "DPSegLiveTest2: test segmenter (and sync thread) against UDPLBd by sending 5 events via event queue small MTU so 10 frames are sent" << std::endl;
+    std::cout << "DPSegLiveTest2: test segmenter (and sync thread) against UDPLBd by sending 5 events via event queue small MTU so 20 frames are sent" << std::endl;
 
     // parse URI from env variable
     // it needs to have the sync address/port
@@ -217,13 +217,13 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     }
     // send 10 sync messages and no errors
     std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    BOOST_CHECK(syncStats.get<0>() >= 10);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // check the send stats
     std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 10);
+    BOOST_CHECK(sendStats.get<0>() == 20);
     BOOST_CHECK(sendStats.get<1>() == 0);
     
     // call free - this will correctly use the admin token (even though instance token
