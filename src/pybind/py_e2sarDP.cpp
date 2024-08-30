@@ -90,6 +90,7 @@ void init_e2sarDP_segmenter(py::module_ &m)
 
     // Return type of result<int>
     seg.def("OpenAndStart", &Segmenter::openAndStart);
+    seg.def("sendEvent", &Segmenter::sendEvent);
 
     // Send method related to callback. Have to define corresponding wrapper function.
     seg.def("addToSendQueue",
@@ -134,6 +135,15 @@ void init_e2sarDP_segmenter(py::module_ &m)
             auto stats = segObj.getSendStats();
             return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
         });
+    seg.def("getSyncStats", [](const Segmenter& segObj) {
+            auto stats = segObj.getSyncStats();
+            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
+        });
+
+    // Simple return types
+    seg.def("getMTU", &Segmenter::getMTU);
+    seg.def("getMaxPldLen", &Segmenter::getMaxPldLen);
+    seg.def("stopThreads", &Segmenter::stopThreads);
 }
 
 void init_e2sarDP_reassembler(py::module_ &m)
@@ -165,7 +175,7 @@ void init_e2sarDP_reassembler(py::module_ &m)
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
-    // Recv events part
+    // Recv events part. return py::tuple.
     reas.def("getEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes
         ) -> py::tuple {
@@ -195,8 +205,42 @@ void init_e2sarDP_reassembler(py::module_ &m)
             return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
 
     },
-    "Get an event from the Reassembler. Use py::list[None] to accept the data.",
+    "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
     py::arg("recv_bytes_list")
+    );
+
+    reas.def("recvEvent",
+        [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes,
+        u_int64_t wait_ms) -> py::tuple {
+            u_int8_t *eventBuf{nullptr};
+            size_t eventLen = 0;
+            EventNum_t eventNum = 0;
+            u_int16_t recDataId = 0;
+
+            auto recvres = self.recvEvent(&eventBuf, &eventLen, &eventNum, &recDataId, wait_ms);
+
+            if (recvres.has_error()) {
+                std::cout << "Error encountered receiving event frames: "
+                    << recvres.error().message() << std::endl;
+                return py::make_tuple((int)-2, eventLen, eventNum, recDataId);
+            }
+            if (recvres.value() == -1)
+                std::cout << "No message received, continuing" << std::endl;
+            else {
+                // // Received event
+                // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
+                //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
+
+                // Convert eventBuf to a Python bytes object and update the Python list with it
+                recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
+            }
+
+            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
+
+    },
+    "Get an event in the blocking mode. Use py::list[None] to accept the data.",
+    py::arg("recv_bytes_list"),
+    py::arg("wait_ms") = 0
     );
 
     // Return type of result<int>
@@ -218,5 +262,4 @@ void init_e2sarDP_reassembler(py::module_ &m)
     reas.def("get_recvPorts", &Reassembler::get_recvPorts);
     reas.def("get_portRange", &Reassembler::get_portRange);
     reas.def("stopThreads", &Reassembler::stopThreads);
-
 }
