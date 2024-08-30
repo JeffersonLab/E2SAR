@@ -206,10 +206,17 @@ void init_e2sarDP_reassembler(py::module_ &m)
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
 
-    // Return type of boost::tuple<>
+    // Return type of boost::tuple<>: convert to std::tuple
     reas.def("getStats", [](const Reassembler& reasObj) {
             auto stats = reasObj.getStats();
             return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
                                     boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats));
         });
+
+    // Simple return types
+    reas.def("get_numRecvThreads", &Reassembler::get_numRecvThreads);
+    reas.def("get_recvPorts", &Reassembler::get_recvPorts);
+    reas.def("get_portRange", &Reassembler::get_portRange);
+    reas.def("stopThreads", &Reassembler::stopThreads);
+
 }
