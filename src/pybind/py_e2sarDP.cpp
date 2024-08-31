@@ -9,7 +9,6 @@
 #include "e2sarDPReassembler.hpp"
 #include "e2sarDPSegmenter.hpp"
 
-
 #include <iostream>
 #include <typeinfo>
 #include <cxxabi.h>
@@ -18,7 +17,7 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/any.hpp>
 
-// Function to print demangled type names
+// Helper function to print demangled type names
 template <typename T>
 void print_type(const T& param) {
     int status;
@@ -32,7 +31,8 @@ void print_type(const T& param) {
 namespace py = pybind11;
 using namespace e2sar;
 
-result<int> addToSendQueueWrapper(e2sar::Segmenter& seg, uint8_t *event, size_t bytes, 
+// Has to have a wrapper because of the callback function.
+result<int> addToSendQueueWrapper(Segmenter& seg, uint8_t *event, size_t bytes,
                                   int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
                                   std::function<void(boost::any)> callback,
                                   boost::any cbArg) noexcept {
