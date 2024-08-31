@@ -49,7 +49,6 @@ void init_e2sarHeaders(py::module_ &m) {
             };
         });
 
-    /// TODO: test this. See if we need to fulfill the constructor.
     py::class_<LBREHdr>(m, "LBREHdr")
         .def(py::init<>());
 
