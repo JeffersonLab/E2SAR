@@ -51,9 +51,10 @@ jobs:
           path: package/usr/local 
           key: ${{ runner.os }}-dependencies-cache-grpc-1.54.0-boost-1.85.0  
           restore-keys: |
-            ${{ runner.os }}-dependencies-cache
-
+            ${{ runner.os }}-dependencies-cache-grpc-1.54.0-boost-1.85.0 
+            
       - name: Checkout gRPC
+        if: steps.cache.outputs.cache-hit != 'true' 
         uses: actions/checkout@v3
         with:
           repository: grpc/grpc  
@@ -62,6 +63,7 @@ jobs:
           submodules: true  
 
       - name: Build grpc
+        if: steps.cache.outputs.cache-hit != 'true' 
         run: |
           cd grpc
           mkdir -p cmake/build
@@ -71,6 +73,7 @@ jobs:
           make install
 
       - name: Download and build boost
+        if: steps.cache.outputs.cache-hit != 'true' 
         run: |
           wget https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
           tar -zxf boost_1_85_0.tar.gz
@@ -81,9 +84,9 @@ jobs:
 
       - name: Build E2SAR using Meson
         run: |
-          export CDIR=`pwd`
+          export IDIR=`pwd`/package/usr/local
           cd E2SAR
-          BOOST_ROOT=package/usr/local PATH=${CDIR}/package/usr/local/bin:$PATH LD_LIBRARY_PATH=${CDIR}/package/usr/local/lib meson setup -Dpkg_config_path=${CDIR}/package/usr/local/lib/pkgconfig/:${CDIR}/package/usr/local/lib64/pkgconfig/ --prefix ${CDIR}/package/usr/local build && sed -i 's/-std=c++11//g' build/build.ninja
+          BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
           meson compile -C build
           meson install -C build
 
