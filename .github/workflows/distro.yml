@@ -45,6 +45,14 @@ jobs:
           mkdir -p package/usr/local/lib
           mkdir -p package/usr/local/lib64
 
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: package/usr/local 
+          key: ${{ runner.os }}-dependencies-cache-grpc-1.54.0-boost-1.85.0  
+          restore-keys: |
+            ${{ runner.os }}-dependencies-cache
+
       - name: Checkout gRPC
         uses: actions/checkout@v3
         with:
@@ -73,8 +81,9 @@ jobs:
 
       - name: Build E2SAR using Meson
         run: |
+          export CDIR=`pwd`
           cd E2SAR
-          BOOST_ROOT=package/usr/local PATH=package/usr/local/bin:$PATH LD_LIBRARY_PATH=package/usr/local/lib meson setup -Dpkg_config_path=package/usr/local/lib/pkgconfig/:package/usr/local/lib64/pkgconfig/ --prefix package/usr/local build && sed -i 's/-std=c++11//g' build/build.ninja
+          BOOST_ROOT=package/usr/local PATH=${CDIR}/package/usr/local/bin:$PATH LD_LIBRARY_PATH=${CDIR}/package/usr/local/lib meson setup -Dpkg_config_path=${CDIR}/package/usr/local/lib/pkgconfig/:${CDIR}/package/usr/local/lib64/pkgconfig/ --prefix ${CDIR}/package/usr/local build && sed -i 's/-std=c++11//g' build/build.ninja
           meson compile -C build
           meson install -C build
 
