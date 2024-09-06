@@ -30,17 +30,16 @@ void init_e2sarUtil(py::module_ &m) {
     ejfat_uri.def_property("lb_id", &EjfatURI::get_lbId, &EjfatURI::set_lbId);
     ejfat_uri.def_property("session_id", &EjfatURI::get_sessionId, &EjfatURI::set_sessionId);
 
-    ejfat_uri.def("get_useTls", &EjfatURI::get_useTls);
-
+    // Return types of void
     ejfat_uri.def("set_instance_token", &EjfatURI::set_InstanceToken);
     ejfat_uri.def("set_session_token", &EjfatURI::set_SessionToken);
-
     ejfat_uri.def("set_sync_addr", &EjfatURI::set_syncAddr);
     ejfat_uri.def("set_data_addr", &EjfatURI::set_dataAddr);
 
+    // Return types of bool
+    ejfat_uri.def("get_useTls", &EjfatURI::get_useTls);
     ejfat_uri.def("has_data_addr_v4", &EjfatURI::has_dataAddrv4);
     ejfat_uri.def("has_data_addr_v6", &EjfatURI::has_dataAddrv6);
-
     ejfat_uri.def("has_data_addr", &EjfatURI::has_dataAddr);
     ejfat_uri.def("has_sync_addr", &EjfatURI::has_syncAddr);
 
