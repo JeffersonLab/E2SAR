@@ -90,7 +90,15 @@ void init_e2sarDP_segmenter(py::module_ &m)
 
     // Return type of result<int>
     seg.def("OpenAndStart", &Segmenter::openAndStart);
-    seg.def("sendEvent", &Segmenter::sendEvent);
+    seg.def(
+        "sendEvent", &Segmenter::sendEvent,
+        "Send immediately overriding event number",
+        py::arg("send_buf"),
+        py::arg("buf_len"),
+        py::arg("_eventNum") = 0LL,
+        py::arg("_dataId") = 0,
+        py::arg("entropy") = 0
+        );
 
     // Send method related to callback. Have to define corresponding wrapper function.
     seg.def("addToSendQueue",
@@ -121,8 +129,8 @@ void init_e2sarDP_segmenter(py::module_ &m)
             return addToSendQueueWrapper(seg, data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
         },
         "Call Segmenter::addToSendQueue.",
-        py::arg("event"),
-        py::arg("bytes"),
+        py::arg("send_buf"),
+        py::arg("buf_len"),
         py::arg("_eventNum") = 0LL,
         py::arg("_dataId") = 0,
         py::arg("entropy") = 0,
