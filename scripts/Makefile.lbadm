@@ -25,6 +25,8 @@ LBADM = $(E2SAR)/build/bin/lbadm
 MY_IP    ?= $(shell ifconfig | grep 198.128 | awk '{print $$2}' )
 MY_NAME  ?= $(shell hostname)
 
+CN_PORTS = 9999 9998 9997 9996
+
 #---------make sure your ADMIN URI is either in an env variable or read it from a secrets file ---------
 # Just don't code it directly into a script or check it into git. 
 # EJFAT ADMIN URI contains the secret key, hostname and port of the LB we want to use.
@@ -54,29 +56,37 @@ free :
 	$(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --free 
 
 reserve :
-	echo "My IP address is $(MY_IP)"
+	@echo "My IP address is $(MY_IP)"
 	mkdir -p $(URI_DIR)
 	$(LBADM) -v -u "$(EJFAT_ADMIN_URI)"  --reserve  -d 06:05:00 --lbname yk_testing -a $(MY_IP) --export > $(INSTANCE_URI_FILENAME)
 
 register :
-	echo "My IP address is $(MY_IP)"
+	@echo "----------------Registering ------------------------------"
 	mkdir -p $(URI_DIR)
-	$(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --register --name "$(MY_NAME):9999" --address $(MY_IP)  --port 9999 --weight 0 --count 1 --minfactor 0 --maxfactor 0  --export > $(SESSION_URI_FILENAME).9999
-	$(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --register --name "$(MY_NAME):9998" --address $(MY_IP)  --port 9998 --weight 0 --count 1 --minfactor 0 --maxfactor 0  --export > $(SESSION_URI_FILENAME).9998
+	@( \
+	  for PORT in $(CN_PORTS) ; do \
+	    echo "Registering Compute Node : $(MY_IP):$$PORT" ; \
+	    $(LBADM) -v -u "$(EJFAT_INSTANCE_URI)"  --register --name "$(MY_NAME):$$PORT" --address $(MY_IP)  --port $$PORT --weight 0 --count 1 --minfactor 0 --maxfactor 0  --export > $(SESSION_URI_FILENAME).$$PORT; \
+	  done \
+	  )
 
 deregister :
-	echo "My IP address is $(MY_IP)"
+	@echo "----------------DE Registering ---------------------------"
 	mkdir -p $(URI_DIR)
-	@( source $(SESSION_URI_FILENAME).9999 ; $(LBADM) -v  -u "$$EJFAT_URI" --deregister )
-	@( source $(SESSION_URI_FILENAME).9998 ; $(LBADM) -v  -u "$$EJFAT_URI" --deregister )
-
-
-EJFAT_SESSION_URI_9999 = $(shell source $(SESSION_URI_FILENAME).9999 ; echo $$EJFAT_URI)
-EJFAT_SESSION_URI_9998 = $(shell source $(SESSION_URI_FILENAME).9998 ; echo $$EJFAT_URI)
+	@( \
+	  for PORT in $(CN_PORTS) ; do \
+	    echo "DE-Registering Compute Node : $(MY_IP):$$PORT" ; \
+	    source $(SESSION_URI_FILENAME).$$PORT ; $(LBADM) -v  -u "$$EJFAT_URI" --deregister ; \
+	  done \
+	)
 
 state :
-	$(LBADM) -v -u "$(EJFAT_SESSION_URI_9999)" --state --queue 0 --ctrl 0 --ready 1
-	$(LBADM) -v -u "$(EJFAT_SESSION_URI_9998)" --state --queue 0 --ctrl 0 --ready 1
+	@( \
+	  for PORT in $(CN_PORTS) ; do \
+	    source $(SESSION_URI_FILENAME).$$PORT ; $(LBADM) -v -u "$$EJFAT_URI" --state --queue 0 --ctrl 0 --ready 1 ; \
+	  done \
+	)
+
 
 heartbeat :
 	@(while true; \
