@@ -49,9 +49,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: package/usr/local 
-          key: ${{ runner.os }}-dependencies-cache-grpc-1.54.0-boost-1.85.0  
+          key: ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0  
           restore-keys: |
-            ${{ runner.os }}-dependencies-cache-grpc-1.54.0-boost-1.85.0 
+            ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0 
             
       - name: Checkout gRPC
         if: steps.cache.outputs.cache-hit != 'true' 
@@ -59,7 +59,7 @@ jobs:
         with:
           repository: grpc/grpc  
           path: grpc  
-          ref: v1.54.0
+          ref: v1.54.1
           submodules: true  
 
       - name: Build grpc
