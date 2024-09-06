@@ -167,7 +167,7 @@ There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which 
 
 ## Python
 
-TBD
+The C++ unit tests `e2sar_uri_test` and `e2sar_reas_test` have been reproduced in Python Jupyter notebooks, which can be found at [scripts/notebooks/pybind11_examples/](scripts/notebooks/pybind11_examples/). The Python `e2sar_lbcp_live_test` is currently under development.
 
 ## Scapy
 
