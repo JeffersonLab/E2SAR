@@ -30,17 +30,16 @@ void init_e2sarUtil(py::module_ &m) {
     ejfat_uri.def_property("lb_id", &EjfatURI::get_lbId, &EjfatURI::set_lbId);
     ejfat_uri.def_property("session_id", &EjfatURI::get_sessionId, &EjfatURI::set_sessionId);
 
-    ejfat_uri.def("get_use_tls", &EjfatURI::get_useTls);
-
+    // Return types of void
     ejfat_uri.def("set_instance_token", &EjfatURI::set_InstanceToken);
     ejfat_uri.def("set_session_token", &EjfatURI::set_SessionToken);
-
     ejfat_uri.def("set_sync_addr", &EjfatURI::set_syncAddr);
     ejfat_uri.def("set_data_addr", &EjfatURI::set_dataAddr);
 
+    // Return types of bool
+    ejfat_uri.def("get_useTls", &EjfatURI::get_useTls);
     ejfat_uri.def("has_data_addr_v4", &EjfatURI::has_dataAddrv4);
     ejfat_uri.def("has_data_addr_v6", &EjfatURI::has_dataAddrv6);
-
     ejfat_uri.def("has_data_addr", &EjfatURI::has_dataAddr);
     ejfat_uri.def("has_sync_addr", &EjfatURI::has_syncAddr);
 
@@ -59,23 +58,39 @@ void init_e2sarUtil(py::module_ &m) {
     ejfat_uri.def("get_cp_host", &EjfatURI::get_cpHost);
 
     // Bind the conversion operator std::string()
-    /// TODO: test these!!!
     ejfat_uri.def("__str__", [](const EjfatURI &self) {
         return static_cast<std::string>(self);
     });
 
     // Operator
-    /// TODO: test these!!!
     ejfat_uri.def(pybind11::self == pybind11::self);
     ejfat_uri.def(pybind11::self != pybind11::self);
 
-    ///TODO: not tested with Python.
     ejfat_uri.def(
         "to_string", &EjfatURI::to_string,
         py::arg("tt") = EjfatURI::TokenType::admin
         );
+
     // Return type of result<EjfatURI>.
-    ejfat_uri.def_static("get_from_env", &EjfatURI::getFromEnv);
-    ejfat_uri.def_static("get_from_string", &EjfatURI::getFromString);
-    ejfat_uri.def_static("get_from_file", &EjfatURI::getFromFile);
+    ejfat_uri.def_static(
+        "get_from_env", &EjfatURI::getFromEnv,
+        py::arg("env_var") = "EJFAT_URI",
+        py::arg("tt") = EjfatURI::TokenType::admin,
+        py::arg("preferV6") = false,
+        "Create EjfatURI object from environment variable 'EJFAT_URI'."
+    );
+    ejfat_uri.def_static(
+        "get_from_string", &EjfatURI::getFromString,
+        py::arg("_str"),
+        py::arg("tt") = EjfatURI::TokenType::admin,
+        py::arg("preferV6") = false,
+        "Create EjfatURI object from string."
+    );
+    ejfat_uri.def_static(
+        "get_from_file", &EjfatURI::getFromFile,
+        py::arg("_filename") = "/tmp/ejfat_uri",
+        py::arg("tt") = EjfatURI::TokenType::admin,
+        py::arg("preferV6") = false,
+        "Create EjfatURI object from a path indicated by a string."
+    );
 }
