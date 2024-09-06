@@ -65,22 +65,24 @@ jobs:
       - name: Build grpc
         if: steps.cache.outputs.cache-hit != 'true' 
         run: |
+          export IDIR=`pwd`/package/usr/local
           cd grpc
           mkdir -p cmake/build
           pushd cmake/build
-          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=package/usr/local/ -DBUILD_SHARED_LIBS=ON ../..
+          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
           make -j 4
           make install
 
       - name: Download and build boost
         if: steps.cache.outputs.cache-hit != 'true' 
         run: |
+          export IDIR=`pwd`/package/usr/local
           wget https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
           tar -zxf boost_1_85_0.tar.gz
           cd boost_1_85_0
           ./bootstrap.sh
           ./b2
-          ./b2 install --prefix=package/usr/local/
+          ./b2 install --prefix=${IDIR}
 
       - name: Build E2SAR using Meson
         run: |
