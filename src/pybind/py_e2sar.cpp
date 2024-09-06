@@ -62,9 +62,6 @@ PYBIND11_MODULE(e2sar_py, m) {
     // Bind the get_Version method
     m.def("get_version", &get_Version);
 
-    /// TODO: try bind the E2SARErrorc enum class to submodule "e2sarError" to make the top module looks nicer.
-    // py::module_ e2sar_ec = m.def_submodule("e2sarError", "E2SAR e2sarError submodule");
-
     py::enum_<E2SARErrorc>(m, "E2SARErrorc")
         .value("NoError", E2SARErrorc::NoError)
         .value("CaughtException", E2SARErrorc::CaughtException)

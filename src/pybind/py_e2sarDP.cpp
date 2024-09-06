@@ -253,7 +253,6 @@ void init_e2sarDP_reassembler(py::module_ &m)
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
-
     /// TODO: to be test
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
