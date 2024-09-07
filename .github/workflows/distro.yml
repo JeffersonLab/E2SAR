@@ -65,8 +65,6 @@ jobs:
       - name: Build E2SAR using Meson
         run: |
           export IDIR=`pwd`/package/usr/local
-          echo ${IDIR}
-          find package
           cd E2SAR
           BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
           meson compile -C build
