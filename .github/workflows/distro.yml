@@ -2,12 +2,6 @@ name: Build E2SAR .deb and .rpms
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build:
