@@ -21,8 +21,8 @@ jobs:
       - name: Set up environment
         run: |
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
-            sudo apt-get update
-            sudo apt-get install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
+            sudo apt-get -yq update
+            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
             pip3 install meson pybind11
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
             sudo dnf -yq install epel-release
@@ -39,7 +39,7 @@ jobs:
         with:
           path: E2SAR
           submodules: true  
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          token: ${{ secrets.PRIVATE_REPO_RW_PAT }}
 
       - name: Create install directories
         run: |
@@ -79,7 +79,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true' 
         run: |
           export IDIR=`pwd`/package/usr/local
-          wget https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
+          wget -q https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
           tar -zxf boost_1_85_0.tar.gz
           cd boost_1_85_0
           ./bootstrap.sh
