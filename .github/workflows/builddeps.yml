@@ -1,0 +1,74 @@
+name: Build E2SAR dependency artifacts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+
+    steps:
+      - name: Set up environment
+        run: |
+          if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
+            sudo apt-get -yq update
+            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
+            pip3 install meson pybind11
+          elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
+            sudo dnf -yq install epel-release
+            sudo dnf -yq --enablerepo=devel update
+            sudo dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+            sudo dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
+            sudo update-alternatives --set python /usr/bin/python3.9
+            sudo update-alternatives --set python3 /usr/bin/python3.9
+            pip3 install meson pybind11
+          fi
+          
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Create install directories
+        run: |
+          mkdir -p package/usr/local/include/
+          mkdir -p package/usr/local/lib
+          mkdir -p package/usr/local/lib64
+            
+      - name: Checkout gRPC
+        uses: actions/checkout@v3
+        with:
+          repository: grpc/grpc  
+          path: grpc  
+          ref: v1.54.1
+          submodules: true  
+
+      - name: Build grpc
+        run: |
+          export IDIR=`pwd`/package/usr/local
+          cd grpc
+          mkdir -p cmake/build
+          pushd cmake/build
+          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
+          make -j 4
+          make install
+
+      - name: Download and build boost
+        if: steps.cache.outputs.cache-hit != 'true' 
+        run: |
+          export IDIR=`pwd`/package/usr/local
+          wget -q https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
+          tar -zxf boost_1_85_0.tar.gz
+          cd boost_1_85_0
+          ./bootstrap.sh
+          ./b2
+          ./b2 install --prefix=${IDIR}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: grpc-boost-ubuntu22
+          path: package
