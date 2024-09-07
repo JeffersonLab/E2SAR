@@ -34,12 +34,16 @@ jobs:
             pip3 install meson pybind11
           fi
           
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+          
       - name: Checkout E2SAR code
         uses: actions/checkout@v3
         with:
           path: E2SAR
-          submodules: true  
-          token: ${{ secrets.PRIVATE_REPO_RW_PAT }}
+          submodules: true
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
 
       - name: Create install directories
         run: |
