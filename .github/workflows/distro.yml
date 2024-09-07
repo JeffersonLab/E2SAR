@@ -16,16 +16,18 @@ jobs:
         run: |
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
             sudo apt-get -yq update
-            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
+            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools
             pip3 install meson pybind11
+            sudo gem install fpm
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
             sudo dnf -yq install epel-release
             sudo dnf -yq --enablerepo=devel update
             sudo dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-            sudo dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
+            sudo dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39 rpm-build squashfs-tools ruby
             sudo update-alternatives --set python /usr/bin/python3.9
             sudo update-alternatives --set python3 /usr/bin/python3.9
             pip3 install meson pybind11
+            sudo gem install fpm
           fi
           
       - name: Set up authentication for HTTPS
