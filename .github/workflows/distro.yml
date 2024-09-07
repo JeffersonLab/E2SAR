@@ -39,6 +39,7 @@ jobs:
         with:
           path: E2SAR
           submodules: true  
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
 
       - name: Create install directories
         run: |
