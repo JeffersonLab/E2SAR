@@ -66,9 +66,13 @@ jobs:
           ./bootstrap.sh
           ./b2
           ./b2 install --prefix=${IDIR}
+          
+      - name: Tar the packaged files
+        run: |
+          tar -zxf package-boost-1.85.0-grpc-1.54.1.tar.gz package/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: grpc-boost-ubuntu22
-          path: package
+          path: package-boost-1.85.0-grpc-1.54.1.tar.gz
