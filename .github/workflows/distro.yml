@@ -48,17 +48,19 @@ jobs:
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: package/usr/local 
+          path: package
           key: ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0  
           restore-keys: |
             ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0 
-            
-      - name: Download build artifact
+
+      - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
-        uses: actions/download-artifact@v3
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
         with:
+          workflow: builddeps.yml
           name: grpc-boost-ubuntu22
-          path: package  
+          path: package
 
       - name: Build E2SAR using Meson
         run: |
