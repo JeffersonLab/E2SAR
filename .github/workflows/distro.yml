@@ -60,7 +60,12 @@ jobs:
         with:
           workflow: builddeps.yml
           name: grpc-boost-ubuntu22
-          path: package
+          path: ./
+
+      - name: Untar the grpc and boost install tree
+        run: |
+          tar -zxf package-boost-1.85.0-grpc-1.54.1.tar.gz
+          ls -l package/usr/local/bin
 
       - name: Build E2SAR using Meson
         run: |
