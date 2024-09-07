@@ -69,7 +69,7 @@ jobs:
           
       - name: Tar the packaged files
         run: |
-          tar -zxf package-boost-1.85.0-grpc-1.54.1.tar.gz package/
+          tar -zcf package-boost-1.85.0-grpc-1.54.1.tar.gz package/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
