@@ -54,7 +54,8 @@ jobs:
             ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0 
             
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        uses: actions/download-artifact@v3
         with:
           name: grpc-boost-ubuntu22
           path: package  
