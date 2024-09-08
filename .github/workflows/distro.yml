@@ -9,7 +9,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
 
     steps:
       - name: Set up environment
@@ -47,21 +47,13 @@ jobs:
           mkdir -p package/usr/local/lib
           mkdir -p package/usr/local/lib64
 
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: package
-          key: ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0  
-          restore-keys: |
-            ${{ runner.os }}-dependencies-cache-grpc-1.54.1-boost-1.85.0 
-
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
         id: download-artifact
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: builddeps.yml
-          name: grpc-boost-ubuntu22
+          name: ${{ matrix.os }}-package-boost-1.85.0-grpc-1.54.1
           path: ./
 
       - name: Untar the grpc and boost install tree
