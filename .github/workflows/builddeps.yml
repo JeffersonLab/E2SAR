@@ -10,8 +10,14 @@ jobs:
     strategy:
       matrix:
         os: [rocky-9]
-
+    
     steps:
+
+      - name: Check if dnf or yum is available
+        run: |
+          which dnf || echo "dnf not found"
+          which yum || echo "yum not found"
+        
       - name: Set up environment
         run: |
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
