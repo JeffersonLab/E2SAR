@@ -9,7 +9,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
 
     steps:
       - name: Set up environment
@@ -74,5 +74,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: grpc-boost-ubuntu22
+          name: ${{ matrix.os }}-package-boost-1.85.0-grpc-1.54.1
           path: package-boost-1.85.0-grpc-1.54.1.tar.gz
