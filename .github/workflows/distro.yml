@@ -80,10 +80,11 @@ jobs:
 
       - name: Package project into .deb or .rpm
         run: |
+          pushd package/ && tar -zcf ../e2sar.tar.gz usr/ && popd
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
-            fpm -s dir -t deb -n e2sar -v 0.1.0 --prefix=/usr/local package/
+            fpm -s tar -t deb -n e2sar -v 0.1.0 --prefix=/ e2sar.tar.gz
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-            fpm -s dir -t rpm -n e2sar -v 0.1.0 --prefix=/usr/local package/
+           fpm -s tar -t deb -n e2sar -v 0.1.0 --prefix=/ e2sar.tar.gz
           fi
 
       - name: Upload artifacts
