@@ -2,6 +2,9 @@ name: Build E2SAR .deb and .rpms
 
 on:
   workflow_dispatch:
+env:
+  E2SAR_VER: 0.1.0
+  E2SAR_DEP: boost-1.85.0-grpc-1.54.1
 
 jobs:
   build:
@@ -9,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
 
     steps:
       - name: Set up environment
@@ -53,12 +56,12 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: builddeps.yml
-          name: ${{ matrix.os }}-package-boost-1.85.0-grpc-1.54.1
+          name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
           path: ./
 
       - name: Untar the grpc and boost install tree
         run: |
-          tar -zxf package-boost-1.85.0-grpc-1.54.1.tar.gz
+          tar -zxf package-${{ env.E2SAR_DEP }}.tar.gz
           ls -l package/usr/local/bin
 
       - name: Build E2SAR using Meson
@@ -74,15 +77,15 @@ jobs:
         run: |
           pushd package/ && tar -zcf ../e2sar.tar.gz usr/ && popd
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
-            fpm -s tar -t deb -n e2sar -v 0.1.0 --prefix=/ e2sar.tar.gz
+            fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-           fpm -s tar -t deb -n e2sar -v 0.1.0 --prefix=/ e2sar.tar.gz
+           fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-package
+          name: ${{ matrix.os }}-${{ env.E2SAR_VER }}-package
           path: |
             *.deb
             *.rpm
