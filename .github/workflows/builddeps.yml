@@ -9,7 +9,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [rocky-8]
+        os: [rocky-9]
 
     steps:
       - name: Set up environment
