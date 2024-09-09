@@ -19,8 +19,8 @@ jobs:
         run: |
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
             sudo apt-get -yq update
-            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools
-            pip3 install --user meson pybind11
+            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools python3-pybind11
+            pip3 install meson
             sudo gem install fpm
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
             sudo dnf -yq install epel-release
