@@ -20,9 +20,6 @@ jobs:
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
             sudo apt-get -yq update
             sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools python3-venv
-            python3 -m venv ~/venv
-            . ~/venv/bin/activate
-            pip3 install meson pybind11
             sudo gem install fpm
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
             sudo dnf -yq install epel-release
@@ -33,6 +30,24 @@ jobs:
             sudo update-alternatives --set python3 /usr/bin/python3.9
             pip3 install --user meson pybind11
             sudo gem install fpm
+          fi
+
+      - name: Install Python dependencies
+        run: |
+          if [[ ${{ matrix.os }} == "ubuntu-20.04" ]]; then
+            sudo apt-get -yq update
+            sudo apt-get install -yq software-properties-common
+            sudo add-apt-repository -y ppa:deadsnakes/ppa
+            sudo apt-get -yq update
+            sudo apt-get install python3.10
+            python3 -m venv ~/venv
+            . ~/venv/bin/activate
+          elif [[ ${{ matrix.os }} == "ubuntu-22.04" ]]; then
+            python3 -m venv ~/venv
+            . ~/venv/bin/activate
+          elif [[ ${{ matrix.os }} == "ubuntu-24.04" ]]; then
+            python3 -m venv ~/venv
+            . ~/venv/bin/activate
           fi
           
       - name: Set up authentication for HTTPS
