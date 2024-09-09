@@ -171,14 +171,14 @@ The C++ unit tests `e2sar_uri_test` and `e2sar_reas_test` have been reproduced i
 
 ## Scapy
 
-Scapy scripts are provided for sniffing/validating and generating various kinds of UDP packets. See this [folder](scripts/scapy/) for details. Make sure Scapy is installed (`pip install scapy`) and for most tasks the scripts must be run as root (bot for sending and sniffing). 
+Scapy scripts are provided for sniffing/validating and generating various kinds of UDP packets. See this [folder](scripts/scapy/) for details. Make sure Scapy is installed (`pip install scapy`) and for most tasks the scripts must be run as root (both for sending and sniffing). 
 
 More details on the use can be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki/Code-and-Binaries).
 
 
 ## Dealing with SSL certificate validation
 
-UDPLBd implements gRPC over TLS to support channel privacy. Only server-side certificate for UDPLBd is required - the code does not rely on SSL client-side authentication. For testing You can generate UDPLBd certificate as follows:
+UDPLBd implements gRPC over TLS to support channel privacy and server authentication. Only server-side certificate for UDPLBd is required - the code does not rely on SSL client-side authentication. For testing you can generate UDPLBd certificate as follows:
 
 ```bash
 $ openssl req -x509 -newkey rsa:4096 -keyout udplbd/etc/server_key.pem -out udplbd/etc/server_cert.pem -sha256 -days 365 -nodes -subj "/CN=cpnode/subjectAltName=IP:192.168.0.3" -nodes
