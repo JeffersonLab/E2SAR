@@ -43,8 +43,6 @@ jobs:
             sudo apt-get install python3.10
             sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
             sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 2
-            sudo update-alternatives --set python /usr/bin/python3.10
-            sudo update-alternatives --set python3 /usr/bin/python3.10
           elif [[ ${{ matrix.os }} == "ubuntu-22.04" ]]; then
             echo No special steps
           elif [[ ${{ matrix.os }} == "ubuntu-24.04" ]]; then
