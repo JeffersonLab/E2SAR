@@ -35,12 +35,12 @@ jobs:
       - name: Install Python dependencies
         run: |
           if [[ ${{ matrix.os }} == "ubuntu-20.04" ]]; then
-            echo Installing Python3.10
+            echo Installing Python3.9
             sudo apt-get -yq update
             sudo apt-get install -yq software-properties-common
             sudo add-apt-repository -y ppa:deadsnakes/ppa
             sudo apt-get -yq update
-            sudo apt-get install python3.10
+            sudo apt-get install python3.9
           elif [[ ${{ matrix.os }} == "ubuntu-22.04" ]]; then
             echo No special steps
           elif [[ ${{ matrix.os }} == "ubuntu-24.04" ]]; then
