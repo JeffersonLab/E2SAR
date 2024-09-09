@@ -22,7 +22,7 @@ jobs:
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
             sudo apt-get -yq update
             sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
-            pip3 install meson pybind11
+            pip3 install --user meson pybind11
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
             sudo yum -yq install epel-release
             sudo yum -yq --enablerepo=devel update
@@ -30,7 +30,7 @@ jobs:
             sudo yum -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
             sudo update-alternatives --set python /usr/bin/python3.9
             sudo update-alternatives --set python3 /usr/bin/python3.9
-            pip3 install meson pybind11
+            pip3 install --user meson pybind11
           fi
           
       - name: Set up authentication for HTTPS
