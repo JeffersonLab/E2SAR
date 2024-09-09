@@ -3,6 +3,10 @@ name: Build E2SAR dependency artifacts
 on:
   workflow_dispatch:
 
+env:
+  GRPC_VER: 1.54.1
+  BOOST_VER: 1.85.0
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -44,7 +48,7 @@ jobs:
         with:
           repository: grpc/grpc  
           path: grpc  
-          ref: v1.54.1
+          ref: v${{ env.GRPC_VER }}
           submodules: true  
 
       - name: Build grpc
@@ -61,19 +65,21 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true' 
         run: |
           export IDIR=`pwd`/package/usr/local
-          wget -q https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz
-          tar -zxf boost_1_85_0.tar.gz
-          cd boost_1_85_0
+          # produce 1_85_0 from 1.85.0
+          export BOOST_SUB_VER = `echo ${{ env.BOOST_VER }} | sed s/\\./_/g`
+          wget -q https://archives.boost.io/release/${{ BOOST_VER }}/source/boost_${BOOST_SUB_VER}.tar.gz
+          tar -zxf boost_${BOOST_SUB_VER}.tar.gz
+          cd boost_${BOOST_SUB_VER}
           ./bootstrap.sh
           ./b2
           ./b2 install --prefix=${IDIR}
           
       - name: Tar the packaged files
         run: |
-          tar -zcf package-boost-1.85.0-grpc-1.54.1.tar.gz package/
+          tar -zcf package-boost-${{ env.BOOST_VER }}-grpc-${{ env.GRPC_VER }}.tar.gz package/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-package-boost-1.85.0-grpc-1.54.1
-          path: package-boost-1.85.0-grpc-1.54.1.tar.gz
+          name: ${{ matrix.os }}-package-boost-${{ env.BOOST_VER }}-grpc-${{ env.GRPC_VER }}
+          path: package-boost-${{ env.BOOST_VER }}-grpc-${{ env.GRPC_VER }}.tar.gz
