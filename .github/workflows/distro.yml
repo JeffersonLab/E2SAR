@@ -35,20 +35,20 @@ jobs:
       - name: Install Python dependencies
         run: |
           if [[ ${{ matrix.os }} == "ubuntu-20.04" ]]; then
+            echo Installing Python3.10
             sudo apt-get -yq update
             sudo apt-get install -yq software-properties-common
             sudo add-apt-repository -y ppa:deadsnakes/ppa
             sudo apt-get -yq update
             sudo apt-get install python3.10
-            python3 -m venv ~/venv
-            . ~/venv/bin/activate
           elif [[ ${{ matrix.os }} == "ubuntu-22.04" ]]; then
-            python3 -m venv ~/venv
-            . ~/venv/bin/activate
+            echo No special steps
           elif [[ ${{ matrix.os }} == "ubuntu-24.04" ]]; then
-            python3 -m venv ~/venv
-            . ~/venv/bin/activate
+            echo No special steps
           fi
+          python3 -m venv ~/venv
+          . ~/venv/bin/activate
+          pip3 install meson pybind11
           
       - name: Set up authentication for HTTPS
         run: |
