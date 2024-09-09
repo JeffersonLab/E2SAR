@@ -66,7 +66,7 @@ jobs:
         run: |
           export IDIR=`pwd`/package/usr/local
           # produce 1_85_0 from 1.85.0
-          export BOOST_SUB_VER = `echo ${{ env.BOOST_VER }} | sed s/\\./_/g`
+          export BOOST_SUB_VER=`echo ${{ env.BOOST_VER }} | sed s/\\./_/g`
           wget -q https://archives.boost.io/release/${{ env.BOOST_VER }}/source/boost_${BOOST_SUB_VER}.tar.gz
           tar -zxf boost_${BOOST_SUB_VER}.tar.gz
           cd boost_${BOOST_SUB_VER}
