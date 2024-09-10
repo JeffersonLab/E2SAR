@@ -1,0 +1,70 @@
+name: Build gRPC+Boost .deb and .rpms
+
+on:
+  workflow_dispatch:
+env:
+  E2SAR_DEP: boost-1.85.0-grpc-1.54.1
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+
+    steps:
+      - name: Set up environment
+        run: |
+          if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
+            sudo apt-get -yq update
+            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools
+            sudo gem install fpm
+          elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
+            sudo dnf -yq install epel-release
+            sudo dnf -yq --enablerepo=devel update
+            sudo dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+            sudo dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39 rpm-build squashfs-tools ruby
+            sudo gem install fpm
+          fi
+          
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Create install directories
+        run: |
+          mkdir -p package/usr/local/include/
+          mkdir -p package/usr/local/lib
+          mkdir -p package/usr/local/lib64
+
+      - name: Download built boost and grpc artifact
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: builddeps.yml
+          name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
+          path: ./
+
+      - name: Untar the grpc and boost install tree
+        run: |
+          tar -zxf package-${{ env.E2SAR_DEP }}.tar.gz
+          ls -l package/usr/local/bin
+
+      - name: Package into .deb or .rpm
+        run: |
+          pushd package/ && tar -zcf ../grpc-boost-dep.tar.gz usr/ && popd
+          if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
+            fpm -s tar -t deb -n grpc_boost -v ${{ env.E2SAR_DEP }} --prefix=/ grpc-boost-dep.tar.gz
+          elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
+           fpm -s tar -t deb -n grpc_boost -v ${{ env.E2SAR_DEP }} --prefix=/ grpc-boost-dep.tar.gz
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ env.E2SAR_DEP }}-package
+          path: |
+            *.deb
+            *.rpm
