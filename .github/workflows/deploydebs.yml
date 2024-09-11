@@ -49,7 +49,7 @@ jobs:
       - name: create GH release
         run: |
           cd E2SAR
-          gh release create E2SAR-${{ env.E2SAR_VER }}-${{ matrix.os }} ./*.tar.gz ./*.zip
+          gh release create E2SAR-${{ env.E2SAR_VER }}-${{ matrix.os }} ./*.tar.gz ./*.deb
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
         shell: bash
