@@ -21,6 +21,13 @@ jobs:
         os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
         
     steps:
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: false
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
+
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
         id: download-artifact
@@ -28,10 +35,11 @@ jobs:
         with:
           workflow: builddeps.yml
           name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
-          path: ./
+          path: E2SAR
 
       - name: create GH release
         run: |
+          cd E2SAR
           gh release create ${{ matrix.os }}-${{ env.E2SAR_DEP }}-deps ./*.tar.gz
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
