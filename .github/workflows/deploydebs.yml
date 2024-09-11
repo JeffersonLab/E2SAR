@@ -1,7 +1,7 @@
 permissions:
   contents: write
   
-name: Deploy deps to releases
+name: Deploy E2sar debs and dependency debs to releases
 
 on:
   workflow_dispatch:
@@ -35,6 +35,15 @@ jobs:
         with:
           workflow: builddeps.yml
           name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
+          path: E2SAR
+
+      - name: Download built e2sar deb
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-e2sar-deb
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: distro.yml
+          name: ${{ matrix.os }}-e2sar-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
       - name: create GH release
