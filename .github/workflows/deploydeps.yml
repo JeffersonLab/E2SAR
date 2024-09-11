@@ -32,7 +32,7 @@ jobs:
 
       - name: create GH release
         run: |
-          gh release create ${{ matrix.os }}-{{ env.E2SAR_DEP }}-deps ./*.tgz
+          gh release create ${{ matrix.os }}-${{ env.E2SAR_DEP }}-deps ./*.tgz
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
         shell: bash
