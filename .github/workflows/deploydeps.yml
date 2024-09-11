@@ -1,0 +1,41 @@
+permissions:
+  contents: write
+  
+name: Deploy deps to releases
+
+on:
+  workflow_dispatch:
+env:
+  E2SAR_VER: 0.1.0
+  E2SAR_DEP: boost-1.85.0-grpc-1.54.1
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+        
+    steps:
+      - name: Download built boost and grpc artifact
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: builddeps.yml
+          name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
+          path: ./
+
+      - name: create GH release
+        run: |
+          gh release create ${{ matrix.os }}-{{ env.E2SAR_DEP }}-deps ./*.tgz
+        env:
+          GITHUB_TOKEN: ${{ github.TOKEN }}
+        shell: bash
+
+        
+          
