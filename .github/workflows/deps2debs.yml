@@ -3,8 +3,7 @@ name: Build gRPC+Boost .deb and .rpms
 on:
   workflow_dispatch:
 env:
-  E2SAR_DEP: boost-1.85.0-grpc-1.54.1
-  DEBIAN_VER: 1.85.0-boost-1.54.1-grpc
+  E2SAR_DEP: 1.85.0-boost-1.54.1-grpc
 
 jobs:
   build:
@@ -57,9 +56,9 @@ jobs:
         run: |
           pushd package/ && tar -zcf ../grpc-boost-dep.tar.gz usr/ && popd
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
-            fpm -s tar -t deb -n grpc_boost -v ${{ env.DEBIAN_VER }} --prefix=/ grpc-boost-dep.tar.gz
+            fpm -s tar -t deb -n grpc_boost -v ${{ env.E2SAR_DEP }} --prefix=/ grpc-boost-dep.tar.gz
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-           fpm -s tar -t deb -n grpc_boost -v ${{ env.DEBIAN_VER }} --prefix=/ grpc-boost-dep.tar.gz
+           fpm -s tar -t deb -n grpc_boost -v ${{ env.E2SAR_DEP }} --prefix=/ grpc-boost-dep.tar.gz
           fi
 
       - name: Upload artifacts
