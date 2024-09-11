@@ -33,7 +33,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v6
         with:
-          workflow: builddeps.yml
+          workflow: deps2debs.yml
           name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
           path: E2SAR
 
@@ -49,7 +49,7 @@ jobs:
       - name: create GH release
         run: |
           cd E2SAR
-          gh release create E2SAR-${{ env.E2SAR_VER }}-${{ matrix.os }} ./*.tar.gz ./*.deb
+          gh release create E2SAR-${{ env.E2SAR_VER }}-${{ matrix.os }} ./*.deb
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
         shell: bash
