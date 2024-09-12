@@ -77,7 +77,7 @@ jobs:
           
       - name: Tar the packaged files
         run: |
-          tar -zcf package-e2sar-deps${{ env.E2SAR_VER }}.tar.gz package/
+          tar -zcf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz package/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
