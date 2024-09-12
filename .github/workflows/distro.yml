@@ -75,12 +75,12 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: builddeps.yml
-          name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
+          name: ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: ./
 
       - name: Untar the grpc and boost install tree
         run: |
-          tar -zxf package-${{ env.E2SAR_DEP }}.tar.gz
+          tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
           ls -l package/usr/local/bin
 
       - name: Build E2SAR using Meson
