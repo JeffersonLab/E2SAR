@@ -34,7 +34,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: deps2debs.yml
-          name: ${{ matrix.os }}-${{ env.E2SAR_DEP }}-package
+          name: ${{ matrix.os }}-e2sar-deps-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
       - name: Download built e2sar deb
