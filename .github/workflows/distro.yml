@@ -81,7 +81,7 @@ jobs:
       - name: Untar the grpc and boost install tree
         run: |
           ls ./
-          tar -zxf ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
+          tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
           ls -l package/usr/local/bin
 
       - name: Build E2SAR using Meson
