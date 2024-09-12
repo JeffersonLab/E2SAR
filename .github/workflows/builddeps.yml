@@ -6,6 +6,7 @@ on:
 env:
   GRPC_VER: 1.54.1
   BOOST_VER: 1.85.0
+  E2SAR_VER: 0.1.0
 
 jobs:
   build:
@@ -76,10 +77,10 @@ jobs:
           
       - name: Tar the packaged files
         run: |
-          tar -zcf package-boost-${{ env.BOOST_VER }}-grpc-${{ env.GRPC_VER }}.tar.gz package/
+          tar -zcf package-e2sar-deps${{ env.E2SAR_VER }}.tar.gz package/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-package-boost-${{ env.BOOST_VER }}-grpc-${{ env.GRPC_VER }}
-          path: package-boost-${{ env.BOOST_VER }}-grpc-${{ env.GRPC_VER }}.tar.gz
+          name: ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}
+          path: package-e2sar-deps${{ env.E2SAR_VER }}.tar.gz
