@@ -83,4 +83,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}
-          path: package-e2sar-deps${{ env.E2SAR_VER }}.tar.gz
+          path: package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
