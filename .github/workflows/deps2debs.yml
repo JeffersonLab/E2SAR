@@ -3,8 +3,8 @@ name: Build gRPC+Boost .deb and .rpms
 on:
   workflow_dispatch:
 env:
-  E2SAR_DEP: boost-1.85.0-grpc-1.54.1
-  DEB_VER: 1.85.0-boost-1.54.1-grpc
+  E2SAR_VER: 0.1.0
+  DEPS_VER: 1.85.0-boost-1.54.1-grpc
 
 jobs:
   build:
@@ -45,27 +45,27 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: builddeps.yml
-          name: ${{ matrix.os }}-package-${{ env.E2SAR_DEP }}
+          name: ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: ./
 
       - name: Untar the grpc and boost install tree
         run: |
-          tar -zxf package-${{ env.E2SAR_DEP }}.tar.gz
+          tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
           ls -l package/usr/local/bin
 
       - name: Package into .deb or .rpm
         run: |
-          pushd package/ && tar -zcf ../grpc-boost-dep.tar.gz usr/ && popd
+          pushd package/ && tar -zcf ../e2sar-deps.tar.gz usr/ && popd
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
-            fpm -s tar -t deb -n grpc_boost -v ${{ env.DEB_VER }} --prefix=/ grpc-boost-dep.tar.gz
+            fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-           fpm -s tar -t deb -n grpc_boost -v ${{ env.DEB_VER }} --prefix=/ grpc-boost-dep.tar.gz
+           fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ env.DEB_VER }}-package
+          name: ${{ matrix.os }}-e2sar-deps-${{ env.E2SAR_VER }}-package
           path: |
             *.deb
             *.rpm
