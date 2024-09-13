@@ -61,11 +61,6 @@ if [[ ${distro} == 'rocky' ]]; then
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | sudo bash
     sudo dnf -yq install git-lfs
 
-    # install github cli (gh)
-    sudo dnf -yq install 'dnf-command(config-manager)'
-    sudo dnf -yq config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-    sudo dnf -yq install gh --repo gh-cli
-
 fi
 
 # install docker compose and buildx bits
