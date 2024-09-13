@@ -17,6 +17,8 @@ RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoco
 
 RUN pip3 install pybind11 scapy meson
 
+RUN apt-get install git-lfs && git lfs install 
+
 #
 # Stage 'compile'
 #
