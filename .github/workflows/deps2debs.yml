@@ -5,6 +5,7 @@ on:
 env:
   E2SAR_VER: 0.1.0
   DEPS_VER: 1.85.0-boost-1.54.1-grpc
+  FINAL_INSTALL: /usr/local
 
 jobs:
   build:
@@ -52,6 +53,12 @@ jobs:
         run: |
           tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
           ls -l package/usr/local/bin
+
+      - name: Update pkgconfig prefix files for final installation
+        run: |
+          # update pkgconfig files for the install location. DESTDIR didn't work
+          echo Updating pkgconfig files prefix from ${IDIR} to ${{ env.FINAL_INSTALL }}
+          for file in `ls -1 ${IDIR}/lib/pkgconfig`; sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
 
       - name: Package into .deb or .rpm
         run: |
