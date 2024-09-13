@@ -13,7 +13,7 @@ ENV PATH=/usr/local/bin:$PATH
 ENV DEPSVER=0.1.0
 ENV DEPSDEB=e2sar-deps_0.1.0_amd64.deb
 
-RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb curl git
+RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb curl git vim
 
 RUN pip3 install pybind11 scapy meson
 
