@@ -50,13 +50,16 @@ jobs:
 
       - name: Build grpc
         run: |
+          # note that with this, all prefixes in pkgconfig files will be ${IDIR} instead of /usr/local 
+          # which is what is normally needed. This is OK to build e2sar, but not OK if you want to biuld
+          # debs out of these. We will fix in in the other workflow.
           export IDIR=`pwd`/package/usr/local
-          cd grpc
-          mkdir -p cmake/build
-          pushd cmake/build
+          mkdir -p grpc/cmake/build
+          pushd grpc/cmake/build
           cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
           make -j 4
           make install
+          popd
 
       - name: Download and build boost
         if: steps.cache.outputs.cache-hit != 'true' 
