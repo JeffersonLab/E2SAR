@@ -24,6 +24,8 @@ $ cd udplbd
 $ git fetch && get switch develop
 ```
 
+Also a section below discusses the development Docker image which can be used for modifying, compiling and testing the code inside a running container.
+
 ## Building the code
 
 Overview: the build process requires multiple dependencies for tools and code (gRPC+protobufs, boost and their dependencies). E2SAR uses Meson for a build tool. Also the protoc compiler is required to generate gRPC client stubs.
@@ -178,7 +180,7 @@ Once the container is started it checks out the appropriate branch and compiles 
 $ docker exec -ti <container id> bash
 # cd /src/E2SAR
 ```
-To connect VSCode be sure to install the `Dev Containers`  VSCode extension. To connect click <F1> then in the command prompt search for `Dev Containers: Attach to Running Container`. Select that, then select the running container. A new window will open connected to this container. You can open the `/src/E2SAR` folder in this workspace to find the source code. Compiling the code requires opening a terminal from inside VSCode. Locate `/src/E2SAR` directory then issue `meson compile -C build` command like explained above to build inside the container.
+To connect VSCode be sure to install the `Dev Containers`  VSCode extension. To connect click `<F1>` then in the command prompt search for `Dev Containers: Attach to Running Container`. Select that, then select the running container. A new window will open connected to this container. You can open the `/src/E2SAR` folder in this workspace to find the source code. Compiling the code requires opening a terminal from inside VSCode. Locate `/src/E2SAR` directory then issue `meson compile -C build` command like explained above to build inside the container.
 
 ## Installing and creating a distribution
 
