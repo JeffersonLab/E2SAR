@@ -24,6 +24,8 @@ $ cd udplbd
 $ git fetch && get switch develop
 ```
 
+Also a section below discusses the development Docker image which can be used for modifying, compiling and testing the code inside a running container.
+
 ## Building the code
 
 Overview: the build process requires multiple dependencies for tools and code (gRPC+protobufs, boost and their dependencies). E2SAR uses Meson for a build tool. Also the protoc compiler is required to generate gRPC client stubs.
@@ -36,7 +38,6 @@ Build dependences
 
 - MacOS: `brew install autoconf automake libtool shtool meson abseil c-ares re2 grpc pkg-config boost protobuf`
 - Linux: see [this script](scripts/notebooks//EJFAT/post-boot/sender.sh) for necessary dependencies.
-
 
 For python dependencies minimum Python 3.9 is required. It is recommended you create a virtual environment for Python build dependencies, then activate the venv and install pybind11 and other dependencies:
 
@@ -51,6 +52,12 @@ $ pip install protobuf
 Continue using the venv when compiling and testing e2sar. PSA: you can get out of the venv by running `deactivate` from inside the venv. 
 
 The other two large dependencies are the C++ Boost library and gRPC library. For some common distributions we have pre-compiled installation trees stored [under this directory](binary_artifacts/). Note that you must have git-lfs installed to access them. In many cases they m ay need to be built from scratch using instructions provided below.
+
+#### Installing gRPC and Boost as packages
+
+Major dependencies are available from the [release page](https://github.com/JeffersonLab/E2SAR/releases) as `e2sar-deps` Debian package for Ubuntu 20, 22 and 24. The package includes gRPC and Boost libraries of appropriate versions for each E2SAR release installed under `/usr/local/`. Using them requires adjusting `PATH` and `LD_LIBRARY_PATH` to point to `/usr/local/bin` and `/usr/local/lib`, respectively. 
+
+They can also be built from scratch, as described below.
 
 #### Installing gRPC from source
 
@@ -109,8 +116,7 @@ Update `setup_compile_env.sh` file for your environment. Then run:
 ```
 $ . ./setup_compile_env.sh
 $ meson setup build
-$ cd build
-$ meson compile
+$ meson compile -C build
 $ EJFAT_URI='ejfats://udplbd@192.168.0.3:18347/lb/1?sync=192.168.2.1:19020&data=10.100.100.14' meson test -C build --suite unit --timeout 0
 $ EJFAT_URI='ejfats://udplbd@192.168.0.3:18347/lb/12?sync=192.168.100.10:19020&data=192.168.101.10:18020' meson test -C build --suite unit --timeout 0
 ```
@@ -129,7 +135,7 @@ There are several Docker files in the root of the source tree. They build variou
 
 #### Control Plane and other tools
 
-To build this docker use the following command:
+To build this docker (Dockerfile.cli) use the following command:
 ```
 $ docker build -t cli -f Dockerfile.cli .
 ```
@@ -147,9 +153,34 @@ $ docker run --rm cli snifgen.py -g --sync --ip 192.168.100.1
 ```
 When running a Docker Hub version, then:
 ```
-$ docker run --rm <username>/<repo>:latest lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
+$ docker run --rm ibaldin/e2sar:latest lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
 ```
 (Notice that default docker network plumbing probably isn't appropriate for listening or sending packets using snifgen.py).
+
+#### Development Docker
+
+We provide another Docker image which allows development inside the running container. It includes all necessary dependencies for a given version of E2SAR. VSCode can be attached to it to ease the development. 
+
+To build this image (Dockerfile.dev) use the following command:
+```
+$ docker build -t <username>/<repo>:<version> -t <username>/<repo>:latest -f Dockerfile.dev .
+```
+
+This docker image expects that user's GitHub SSH key is mounted read-only when it is started in order to be able to checkout the code. It also expects an optional E2SAR branch indicator as shown:
+```
+$ docker run --rm -v "${HOME}/.ssh/github_ecdsa:/src/git_ssh_key:ro" -e E2SAR_BRANCH=docker-dev ibaldin/e2sar-dev:latest
+```
+Note that the SSH key in the container must always be named `/src/git_ssh_key`. You can add `-d` option to background the process. If you want to preserve the container state, omit the `--rm` option above. Then after the container is stopped, it can be restarted (with all the changes) as follows:
+```
+$ docker start <container name>
+```
+
+Once the container is started it checks out the appropriate branch and compiles it and then continues to run indefinitely. You can connect to it and find the code in `/src/E2SAR`:
+```
+$ docker exec -ti <container id> bash
+# cd /src/E2SAR
+```
+To connect VSCode be sure to install the `Dev Containers`  VSCode extension. To connect click `<F1>` then in the command prompt search for `Dev Containers: Attach to Running Container`. Select that, then select the running container. A new window will open connected to this container. You can open the `/src/E2SAR` folder in this workspace to find the source code. Compiling the code requires opening a terminal from inside VSCode. Locate `/src/E2SAR` directory then issue `meson compile -C build` command like explained above to build inside the container.
 
 ## Installing and creating a distribution
 
