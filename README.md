@@ -11,7 +11,7 @@ Documentation for E2SAR adopters is contained in the [wiki](https://github.com/J
 
 ### Via cloning
 
-All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
+Binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
 Clone the project as shown below, to include the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb) as well as wiki/ and docs/ (which are separate repos maintaining doxygen documentation and the wiki):
 ```bash
