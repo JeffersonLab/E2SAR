@@ -11,7 +11,7 @@ Documentation for E2SAR adopters is contained in the [wiki](https://github.com/J
 
 ### Via cloning
 
-All binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
+Binary artifacts in this project are stored using Git LFS and you must [install git lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=linux) in order to properly check out their contents.
 
 Clone the project as shown below, to include the [UDPLBd](https://github.com/esnet/udplbd) repo contents (needed for the protobuf definitions located in udplbd/pkg/pb) as well as wiki/ and docs/ (which are separate repos maintaining doxygen documentation and the wiki):
 ```bash
@@ -24,7 +24,7 @@ $ cd udplbd
 $ git fetch && get switch develop
 ```
 
-Also a section below discusses the development Docker image which can be used for modifying, compiling and testing the code inside a running container.
+Also a [section below](#Development-Docker) discusses the development Docker image which can be used for modifying, compiling and testing the code inside a running container.
 
 ## Building the code
 
@@ -51,7 +51,7 @@ $ pip install protobuf
 ```
 Continue using the venv when compiling and testing e2sar. PSA: you can get out of the venv by running `deactivate` from inside the venv. 
 
-The other two large dependencies are the C++ Boost library and gRPC library. For some common distributions we have pre-compiled installation trees stored [under this directory](binary_artifacts/). Note that you must have git-lfs installed to access them. In many cases they m ay need to be built from scratch using instructions provided below.
+The other two large dependencies are the C++ Boost library and gRPC library. Specific versions are defined in the top-level [meson.build](./meson.build) file.
 
 #### Installing gRPC and Boost as packages
 
@@ -125,17 +125,17 @@ The `live` test suite requires a running UDPLBd and the setting of EJFAT_URI mus
 
 If you desire a custom installation directory you can add `--prefix=/absolute/path/to/install/root`. If you have a custom location for pkg-config scripts, you can also add `-Dpkg_config_path=/path/to/pkg-config/scripts` to the setup command. 
 
-### Building on older systems (e.g. RHEL8)
+#### Building on older systems (e.g. RHEL8)
 
 Due to a much older g++ compiler on those systems meson produces incorrect ninja.build files. After the `setup build` step execute the following command to correct the build file: `sed -i 's/-std=c++11//g' build/build.ninja`. 
 
-### Building a Docker version
+## Building Dockers
 
 There are several Docker files in the root of the source tree. They build various versions of the system for improved portability
 
-#### Control Plane and other tools
+### Control Plane and other tools
 
-To build this docker (Dockerfile.cli) use the following command:
+To build [this docker](Dockerfile.cli) use the following command:
 ```
 $ docker build -t cli -f Dockerfile.cli .
 ```
@@ -157,7 +157,7 @@ $ docker run --rm ibaldin/e2sar:latest lbadm --version -u "ejfats://udplbd@192.1
 ```
 (Notice that default docker network plumbing probably isn't appropriate for listening or sending packets using snifgen.py).
 
-#### Development Docker
+### Development Docker
 
 We provide another Docker image which allows development inside the running container. It includes all necessary dependencies for a given version of E2SAR. VSCode can be attached to it to ease the development. 
 
@@ -188,24 +188,23 @@ You can install the code after compilation by running `meson install -C build` (
 
 To create a source distribution you can run `meson dist -C build --no-tests` (the `--no-tests` is needed because GRPC headers won't build properly when distribution is generated). 
 
-# Testing
+## Testing
 
-## C++
+### C++
 
 E2SAR code comes with a set of tests under [test/](test/) folder. It relies on Boost unit-testing framework as well as meson testing capabilities. The easiest way is to execute `meson test` or `meson test --suite unit` or `meson test --suite live`. The latter requires an instance of UDPLBd running and `EJFAT_URI` environment variable to be set to point to it (e.g. `export EJFAT_URI="ejfats://udplbd@192.168.0.3:18347/").
 
 There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which runs all the tests on FABRIC testbed.
 
-## Python
+### Python
 
 The C++ unit tests `e2sar_uri_test` and `e2sar_reas_test` have been reproduced in Python Jupyter notebooks, which can be found at [scripts/notebooks/pybind11_examples/](scripts/notebooks/pybind11_examples/). The Python `e2sar_lbcp_live_test` is currently under development.
 
-## Scapy
+### Scapy
 
 Scapy scripts are provided for sniffing/validating and generating various kinds of UDP packets. See this [folder](scripts/scapy/) for details. Make sure Scapy is installed (`pip install scapy`) and for most tasks the scripts must be run as root (both for sending and sniffing). 
 
 More details on the use can be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki/Code-and-Binaries).
-
 
 ## Dealing with SSL certificate validation
 
@@ -235,9 +234,9 @@ If using a private CA, the `-o` option should be used to point to the CA certifi
 
 See [lbadm](bin/lbadm.cpp) code on how the two options are implemented and used. Programmatically it is possible to supply client-side certs to E2SAR, however UDPLBd does not validate them. See [LBManager constructor](src/e2sarCP.cpp) for how that can be done.
 
-# Generating Documentation
+## Generating Documentation
 
-## Doxygen
+### Doxygen
 
 A [Doxygen configuration file](Doxyfile) is provided with the distribution. It will update the documentation under docs/ which is a submodule - a separate public repo just for the documentation. Once updated, to make the documentation go live on [GitHub pages site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html) you can do as follows from E2SAR root (this assumes you have installed Doxygen 1.12.0 or later):
 ```bash
@@ -252,7 +251,7 @@ $ git commit -S -m "Link docs/ commit to this commit of E2SAR"
 $ git push origin <appropriate E2SAR branch>
 ```
 
-## Wiki
+### Wiki
 
 The [Wiki](https://github.com/JeffersonLab/E2SAR/wiki) is also a submodule of the project (but is a separate repository) under wiki/. You can update it by doing the following:
 ```bash
@@ -268,7 +267,7 @@ $ git push origin <appropriate E2SAR branch>
 ```
 Note that wiki uses `master` as its main branch, while docs/ and main E2SAR repo use `main`. 
 
-# Related information
+## Related information
 
 - [UDPLBd repo](https://github.com/esnet/udplbd) (aka Control Plane)
 - [ejfat-rs repo](https://github.com/esnet/ejfat-rs) (command-line tool for testing)
