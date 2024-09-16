@@ -5,6 +5,21 @@ distro=`awk 'BEGIN { FS = "=" } ; /^ID=/ {gsub(/"/, ""); print $2}' /etc/*-relea
 
 if [[ ${distro} == 'ubuntu' ]]; then 
     echo Installing for Ubuntu
+
+    # need to install python3.10 on ubuntu20.04
+    version=`awk 'BEGIN { FS = "=" } ; /^DISTRIB_RELEASE=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+
+    if [[ ${version} == '20.04' ]]; then
+        echo Installing python3.10 for Ubuntu 20.04
+        sudo apt-get -yq update
+        sudo apt-get install -yq software-properties-common
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get -yq update
+        sudo apt-get -yq install python3.10
+        sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+        sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 2
+    fi
+    
     # install missing software
     sudo apt-get -yq update
     sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb docker.io
@@ -23,6 +38,7 @@ if [[ ${distro} == 'ubuntu' ]]; then
     
     # enable apport so core dumps can be caught under /var/lib/apport/coredump/
     sudo systemctl enable apport.service
+    
 fi
 
 if [[ ${distro} == 'rocky' ]]; then
