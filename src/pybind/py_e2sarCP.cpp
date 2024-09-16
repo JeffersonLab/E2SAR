@@ -15,7 +15,8 @@ py::object outcome_result_to_pyobject(outcome::result<T, E>& res) {
     if (res) {
         return py::cast(res.value().release());
     } else {
-        // Handle the error case (for simplicity, converting to a string here)
+        // Handle the error case (for simplicity, printing the error message here).
+        std::cerr << "Error: " << res.error().message() << std::endl;
         return py::none();
     }
 }
@@ -41,48 +42,108 @@ void init_e2sarCP(py::module_ &m) {
     // Define the submodule "ControlPlane"
     py::module_ e2sarCP = m.def_submodule("ControlPlane", "E2SAR ControlPlane submodule");
 
-    // Expose the LoadBalancerStatusReply class
+    // Basic return types
+    e2sarCP.def("get_port_range", &get_PortRange);
+
+    // Expose the grpc classes
+    py::class_<WorkerStatus>(e2sarCP, "WorkerStatus")
+        .def(py::init<>());
     py::class_<LoadBalancerStatusReply>(e2sarCP, "LoadBalancerStatusReply")
         .def(py::init<>());
+    py::class_<OverviewReply>(e2sarCP, "OverviewReply")
+        .def(py::init<>());
 
-    py::class_<google::protobuf::Timestamp>(m, "Timestamp")
+    py::class_<google::protobuf::Timestamp>(e2sarCP, "Timestamp")
         .def(py::init<>())
         .def("get_seconds", &google::protobuf::Timestamp::seconds)
         .def("get_nanos", &google::protobuf::Timestamp::nanos)
         .def("set_seconds", &google::protobuf::Timestamp::set_seconds)
         .def("set_nanos", &google::protobuf::Timestamp::set_nanos);
 
+    /**
+     * Bindings for struct "LBWorkerStatus"
+     */
     py::class_<LBWorkerStatus>(e2sarCP, "LBWorkerStatus")
         .def(py::init<const std::string&, float, float, int, const google::protobuf::Timestamp&>(),
             py::arg("name"),
             py::arg("fill_percent"),
             py::arg("control_signal"),
             py::arg("slots_assigned"),
-            py::arg("last_updated"))
-        .def_readwrite("name", &LBWorkerStatus::name)
-        .def_readwrite("fill_percent", &LBWorkerStatus::fillPercent)
-        .def_readwrite("control_signal", &LBWorkerStatus::controlSignal)
-        .def_readwrite("slots_assigned", &LBWorkerStatus::slotsAssigned)
-        .def_property("last_updated",
+            py::arg("last_updated")
+        )
+        // For params return from the LB, bind them as _readonly instead of _readwrite 
+        .def_readonly("name", &LBWorkerStatus::name)
+        .def_readonly("fill_percent", &LBWorkerStatus::fillPercent)
+        .def_readonly("control_signal", &LBWorkerStatus::controlSignal)
+        .def_readonly("slots_assigned", &LBWorkerStatus::slotsAssigned)
+        .def_property_readonly("last_updated",
             [](const LBWorkerStatus &self) {
                 return convert_timestamp_to_python(self.lastUpdated); // Access the member directly
-            },
-            [](LBWorkerStatus &self, py::object py_timestamp) {
-                self.lastUpdated = convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
             }
+            // ,
+            // [](LBWorkerStatus &self, py::object py_timestamp) {
+            //     self.lastUpdated = convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
+            // }
         );
 
-    // Bind LBStatus
-    /// TODO: check with Python tests; method with move()
+    /**
+     * Bindings for struct "LBStatus"
+     */
     py::class_<LBStatus>(e2sarCP, "LBStatus")
-        /// TODO: No binding for method with move()
-        .def(py::init<>());
+        // Default constructor
+        .def(py::init<>())
+
+        // Constructor with arguments using move semantics for workers and senderAddresses
+        .def(py::init<
+            google::protobuf::Timestamp,
+            /* Basic types */ u_int64_t, u_int64_t,
+            std::vector<WorkerStatus>&,
+            std::vector<std::string>&,
+            google::protobuf::Timestamp>(),
+            py::arg("timestamp"),
+            py::arg("currentEpoch"), py::arg("currentPredictedEventNumber"),
+            py::arg("workers"),
+            py::arg("sender_addresses"),
+            py::arg("expiresAt"))
+
+        // Expose the struct members
+        .def_property("timestamp",
+            [](const LBStatus &self) {
+                return convert_timestamp_to_python(self.timestamp); // Access the member directly
+            },
+            [](LBStatus &self, py::object py_timestamp) {
+                self.timestamp = convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
+            })
+        .def_readonly("currentEpoch", &LBStatus::currentEpoch)
+        .def_readonly("currentPredictedEventNumber", &LBStatus::currentPredictedEventNumber)
+        .def_readonly("workers", &LBStatus::workers)
+        .def_readonly("senderAddresses", &LBStatus::senderAddresses)
+        .def_property_readonly("expiresAt",
+            [](const LBStatus &self) {
+                return convert_timestamp_to_python(self.expiresAt); // Access the member directly
+            }
+            // ,
+            // [](LBStatus &self, py::object py_timestamp) {
+            //     self.expiresAt= convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
+            // }
+        );
+    
+    /**
+     * Bindings for struct "OverviewEntry"
+     */
+    py::class_<OverviewEntry>(e2sarCP, "OverviewEntry")
+        .def(py::init<>())
+        
+        .def_readonly("name", &OverviewEntry::name)
+        .def_readonly("lb_id", &OverviewEntry::lbid)
+        .def_readonly("syncAddressAndPort", &OverviewEntry::syncAddressAndPort)
+        .def_readonly("data_ip_v4", &OverviewEntry::dataIPv4)
+        .def_readonly("data_ip_v6", &OverviewEntry::dataIPv6)
+        .def_readonly("fpga_lb_id", &OverviewEntry::fpgaLBId)
+        .def_readonly("lb_status", &OverviewEntry::status);
 
     /**
-     * Binding the LBManager class as "LBManager" in the submodule "ControlPlane".
-     * This has never been test in Python with a real or a mock LB.
-     *
-     * TODO: Python mock LB test
+     * Bind the `e2sar::LBManager` class as "LBManager" in the submodule "ControlPlane".
      */
     py::class_<LBManager> lb_manager(e2sarCP, "LBManager");
 
@@ -94,13 +155,28 @@ void init_e2sarCP(py::module_ &m) {
         py::arg("opts") = grpc::SslCredentialsOptions()
     );
 
-    lb_manager.def("get_version", &LBManager::version);
+    // Return type contains result<boost::tuple<...>>: 
+    // - transform boost::tuple to std::tuple
+    // - return std::tuple
+    lb_manager.def("get_version", [](LBManager &self) {
+        auto result = self.version();
+
+        // Check if the result contains an error
+        if (result.has_error()) {
+            // You can define a Python exception or use a standard one
+            throw std::runtime_error(result.error().message());
+        }
+
+        // Extract the tuple and return it
+        auto val = result.value();
+        return py::make_tuple(val.get<0>(), val.get<1>(), val.get<2>());
+    });
 
     // Bind LBManager::reserveLB to use duration in seconds
     // It is specifically designed to interface with Python datetime.timedelta
     /// NOTE: std::vector<std::string> will map to the Python data type of: List[str]
     lb_manager.def(
-        "reserve_lb_seconds",
+        "reserve_lb_in_seconds",
         static_cast<result<u_int32_t> (LBManager::*)(
             const std::string &,
             const double &,
@@ -110,7 +186,7 @@ void init_e2sarCP(py::module_ &m) {
     );
 
     /// NOTE: Bindings for overloaded methods.
-    ///       Ref: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
+    /// https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
     lb_manager.def(
         "get_lb",
         static_cast<result<int> (LBManager::*)()>(&LBManager::getLB)
@@ -137,8 +213,27 @@ void init_e2sarCP(py::module_ &m) {
         py::arg("lb_id")
     );
 
-    lb_manager.def("register_worker", &LBManager::registerWorker);
-    lb_manager.def("deregister_worker", &LBManager::deregisterWorker);
+    // C++14 above usage. No py::arg() allowed. Must define as def_static
+    lb_manager.def_static(
+        "get_sender_addresses",
+        py::overload_cast<const LoadBalancerStatusReply &>(&LBManager::get_SenderAddressVector),
+        "Retrieve sender addresses as a list of strings."
+    );
+    lb_manager.def_static(
+        "get_worker_statuses",
+        py::overload_cast<const LoadBalancerStatusReply &>(&LBManager::get_WorkerStatusVector),
+        "Retrieve worker status as a list of ControlPlane.WorkerStatus objects."
+    );
+    lb_manager.def_static(
+        "as_lb_status",
+        py::overload_cast<const LoadBalancerStatusReply &>(&LBManager::asLBStatus),
+        "Helper function copies LoadBalancerStatusReply protobuf into a simpler object."
+    );
+    lb_manager.def_static(
+        "as_overview_message",
+        py::overload_cast<const OverviewReply &>(&LBManager::asOverviewMessage),
+        "Helper function copies OverviewReply protobuf into a simpler object."
+    );
 
     lb_manager.def(
         "send_state",
@@ -146,7 +241,6 @@ void init_e2sarCP(py::module_ &m) {
         "Send worker state update using session ID and session token from register call.",
         py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready")
     );
-
     /// TODO: type cast between C++ google::protobuf::Timestamp between Python datetime package
     // lb_manager.def(
     //     "send_state_with_timestamp",
@@ -155,10 +249,15 @@ void init_e2sarCP(py::module_ &m) {
     //     py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready"), py::arg("timestamp")
     // );
 
-    /**
-     * Return type containing std::unique_ptr<LoadBalancerStatusReply>
-     */
+    // Simple return types of result<int>
+    lb_manager.def("add_senders",  &LBManager::addSenders);
+    lb_manager.def("remove_senders",  &LBManager::removeSenders);
+    lb_manager.def("register_worker", &LBManager::registerWorker);
+    lb_manager.def("deregister_worker", &LBManager::deregisterWorker);
 
+    /**
+     * Return type containing result<std::unique_ptr<LoadBalancerStatusReply>>
+     */
     lb_manager.def(
         "get_lb_status",
         [](LBManager& self){
@@ -166,7 +265,6 @@ void init_e2sarCP(py::module_ &m) {
             return outcome_result_to_pyobject(result);
         }
     );
-
     lb_manager.def(
         "get_lb_status_by_id",
         [](LBManager& self, const std::string & lbid){
@@ -176,17 +274,21 @@ void init_e2sarCP(py::module_ &m) {
         py::arg("lb_id")
     );
 
-    lb_manager.def("make_ssl_options", &LBManager::makeSslOptions);
+    /**
+     * Return type containing result<std::unique_ptr<OverviewReply>>
+     */
+        lb_manager.def(
+        "get_lb_overview",
+        [](LBManager& self){
+            auto result = self.overview();
+            return outcome_result_to_pyobject(result);
+        }
+    );
 
-    lb_manager.def("get_port_range", &get_PortRange);
+    lb_manager.def("make_ssl_options", &LBManager::makeSslOptions);
 
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
 
     /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
-
-    /// TODO: donot how to bind
-    /// - LBManager::get_WorkerStatusVector
-    /// - LBManager::get_SenderAddressVector
-    /// Datatype too complicated
 }
