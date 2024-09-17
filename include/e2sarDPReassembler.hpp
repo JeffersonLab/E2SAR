@@ -354,6 +354,11 @@ namespace e2sar
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3} {}
+                /**
+                 * Initialize flags from an INI file
+                 * @param iniFile - path to the INI file
+                 */
+                static result<Reassembler::ReassemblerFlags> getFromINI(const std::string &iniFile);
             };
             /**
              * Create a reassembler object to run receive on a specific set of CPU cores

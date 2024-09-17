@@ -1,5 +1,9 @@
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/detail/file_parser_error.hpp>
+#include <iostream>
 
 #include "portable_endian.h"
 
@@ -593,5 +597,40 @@ namespace e2sar
         // wake up send thread (no need to hold the lock as queue is lock_free)
         sendThreadCond.notify_one();
         return 0;
+    }
+
+    result<Segmenter::SegmenterFlags> Segmenter::SegmenterFlags::getFromINI(const std::string &iniFile)
+    {
+        boost::property_tree::ptree paramTree;
+        Segmenter::SegmenterFlags sFlags;
+
+        try {
+            boost::property_tree::ini_parser::read_ini(iniFile, paramTree);
+        } catch(boost::property_tree::ini_parser_error &ie) {
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, 
+                "Unable to parse the segmenter flags configuration file "s + iniFile};
+        }
+
+        // general
+        sFlags.dpV6 = paramTree.get<bool>("general.useCP", sFlags.dpV6);
+
+        // control plane
+        sFlags.syncPeriods = paramTree.get<u_int16_t>("control-plane.syncPeriods", 
+            sFlags.syncPeriods);
+        sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
+            sFlags.syncPeriodMs);
+
+        // data plane
+        sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
+        sFlags.zeroCopy = paramTree.get<bool>("data-plane.zeroCopy", sFlags.zeroCopy);
+        sFlags.connectedSocket = paramTree.get<bool>("data-plane.connectedSocket", 
+            sFlags.connectedSocket);
+        sFlags.mtu = paramTree.get<u_int16_t>("data-plane.mtu", sFlags.mtu);
+        sFlags.numSendSockets = paramTree.get<size_t>("data-plane.numSendSockets", 
+            sFlags.numSendSockets);
+        sFlags.sndSocketBufSize = paramTree.get<int>("data-plane.sndSocketBufSize", 
+            sFlags.sndSocketBufSize);
+
+        return sFlags;
     }
 }

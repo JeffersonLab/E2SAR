@@ -134,6 +134,10 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.get<0>() << " frames sent, " << stats.get<1>() << " errors" << std::endl;
+    if (stats.get<1>() != 0)
+    {
+        std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
+    }
     return 0;
 }
 
@@ -232,6 +236,8 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
+    bool withCP;
+    std::string iniFile;
 
     // parameters
     opts("send,s", "send traffic");
@@ -248,7 +254,10 @@ int main(int argc, char **argv)
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
-    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is presses)");
+    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)");
+    opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
+    opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s]] or ReassemblerFlags [r]."
+        " Values found in the file override --withcp, --mtu and --bufsize");
 
     po::variables_map vm;
 
@@ -284,6 +293,11 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    withCP = vm["withcp"].as<bool>();
+    std::cout << "Control plane will be " << (withCP ? "ON" : "OFF") << std::endl;
+    std::cout << (withCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
+        "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
+
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::instance};
 
@@ -300,9 +314,20 @@ int main(int argc, char **argv)
         auto uri = uri_r.value();
         if (vm.count("send")) {
             Segmenter::SegmenterFlags sflags;
-            sflags.useCP = false; // turn off CP sync
-            sflags.mtu = mtu;
-            sflags.sndSocketBufSize = sockBufSize;
+            if (!vm["ini"].as<std::string>().empty())
+            {
+                auto sflagsRes = Segmenter::SegmenterFlags::getFromINI(vm["ini"].as<std::string>());
+                if (sflagsRes.has_error())
+                {
+                    std::cerr << "Unable to parse SegmenterFlags INI file " << vm["ini"].as<std::string>() << std::endl;
+                    return -1;
+                }
+                sflags = sflagsRes.value();
+            } else {   
+                sflags.useCP = withCP; 
+                sflags.mtu = mtu;
+                sflags.sndSocketBufSize = sockBufSize;
+            }
 
             try {
                 Segmenter seg(uri, dataId, eventSourceId, sflags);
@@ -319,9 +344,21 @@ int main(int argc, char **argv)
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 
-            rflags.useCP = false; // turn off CP gRPC
-            rflags.withLBHeader = true; // no LB
-            rflags.rcvSocketBufSize = sockBufSize;
+            if (!vm["ini"].as<std::string>().empty())
+            {
+                auto rflagsRes = Reassembler::ReassemblerFlags::getFromINI(vm["ini"].as<std::string>());
+                if (rflagsRes.has_error())
+                {
+                    std::cerr << "Unable to parse ReassemblerFlags INI file " << vm["ini"].as<std::string>() << std::endl;
+                    return -1;
+                }
+                rflags = rflagsRes.value();
+            } else 
+            {
+                rflags.useCP = withCP;
+                rflags.withLBHeader = not withCP;
+                rflags.rcvSocketBufSize = sockBufSize;
+            }
             try {
                 Reassembler reas(uri, numThreads, rflags);
                 reasPtr = &reas;

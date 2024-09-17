@@ -1,5 +1,8 @@
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/detail/file_parser_error.hpp>
+#include <iostream>
 
 #include "portable_endian.h"
 
@@ -522,5 +525,42 @@ namespace e2sar
         // just rely on its locking
         delete eventItem;
         return 0;
+    }
+
+    result<Reassembler::ReassemblerFlags> Reassembler::ReassemblerFlags::getFromINI(const std::string &iniFile)
+    {
+        boost::property_tree::ptree paramTree;
+        Reassembler::ReassemblerFlags rFlags;
+
+        try {
+            boost::property_tree::ini_parser::read_ini(iniFile, paramTree);
+        } catch(boost::property_tree::ini_parser_error &ie) {
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, 
+                "Unable to parse the reassembler flags configuration file "s + iniFile};
+        }
+
+        // general
+        rFlags.dpV6 = paramTree.get<bool>("general.useCP", rFlags.dpV6);
+        rFlags.validateCert = paramTree.get<bool>("general.validateCert", rFlags.validateCert);
+
+        // control plane
+        rFlags.cpV6 = paramTree.get<bool>("control-plane.cpV6", rFlags.cpV6);
+
+        // data plane
+        rFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", rFlags.dpV6);
+        rFlags.portRange = paramTree.get<int>("data-plane.portRange", rFlags.portRange);
+        rFlags.withLBHeader = paramTree.get<bool>("data-plane.withLBHeader", rFlags.withLBHeader);
+        rFlags.eventTimeout_ms = paramTree.get<int>("data-plane.eventTimeoutMS", rFlags.eventTimeout_ms);
+        rFlags.rcvSocketBufSize = paramTree.get<int>("data-plane.rcvSocketBufSize", rFlags.rcvSocketBufSize);
+        rFlags.epoch_ms = paramTree.get<u_int32_t>("data-plane.epochMS", rFlags.epoch_ms);
+        rFlags.period_ms = paramTree.get<u_int16_t>("data-plane.periodMS", rFlags.period_ms);
+
+        // PID parameters
+        rFlags.setPoint = paramTree.get<float>("pid.setPoint", rFlags.setPoint);
+        rFlags.Ki = paramTree.get<float>("pid.Ki", rFlags.Ki);
+        rFlags.Kp = paramTree.get<float>("pid.Kp", rFlags.Kp);
+        rFlags.Kd = paramTree.get<float>("pid.Kd", rFlags.Kd);
+
+        return rFlags;
     }
 }
