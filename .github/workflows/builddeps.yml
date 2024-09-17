@@ -6,7 +6,7 @@ on:
 env:
   GRPC_VER: 1.54.1
   BOOST_VER: 1.85.0
-  E2SAR_VER: 0.1.0
+  E2SAR_VER: 0.1.1
 
 jobs:
   build:
