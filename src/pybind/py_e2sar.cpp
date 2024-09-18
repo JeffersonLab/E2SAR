@@ -132,4 +132,6 @@ void init_e2sarResultTypes(py::module_ &m)
     bind_result<u_int32_t>(m, "E2SARResultUInit32");
     bind_result<std::pair<boost::asio::ip::address, uint16_t>>(m, "E2SARResultPairIP");
     bind_result<std::pair<std::string, uint16_t>>(m, "E2SARResultPairString");
+    bind_result<Reassembler::ReassemblerFlags>(m, "E2SARResultReassemblerFlags");
+    bind_result<Segmenter::SegmenterFlags>(m, "E2SARResultSegmenterFlags");
 }
