@@ -159,6 +159,9 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
 
     auto nowT = boost::chrono::steady_clock::now();
 
+    // register the worker (will be NOOP if withCP is set to false)
+    //r.registerWorker(name, weight, min_factor, max_factor);
+
     // receive loop
     while(true)
     {
@@ -238,6 +241,8 @@ int main(int argc, char **argv)
     int durationSec;
     bool withCP;
     std::string iniFile;
+    std::string recvIP;
+    u_int16_t recvStartPort;
 
     // parameters
     opts("send,s", "send traffic");
@@ -258,6 +263,8 @@ int main(int argc, char **argv)
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s]] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu and --bufsize");
+    opts("ip", po::value<std::string>(&recvIP)->default_value("127.0.0.1"), "IP address (IPv4 or IPv6) on which receiver listens. Defaults to 127.0.0.1. [r]");
+    opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
 
     po::variables_map vm;
 
@@ -279,6 +286,8 @@ int main(int argc, char **argv)
         conflicting_options(vm, "recv", "rate");
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "send", "period");
+        option_dependency(vm, "recv", "ip");
+        option_dependency(vm, "vm", "port");
     }
     catch (const std::logic_error &le)
     {
@@ -294,9 +303,6 @@ int main(int argc, char **argv)
     }
 
     withCP = vm["withcp"].as<bool>();
-    std::cout << "Control plane will be " << (withCP ? "ON" : "OFF") << std::endl;
-    std::cout << (withCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
-        "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::instance};
@@ -328,6 +334,9 @@ int main(int argc, char **argv)
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
             }
+            std::cout << "Control plane will be " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
+                "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
                 Segmenter seg(uri, dataId, eventSourceId, sflags);
@@ -359,8 +368,13 @@ int main(int argc, char **argv)
                 rflags.withLBHeader = not withCP;
                 rflags.rcvSocketBufSize = sockBufSize;
             }
+            std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
+                "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
+
             try {
-                Reassembler reas(uri, numThreads, rflags);
+                ip::address ip = ip::make_address(vm["ip"].as<std::string>());
+                Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
                 reasPtr = &reas;
                 boost::thread statT(&recvStatsThread, &reas);
                 auto res = recvEvents(reas, durationSec);

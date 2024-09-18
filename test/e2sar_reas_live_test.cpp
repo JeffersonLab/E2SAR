@@ -36,8 +36,10 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     Reassembler::ReassemblerFlags rflags;
     rflags.validateCert = false;
 
+    ip::address loopback = ip::make_address("127.0.0.1");
+    u_int16_t listen_port = 10000;
     // create a reassembler and start the threads
-    Reassembler reas(uri, 1, rflags);
+    Reassembler reas(uri, loopback, listen_port, 1, rflags);
 
     auto oas_r = reas.openAndStart();
 

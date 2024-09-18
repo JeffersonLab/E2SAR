@@ -231,9 +231,8 @@ namespace e2sar
 
             // receive related parameters
             const std::vector<int> cpuCoreList;
-            const ip::address dataIP; // from URI
-            const u_int16_t dataPort; // starting receive port from URI
-            const bool dpV6; // prefer V6 over v4 address from URI
+            const ip::address dataIP; 
+            const u_int16_t dataPort; 
             const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
             const size_t numRecvPorts;
@@ -319,7 +318,6 @@ namespace e2sar
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
-             * - dpV6 - prefer the IPv6 address/port in the URI data address. Reassembler will bind to IPv6 instead of IPv4 address. {false}
              * - cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
              * - useCP - whether to use the control plane (sendState, registerWorker) {true}
              * - period_ms - period of the send state thread in milliseconds {100}
@@ -339,7 +337,6 @@ namespace e2sar
              */
             struct ReassemblerFlags 
             {
-                bool dpV6;
                 bool cpV6;
                 bool useCP;
                 u_int16_t period_ms;
@@ -350,7 +347,7 @@ namespace e2sar
                 bool withLBHeader;
                 int eventTimeout_ms;
                 int rcvSocketBufSize; 
-                ReassemblerFlags(): dpV6{false}, cpV6{false}, useCP{true}, 
+                ReassemblerFlags(): cpV6{false}, useCP{true}, 
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3} {}
@@ -367,20 +364,25 @@ namespace e2sar
              * the number of cores on the list. For the started receive threads affinity will be 
              * set to these cores. 
              * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
+             * @param data_ip - IP address (v4 or v6) on which we are listening
+             * @param starting_port - starting port number on which we are listening
              * @param cpuCoreList - list of core identifiers to be used for receive threads
              * @param rflags - optional ReassemblerFlags structure with additional flags
              */
-            Reassembler(const EjfatURI &uri, std::vector<int> cpuCoreList, 
+            Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
+                        std::vector<int> cpuCoreList, 
                         const ReassemblerFlags &rflags = ReassemblerFlags());
             /**
              * Create a reassembler object to run on a specified number of receive threads
              * without taking into account thread-to-CPU and CPU-to-NUMA affinity.
              * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
+             * @param data_ip - IP address (v4 or v6) on which we are listening
+             * @param starting_port - starting port number on which we are listening
              * @param numRecvThreads - number of threads 
              * @param rflags - optional ReassemblerFlags structure with additional flags
              */
-            Reassembler(const EjfatURI &uri, size_t numRecvThreads = 1, 
-                        const ReassemblerFlags &rflags = ReassemblerFlags());
+            Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
+                        size_t numRecvThreads = 1, const ReassemblerFlags &rflags = ReassemblerFlags());
             Reassembler(const Reassembler &r) = delete;
             Reassembler & operator=(const Reassembler &o) = delete;
             ~Reassembler()

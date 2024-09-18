@@ -161,7 +161,6 @@ void init_e2sarDP_reassembler(py::module_ &m)
     // Bind the ReassemblerFlags struct as a nested class of Reassembler
     py::class_<Reassembler::ReassemblerFlags>(m, "ReassemblerFlags")
         .def(py::init<>())  // The default values will be the same in Python after binding.
-        .def_readwrite("dpV6", &Reassembler::ReassemblerFlags::dpV6)
         .def_readwrite("cpV6", &Reassembler::ReassemblerFlags::cpV6)
         .def_readwrite("useCP", &Reassembler::ReassemblerFlags::useCP)
         .def_readwrite("period_ms", &Reassembler::ReassemblerFlags::period_ms)
@@ -177,9 +176,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
 
     // Constructor
     reas.def(
-        py::init<const EjfatURI &, size_t, const Reassembler::ReassemblerFlags &>(),
+        py::init<const EjfatURI &, ip::address, u_int16_t, size_t, const Reassembler::ReassemblerFlags &>(),
         "Init the Reassembler object with number of recv threads.",
         py::arg("uri"),  // must-have arg when init
+        py::arg("ip"),
+        py::arg("port"),
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 

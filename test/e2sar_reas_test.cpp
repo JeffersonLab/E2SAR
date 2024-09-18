@@ -25,7 +25,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     std::cout << "DPReasTest1: Test segmentation and reassembly on local host with no control plane (no segmentation)" << std::endl;
 
     // create URI for segmenter - since we will turn off CP only the data part of the query is used
-    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1"};
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1:10000"};
     // create URI for reassembler - since we turn off CP, none of it is actually used
     std::string reasUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1"};
 
@@ -51,7 +51,9 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         rflags.useCP = false; // turn off CP
         rflags.withLBHeader = true; // LB header will be attached since there is no LB
 
-        Reassembler reas(reasUri, 1, rflags);
+        ip::address loopback = ip::make_address("127.0.0.1");
+        u_int16_t listen_port = 10000;
+        Reassembler reas(reasUri, loopback, listen_port, 1, rflags);
 
         std::cout << "This reassembler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
             reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -163,7 +165,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
     std::cout << "DPReasTest2: Test segmentation and reassembly on local host with no control plane (basic segmentation)" << std::endl;
 
     // create URI for segmenter - since we will turn off CP only the data part of the query is used
-    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1"};
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1:10000"};
     // create URI for reassembler - since we turn off CP, none of it is actually used
     std::string reasUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1"};
 
@@ -190,7 +192,9 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         rflags.useCP = false; // turn off CP
         rflags.withLBHeader = true; // LB header will be attached since there is no LB
 
-        Reassembler reas(reasUri, 1, rflags);
+        ip::address loopback = ip::make_address("127.0.0.1");
+        u_int16_t listen_port = 10000;
+        Reassembler reas(reasUri, loopback, listen_port, 1, rflags);
 
         std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
             reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -306,9 +310,11 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
         // create reassembler with no control plane
         Reassembler::ReassemblerFlags rflags;
 
+        ip::address loopback = ip::make_address("127.0.0.1");
+        u_int16_t listen_port = 19522;
         {
             // one thread
-            Reassembler reas(reasUri, 1, rflags);
+            Reassembler reas(reasUri, loopback, listen_port,  1, rflags);
 
             std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
                 reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -321,7 +327,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
 
         {
             // 4 threads
-            Reassembler reas(reasUri, 4, rflags);
+            Reassembler reas(reasUri, loopback, listen_port, 4, rflags);
 
             std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
                 reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -334,7 +340,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
 
          {
             // 7 threads
-            Reassembler reas(reasUri, 7, rflags);
+            Reassembler reas(reasUri, loopback, listen_port, 7, rflags);
 
             std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
                 reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -348,7 +354,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
         {
             // 4 threads with portRange override
             rflags.portRange = 10;
-            Reassembler reas(reasUri, 4, rflags);
+            Reassembler reas(reasUri, loopback, listen_port, 4, rflags);
 
             std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
                 reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -361,7 +367,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest3)
         {
             // 4 threads with low portRange override
             rflags.portRange = 1;
-            Reassembler reas(reasUri, 4, rflags);
+            Reassembler reas(reasUri, loopback, listen_port, 4, rflags);
 
             std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
                 reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 
@@ -399,7 +405,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
     std::cout << "DPReasTest4: Test segmentation and reassembly on local host with no control plane (with segmentation and multiple senders)" << std::endl;
 
     // create URIs for segmenters - since we will turn off CP only the data part of the query is used
-    std::string segUriString1{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1"};
+    std::string segUriString1{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1:19522"};
     std::string segUriString2{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1:19523"};
     std::string segUriString3{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1:19524"};
     std::string segUriString4{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1:19525"};
@@ -436,8 +442,10 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         rflags.withLBHeader = true; // LB header will be attached since there is no LB
         rflags.portRange = 2;
 
+        ip::address loopback = ip::make_address("127.0.0.1");
+        u_int16_t listen_port = 19522;
         // 1 thread for 4 ports
-        Reassembler reas(reasUri, 1, rflags);
+        Reassembler reas(reasUri, loopback, listen_port,  1, rflags);
 
         std::cout << "This reassmebler has " << reas.get_numRecvThreads() << " receive threads and is listening on ports " << 
             reas.get_recvPorts().first << ":" << reas.get_recvPorts().second << " using portRange " << reas.get_portRange() << 

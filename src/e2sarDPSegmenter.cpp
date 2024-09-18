@@ -612,7 +612,7 @@ namespace e2sar
         }
 
         // general
-        sFlags.dpV6 = paramTree.get<bool>("general.useCP", sFlags.dpV6);
+        sFlags.useCP = paramTree.get<bool>("general.useCP", sFlags.useCP);
 
         // control plane
         sFlags.syncPeriods = paramTree.get<u_int16_t>("control-plane.syncPeriods", 

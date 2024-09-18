@@ -34,7 +34,8 @@ namespace e2sar
             error, integral);  // control output
     }
 
-    Reassembler::Reassembler(const EjfatURI &uri, std::vector<int> cpuCoreList,
+    Reassembler::Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
+        std::vector<int> cpuCoreList,
         const ReassemblerFlags &rflags):
         dpuri(uri),
         lbman(dpuri, rflags.validateCert),
@@ -42,9 +43,8 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{cpuCoreList}, 
-        dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)},
-        dataPort{(rflags.dpV6 ? uri.get_dataAddrv6().value().second : uri.get_dataAddrv4().value().second)},
-        dpV6{rflags.dpV6},
+        dataIP{data_ip},
+        dataPort{starting_port},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
@@ -67,17 +67,16 @@ namespace e2sar
         assignPortsToThreads();
     }
 
-    Reassembler::Reassembler(const EjfatURI &uri, size_t numRecvThreads,
-        const ReassemblerFlags &rflags):
+    Reassembler::Reassembler(const EjfatURI &uri,  ip::address data_ip, u_int16_t starting_port,
+        size_t numRecvThreads, const ReassemblerFlags &rflags):
         dpuri(uri),
         lbman(dpuri, rflags.validateCert),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{std::vector<int>()}, // no core list given
-        dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)},
-        dataPort{(rflags.dpV6 ? uri.get_dataAddrv6().value().second : uri.get_dataAddrv4().value().second)},
-        dpV6{rflags.dpV6},
+        dataIP{data_ip},
+        dataPort{starting_port},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
@@ -540,14 +539,13 @@ namespace e2sar
         }
 
         // general
-        rFlags.dpV6 = paramTree.get<bool>("general.useCP", rFlags.dpV6);
+        rFlags.useCP = paramTree.get<bool>("general.useCP", rFlags.useCP);
         rFlags.validateCert = paramTree.get<bool>("general.validateCert", rFlags.validateCert);
 
         // control plane
         rFlags.cpV6 = paramTree.get<bool>("control-plane.cpV6", rFlags.cpV6);
 
         // data plane
-        rFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", rFlags.dpV6);
         rFlags.portRange = paramTree.get<int>("data-plane.portRange", rFlags.portRange);
         rFlags.withLBHeader = paramTree.get<bool>("data-plane.withLBHeader", rFlags.withLBHeader);
         rFlags.eventTimeout_ms = paramTree.get<int>("data-plane.eventTimeoutMS", rFlags.eventTimeout_ms);
