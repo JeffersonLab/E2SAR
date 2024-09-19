@@ -32,15 +32,28 @@ bool threadsRunning = true;
 u_int16_t reportThreadSleepMs{1000};
 Reassembler *reasPtr{nullptr};
 Segmenter *segPtr{nullptr};
+LBManager *lbmPtr{nullptr};
+std::vector<std::string> senders;
 
 void ctrlCHandler(int sig) 
 {
     std::cout << "Stopping threads" << std::endl;
 
-    if (segPtr != nullptr)
+    if (segPtr != nullptr) {
+        if (lbmPtr != nullptr) {
+            auto rmres = lbmPtr->removeSenders(senders);
+            if (rmres.has_error()) 
+                std::cerr << "Unable to remove sender from list on exit: " << rmres.error().message() << std::endl;
+        }
         segPtr->stopThreads();
+    }
     if (reasPtr != nullptr)
+    {
+        auto deregres = reasPtr->deregisterWorker();
+        if (deregres.has_error()) 
+            std::cerr << "Unable to deregister worker on exit: " << deregres.error().message() << std::endl;
         reasPtr->stopThreads();
+    }
     threadsRunning = false;
     // instead of join
     boost::chrono::milliseconds duration(1000);
@@ -160,7 +173,17 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
     auto nowT = boost::chrono::steady_clock::now();
 
     // register the worker (will be NOOP if withCP is set to false)
-    //r.registerWorker(name, weight, min_factor, max_factor);
+    auto hostname_res = NetUtil::getHostName();
+    if (hostname_res.has_error()) 
+    {
+        return E2SARErrorInfo{hostname_res.error().code(), hostname_res.error().message()};
+    }
+    auto regres = r.registerWorker(hostname_res.value());
+    if (regres.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError, 
+            "Unable to register worker node due to " + regres.error().message()};
+    }
 
     // receive loop
     while(true)
@@ -240,8 +263,8 @@ int main(int argc, char **argv)
     int sockBufSize;
     int durationSec;
     bool withCP;
+    std::string sndrcvIP;
     std::string iniFile;
-    std::string recvIP;
     u_int16_t recvStartPort;
 
     // parameters
@@ -263,7 +286,7 @@ int main(int argc, char **argv)
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s]] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu and --bufsize");
-    opts("ip", po::value<std::string>(&recvIP)->default_value("127.0.0.1"), "IP address (IPv4 or IPv6) on which receiver listens. Defaults to 127.0.0.1. [r]");
+    opts("ip", po::value<std::string>(&sndrcvIP)->default_value("127.0.0.1"), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens. Defaults to 127.0.0.1. [s,r]");
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
 
     po::variables_map vm;
@@ -288,6 +311,8 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "period");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "vm", "port");
+        option_dependency(vm, "send", "ip");
+        conflicting_options(vm, "recv", "port");
     }
     catch (const std::logic_error &le)
     {
@@ -319,13 +344,33 @@ int main(int argc, char **argv)
         }
         auto uri = uri_r.value();
         if (vm.count("send")) {
-            Segmenter::SegmenterFlags sflags;
-            if (!vm["ini"].as<std::string>().empty())
+            // if using control plane
+            if (withCP)
             {
-                auto sflagsRes = Segmenter::SegmenterFlags::getFromINI(vm["ini"].as<std::string>());
+                // add to senders list of 1 element
+                senders.push_back(sndrcvIP);
+
+                // create LBManager
+                lbmPtr = new LBManager(uri, false);
+
+                // register senders
+                auto addres = lbmPtr->addSenders(senders);
+                if (addres.has_error()) 
+                {
+                    std::cerr << "Unable to add a sender due to error " << addres.error().message() 
+                        << ", exiting" << std::endl;
+                    return -1;
+                }
+            }
+
+            Segmenter::SegmenterFlags sflags;
+            if (!iniFile.empty())
+            {
+                std::cout << "Loading SegmenterFlags from " << iniFile << std::endl;
+                auto sflagsRes = Segmenter::SegmenterFlags::getFromINI(iniFile);
                 if (sflagsRes.has_error())
                 {
-                    std::cerr << "Unable to parse SegmenterFlags INI file " << vm["ini"].as<std::string>() << std::endl;
+                    std::cerr << "Unable to parse SegmenterFlags INI file " << iniFile << std::endl;
                     return -1;
                 }
                 sflags = sflagsRes.value();
@@ -353,12 +398,13 @@ int main(int argc, char **argv)
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 
-            if (!vm["ini"].as<std::string>().empty())
+            if (!iniFile.empty())
             {
-                auto rflagsRes = Reassembler::ReassemblerFlags::getFromINI(vm["ini"].as<std::string>());
+                std::cout << "Loading ReassemblerFlags from " << iniFile << std::endl;
+                auto rflagsRes = Reassembler::ReassemblerFlags::getFromINI(iniFile);
                 if (rflagsRes.has_error())
                 {
-                    std::cerr << "Unable to parse ReassemblerFlags INI file " << vm["ini"].as<std::string>() << std::endl;
+                    std::cerr << "Unable to parse ReassemblerFlags INI file " << iniFile << std::endl;
                     return -1;
                 }
                 rflags = rflagsRes.value();
@@ -373,7 +419,7 @@ int main(int argc, char **argv)
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                ip::address ip = ip::make_address(vm["ip"].as<std::string>());
+                ip::address ip = ip::make_address(sndrcvIP);
                 Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
                 reasPtr = &reas;
                 boost::thread statT(&recvStatsThread, &reas);

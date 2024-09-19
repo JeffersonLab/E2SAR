@@ -3,7 +3,8 @@
 namespace e2sar
 {
     /**
-     * Get MTU of a given interface
+     * Get MTU of a given interface. Used in constructors, so doesn't
+     * return error.
      */
     u_int16_t NetUtil::getMTU(const std::string &interfaceName) {
         // Default MTU
@@ -14,9 +15,20 @@ namespace e2sar
         strcpy(ifr.ifr_name, interfaceName.c_str());
         if (!ioctl(sock, SIOCGIFMTU, &ifr)) {
             mtu = ifr.ifr_mtu;
-        }
+        } 
         close(sock);
         return mtu;
+    }
+
+    result<std::string> NetUtil::getHostName() {
+        char nameBuf[255];
+
+        if (!gethostname(nameBuf, 255)) 
+        {
+            std::string ret{nameBuf};
+            return ret;
+        } else 
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to retrieve hostname"};
     }
 #ifdef NETLINK_CAPABLE
     /**
