@@ -310,9 +310,9 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "send", "period");
         option_dependency(vm, "recv", "ip");
-        option_dependency(vm, "vm", "port");
+        option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
-        conflicting_options(vm, "recv", "port");
+        conflicting_options(vm, "send", "port");
     }
     catch (const std::logic_error &le)
     {
