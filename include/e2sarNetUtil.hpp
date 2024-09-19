@@ -29,6 +29,11 @@ namespace e2sar
          * @return MTU or 1500 as the best guess
          */
         static u_int16_t getMTU(const std::string &interfaceName);
+        /**
+         * Get the hostname of the host
+         */
+        static result<std::string> getHostName();
+
 #ifdef NETLINK_CAPABLE
         /**
          * Get the outgoing interface and its MTU for a given IPv4 or IPv6

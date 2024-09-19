@@ -41,6 +41,7 @@ namespace e2sar
         lbman(dpuri, rflags.validateCert),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{cpuCoreList}, 
         dataIP{data_ip},
@@ -73,6 +74,7 @@ namespace e2sar
         lbman(dpuri, rflags.validateCert),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{std::vector<int>()}, // no core list given
         dataIP{data_ip},
@@ -455,8 +457,7 @@ namespace e2sar
         }
     }
 
-    result<int> Reassembler::registerWorker(const std::string &node_name, float weight, 
-        float min_factor, float max_factor) noexcept 
+    result<int> Reassembler::registerWorker(const std::string &node_name) noexcept 
     {
         if (useCP)
         {
@@ -558,6 +559,10 @@ namespace e2sar
         rFlags.Ki = paramTree.get<float>("pid.Ki", rFlags.Ki);
         rFlags.Kp = paramTree.get<float>("pid.Kp", rFlags.Kp);
         rFlags.Kd = paramTree.get<float>("pid.Kd", rFlags.Kd);
+        rFlags.Kd = paramTree.get<float>("pid.weight", rFlags.Kd);
+        rFlags.Kd = paramTree.get<float>("pid.min_factor", rFlags.Kd);
+        rFlags.Kd = paramTree.get<float>("pid.max_factor", rFlags.Kd);
+
 
         return rFlags;
     }

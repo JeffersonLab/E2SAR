@@ -166,6 +166,9 @@ namespace e2sar
             const float Kp; // PID proportional
             const float Ki; // PID integral
             const float Kd; // PID derivative
+            const float weight; // processing power factor
+            const float min_factor;  
+            const float max_factor;
             struct PIDSample {
                 UnixTimeMicro_t sampleTime; // in usec since epoch
                 float error;
@@ -334,6 +337,11 @@ namespace e2sar
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              * - rcvSocketBufSize - socket buffer size for receiving set via SO_RCVBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.rmem_max) to be higher. {3MB}
+             * - weight - weight given to this node in terms of processing power
+             * - min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
+             * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
+             * - max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
+             * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
              */
             struct ReassemblerFlags 
             {
@@ -347,10 +355,11 @@ namespace e2sar
                 bool withLBHeader;
                 int eventTimeout_ms;
                 int rcvSocketBufSize; 
+                float weight, min_factor, max_factor;
                 ReassemblerFlags(): cpV6{false}, useCP{true}, 
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
-                    rcvSocketBufSize{1024*1024*3} {}
+                    rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
@@ -405,14 +414,9 @@ namespace e2sar
             /**
              * Register a worker with the control plane 
              * @param node_name - name of this node (any unique string)
-             * @param weight - weight given to this node in terms of processing power
-             * @param min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
-             * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
-             * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
-             * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
              * @return - 0 on success or an error condition
              */
-            result<int> registerWorker(const std::string &node_name, float weight, float min_factor, float max_factor) noexcept;
+            result<int> registerWorker(const std::string &node_name) noexcept;
 
             /**
              * Deregister this worker
