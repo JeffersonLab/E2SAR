@@ -77,7 +77,9 @@ void init_e2sarDP_segmenter(py::module_ &m)
         .def_readwrite("syncPeriodMs", &Segmenter::SegmenterFlags::syncPeriodMs)
         .def_readwrite("syncPeriods", &Segmenter::SegmenterFlags::syncPeriods)
         .def_readwrite("mtu", &Segmenter::SegmenterFlags::mtu)
-        .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets);
+        .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets)
+        .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
+        .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
     // Constructor
     seg.def(
@@ -172,15 +174,17 @@ void init_e2sarDP_reassembler(py::module_ &m)
         .def_readwrite("epoch_ms", &Reassembler::ReassemblerFlags::epoch_ms)
         .def_readwrite("portRange", &Reassembler::ReassemblerFlags::portRange)
         .def_readwrite("withLBHeader", &Reassembler::ReassemblerFlags::withLBHeader)
-        .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms);
+        .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms)
+        .def_readwrite("rcvSocketBufSize", &Reassembler::ReassemblerFlags::rcvSocketBufSize)
+        .def("getFromINI", &Reassembler::ReassemblerFlags::getFromINI);
 
     // Constructor
     reas.def(
         py::init<const EjfatURI &, ip::address, u_int16_t, size_t, const Reassembler::ReassemblerFlags &>(),
         "Init the Reassembler object with number of recv threads.",
         py::arg("uri"),  // must-have arg when init
-        py::arg("ip"),
-        py::arg("port"),
+        py::arg("data_ip"),
+        py::arg("starting_port"),
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
