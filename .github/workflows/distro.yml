@@ -100,7 +100,7 @@ jobs:
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
             fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-           fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
+            fpm -s tar -t rpm -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           fi
 
       - name: Upload artifacts
