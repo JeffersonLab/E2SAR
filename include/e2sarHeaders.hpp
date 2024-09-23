@@ -163,7 +163,7 @@ namespace e2sar
         struct REHdr re;
     } __attribute__((__packed__));
 
-    constexpr u_int8_t synchdrVersion = 1;
+    constexpr u_int8_t synchdrVersion = 2;
     /**
         The Syncr Header. You should always use the provided methods to set
         and interrogate fields as the structure maintains Big-Endian order
