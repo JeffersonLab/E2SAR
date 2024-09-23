@@ -41,6 +41,10 @@ void ctrlCHandler(int sig)
 
     if (segPtr != nullptr) {
         if (lbmPtr != nullptr) {
+            std::cout << "Removing senders: ";
+            for (auto s: senders)
+                std::cout << s << " ";
+            std::cout << std::endl;
             auto rmres = lbmPtr->removeSenders(senders);
             if (rmres.has_error()) 
                 std::cerr << "Unable to remove sender from list on exit: " << rmres.error().message() << std::endl;
@@ -49,6 +53,7 @@ void ctrlCHandler(int sig)
     }
     if (reasPtr != nullptr)
     {
+        std::cout << "Deregistering worker" << std::endl;
         auto deregres = reasPtr->deregisterWorker();
         if (deregres.has_error()) 
             std::cerr << "Unable to deregister worker on exit: " << deregres.error().message() << std::endl;
@@ -184,6 +189,8 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
         return E2SARErrorInfo{E2SARErrorc::RPCError, 
             "Unable to register worker node due to " + regres.error().message()};
     }
+    if (regres.value() == 1)
+        std::cout << "Registered the worker" << std::endl;
 
     // receive loop
     while(true)
@@ -354,6 +361,10 @@ int main(int argc, char **argv)
                 lbmPtr = new LBManager(uri, false);
 
                 // register senders
+                std::cout << "Adding senders to LB: ";
+                for (auto s: senders)
+                    std::cout << s << " ";
+                std::cout << std::endl;
                 auto addres = lbmPtr->addSenders(senders);
                 if (addres.has_error()) 
                 {

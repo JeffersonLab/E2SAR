@@ -464,6 +464,7 @@ namespace e2sar
             registeredWorker = true;
             return lbman.registerWorker(node_name, std::make_pair(dataIP, dataPort), weight, numRecvPorts, 
                 min_factor, max_factor);
+            return 1;
         }
         return 0;
     }

@@ -414,7 +414,7 @@ namespace e2sar
             /**
              * Register a worker with the control plane 
              * @param node_name - name of this node (any unique string)
-             * @return - 0 on success or an error condition
+             * @return - 0 if CP was off and nothing was done, 1 on success or an error condition
              */
             result<int> registerWorker(const std::string &node_name) noexcept;
 
