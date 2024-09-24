@@ -161,15 +161,15 @@ namespace e2sar
                     throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
                 auto cp_addr_v = cp_addr_r.value();
                 if (cp_addr_v.first.is_v4())
-                    addr_string = "ipv4://" + cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
+                    addr_string = "ipv4:///" + cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
                 else
-                    addr_string = "ipv6://[" + cp_addr_v.first.to_string() + "]:" + std::to_string(cp_addr_v.second);
+                    addr_string = "ipv6:///[" + cp_addr_v.first.to_string() + "]:" + std::to_string(cp_addr_v.second);
             }
 
             if (cpuri.get_useTls())
             {
                 grpc::experimental::TlsChannelCredentialsOptions topts;
-                if (validateServer)
+                if (!validateServer)
                 {
                     // disable most of server certificate validation
                     std::shared_ptr<grpc::experimental::NoOpCertificateVerifier> verifier = std::make_shared<grpc::experimental::NoOpCertificateVerifier>();
