@@ -443,6 +443,8 @@ int main(int argc, char **argv)
                 rflags.useCP = withCP;
                 rflags.withLBHeader = not withCP;
                 rflags.rcvSocketBufSize = sockBufSize;
+                rflags.useHostAddress = preferHostAddr;
+                rflags.validateCert = noValidate;
             }
             std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
