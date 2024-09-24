@@ -168,15 +168,6 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
     EventNum_t evtNum;
     u_int16_t dataId;
 
-    auto openRes = r.openAndStart();
-    if (openRes.has_error())
-        return openRes;
-
-    // to help print large integers
-    std::cout.imbue(std::locale(""));
-
-    auto nowT = boost::chrono::steady_clock::now();
-
     // register the worker (will be NOOP if withCP is set to false)
     auto hostname_res = NetUtil::getHostName();
     if (hostname_res.has_error()) 
@@ -191,6 +182,18 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
     }
     if (regres.value() == 1)
         std::cout << "Registered the worker" << std::endl;
+
+    // NOTE: if we switch the order of registerWorker and openAndStart
+    // you get into a race condition where the sendState thread starts and tries
+    // to send queue updates, however session token is not yet available...
+    auto openRes = r.openAndStart();
+    if (openRes.has_error())
+        return openRes;
+
+    // to help print large integers
+    std::cout.imbue(std::locale(""));
+
+    auto nowT = boost::chrono::steady_clock::now();
 
     // receive loop
     while(true)

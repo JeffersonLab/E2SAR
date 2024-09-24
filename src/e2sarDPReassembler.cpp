@@ -537,7 +537,7 @@ namespace e2sar
         return 0;
     }
 
-    result<Reassembler::ReassemblerFlags> Reassembler::ReassemblerFlags::getFromINI(const std::string &iniFile)
+    result<Reassembler::ReassemblerFlags> Reassembler::ReassemblerFlags::getFromINI(const std::string &iniFile) noexcept
     {
         boost::property_tree::ptree paramTree;
         Reassembler::ReassemblerFlags rFlags;
@@ -572,7 +572,6 @@ namespace e2sar
         rFlags.Kd = paramTree.get<float>("pid.weight", rFlags.Kd);
         rFlags.Kd = paramTree.get<float>("pid.min_factor", rFlags.Kd);
         rFlags.Kd = paramTree.get<float>("pid.max_factor", rFlags.Kd);
-
 
         return rFlags;
     }

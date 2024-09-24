@@ -599,7 +599,7 @@ namespace e2sar
         return 0;
     }
 
-    result<Segmenter::SegmenterFlags> Segmenter::SegmenterFlags::getFromINI(const std::string &iniFile)
+    result<Segmenter::SegmenterFlags> Segmenter::SegmenterFlags::getFromINI(const std::string &iniFile) noexcept
     {
         boost::property_tree::ptree paramTree;
         Segmenter::SegmenterFlags sFlags;
