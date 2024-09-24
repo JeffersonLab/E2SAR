@@ -362,7 +362,7 @@ namespace e2sar
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
                  */
-                static result<Reassembler::ReassemblerFlags> getFromINI(const std::string &iniFile);
+                static result<Reassembler::ReassemblerFlags> getFromINI(const std::string &iniFile) noexcept;
             };
             /**
              * Create a reassembler object to run receive on a specific set of CPU cores

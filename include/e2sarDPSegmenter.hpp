@@ -290,7 +290,7 @@ namespace e2sar
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
                  */
-                static result<SegmenterFlags> getFromINI(const std::string &iniFile);
+                static result<SegmenterFlags> getFromINI(const std::string &iniFile) noexcept;
             };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
