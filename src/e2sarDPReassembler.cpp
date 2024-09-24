@@ -395,12 +395,23 @@ namespace e2sar
 
     void Reassembler::SendStateThreadState::_threadBody()
     {
+        // get the time
+        auto nowT = boost::chrono::high_resolution_clock::now();
+        auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+        UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
+
+        // create first PID sample with 0 error and integral values
+        PIDSample newSample{currentTimeMicros, 0.0, 0.0};
+        // push a new entry onto the circular buffer ejecting the oldest
+        reas.pidSampleBuffer.push_back(newSample);
+        
+        // wait before entering the loop
+        auto until = nowT + boost::chrono::milliseconds(period_ms);
+        boost::this_thread::sleep_until(until);
+
         while(!reas.threadsStop)
         {
             // periodically send state to control plane sampling the queue state
-
-            // Get the current time point
-            auto nowT = boost::chrono::high_resolution_clock::now();
 
             // principle of operation:
             // CP requires PID signal and queue fill state in order to come up
@@ -418,38 +429,37 @@ namespace e2sar
             //
             // fillPercent is always reported as sampled in the current moment
 
-            // if there are no samples in the buffer just skip
-            if (reas.pidSampleBuffer.end() != reas.pidSampleBuffer.begin())
+            // Get the current time point
+            auto nowT = boost::chrono::high_resolution_clock::now();
+            auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+            UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
+
+            // at 100msec period and depth of 10 this should normally be about 1 sec
+            auto deltaTfloat = static_cast<float>(currentTimeMicros - 
+                reas.pidSampleBuffer.begin()->sampleTime)/1000000.;
+
+            // sample queue state
+            auto fillPercent = static_cast<float>(static_cast<float>(reas.eventQueueDepth)/static_cast<float>(reas.QSIZE));
+            // get PID terms (PID value, error, integral accumulator)
+            auto PIDTuple = pid<float>(reas.setPoint, fillPercent,  
+                deltaTfloat, reas.Kp, reas.Ki, reas.Kd, 
+                reas.pidSampleBuffer.begin()->error,
+                reas.pidSampleBuffer.end()->integral);
+
+            // create new PID sample using last error and integral accumulated value
+            PIDSample newSample{currentTimeMicros, PIDTuple.get<1>(), PIDTuple.get<2>()};
+            // push a new entry onto the circular buffer ejecting the oldest
+            reas.pidSampleBuffer.push_back(newSample);
+
+            // send update to CP
+            auto res = reas.lbman.sendState(fillPercent, PIDTuple.get<0>(), true);
+            if (res.has_error())
             {
-                auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
-                UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
-
-                // at 100msec period and depth of 10 this should normally be about 1 sec
-                auto deltaTfloat = static_cast<float>(currentTimeMicros - 
-                    reas.pidSampleBuffer.begin()->sampleTime)/1000000.;
-
-                // sample queue state
-                auto fillPercent = static_cast<float>(static_cast<float>(reas.eventQueueDepth)/static_cast<float>(reas.QSIZE));
-                // get PID terms (PID value, error, integral accumulator)
-                auto PIDTuple = pid<float>(reas.setPoint, fillPercent,  
-                    deltaTfloat, reas.Kp, reas.Ki, reas.Kd, 
-                    reas.pidSampleBuffer.begin()->error,
-                    reas.pidSampleBuffer.end()->integral);
-
-                // create new PID sample using last error and integral accumulated value
-                PIDSample newSample{currentTimeMicros, PIDTuple.get<1>(), PIDTuple.get<2>()};
-                // push a new entry onto the circular buffer ejecting the oldest
-                reas.pidSampleBuffer.push_back(newSample);
-
-                // send update to CP
-                auto res = reas.lbman.sendState(fillPercent, PIDTuple.get<0>(), true);
-                if (res.has_error())
-                {
-                    // update error counts
-                    reas.recvStats.grpcErrCnt++;
-                    reas.recvStats.lastE2SARError = res.error().code();
-                }
+                // update error counts
+                reas.recvStats.grpcErrCnt++;
+                reas.recvStats.lastE2SARError = res.error().code();
             }
+
 
             // sleep approximately so we wake up every ~100ms
             auto until = nowT + boost::chrono::milliseconds(period_ms);
