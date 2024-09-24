@@ -12,6 +12,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <google/protobuf/util/time_util.h>
 #include <boost/unordered_map.hpp>
+#include <boost/circular_buffer.hpp>
 
 #include <boost/pool/object_pool.hpp>
 
@@ -312,5 +313,22 @@ int main()
     std::cout << map[std::make_pair(0x123456, 1)] << std::endl;
     std::cout << map[std::make_pair(0x123456, 2)] << std::endl;
     std::cout << map[std::make_pair(0x1234567, 10)] << std::endl;
+
+
+    std::cout << "Test circular buffer" << std::endl;
+
+    boost::circular_buffer<int> pidSampleBuffer(5);
+
+    for (int i = 0; i<6; i++)
+        pidSampleBuffer.push_back(i);
+
+    std::cout << "Head of buffer " << pidSampleBuffer.front() << std::endl;
+    std::cout << "Tail of buffer " << pidSampleBuffer.back() << std::endl;
+
+    for (int i = 10; i<20; i++)
+        pidSampleBuffer.push_back(i);
+
+    std::cout << "Head of buffer " << pidSampleBuffer.front() << std::endl;
+    std::cout << "Tail of buffer " << pidSampleBuffer.back() << std::endl;
 }
 

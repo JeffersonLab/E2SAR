@@ -404,7 +404,7 @@ namespace e2sar
         PIDSample newSample{currentTimeMicros, 0.0, 0.0};
         // push a new entry onto the circular buffer ejecting the oldest
         reas.pidSampleBuffer.push_back(newSample);
-        
+
         // wait before entering the loop
         auto until = nowT + boost::chrono::milliseconds(period_ms);
         boost::this_thread::sleep_until(until);
@@ -436,15 +436,15 @@ namespace e2sar
 
             // at 100msec period and depth of 10 this should normally be about 1 sec
             auto deltaTfloat = static_cast<float>(currentTimeMicros - 
-                reas.pidSampleBuffer.begin()->sampleTime)/1000000.;
+                reas.pidSampleBuffer.front().sampleTime)/1000000.;
 
             // sample queue state
             auto fillPercent = static_cast<float>(static_cast<float>(reas.eventQueueDepth)/static_cast<float>(reas.QSIZE));
             // get PID terms (PID value, error, integral accumulator)
             auto PIDTuple = pid<float>(reas.setPoint, fillPercent,  
                 deltaTfloat, reas.Kp, reas.Ki, reas.Kd, 
-                reas.pidSampleBuffer.begin()->error,
-                reas.pidSampleBuffer.end()->integral);
+                reas.pidSampleBuffer.front().error,
+                reas.pidSampleBuffer.back().integral);
 
             // create new PID sample using last error and integral accumulated value
             PIDSample newSample{currentTimeMicros, PIDTuple.get<1>(), PIDTuple.get<2>()};
