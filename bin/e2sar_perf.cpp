@@ -351,9 +351,9 @@ int main(int argc, char **argv)
     if (vm.count("ipv6") || vm.count("ipv4"))
         preferHostAddr = true;
 
-    bool noValidate = false;
+    bool validate = true;
     if (vm.count("novalidate"))
-        noValidate = true;
+        validate = false;
 
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::instance};
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
                 senders.push_back(sndrcvIP);
 
                 // create LBManager
-                lbmPtr = new LBManager(uri, noValidate, preferHostAddr);
+                lbmPtr = new LBManager(uri, validate, preferHostAddr);
 
                 // register senders
                 std::cout << "Adding senders to LB: ";
@@ -444,7 +444,7 @@ int main(int argc, char **argv)
                 rflags.withLBHeader = not withCP;
                 rflags.rcvSocketBufSize = sockBufSize;
                 rflags.useHostAddress = preferHostAddr;
-                rflags.validateCert = noValidate;
+                rflags.validateCert = validate;
             }
             std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
