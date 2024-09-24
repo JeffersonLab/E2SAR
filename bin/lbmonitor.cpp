@@ -101,7 +101,8 @@ int main(int argc, char **argv)
     opts("lbid,i", po::value<std::string>(), "specify id of the loadbalancer as issued by reserve call instead of using what is in EJFAT_URI");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
-    opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
+    opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname (disables cert validation)");
+    opts("ipv4,4", "prefer IPv4 control plane address if URI specifies hostname (disables cert validation)");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
     opts("time,t", po::value<uint64_t>(), "specify refresh time in ms (default is 5000ms)");
     
@@ -125,6 +126,11 @@ int main(int argc, char **argv)
         preferV6 = true;
     }
 
+    // if ipv4 or ipv6 requested explicitly
+    bool preferHostAddr = false;
+    if (vm.count("ipv6") || vm.count("ipv4"))
+        preferHostAddr = true;
+
     std::string ejfat_uri;
     auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt, preferV6) : 
         EjfatURI::getFromEnv("EJFAT_URI"s, tt, preferV6));
@@ -135,7 +141,7 @@ int main(int argc, char **argv)
     }
 
     auto uri = uri_r.value();
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, true, preferHostAddr);
 
     if (vm.count("root") && !uri.get_useTls())
     {
@@ -151,14 +157,14 @@ int main(int argc, char **argv)
                 std::cerr << "Unable to read server root certificate file "s;
                 return -1;
             }
-            lbman = LBManager(uri, true, opts_res.value());
+            lbman = LBManager(uri, true, preferHostAddr, opts_res.value());
         }
         else
         {
             if (vm.count("novalidate"))
             {
                 std::cerr << "Skipping server certificate validation" << std::endl;
-                lbman = LBManager(uri, false);
+                lbman = LBManager(uri, false, preferHostAddr);
             }
         }
     }

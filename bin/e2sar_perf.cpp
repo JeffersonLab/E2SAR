@@ -295,6 +295,9 @@ int main(int argc, char **argv)
         " Values found in the file override --withcp, --mtu and --bufsize");
     opts("ip", po::value<std::string>(&sndrcvIP)->default_value("127.0.0.1"), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens. Defaults to 127.0.0.1. [s,r]");
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
+    opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
+    opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
+    opts("novalidate,v", "don't validate server certificate");
 
     po::variables_map vm;
 
@@ -316,6 +319,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "recv", "rate");
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "send", "period");
+        conflicting_options(vm, "ipv4", "ipv6");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -336,14 +340,29 @@ int main(int argc, char **argv)
 
     withCP = vm["withcp"].as<bool>();
 
+    bool preferV6 = false;
+    if (vm.count("ipv6"))
+    {
+        preferV6 = true;
+    }
+
+    // if ipv4 or ipv6 requested explicitly
+    bool preferHostAddr = false;
+    if (vm.count("ipv6") || vm.count("ipv4"))
+        preferHostAddr = true;
+
+    bool noValidate = false;
+    if (vm.count("novalidate"))
+        noValidate = true;
+
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::instance};
 
     std::string ejfat_uri;
     if (vm.count("send") || vm.count("recv")) 
     {
-        auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt) : 
-            EjfatURI::getFromEnv("EJFAT_URI"s, tt));
+        auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt, preferV6) : 
+            EjfatURI::getFromEnv("EJFAT_URI"s, tt, preferV6));
         if (uri_r.has_error())
         {
             std::cerr << "Error in parsing URI from command-line, error "s + uri_r.error().message() << std::endl;
@@ -358,7 +377,7 @@ int main(int argc, char **argv)
                 senders.push_back(sndrcvIP);
 
                 // create LBManager
-                lbmPtr = new LBManager(uri, false);
+                lbmPtr = new LBManager(uri, noValidate, preferHostAddr);
 
                 // register senders
                 std::cout << "Adding senders to LB: ";

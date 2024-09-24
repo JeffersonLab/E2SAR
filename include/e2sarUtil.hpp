@@ -78,7 +78,7 @@ namespace e2sar
          * @param uri - the URI string
          * @param tt - convert to this token type (admin, instance, session)
          * @param preferV6 - when connecting to the control plane, prefer IPv6 address
-         * (defaults to v4)
+         * if the name resolves to both (defaults to v4)
          */
         EjfatURI(const std::string &uri, TokenType tt=TokenType::admin, bool preferV6=false);
 

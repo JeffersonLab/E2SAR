@@ -38,7 +38,7 @@ namespace e2sar
         std::vector<int> cpuCoreList,
         const ReassemblerFlags &rflags):
         dpuri(uri),
-        lbman(dpuri, rflags.validateCert),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
@@ -54,7 +54,7 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         condLock{recvThreadMtx},
-        sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
+        sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
         sanityChecks();
@@ -71,7 +71,7 @@ namespace e2sar
     Reassembler::Reassembler(const EjfatURI &uri,  ip::address data_ip, u_int16_t starting_port,
         size_t numRecvThreads, const ReassemblerFlags &rflags):
         dpuri(uri),
-        lbman(dpuri, rflags.validateCert),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
@@ -87,7 +87,7 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         condLock{recvThreadMtx},
-        sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
+        sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
         sanityChecks();
@@ -541,10 +541,10 @@ namespace e2sar
 
         // general
         rFlags.useCP = paramTree.get<bool>("general.useCP", rFlags.useCP);
-        rFlags.validateCert = paramTree.get<bool>("general.validateCert", rFlags.validateCert);
 
         // control plane
-        rFlags.cpV6 = paramTree.get<bool>("control-plane.cpV6", rFlags.cpV6);
+        rFlags.useHostAddress = paramTree.get<bool>("control-plane.useHostAddress", rFlags.useHostAddress);
+        rFlags.validateCert = paramTree.get<bool>("control-plane.validateCert", rFlags.validateCert);
 
         // data plane
         rFlags.portRange = paramTree.get<int>("data-plane.portRange", rFlags.portRange);

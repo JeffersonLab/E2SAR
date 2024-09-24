@@ -131,16 +131,23 @@ namespace e2sar
          * use makeSslOptions[FromFiles]() methods and pass the output to this constructor.
          * @param cpuri an EjfatURI object parsed from configuration data
          * @param validateServer if false, skip server certificate validation (useful for self-signed testing)
+         * @param useHostAddress even if hostname is provided, use host address as resolved by URI object (with preference for 
+         * IPv4 by default or for IPv6 if explicitly requested)
          * @param opts grpc::SslCredentialsOptions containing some combination of server root certs, client key and client cert
          * use of SSL/TLS is governed by the URI scheme ('ejfat' vs 'ejfats')
          */
-        LBManager(const EjfatURI &cpuri, bool validateServer = true,
+        LBManager(const EjfatURI &cpuri, bool validateServer = true, bool useHostAddress = false,
                   grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri)
         {
 
             auto cp_host_r = cpuri.get_cpHost();
             std::string addr_string;
-            if (!cp_host_r.has_error())
+
+            // using host address automatically disables cert validation
+            if (useHostAddress)
+                validateServer = false;
+
+            if (!useHostAddress && !cp_host_r.has_error())
             {
                 // try hostname
                 auto cp_host_v = cp_host_r.value();
@@ -153,13 +160,16 @@ namespace e2sar
                 if (cp_addr_r.has_error())
                     throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
                 auto cp_addr_v = cp_addr_r.value();
-                addr_string = cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
+                if (cp_addr_v.first.is_v4())
+                    addr_string = "ipv4://" + cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
+                else
+                    addr_string = "ipv6://[" + cp_addr_v.first.to_string() + "]:" + std::to_string(cp_addr_v.second);
             }
 
             if (cpuri.get_useTls())
             {
                 grpc::experimental::TlsChannelCredentialsOptions topts;
-                if (!validateServer)
+                if (validateServer)
                 {
                     // disable most of server certificate validation
                     std::shared_ptr<grpc::experimental::NoOpCertificateVerifier> verifier = std::make_shared<grpc::experimental::NoOpCertificateVerifier>();

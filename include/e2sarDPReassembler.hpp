@@ -276,14 +276,12 @@ namespace e2sar
                 boost::thread threadObj;
 
                 const u_int16_t period_ms;
-                // flags
-                const bool useV6;
 
                 // UDP sockets
                 int socketFd{0};
 
-                inline SendStateThreadState(Reassembler &r, bool v6, u_int16_t period_ms): 
-                    reas{r}, period_ms{period_ms}, useV6{v6}
+                inline SendStateThreadState(Reassembler &r, u_int16_t period_ms): 
+                    reas{r}, period_ms{period_ms}
                 {}
 
                 // thread loop. all important behavior is encapsulated inside LBManager
@@ -321,8 +319,8 @@ namespace e2sar
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
-             * - cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
              * - useCP - whether to use the control plane (sendState, registerWorker) {true}
+             * - useHostAddress - use IPv4 or IPv6 address for gRPC even if hostname is specified (disables cert validation) {false}
              * - period_ms - period of the send state thread in milliseconds {100}
              * - epoch_ms - period of one epoch in milliseconds {1000}
              * - Ki, Kp, Kd - PID gains (integral, proportional and derivative) {0., 0., 0.}
@@ -345,8 +343,8 @@ namespace e2sar
              */
             struct ReassemblerFlags 
             {
-                bool cpV6;
                 bool useCP;
+                bool useHostAddress;
                 u_int16_t period_ms;
                 bool validateCert;
                 float Ki, Kp, Kd, setPoint;
@@ -356,7 +354,7 @@ namespace e2sar
                 int eventTimeout_ms;
                 int rcvSocketBufSize; 
                 float weight, min_factor, max_factor;
-                ReassemblerFlags(): cpV6{false}, useCP{true}, 
+                ReassemblerFlags(): useCP{true}, useHostAddress{false},
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0} {}

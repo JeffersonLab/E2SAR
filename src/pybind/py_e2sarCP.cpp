@@ -152,9 +152,10 @@ void init_e2sarCP(py::module_ &m) {
 
     // Constructor
     lb_manager.def(
-        py::init<const EjfatURI &, bool, grpc::SslCredentialsOptions>(),
+        py::init<const EjfatURI &, bool, bool, grpc::SslCredentialsOptions>(),
         py::arg("cpuri"),
         py::arg("validate_server") = true,
+        py::arg("use_host_address") = false,
         py::arg("opts") = grpc::SslCredentialsOptions()
     );
 

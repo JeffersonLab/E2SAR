@@ -163,8 +163,8 @@ void init_e2sarDP_reassembler(py::module_ &m)
     // Bind the ReassemblerFlags struct as a nested class of Reassembler
     py::class_<Reassembler::ReassemblerFlags>(m, "ReassemblerFlags")
         .def(py::init<>())  // The default values will be the same in Python after binding.
-        .def_readwrite("cpV6", &Reassembler::ReassemblerFlags::cpV6)
         .def_readwrite("useCP", &Reassembler::ReassemblerFlags::useCP)
+        .def_readwrite("useHostAddress", &Reassembler::ReassemblerFlags::useHostAddress)
         .def_readwrite("period_ms", &Reassembler::ReassemblerFlags::period_ms)
         .def_readwrite("validateCert", &Reassembler::ReassemblerFlags::validateCert)
         .def_readwrite("Ki", &Reassembler::ReassemblerFlags::Ki)

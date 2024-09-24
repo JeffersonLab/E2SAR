@@ -358,7 +358,8 @@ int main(int argc, char **argv)
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
     opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
     opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
-    opts("ipv6,6", "prefer IPv6 control plane address if URI specifies hostname");
+    opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation)");
+    opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation)");
     opts("export,e", "suppresses other messages and prints out 'export EJFAT_URI=<the new uri>' returned by the LB");
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
@@ -395,6 +396,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
         conflicting_options(vm, "root", "novalidate");
+        conflicting_options(vm, "ipv4", "ipv6");
         option_dependency(vm,"addsenders", "address");
         option_dependency(vm,"removesenders", "address");
     }
@@ -437,6 +439,11 @@ int main(int argc, char **argv)
         preferV6 = true;
     }
 
+    // if ipv4 or ipv6 requested explicitly
+    bool preferHostAddr = false;
+    if (vm.count("ipv6") || vm.count("ipv4"))
+        preferHostAddr = true;
+
     std::string ejfat_uri;
     auto uri_r = (vm.count("uri") ? EjfatURI::getFromString(vm["uri"].as<std::string>(), tt, preferV6) : 
         EjfatURI::getFromEnv("EJFAT_URI"s, tt, preferV6));
@@ -455,7 +462,7 @@ int main(int argc, char **argv)
     if (vm.count("lbid")) 
         uri.set_lbId(vm["lbid"].as<std::string>());
 
-    auto lbman = LBManager(uri);
+    auto lbman = LBManager(uri, true, preferHostAddr);
 
     if (vm.count("root") && !uri.get_useTls())
     {
@@ -471,14 +478,14 @@ int main(int argc, char **argv)
                 std::cerr << "Unable to read server root certificate file "s;
                 return -1;
             }
-            lbman = LBManager(uri, true, opts_res.value());
+            lbman = LBManager(uri, true, preferHostAddr, opts_res.value());
         } 
         else
         {
             if (vm.count("novalidate"))
             {
                 std::cerr << "Skipping server certificate validation" << std::endl;
-                lbman = LBManager(uri, false);
+                lbman = LBManager(uri, false, preferHostAddr);
             }
         }
     }
