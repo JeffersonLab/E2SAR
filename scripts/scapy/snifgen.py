@@ -21,7 +21,7 @@ class SyncPacket(Packet):
     name = "SyncPacket"
     fields_desc = [
         StrFixedLenField('preamble', 'LC', 2),
-        XByteField('version', 1),
+        XByteField('version', 2),
         XByteField('reserved', 0),
         IntField('eventSrcId', 0),
         LongField('eventNumber', 0),
