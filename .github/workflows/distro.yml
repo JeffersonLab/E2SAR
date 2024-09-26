@@ -5,6 +5,7 @@ on:
 env:
   E2SAR_VER: 0.1.2
   E2SAR_DEP: boost-1.85.0-grpc-1.54.1
+  FINAL_INSTALL: /usr/local
 
 jobs:
   build:
