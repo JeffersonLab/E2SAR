@@ -94,6 +94,15 @@ jobs:
           PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson test -C build --suite=unit --timeout=0
           PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson install -C build
 
+      - name: Update pkgconfig prefix files for final installation
+        run: |
+          # update pkgconfig files for the install location. DESTDIR didn't work
+          export IDIR=`pwd`/package/usr/local
+          echo Updating pkgconfig files prefix from ${IDIR} to ${{ env.FINAL_INSTALL }}
+          for file in `ls -1 ${IDIR}/lib/pkgconfig`; do sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
+          echo Updating E2SAR pkgconfig
+          sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
+
       - name: Package project into .deb or .rpm
         run: |
           pushd package/ && tar -zcf ../e2sar.tar.gz usr/ && popd
