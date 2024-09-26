@@ -51,7 +51,8 @@ result<int> reserveLB(LBManager &lbman,
     if(!suppress)
     {
         std::cout << "Reserving a new load balancer " << std::endl;
-        std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+        std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " using address: " << 
+            lbman.get_AddrString() << std::endl;
         std::cout << "   LB Name: " << lbname << std::endl;
         std::cout << "   Allowed senders: ";
         std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
@@ -85,7 +86,8 @@ result<int> reserveLB(LBManager &lbman,
 result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 {
     std::cout << "Freeing a load balancer " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     result<int> res{0};
@@ -116,7 +118,8 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name,
     if(!suppress)
     {
         std::cout << "Registering a worker " << std::endl;
-        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::instance) << " using address: " << 
+            lbman.get_AddrString() << std::endl;
         std::cout << "   Worker details: " << node_name << " at "s << node_ip << ":"s << node_port << std::endl;
         std::cout << "   CP parameters: "
                 << "w="s << weight << ",  source_count="s << src_cnt << std::endl;
@@ -148,7 +151,8 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name,
 result<int> deregisterWorker(LBManager &lbman)
 {
     std::cout << "De-Registering a worker " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
 
     auto res = lbman.deregisterWorker();
 
@@ -167,7 +171,8 @@ result<int> deregisterWorker(LBManager &lbman)
 result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 {
     std::cout << "Getting LB Status " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
     std::cout << "   LB ID: " << (lbid.empty() ? lbman.get_URI().get_lbId() : lbid) << std::endl;
 
     auto res = lbman.getLBStatus(lbid);
@@ -202,7 +207,8 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 result<int> overview(LBManager &lbman)
 {
     std::cout << "Getting Overview " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
 
     auto res = lbman.overview();
 
@@ -243,7 +249,8 @@ result<int> overview(LBManager &lbman)
 result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready)
 {
     std::cout << "Sending Worker State " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
     auto res = lbman.sendState(fill_percent, ctrl_signal, is_ready);
@@ -264,7 +271,8 @@ result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, b
 result<int> removeSenders(LBManager &lbman, const std::vector<std::string>& senders)
 {
     std::cout << "Removing senders to CP " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   Sender list: ";
     std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
@@ -288,7 +296,8 @@ result<int> removeSenders(LBManager &lbman, const std::vector<std::string>& send
 result<int> addSenders(LBManager &lbman, const std::vector<std::string>& senders)
 {
     std::cout << "Adding senders to CP " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   Sender list: ";
     std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
@@ -313,7 +322,8 @@ result<int> version(LBManager &lbman)
 {
 
     std::cout << "Getting load balancer version " << std::endl;
-    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << static_cast<std::string>(lbman.get_URI()) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
 
     auto res = lbman.version();
 

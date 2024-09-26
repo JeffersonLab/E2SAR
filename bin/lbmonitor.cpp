@@ -13,7 +13,8 @@ using namespace e2sar;
 result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 {
     std::cout << "Getting LB Status " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
     std::cout << "   LB ID: " << lbid << std::endl;
 
@@ -49,7 +50,8 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
 result<int> getLBOverview(LBManager &lbman)
 {
     std::cout << "Getting Overview " << std::endl;
-    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " on IP " << lbman.get_URI().get_cpAddr().value().first << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
 
     auto res = lbman.overview();
 

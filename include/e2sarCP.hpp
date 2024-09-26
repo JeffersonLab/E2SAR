@@ -120,6 +120,7 @@ namespace e2sar
     {
     private:
         EjfatURI _cpuri;
+        std::string addr_string;
         std::unique_ptr<LoadBalancer::Stub> _stub;
         std::shared_ptr<grpc::Channel> _channel;
 
@@ -141,7 +142,6 @@ namespace e2sar
         {
 
             auto cp_host_r = cpuri.get_cpHost();
-            std::string addr_string;
 
             // using host address automatically disables cert validation
             if (useHostAddress)
@@ -510,7 +510,7 @@ namespace e2sar
          */
         static inline result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
                                                                          const std::string &pem_private_key,
-                                                                         const std::string &pem_cert_chain)
+                                                                         const std::string &pem_cert_chain) noexcept
         {
             return grpc::SslCredentialsOptions{std::move(pem_root_certs),
                                                std::move(pem_private_key),
@@ -529,14 +529,24 @@ namespace e2sar
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
             std::string_view pem_root_certs,
             std::string_view pem_private_key,
-            std::string_view pem_cert_chain);
+            std::string_view pem_cert_chain) noexcept;
 
         /**
          * Generate gRPC-compliant custom SSL Options object with just the server root cert 
          * @param pem_root_certs - The file name containing the PEM encoding of the server root certificate.
          */
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
-            std::string_view pem_root_certs);
+            std::string_view pem_root_certs) noexcept;
+
+        /**
+         * Return the address string used by gRPC to connect to control plane. Can be
+         * in the format of hostname:port or ipv4:///W.X.Y.Z:port or ipv6:///[XXXX::XX:XXXX]:port
+         * 
+         * @return the string containing the address
+         */
+        inline std::string get_AddrString() {
+            return addr_string;
+        }
     };
 
     /**
