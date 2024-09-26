@@ -281,7 +281,7 @@ void init_e2sarCP(py::module_ &m) {
     /**
      * Return type containing result<std::unique_ptr<OverviewReply>>
      */
-        lb_manager.def(
+    lb_manager.def(
         "get_lb_overview",
         [](LBManager& self){
             auto result = self.overview();
@@ -293,6 +293,9 @@ void init_e2sarCP(py::module_ &m) {
 
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
+
+    // return connect string
+    lb_manager.def("get_addrstring", &LBManager::get_AddrString, py::return_value_policy::reference);
 
     /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
 }
