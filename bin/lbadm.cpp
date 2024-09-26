@@ -349,25 +349,30 @@ int main(int argc, char **argv)
     po::options_description od("Command-line options");
 
     auto opts = od.add_options()("help,h", "show this help message");
+    std::string duration;
+    float weight;
+    u_int16_t count;
+    float queue, ctrl, minfactor, maxfactor;
+    bool ready;
 
     // parameters
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("lbid,i", po::value<std::string>(), "override/provide id of the loadbalancer");
     opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address, can be used multiple times for 'reserve' call");
-    opts("duration,d", po::value<std::string>()->default_value("02:00:00"), "specify duration as '[hh[:mm[:ss]]]'");
+    opts("duration,d", po::value<std::string>(&duration)->default_value("02:00:00"), "specify duration as '[hh[:mm[:ss]]]'");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
     opts("name,n", po::value<std::string>(), "specify node name for registration");
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
-    opts("weight,w", po::value<float>()->default_value(1.0), "node weight");
-    opts("count,c", po::value<u_int16_t>()->default_value(1), "node source count");
+    opts("weight,w", po::value<float>(&weight)->default_value(1.0), "node weight");
+    opts("count,c", po::value<u_int16_t>(&count)->default_value(1), "node source count");
     opts("session,s", po::value<std::string>(), "override/provide session id");
-    opts("queue,q", po::value<float>()->default_value(0.0), "queue fill");
-    opts("ctrl,t", po::value<float>()->default_value(0.0), "control signal value");
-    opts("ready,r", po::value<bool>()->default_value(true), "worker ready state (1 or 0)");
+    opts("queue,q", po::value<float>(&queue)->default_value(0.0), "queue fill");
+    opts("ctrl,t", po::value<float>(&ctrl)->default_value(0.0), "control signal value");
+    opts("ready,r", po::value<bool>(&ready)->default_value(true), "worker ready state (1 or 0)");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
-    opts("minfactor", po::value<float>()->default_value(0.5), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
-    opts("maxfactor", po::value<float>()->default_value(2.0), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
+    opts("minfactor", po::value<float>(&minfactor)->default_value(0.5), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
+    opts("maxfactor", po::value<float>(&maxfactor)->default_value(2.0), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation)");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation)");
     opts("export,e", "suppresses other messages and prints out 'export EJFAT_URI=<the new uri>' returned by the LB");
@@ -517,8 +522,7 @@ int main(int argc, char **argv)
         // execute command
         auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
                                vm["address"].as<std::vector<std::string>>(),
-                               vm["duration"].as<std::string>(),
-                               suppress);
+                               duration, suppress);
         if (uri_r.has_error())
         {
             std::cerr << "There was an error reserving LB: " << uri_r.error().message() << std::endl;
@@ -552,10 +556,10 @@ int main(int argc, char **argv)
                                     vm["name"].as<std::string>(),
                                     vm["address"].as<std::vector<std::string>>()[0],
                                     vm["port"].as<u_int16_t>(),
-                                    vm["weight"].as<float>(),
-                                    vm["count"].as<u_int16_t>(),
-                                    vm["minfactor"].as<float>(),
-                                    vm["maxfactor"].as<float>(),
+                                    weight,
+                                    count,
+                                    minfactor,
+                                    maxfactor,
                                     suppress
                                     );
 
@@ -589,7 +593,7 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
-        auto int_r = sendState(lbman, vm["queue"].as<float>(), vm["ctrl"].as<float>(), vm["ready"].as<bool>());
+        auto int_r = sendState(lbman, queue, ctrl, ready);
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
