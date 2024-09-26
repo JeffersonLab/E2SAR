@@ -354,20 +354,20 @@ int main(int argc, char **argv)
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("lbid,i", po::value<std::string>(), "override/provide id of the loadbalancer");
     opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address, can be used multiple times for 'reserve' call");
-    opts("duration,d", po::value<std::string>(), "specify duration as '[hh[:mm[:ss]]]'");
+    opts("duration,d", po::value<std::string>()->default_value("02:00:00"), "specify duration as '[hh[:mm[:ss]]]'");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
     opts("name,n", po::value<std::string>(), "specify node name for registration");
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
-    opts("weight,w", po::value<float>(), "node weight");
-    opts("count,c", po::value<u_int16_t>(), "node source count");
+    opts("weight,w", po::value<float>()->default_value(1.0), "node weight");
+    opts("count,c", po::value<u_int16_t>()->default_value(1), "node source count");
     opts("session,s", po::value<std::string>(), "override/provide session id");
-    opts("queue,q", po::value<float>(), "queue fill");
-    opts("ctrl,t", po::value<float>(), "control signal value");
-    opts("ready,r", po::value<bool>(), "worker ready state (1 or 0)");
+    opts("queue,q", po::value<float>()->default_value(0.0), "queue fill");
+    opts("ctrl,t", po::value<float>()->default_value(0.0), "control signal value");
+    opts("ready,r", po::value<bool>()->default_value(true), "worker ready state (1 or 0)");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
     opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
-    opts("minfactor", po::value<float>(), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
-    opts("maxfactor", po::value<float>(), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
+    opts("minfactor", po::value<float>()->default_value(0.5), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
+    opts("maxfactor", po::value<float>()->default_value(2.0), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation)");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation)");
     opts("export,e", "suppresses other messages and prints out 'export EJFAT_URI=<the new uri>' returned by the LB");
@@ -383,6 +383,8 @@ int main(int argc, char **argv)
     opts("addsenders","add 'safe' sender IP addresses to CP (one or more -a required). Uses instance token.");
     opts("removesenders","remove 'safe' sender IP addresses from CP (one or more -a required). Uses instance token.");
 
+    std::vector<std::string> commands{"reserve", "free", "version", "register", 
+        "deregister", "status", "state", "overview", "addsenders", "removesenders"};
 
     po::variables_map vm;
 
@@ -409,6 +411,15 @@ int main(int argc, char **argv)
         conflicting_options(vm, "ipv4", "ipv6");
         option_dependency(vm,"addsenders", "address");
         option_dependency(vm,"removesenders", "address");
+
+        for (auto c1: commands)
+        {
+            for (auto c2: commands)
+            {
+                if (c1.compare(c2))
+                    conflicting_options(vm, c1, c2);
+            }
+        }
     }
     catch (const std::logic_error &le)
     {
