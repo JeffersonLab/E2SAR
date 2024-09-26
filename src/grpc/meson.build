@@ -20,7 +20,8 @@ lb_pb_ch = custom_target(
 
 # build a static library from the stubs
 liblbgrpc = static_library('lbgrpc', [lb_grpc_ch, lb_pb_ch], 
-                           dependencies: [grpc_dep, protobuf_dep])
+                           dependencies: [grpc_dep, protobuf_dep],
+			   install : true)
 
 # install generated headers
 meson.add_install_script('install.sh')
