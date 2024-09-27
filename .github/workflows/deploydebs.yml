@@ -43,7 +43,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: distro.yml
-          name: ${{ matrix.os }}-e2sar-${{ env.E2SAR_VER }}-package
+          name: ${{ matrix.os }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
       - name: create GH release
