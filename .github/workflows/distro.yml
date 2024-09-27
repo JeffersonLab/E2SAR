@@ -116,7 +116,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-e2sar-${{ env.E2SAR_VER }}-package
+          name: ${{ matrix.os }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
           path: |
             *.deb
             *.rpm
