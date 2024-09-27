@@ -8,6 +8,9 @@
 #include <vector>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/detail/file_parser_error.hpp>
 
 #include "e2sar.hpp"
 
@@ -632,6 +635,40 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         std::cout << "Some other exception" << std::endl;
         BOOST_CHECK(false);
     }
+}
+
+BOOST_AUTO_TEST_CASE(DPReasTest5)
+{
+    // test reading SegmenterFlags from INI files
+    // generate a file, read it in and compare expected values
+    boost::property_tree::ptree paramTree;
+    Reassembler::ReassemblerFlags rFlags;
+    std::string iniFileName = "/tmp/reassembler.ini";
+
+    // fill in the parameters
+    paramTree.put<bool>("general.useCP", false);
+    paramTree.put<bool>("control-plane.useHostAddress", true);
+    paramTree.put<int>("data-plane.rcvSocketBufSize", 10000);
+
+    try {
+        boost::property_tree::ini_parser::write_ini(iniFileName, paramTree);
+    } catch(boost::property_tree::ini_parser_error &ie) {
+        std::cout << "Unable to parse the segmenter flags configuration file "s + iniFileName << std::endl;
+        BOOST_CHECK(false);
+    }
+
+    Reassembler::ReassemblerFlags segDefaults;
+    Reassembler::ReassemblerFlags readFlags;
+    auto res = Reassembler::ReassemblerFlags::getFromINI(iniFileName);
+    BOOST_CHECK(!res.has_error());
+    readFlags = res.value();
+
+    BOOST_CHECK(readFlags.useCP == paramTree.get<bool>("general.useCP"));
+    BOOST_CHECK(readFlags.useHostAddress == paramTree.get<bool>("control-plane.useHostAddress"));
+    BOOST_CHECK(readFlags.validateCert == segDefaults.validateCert);
+    BOOST_CHECK(readFlags.rcvSocketBufSize == paramTree.get<int>("data-plane.rcvSocketBufSize"));
+
+    std::remove(iniFileName.c_str());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

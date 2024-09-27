@@ -1,6 +1,9 @@
 #define BOOST_TEST_MODULE DPSegTests
 #include <stdlib.h>
 #include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
 #include <cmath>
 #include <boost/asio.hpp>
 #include <boost/chrono.hpp>
@@ -8,6 +11,9 @@
 #include <vector>
 #include <boost/test/included/unit_test.hpp>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/detail/file_parser_error.hpp>
 
 #include "e2sar.hpp"
 
@@ -332,4 +338,37 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     // stop threads and exit
 }
 
+BOOST_AUTO_TEST_CASE(DPSegTest5)
+{
+    // test reading SegmenterFlags from INI files
+    // generate a file, read it in and compare expected values
+    boost::property_tree::ptree paramTree;
+    Segmenter::SegmenterFlags sFlags;
+    std::string iniFileName = "/tmp/segmenter.ini";
+
+    // fill in the parameters
+    paramTree.put<bool>("general.useCP", false);
+    paramTree.put<bool>("data-plane.zeroCopy", true);
+    paramTree.put<int>("data-plane.sndSocketBufSize", 10000);
+
+    try {
+        boost::property_tree::ini_parser::write_ini(iniFileName, paramTree);
+    } catch(boost::property_tree::ini_parser_error &ie) {
+        std::cout << "Unable to parse the segmenter flags configuration file "s + iniFileName << std::endl;
+        BOOST_CHECK(false);
+    }
+
+    Segmenter::SegmenterFlags segDefaults;
+    Segmenter::SegmenterFlags readFlags;
+    auto res = Segmenter::SegmenterFlags::getFromINI(iniFileName);
+    BOOST_CHECK(!res.has_error());
+    readFlags = res.value();
+
+    BOOST_CHECK(readFlags.useCP == paramTree.get<bool>("general.useCP"));
+    BOOST_CHECK(readFlags.zeroCopy == paramTree.get<bool>("data-plane.zeroCopy"));
+    BOOST_CHECK(readFlags.dpV6 == segDefaults.dpV6);
+    BOOST_CHECK(readFlags.sndSocketBufSize == paramTree.get<int>("data-plane.sndSocketBufSize"));
+
+    std::remove(iniFileName.c_str());
+}
 BOOST_AUTO_TEST_SUITE_END()
