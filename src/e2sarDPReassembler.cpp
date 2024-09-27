@@ -2,6 +2,7 @@
 #include <boost/chrono.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/detail/file_parser_error.hpp>
+#include <boost/container/flat_set.hpp>
 #include <iostream>
 
 #include "portable_endian.h"
@@ -136,8 +137,6 @@ namespace e2sar
     void Reassembler::RecvThreadState::_threadBody()
     {
 
-        std::set<EventNum_t> activeEventNumbers{};
-
         while(!reas.threadsStop)
         {
             fd_set curSet{fdSet};
@@ -153,13 +152,14 @@ namespace e2sar
                 auto inWaiting = nowT - it->second->firstSegment;
                 auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                 if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
+                    // check if this event number has been seen as lost
+                    logLostEvent(it->first);
                     // deallocate event (ood queue and event buffer)
                     it->second->cleanup(recvBufferPool);
                     delete it->second->event;
                     // deallocate queue item
                     delete it->second;
                     it = eventsInProgress.erase(it);  // erase returns the next element (or end())
-                    reas.recvStats.enqueueLoss++;
                 } else {
                     ++it;  // Just advance the iterator if no deletion
                 }
@@ -298,7 +298,14 @@ namespace e2sar
                     eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
 
                     // queue it up for the user to receive
-                    reas.enqueue(item);
+                    auto ret = reas.enqueue(item);
+                    // event lost on enqueuing
+                    if (ret == 1) 
+                    {
+                        logLostEvent(std::make_pair(item->eventNum, item->dataId));
+                        // free up the item
+                        delete item;
+                    }
 
                     // update statistics
                     reas.recvStats.eventSuccess++;

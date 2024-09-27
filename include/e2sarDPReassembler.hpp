@@ -14,6 +14,7 @@
 #include <boost/asio/ip/udp.hpp>
 #include <boost/variant.hpp>
 #include <boost/heap/priority_queue.hpp>
+#include <boost/container/flat_set.hpp>
 
 #include <sys/select.h>
 
@@ -137,16 +138,20 @@ namespace e2sar
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
             std::atomic<size_t> eventQueueDepth{0};
 
-            // push event on the event queue
-            inline void enqueue(EventQueueItem* item) noexcept
+            // push event on the common event queue
+            // return 1 if event is lost, 0 on success
+            inline int enqueue(EventQueueItem* item) noexcept
             {
+                int ret = 0;
                 if (eventQueue.push(item))
                     eventQueueDepth++;
                 else 
-                    recvStats.enqueueLoss++; // event lost, queue was full
+                    ret = 1; // event lost, queue was full
                 // queue is lock free so we don't lock
                 recvThreadCond.notify_all();
+                return ret;
             }
+
             // pop event off the event queue
             inline EventQueueItem* dequeue() noexcept
             {
@@ -209,6 +214,8 @@ namespace e2sar
                 // segments are transmitted, they are guarangeed to go
                 // to the same port
                 boost::unordered_map<std::pair<EventNum_t, u_int16_t>, EventQueueItem*, pair_hash, pair_equal> eventsInProgress;
+                // thread local instance of events we lost
+                boost::container::flat_set<std::pair<EventNum_t, u_int16_t>> lostEvents;
 
                 // CPU core ids
                 std::vector<int> cpuCoreList;
@@ -228,6 +235,17 @@ namespace e2sar
                 result<int> _close();
                 // thread loop
                 void _threadBody();
+
+                // log a lost event via a set of known lost
+                inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt)
+                {
+                    if (lostEvents.contains(evt))
+                        return;
+                    // this is thread-local
+                    lostEvents.insert(evt);
+                    // this is atomic
+                    reas.recvStats.enqueueLoss++;
+                }
             };
             friend struct RecvThreadState;
             std::list<RecvThreadState> recvThreadState;
