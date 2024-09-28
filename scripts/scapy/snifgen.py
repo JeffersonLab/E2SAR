@@ -12,9 +12,12 @@ import sys
 
 from typing import List
 
+from datetime import datetime
+
 from scapy.all import *
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ShortField, StrLenField
+
 
 # Sync header
 class SyncPacket(Packet):
@@ -197,8 +200,10 @@ if __name__ == "__main__":
     operations = parser.add_mutually_exclusive_group(required=True)
     operations.add_argument("-l", "--listen", action="store_true", help="listen for incoming packets and try to parse and validate them")
     operations.add_argument("-g", "--generate", action="store_true", help="generate new packets of specific types")
+    operations.add_argument("-a", "--parse", action="store_true", help="parse a pcap file")
     parser.add_argument("-p", "--port", action="store", help="UDP port (for -l and -g)", default=19522, type=int)
-    parser.add_argument("-c", "--count", action="store", help="number of packet streams (if pld larger than mtu, otherwise packets) to generate or expect", default=10, type=int)
+    parser.add_argument("-n", "--nports", action="store", type=int, default=1, help="number of ports starting with -p to listen on")
+    parser.add_argument("-c", "--count", action="store", help="number of packet streams (if pld larger than mtu, otherwise packets) to generate or expect or parse", default=10, type=int)
     parser.add_argument("--ip", action="store", help="IP address to which to send the packet(s) or listen from")
     parser.add_argument("--show", action="store_true", default=False, help="only show the packet without sending it (with -g)")
     parser.add_argument("--entropy", action="store", default=0, help="entropy value for LB+RE packet", type=int)
@@ -209,6 +214,7 @@ if __name__ == "__main__":
     parser.add_argument("--mtu", action="store", type=int, default=1500, help="set the MTU length, so LB+RE and RE packets can be fragmented.")
     parser.add_argument("--pld", action="store", help="payload for LB+RE or RE packets. May be broken up if MTU size insufficient")
     parser.add_argument("--iface", action="store", default="all", help="which interface should we listen on (defaults to all)")
+    parser.add_argument("-f", "--file", action="store", help="pcap file name to parse", default="./e2sar.pcap")
     packet_types = parser.add_mutually_exclusive_group(required=True)
     packet_types.add_argument("--sync", action="store_true", help="listen for or generate sync packets")
     packet_types.add_argument("--lbre", action="store_true", help="listen for or generate packets with LB+RE header")
@@ -245,10 +251,12 @@ if __name__ == "__main__":
                 send(p)
     elif args.listen:
         # craft a filter
+        listeningPorts = [x + args.port for x in range(0, args.nports)]
+        portFilter = "or".join([f" dst port {port} " for port in listeningPorts])
         if args.ip:
-            filter = f'ip dst host {args.ip} and udp dst port {args.port}'
+            filter = f'udp and dst host {args.ip} and \\( {portFilter} \\)'
         else:
-            filter=f'udp dst port {args.port}'
+            filter=f'udp {portFilter}'
 
         if args.sync:
             # sync packets
@@ -272,5 +280,32 @@ if __name__ == "__main__":
 
         # Start sniffing for packets
         sniff(iface=interfaces, filter=filter, prn=packet_callback, count=args.count)
+    
+    elif args.parse:
+
+        if args.sync:
+            # sync packets
+            bind_sync_hdr(args.port)
+            packet_type = 'Sync'
+        elif args.lbre:
+            # lb+re packets
+            bind_lb_hdr(args.port)
+            packet_type = 'LB+RE'
+        elif args.re:
+            bind_re_hdr(args.port)
+            packet_type = 'RE'
+
+        print(f'Looking for {packet_type} packets in PCAP file {args.file}')
+        try:
+            packets = rdpcap(args.file, count=args.count)
+
+            for packet in packets:
+                packet_time = packet.time
+                if packet_time is not None:
+                    human_readable_time = datetime.fromtimestamp(float(packet.time))
+                    print(f"Timestamp: {human_readable_time}")
+                packet_callback(packet)
+        except Exception as e:
+            print(f'Unable to parse file {args.file} due to exception: {e}')
 
     print('Finished')
