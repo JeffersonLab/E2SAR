@@ -272,7 +272,7 @@ int main(int argc, char **argv)
     u_int16_t mtu;
     u_int32_t eventSourceId;
     u_int16_t dataId;
-    size_t numThreads;
+    size_t numThreads, numSockets;
     float rateGbps;
     int sockBufSize;
     int durationSec;
@@ -293,6 +293,7 @@ int main(int argc, char **argv)
     opts("src", po::value<u_int32_t>(&eventSourceId)->default_value(1234), "Event source (default 1234) [s]");
     opts("dataid", po::value<u_int16_t>(&dataId)->default_value(4321), "Data id (default 4321) [s]");
     opts("threads,t", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
+    opts("sockets,s", po::value<size_t>(&numSockets)->default_value(4), "number of send sockets (defaults to 4) [r]");
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
@@ -415,6 +416,7 @@ int main(int argc, char **argv)
                 sflags.useCP = withCP; 
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
+                sflags.numSendSockets = numSockets;
             }
             std::cout << "Control plane will be " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
