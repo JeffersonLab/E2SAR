@@ -48,7 +48,7 @@ class TruncatedStrLenField(StrLenField):
 
     def __init__(self, name, default, length_from, truncate_to=10):
         # Add a truncate_to parameter to control the number of characters to show
-        super().__init__(name, default, None, length_from)
+        super().__init__(name, default, length_from=length_from)
         self.trunc = truncate_to
 
     def i2repr(self, pkt, x):
@@ -165,7 +165,7 @@ def validate_re_packet(packet):
 def packet_callback(packet):
     if Raw in packet:
         del packet[Raw]
-        
+
     if SyncPacket in packet:
         valid, error_msg = validate_sync_packet(packet[SyncPacket])
         if valid:
