@@ -44,17 +44,18 @@ class LBPacket(Packet):
 LBPacketLength = 2 + 1 + 1 + 2 + 2 + 8
 
 class TruncatedStrLenField(StrLenField):
+    __slots__ = ["trunc"]
 
     def __init__(self, name, default, length_from, truncate_to=10):
         # Add a truncate_to parameter to control the number of characters to show
         super().__init__(name, default, None, length_from)
-        self.truncate_to = truncate_to
+        self.trunc = truncate_to
 
     def i2repr(self, pkt, x):
         if x is None:
             return ""
         # Truncate the string to `self.truncate_to` characters for display
-        return repr(x[:self.truncate_to] + ("..." if len(x) > self.truncate_to else ""))
+        return repr(x[:self.trunc] + ("..." if len(x) > self.trunc else ""))
 
 # RE header itself
 class REPacket(Packet):
