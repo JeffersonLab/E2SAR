@@ -43,6 +43,19 @@ class LBPacket(Packet):
     ]
 LBPacketLength = 2 + 1 + 1 + 2 + 2 + 8
 
+class TruncatedStrLenField(StrLenField):
+
+    def __init__(self, name, default, length_from, truncate_to=10):
+        # Add a truncate_to parameter to control the number of characters to show
+        super().__init__(name, default, None, length_from)
+        self.truncate_to = truncate_to
+
+    def i2repr(self, pkt, x):
+        if x is None:
+            return ""
+        # Truncate the string to `self.truncate_to` characters for display
+        return repr(x[:self.truncate_to] + ("..." if len(x) > self.truncate_to else ""))
+
 # RE header itself
 class REPacket(Packet):
     name = "REPacket"
@@ -54,7 +67,7 @@ class REPacket(Packet):
         IntField('bufferOffset', 0),
         IntField('bufferLength', 0), # note this is Event Length
         LongField('eventNumber', 0),
-        StrLenField('pld', '', length_from=lambda p: p.bufferLength)
+        TruncatedStrLenField('pld', '', length_from=lambda p: p.bufferLength, truncate_to=20)
     ] 
 REPacketLength = 1 + 1 + 2 + 4 + 4 + 8
 
