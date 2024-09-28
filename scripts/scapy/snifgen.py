@@ -163,6 +163,9 @@ def validate_re_packet(packet):
 
 # generic callback for all headers
 def packet_callback(packet):
+    if Raw in packet:
+        del packet[Raw]
+        
     if SyncPacket in packet:
         valid, error_msg = validate_sync_packet(packet[SyncPacket])
         if valid:
