@@ -55,7 +55,7 @@ class TruncatedStrLenField(StrLenField):
         if x is None:
             return ""
         # Truncate the string to `self.truncate_to` characters for display
-        return repr(x[:self.trunc] + ("..." if len(x) > self.trunc else ""))
+        return repr(x[:self.trunc].decode("utf-8") + ("..." if len(x) > self.trunc else ""))
 
 # RE header itself
 class REPacket(Packet):
@@ -172,14 +172,13 @@ def packet_callback(packet):
     elif LBPacket in packet:
         valid, error_msg = validate_lb_packet(packet[LBPacket])
         if valid:
-            packet[IP].show()
+            valid, error_msg = validate_re_packet(packet[REPacket])
+            if valid:
+                packet[IP].show()
+            else:
+                print(f"RE packet validation error: {error_msg}")
         else:
-            print(f"LB packet validation error: {error_msg}")
-        valid, error_msg = validate_re_packet(packet[REPacket])
-        if valid:
-            packet[IP].show()
-        else:
-            print(f"RE packet validation error: {error_msg}")       
+            print(f"LB packet validation error: {error_msg}")   
     elif REPacket in packet:
         valid, error_msg = validate_re_packet(packet[REPacket])
         if valid:
