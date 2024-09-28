@@ -148,6 +148,10 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             evtBufferPool->free(item);
         boost::this_thread::sleep_until(until);
     }
+    // sleep to allow small number of frames to leave
+    boost::chrono::seconds duration(1);
+    boost::this_thread::sleep_for(duration);
+    
     auto stats = s.getSendStats();
 
     evtBufferPool->purge_memory();
