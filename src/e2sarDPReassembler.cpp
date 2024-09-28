@@ -2,7 +2,6 @@
 #include <boost/chrono.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/detail/file_parser_error.hpp>
-#include <boost/container/flat_set.hpp>
 #include <iostream>
 
 #include "portable_endian.h"
@@ -312,6 +311,13 @@ namespace e2sar
                 }
             }
         }
+
+        std::cout << "The following events were lost: ";
+        for (const auto& elem :lostEvents)
+        {
+            std::cout << "(" << elem.first << ", " << elem.second << ") ";
+        }
+        std::cout << std::endl;
 
         // close on exit
         auto res = _close();
