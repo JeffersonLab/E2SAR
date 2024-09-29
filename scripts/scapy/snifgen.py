@@ -85,9 +85,13 @@ def bind_lb_hdr(dport):
     bind_layers(UDP, LBPacket, dport=dport)
     bind_layers(LBPacket, REPacket)
 
-# bind RE header to specified port
+# bind RE header to specified ports
 def bind_re_hdr(dport):
-    bind_layers(UDP, REPacket, dport=dport)
+    if (isinstance(dport, list)):
+        for p in dport:
+            bind_layers(UDP, REPacket, dport=p)
+    else:
+        bind_layers(UDP, REPacket, dport=dport)
 
 # generate a packet with specific field values
 def genSyncPkt(ip_addr: str, udp_dport: int, eventSrcId: int, eventNumber: int, avgEventRateHz: int) -> Packet:
@@ -223,6 +227,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # equivalent to -n - not to resolve port numbers to service names
+    conf.noenum.add(UDP.sport)
+    conf.noenum.add(UDP.dport)
+
     if args.generate:
         if not args.ip:
             print(f'--ip option is required (use dotted notation to specify IPv4 address)')
@@ -268,7 +276,7 @@ if __name__ == "__main__":
             bind_lb_hdr(args.port)
             packet_type = 'LB+RE'
         elif args.re:
-            bind_re_hdr(args.port)
+            bind_re_hdr([x + args.port for x in range(0, args.nports)])
             packet_type = 'RE'
 
         # Linux supports "any" shortcut interface specification, but other OSs may not, so we just list
@@ -293,12 +301,16 @@ if __name__ == "__main__":
             bind_lb_hdr(args.port)
             packet_type = 'LB+RE'
         elif args.re:
-            bind_re_hdr(args.port)
+            #bind_re_hdr(args.port)
+            bind_re_hdr([x + args.port for x in range(0, args.nports)])
             packet_type = 'RE'
 
         print(f'Looking for {packet_type} packets in PCAP file {args.file}')
         try:
-            packets = rdpcap(args.file, count=args.count)
+            if (args.count != 0):
+                packets = rdpcap(args.file, count=args.count)
+            else:
+                packets = rdpcap(args.file)
 
             for packet in packets:
                 packet_time = packet.time
