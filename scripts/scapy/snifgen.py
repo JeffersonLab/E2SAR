@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# this is a script for sniffing and generating various UDP packet formats withing EJ-FAT:
+# this is a script for sniffing, parsing PCAP and generating various UDP packet formats within EJ-FAT:
 # - sync packets
 # - data packets with LB+RE header (pre-load-balancer)
 # - data packets with RE header only (post-load-balancer)
