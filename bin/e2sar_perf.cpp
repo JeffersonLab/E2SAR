@@ -240,10 +240,10 @@ void recvStatsThread(Reassembler *r)
 
         auto stats = r->getStats();
 
-        //for(auto res = r->get_LostEvent(); !res.has_error();)
-        //{
-        //    lostEvents.push_back(res.value());
-        //}
+        for(auto res = r->get_LostEvent(); !res.has_error();)
+        {
+            lostEvents.push_back(res.value());
+        }
         /*
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
              *  - EventNum_t eventSuccess; // events successfully processed
