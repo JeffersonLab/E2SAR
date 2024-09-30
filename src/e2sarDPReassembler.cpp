@@ -312,13 +312,6 @@ namespace e2sar
             }
         }
 
-        std::cout << "The following events were lost: ";
-        for (const auto& elem :lostEvents)
-        {
-            std::cout << "(" << elem.first << ", " << elem.second << ") ";
-        }
-        std::cout << std::endl;
-
         // close on exit
         auto res = _close();
     }

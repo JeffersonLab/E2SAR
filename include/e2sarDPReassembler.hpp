@@ -130,6 +130,8 @@ namespace e2sar
                 std::atomic<int> dataErrCnt{0};
                 // last e2sar error
                 std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
+                // a limited queue to push lost event numbers to
+                boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
             };
             AtomicStats recvStats;
 
@@ -237,12 +239,16 @@ namespace e2sar
                 void _threadBody();
 
                 // log a lost event via a set of known lost
+                // and add to lost queue for external inspection
                 inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt)
                 {
                     if (lostEvents.contains(evt))
                         return;
                     // this is thread-local
                     lostEvents.insert(evt);
+                    // lockfree queue (only takes trivial types)
+                    std::pair<EventNum_t, u_int16_t> *evtPtr = new std::pair<EventNum_t, u_int16_t>(evt.first, evt.second);
+                    reas.recvStats.lostEventsQueue.push(evtPtr);
                     // this is atomic
                     reas.recvStats.enqueueLoss++;
                 }
@@ -485,6 +491,23 @@ namespace e2sar
                     recvStats.enqueueLoss, recvStats.eventSuccess,
                     recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
                     recvStats.lastE2SARError);
+            }
+
+            /**
+             * Try to pop an event number of a lost event from the queue that stores them
+             * @return result with either (eventNumber,dataId) or E2SARErrorc::NotFound if queue is empty
+             */
+            inline result<std::pair<EventNum_t, u_int16_t>> get_LostEvent() noexcept
+            {
+                std::pair<EventNum_t, u_int16_t> *res;
+                if (recvStats.lostEventsQueue.pop(res))
+                {
+                    auto ret = *res;
+                    delete res;
+                    return ret;
+                }
+                else
+                    return E2SARErrorInfo{E2SARErrorc::NotFound, "Lost event queue is empty"};
             }
 
             /**

@@ -64,6 +64,13 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     // data error count
     BOOST_CHECK(recvStats.get<4>() == 0);
 
+    auto lostEvent = reas.get_LostEvent();
+    if (lostEvent.has_error())
+        std::cout << "NO EVENT LOSS " << std::endl;
+    else
+        std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+    BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
+
     // stop threads and exit
 }
 

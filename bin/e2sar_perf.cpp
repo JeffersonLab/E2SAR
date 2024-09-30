@@ -232,11 +232,18 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
 
 void recvStatsThread(Reassembler *r)
 {
+    std::vector<std::pair<EventNum_t, u_int16_t>> lostEvents;
+
     while(threadsRunning)
     {
         auto nowT = boost::chrono::high_resolution_clock::now();
 
         auto stats = r->getStats();
+
+        for(auto res = r->get_LostEvent(); !res.has_error();)
+        {
+            lostEvents.push_back(res.value());
+        }
         /*
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
              *  - EventNum_t eventSuccess; // events successfully processed
@@ -254,6 +261,13 @@ void recvStatsThread(Reassembler *r)
         std::cout << "\tgRPC Errors: " << stats.get<3>() << std::endl;
         if (stats.get<5>() != E2SARErrorc::NoError)
             std::cout << "\tLast E2SARError code: " << stats.get<5>() << std::endl;
+
+        std::cout << "\tEvents lost so far: ";
+        for(auto evt: lostEvents)
+        {
+            std::cout << evt.first << ":" << evt.second << " ";
+        }
+        std::cout << std::endl;
 
         auto until = nowT + boost::chrono::milliseconds(reportThreadSleepMs);
         boost::this_thread::sleep_until(until);

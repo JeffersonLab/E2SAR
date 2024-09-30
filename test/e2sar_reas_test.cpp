@@ -136,6 +136,13 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
         BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
 
+        auto lostEvent = reas.get_LostEvent();
+        if (lostEvent.has_error())
+            std::cout << "NO EVENT LOSS " << std::endl;
+        else
+            std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+        BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
+
         // stop threads and exit
     }
     catch (E2SARException &ee) {
@@ -275,6 +282,13 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
         BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
         BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+
+        auto lostEvent = reas.get_LostEvent();
+        if (lostEvent.has_error())
+            std::cout << "NO EVENT LOSS " << std::endl;
+        else
+            std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+        BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
         // stop threads and exit
     }
@@ -612,6 +626,13 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
         BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
         BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+
+        auto lostEvent = reas.get_LostEvent();
+        if (lostEvent.has_error())
+            std::cout << "NO EVENT LOSS " << std::endl;
+        else
+            std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+        BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
         // stop threads and exit
     }
