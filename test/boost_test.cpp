@@ -13,6 +13,7 @@
 #include <google/protobuf/util/time_util.h>
 #include <boost/unordered_map.hpp>
 #include <boost/circular_buffer.hpp>
+#include <boost/lockfree/queue.hpp>
 
 #include <boost/pool/object_pool.hpp>
 
@@ -330,5 +331,20 @@ int main()
 
     std::cout << "Head of buffer " << pidSampleBuffer.front() << std::endl;
     std::cout << "Tail of buffer " << pidSampleBuffer.back() << std::endl;
+
+    std::cout << "Test allocate deallocate" << std::endl;
+
+    boost::lockfree::queue<std::pair<int, u_int16_t>*> lostEventsQueue{20};
+
+    std::pair<int, u_int16_t> *evtPtr = new std::pair<int, u_int16_t>(10, 120);
+    lostEventsQueue.push(evtPtr);
+
+    std::pair<int, u_int16_t> *res;
+    while(lostEventsQueue.pop(res))
+    {
+        auto ret = *res;
+        std::cout << "Retrieved " << ret.first << ":" << ret.second << std::endl;
+        delete res;
+    }
 }
 

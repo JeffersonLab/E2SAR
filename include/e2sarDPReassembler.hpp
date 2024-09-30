@@ -499,10 +499,10 @@ namespace e2sar
              */
             inline result<std::pair<EventNum_t, u_int16_t>> get_LostEvent() noexcept
             {
-                std::pair<EventNum_t, u_int16_t> *res;
+                std::pair<EventNum_t, u_int16_t> *res = nullptr;
                 if (recvStats.lostEventsQueue.pop(res))
                 {
-                    auto ret = *res;
+                    auto ret{*res};
                     delete res;
                     return ret;
                 }
