@@ -294,8 +294,8 @@ void init_e2sarCP(py::module_ &m) {
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
 
-    // return connect string
-    lb_manager.def("get_addrstring", &LBManager::get_AddrString, py::return_value_policy::reference);
+    // Return connect string.
+    lb_manager.def("get_addr_string", &LBManager::get_AddrString);
 
     /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
 }

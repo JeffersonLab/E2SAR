@@ -31,7 +31,7 @@ void print_type(const T& param) {
 namespace py = pybind11;
 using namespace e2sar;
 
-// Has to have a wrapper because of the callback function.
+// Must have a wrapper because of the callback function.
 result<int> addToSendQueueWrapper(Segmenter& seg, uint8_t *event, size_t bytes,
                                   int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
                                   std::function<void(boost::any)> callback,
@@ -182,13 +182,23 @@ void init_e2sarDP_reassembler(py::module_ &m)
     reas.def(
         py::init<const EjfatURI &, ip::address, u_int16_t, size_t, const Reassembler::ReassemblerFlags &>(),
         "Init the Reassembler object with number of recv threads.",
-        py::arg("uri"),  // must-have arg when init
+        py::arg("uri"),  // must-have args when init
         py::arg("data_ip"),
         py::arg("starting_port"),
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
-    // Recv events part. return py::tuple.
+    // Constructor with CPU core list.
+    reas.def(
+        py::init<const EjfatURI &, ip::address, u_int16_t, std::vector<int>, const Reassembler::ReassemblerFlags &>(),
+        "Init the Reassembler object with a list of CPU cores.",
+        py::arg("uri"),  // must-have args when init
+        py::arg("data_ip"),
+        py::arg("starting_port"),
+        py::arg("cpu_core_list"),
+        py::arg("rflags") = Reassembler::ReassemblerFlags());
+
+    // Recv events part. Return py::tuple.
     reas.def("getEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes
         ) -> py::tuple {
