@@ -11,11 +11,10 @@ libe2sar_t = static_library('e2sar_t',
                         install : true)
 
 # build one library from the E2SAR and gRPC library pieces
-#libe2sar = static_library('e2sar',
-#                        objects : [libe2sar_t.extract_all_objects(recursive: false),
-#                                   liblbgrpc.extract_all_objects(recursive: false)],
-#			install : true)
-libe2sar = static_library('e2sar', link_whole : [libe2sar_t, liblbgrpc], install : true)
+libe2sar = static_library('e2sar',
+                        objects : [libe2sar_t.extract_all_objects(recursive: false),
+                                   liblbgrpc.extract_all_objects(recursive: false)],
+			install : true)
 
 # The pybind
 subdir('pybind')
