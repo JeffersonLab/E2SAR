@@ -240,8 +240,11 @@ void recvStatsThread(Reassembler *r)
 
         auto stats = r->getStats();
 
-        for(auto res = r->get_LostEvent(); !res.has_error();)
+        while(true)
         {
+            auto res = r->get_LostEvent();
+            if (res.has_error())
+                break;
             lostEvents.push_back(res.value());
         }
         /*

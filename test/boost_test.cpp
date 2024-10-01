@@ -336,8 +336,10 @@ int main()
 
     boost::lockfree::queue<std::pair<int, u_int16_t>*> lostEventsQueue{20};
 
-    std::pair<int, u_int16_t> *evtPtr = new std::pair<int, u_int16_t>(10, 120);
-    lostEventsQueue.push(evtPtr);
+    for(int i=0; i<5; i++)
+    {
+        lostEventsQueue.push(new std::pair<int, u_int16_t>(i, i*10));
+    }
 
     std::pair<int, u_int16_t> *res;
     while(lostEventsQueue.pop(res))
