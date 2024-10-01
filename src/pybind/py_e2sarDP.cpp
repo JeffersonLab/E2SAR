@@ -170,6 +170,9 @@ void init_e2sarDP_reassembler(py::module_ &m)
         .def_readwrite("Ki", &Reassembler::ReassemblerFlags::Ki)
         .def_readwrite("Kp", &Reassembler::ReassemblerFlags::Kp)
         .def_readwrite("Kd", &Reassembler::ReassemblerFlags::Kd)
+        .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)
+        .def_readwrite("min_factor", &Reassembler::ReassemblerFlags::min_factor)
+        .def_readwrite("max_factor", &Reassembler::ReassemblerFlags::max_factor)
         .def_readwrite("setPoint", &Reassembler::ReassemblerFlags::setPoint)
         .def_readwrite("epoch_ms", &Reassembler::ReassemblerFlags::epoch_ms)
         .def_readwrite("portRange", &Reassembler::ReassemblerFlags::portRange)
@@ -268,9 +271,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
-    /// TODO: to be test
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
+
+    // Return type of resultresult<std::pair<EventNum_t, u_int16_t>>
+    reas.def("get_LostEvent", &Reassembler::get_LostEvent);
 
     // Return type of boost::tuple<>: convert to std::tuple
     reas.def("getStats", [](const Reassembler& reasObj) {
