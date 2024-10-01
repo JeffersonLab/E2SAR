@@ -268,7 +268,7 @@ void recvStatsThread(Reassembler *r)
         std::cout << "\tEvents lost so far: ";
         for(auto evt: lostEvents)
         {
-            std::cout << evt.first << ":" << evt.second << " ";
+            std::cout << "<" << evt.first << ":" << evt.second << "> ";
         }
         std::cout << std::endl;
 
