@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/chrono.h>
 #include <google/protobuf/timestamp.pb.h>
+#include <google/protobuf/util/time_util.h>
 
 #include "e2sarUtil.hpp"
 #include "e2sarCP.hpp"
@@ -47,7 +48,16 @@ void init_e2sarCP(py::module_ &m) {
 
     // Expose the grpc classes
     py::class_<WorkerStatus>(e2sarCP, "WorkerStatus")
-        .def(py::init<>());
+        .def(py::init<>())
+        .def("get_name", &WorkerStatus::name)
+        .def("get_fill_percent", &WorkerStatus::fillpercent)
+        .def("get_control_signal", &WorkerStatus::controlsignal)
+        .def("get_slots_assigned", &WorkerStatus::slotsassigned)
+        .def("get_last_updated",
+            [](const WorkerStatus &self) {
+                return google::protobuf::util::TimeUtil::ToString(self.lastupdated());
+            }
+        );
     py::class_<LoadBalancerStatusReply>(e2sarCP, "LoadBalancerStatusReply")
         .def(py::init<>());
     py::class_<OverviewReply>(e2sarCP, "OverviewReply")
@@ -58,7 +68,11 @@ void init_e2sarCP(py::module_ &m) {
         .def("get_seconds", &google::protobuf::Timestamp::seconds)
         .def("get_nanos", &google::protobuf::Timestamp::nanos)
         .def("set_seconds", &google::protobuf::Timestamp::set_seconds)
-        .def("set_nanos", &google::protobuf::Timestamp::set_nanos);
+        .def("set_nanos", &google::protobuf::Timestamp::set_nanos)
+        // pretty print in Python: use TimeUtil::ToString to get the default string representation
+        .def("__str__", [](const google::protobuf::Timestamp& self) {
+            return google::protobuf::util::TimeUtil::ToString(self);
+    });
 
     /**
      * Bindings for struct "LBWorkerStatus"
@@ -78,12 +92,8 @@ void init_e2sarCP(py::module_ &m) {
         .def_readonly("slots_assigned", &LBWorkerStatus::slotsAssigned)
         .def_property_readonly("last_updated",
             [](const LBWorkerStatus &self) {
-                return convert_timestamp_to_python(self.lastUpdated); // Access the member directly
+                return google::protobuf::util::TimeUtil::ToString(self.lastUpdated); // Access the member directly
             }
-            // ,
-            // [](LBWorkerStatus &self, py::object py_timestamp) {
-            //     self.lastUpdated = convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
-            // }
         );
 
     /**
@@ -101,32 +111,25 @@ void init_e2sarCP(py::module_ &m) {
             std::vector<std::string>&,
             google::protobuf::Timestamp>(),
             py::arg("timestamp"),
-            py::arg("currentEpoch"), py::arg("currentPredictedEventNumber"),
-            py::arg("workers"),
+            py::arg("current_epoch"),
+            py::arg("current_predicted_event_number"),
+            py::arg("worker_status_list"),
             py::arg("sender_addresses"),
-            py::arg("expiresAt"))
+            py::arg("expires_at"))
 
         // Expose the struct members
-        .def_property("timestamp",
+        .def_property_readonly(/* a Python string */"timestamp",
             [](const LBStatus &self) {
-                return convert_timestamp_to_python(self.timestamp); // Access the member directly
-            },
-            [](LBStatus &self, py::object py_timestamp) {
-                self.timestamp = convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
+                return google::protobuf::util::TimeUtil::ToString(self.timestamp);
             })
         .def_readonly("currentEpoch", &LBStatus::currentEpoch)
         .def_readonly("currentPredictedEventNumber", &LBStatus::currentPredictedEventNumber)
-        .def_readonly("workers", &LBStatus::workers)
-        .def_readonly("senderAddresses", &LBStatus::senderAddresses)
-        .def_property_readonly("expiresAt",
+        .def_readonly("workerStatusList", &LBStatus::workers)
+        .def_readonly("senderAddressList", &LBStatus::senderAddresses)
+        .def_property_readonly(/* a Python string */"expiresAt",
             [](const LBStatus &self) {
-                return convert_timestamp_to_python(self.expiresAt); // Access the member directly
-            }
-            // ,
-            // [](LBStatus &self, py::object py_timestamp) {
-            //     self.expiresAt= convert_timestamp_to_cpp(py_timestamp); // Assign the converted value
-            // }
-        );
+                return google::protobuf::util::TimeUtil::ToString(self.expiresAt); // Access the member directly
+            });
     
     /**
      * Bindings for struct "OverviewEntry"
@@ -149,9 +152,10 @@ void init_e2sarCP(py::module_ &m) {
 
     // Constructor
     lb_manager.def(
-        py::init<const EjfatURI &, bool, grpc::SslCredentialsOptions>(),
+        py::init<const EjfatURI &, bool, bool, grpc::SslCredentialsOptions>(),
         py::arg("cpuri"),
         py::arg("validate_server") = true,
+        py::arg("use_host_address") = false,
         py::arg("opts") = grpc::SslCredentialsOptions()
     );
 
@@ -277,7 +281,7 @@ void init_e2sarCP(py::module_ &m) {
     /**
      * Return type containing result<std::unique_ptr<OverviewReply>>
      */
-        lb_manager.def(
+    lb_manager.def(
         "get_lb_overview",
         [](LBManager& self){
             auto result = self.overview();
@@ -289,6 +293,9 @@ void init_e2sarCP(py::module_ &m) {
 
     // Return an EjfatURI object.
     lb_manager.def("get_uri", &LBManager::get_URI, py::return_value_policy::reference);
+
+    // Return connect string.
+    lb_manager.def("get_addr_string", &LBManager::get_AddrString);
 
     /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
 }

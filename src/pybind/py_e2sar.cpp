@@ -129,7 +129,10 @@ void init_e2sarResultTypes(py::module_ &m)
     bind_result<std::string>(m, "E2SARResultString");
     bind_result<EjfatURI>(m, "E2SARResultEjfatURI");
     bind_result<grpc::SslCredentialsOptions>(m, "E2SARResultSslCredentialsOptions");
-    bind_result<u_int32_t>(m, "E2SARResultUInit32");
+    bind_result<u_int32_t>(m, "E2SARResultUInt32");
     bind_result<std::pair<boost::asio::ip::address, uint16_t>>(m, "E2SARResultPairIP");
     bind_result<std::pair<std::string, uint16_t>>(m, "E2SARResultPairString");
+    bind_result<std::pair<u_int64_t, uint16_t>>(m, "E2SARResultPairUInt64");
+    bind_result<Reassembler::ReassemblerFlags>(m, "E2SARResultReassemblerFlags");
+    bind_result<Segmenter::SegmenterFlags>(m, "E2SARResultSegmenterFlags");
 }

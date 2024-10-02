@@ -1,5 +1,8 @@
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/detail/file_parser_error.hpp>
+#include <iostream>
 
 #include "portable_endian.h"
 
@@ -31,17 +34,18 @@ namespace e2sar
             error, integral);  // control output
     }
 
-    Reassembler::Reassembler(const EjfatURI &uri, std::vector<int> cpuCoreList,
+    Reassembler::Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
+        std::vector<int> cpuCoreList,
         const ReassemblerFlags &rflags):
         dpuri(uri),
-        lbman(dpuri, rflags.validateCert),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{cpuCoreList}, 
-        dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)},
-        dataPort{(rflags.dpV6 ? uri.get_dataAddrv6().value().second : uri.get_dataAddrv4().value().second)},
-        dpV6{rflags.dpV6},
+        dataIP{data_ip},
+        dataPort{starting_port},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
@@ -50,7 +54,7 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         condLock{recvThreadMtx},
-        sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
+        sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
         sanityChecks();
@@ -64,17 +68,17 @@ namespace e2sar
         assignPortsToThreads();
     }
 
-    Reassembler::Reassembler(const EjfatURI &uri, size_t numRecvThreads,
-        const ReassemblerFlags &rflags):
+    Reassembler::Reassembler(const EjfatURI &uri,  ip::address data_ip, u_int16_t starting_port,
+        size_t numRecvThreads, const ReassemblerFlags &rflags):
         dpuri(uri),
-        lbman(dpuri, rflags.validateCert),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
         epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
         cpuCoreList{std::vector<int>()}, // no core list given
-        dataIP{(rflags.dpV6 ? uri.get_dataAddrv6().value().first : uri.get_dataAddrv4().value().first)},
-        dataPort{(rflags.dpV6 ? uri.get_dataAddrv6().value().second : uri.get_dataAddrv4().value().second)},
-        dpV6{rflags.dpV6},
+        dataIP{data_ip},
+        dataPort{starting_port},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
@@ -83,7 +87,7 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         condLock{recvThreadMtx},
-        sendStateThreadState(*this, rflags.cpV6, rflags.period_ms),
+        sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
         sanityChecks();
@@ -132,8 +136,6 @@ namespace e2sar
     void Reassembler::RecvThreadState::_threadBody()
     {
 
-        std::set<EventNum_t> activeEventNumbers{};
-
         while(!reas.threadsStop)
         {
             fd_set curSet{fdSet};
@@ -149,13 +151,14 @@ namespace e2sar
                 auto inWaiting = nowT - it->second->firstSegment;
                 auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                 if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
+                    // check if this event number has been seen as lost
+                    logLostEvent(it->first);
                     // deallocate event (ood queue and event buffer)
                     it->second->cleanup(recvBufferPool);
                     delete it->second->event;
                     // deallocate queue item
                     delete it->second;
                     it = eventsInProgress.erase(it);  // erase returns the next element (or end())
-                    reas.recvStats.enqueueLoss++;
                 } else {
                     ++it;  // Just advance the iterator if no deletion
                 }
@@ -294,7 +297,14 @@ namespace e2sar
                     eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
 
                     // queue it up for the user to receive
-                    reas.enqueue(item);
+                    auto ret = reas.enqueue(item);
+                    // event lost on enqueuing
+                    if (ret == 1) 
+                    {
+                        logLostEvent(std::make_pair(item->eventNum, item->dataId));
+                        // free up the item
+                        delete item;
+                    }
 
                     // update statistics
                     reas.recvStats.eventSuccess++;
@@ -391,12 +401,23 @@ namespace e2sar
 
     void Reassembler::SendStateThreadState::_threadBody()
     {
+        // get the time
+        auto nowT = boost::chrono::high_resolution_clock::now();
+        auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+        UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
+
+        // create first PID sample with 0 error and integral values
+        PIDSample newSample{currentTimeMicros, 0.0, 0.0};
+        // push a new entry onto the circular buffer ejecting the oldest
+        reas.pidSampleBuffer.push_back(newSample);
+
+        // wait before entering the loop
+        auto until = nowT + boost::chrono::milliseconds(period_ms);
+        boost::this_thread::sleep_until(until);
+
         while(!reas.threadsStop)
         {
             // periodically send state to control plane sampling the queue state
-
-            // Get the current time point
-            auto nowT = boost::chrono::high_resolution_clock::now();
 
             // principle of operation:
             // CP requires PID signal and queue fill state in order to come up
@@ -414,38 +435,37 @@ namespace e2sar
             //
             // fillPercent is always reported as sampled in the current moment
 
-            // if there are no samples in the buffer just skip
-            if (reas.pidSampleBuffer.end() != reas.pidSampleBuffer.begin())
+            // Get the current time point
+            auto nowT = boost::chrono::high_resolution_clock::now();
+            auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+            UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
+
+            // at 100msec period and depth of 10 this should normally be about 1 sec
+            auto deltaTfloat = static_cast<float>(currentTimeMicros - 
+                reas.pidSampleBuffer.front().sampleTime)/1000000.;
+
+            // sample queue state
+            auto fillPercent = static_cast<float>(static_cast<float>(reas.eventQueueDepth)/static_cast<float>(reas.QSIZE));
+            // get PID terms (PID value, error, integral accumulator)
+            auto PIDTuple = pid<float>(reas.setPoint, fillPercent,  
+                deltaTfloat, reas.Kp, reas.Ki, reas.Kd, 
+                reas.pidSampleBuffer.front().error,
+                reas.pidSampleBuffer.back().integral);
+
+            // create new PID sample using last error and integral accumulated value
+            PIDSample newSample{currentTimeMicros, PIDTuple.get<1>(), PIDTuple.get<2>()};
+            // push a new entry onto the circular buffer ejecting the oldest
+            reas.pidSampleBuffer.push_back(newSample);
+
+            // send update to CP
+            auto res = reas.lbman.sendState(fillPercent, PIDTuple.get<0>(), true);
+            if (res.has_error())
             {
-                auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
-                UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
-
-                // at 100msec period and depth of 10 this should normally be about 1 sec
-                auto deltaTfloat = static_cast<float>(currentTimeMicros - 
-                    reas.pidSampleBuffer.begin()->sampleTime)/1000000.;
-
-                // sample queue state
-                auto fillPercent = static_cast<float>(static_cast<float>(reas.eventQueueDepth)/static_cast<float>(reas.QSIZE));
-                // get PID terms (PID value, error, integral accumulator)
-                auto PIDTuple = pid<float>(reas.setPoint, fillPercent,  
-                    deltaTfloat, reas.Kp, reas.Ki, reas.Kd, 
-                    reas.pidSampleBuffer.begin()->error,
-                    reas.pidSampleBuffer.end()->integral);
-
-                // create new PID sample using last error and integral accumulated value
-                PIDSample newSample{currentTimeMicros, PIDTuple.get<1>(), PIDTuple.get<2>()};
-                // push a new entry onto the circular buffer ejecting the oldest
-                reas.pidSampleBuffer.push_back(newSample);
-
-                // send update to CP
-                auto res = reas.lbman.sendState(fillPercent, PIDTuple.get<0>(), true);
-                if (res.has_error())
-                {
-                    // update error counts
-                    reas.recvStats.grpcErrCnt++;
-                    reas.recvStats.lastE2SARError = res.error().code();
-                }
+                // update error counts
+                reas.recvStats.grpcErrCnt++;
+                reas.recvStats.lastE2SARError = res.error().code();
             }
+
 
             // sleep approximately so we wake up every ~100ms
             auto until = nowT + boost::chrono::milliseconds(period_ms);
@@ -453,8 +473,7 @@ namespace e2sar
         }
     }
 
-    result<int> Reassembler::registerWorker(const std::string &node_name, float weight, 
-        float min_factor, float max_factor) noexcept 
+    result<int> Reassembler::registerWorker(const std::string &node_name) noexcept 
     {
         if (useCP)
         {
@@ -522,5 +541,44 @@ namespace e2sar
         // just rely on its locking
         delete eventItem;
         return 0;
+    }
+
+    result<Reassembler::ReassemblerFlags> Reassembler::ReassemblerFlags::getFromINI(const std::string &iniFile) noexcept
+    {
+        boost::property_tree::ptree paramTree;
+        Reassembler::ReassemblerFlags rFlags;
+
+        try {
+            boost::property_tree::ini_parser::read_ini(iniFile, paramTree);
+        } catch(boost::property_tree::ini_parser_error &ie) {
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, 
+                "Unable to parse the reassembler flags configuration file "s + iniFile};
+        }
+
+        // general
+        rFlags.useCP = paramTree.get<bool>("general.useCP", rFlags.useCP);
+
+        // control plane
+        rFlags.useHostAddress = paramTree.get<bool>("control-plane.useHostAddress", rFlags.useHostAddress);
+        rFlags.validateCert = paramTree.get<bool>("control-plane.validateCert", rFlags.validateCert);
+
+        // data plane
+        rFlags.portRange = paramTree.get<int>("data-plane.portRange", rFlags.portRange);
+        rFlags.withLBHeader = paramTree.get<bool>("data-plane.withLBHeader", rFlags.withLBHeader);
+        rFlags.eventTimeout_ms = paramTree.get<int>("data-plane.eventTimeoutMS", rFlags.eventTimeout_ms);
+        rFlags.rcvSocketBufSize = paramTree.get<int>("data-plane.rcvSocketBufSize", rFlags.rcvSocketBufSize);
+        rFlags.epoch_ms = paramTree.get<u_int32_t>("data-plane.epochMS", rFlags.epoch_ms);
+        rFlags.period_ms = paramTree.get<u_int16_t>("data-plane.periodMS", rFlags.period_ms);
+
+        // PID parameters
+        rFlags.setPoint = paramTree.get<float>("pid.setPoint", rFlags.setPoint);
+        rFlags.Ki = paramTree.get<float>("pid.Ki", rFlags.Ki);
+        rFlags.Kp = paramTree.get<float>("pid.Kp", rFlags.Kp);
+        rFlags.Kd = paramTree.get<float>("pid.Kd", rFlags.Kd);
+        rFlags.Kd = paramTree.get<float>("pid.weight", rFlags.Kd);
+        rFlags.Kd = paramTree.get<float>("pid.min_factor", rFlags.Kd);
+        rFlags.Kd = paramTree.get<float>("pid.max_factor", rFlags.Kd);
+
+        return rFlags;
     }
 }

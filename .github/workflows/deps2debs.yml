@@ -3,7 +3,7 @@ name: Build gRPC+Boost .deb and .rpms
 on:
   workflow_dispatch:
 env:
-  E2SAR_VER: 0.1.1
+  E2SAR_VER: 0.1.2
   DEPS_VER: 1.85.0-boost-1.54.1-grpc
   FINAL_INSTALL: /usr/local
 
@@ -67,7 +67,7 @@ jobs:
           if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
             fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-           fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
+           fpm -s tar -t rpm -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           fi
 
       - name: Upload artifacts

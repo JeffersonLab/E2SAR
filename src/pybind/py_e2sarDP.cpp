@@ -31,7 +31,7 @@ void print_type(const T& param) {
 namespace py = pybind11;
 using namespace e2sar;
 
-// Has to have a wrapper because of the callback function.
+// Must have a wrapper because of the callback function.
 result<int> addToSendQueueWrapper(Segmenter& seg, uint8_t *event, size_t bytes,
                                   int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
                                   std::function<void(boost::any)> callback,
@@ -77,7 +77,9 @@ void init_e2sarDP_segmenter(py::module_ &m)
         .def_readwrite("syncPeriodMs", &Segmenter::SegmenterFlags::syncPeriodMs)
         .def_readwrite("syncPeriods", &Segmenter::SegmenterFlags::syncPeriods)
         .def_readwrite("mtu", &Segmenter::SegmenterFlags::mtu)
-        .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets);
+        .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets)
+        .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
+        .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
     // Constructor
     seg.def(
@@ -161,29 +163,45 @@ void init_e2sarDP_reassembler(py::module_ &m)
     // Bind the ReassemblerFlags struct as a nested class of Reassembler
     py::class_<Reassembler::ReassemblerFlags>(m, "ReassemblerFlags")
         .def(py::init<>())  // The default values will be the same in Python after binding.
-        .def_readwrite("dpV6", &Reassembler::ReassemblerFlags::dpV6)
-        .def_readwrite("cpV6", &Reassembler::ReassemblerFlags::cpV6)
         .def_readwrite("useCP", &Reassembler::ReassemblerFlags::useCP)
+        .def_readwrite("useHostAddress", &Reassembler::ReassemblerFlags::useHostAddress)
         .def_readwrite("period_ms", &Reassembler::ReassemblerFlags::period_ms)
         .def_readwrite("validateCert", &Reassembler::ReassemblerFlags::validateCert)
         .def_readwrite("Ki", &Reassembler::ReassemblerFlags::Ki)
         .def_readwrite("Kp", &Reassembler::ReassemblerFlags::Kp)
         .def_readwrite("Kd", &Reassembler::ReassemblerFlags::Kd)
+        .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)
+        .def_readwrite("min_factor", &Reassembler::ReassemblerFlags::min_factor)
+        .def_readwrite("max_factor", &Reassembler::ReassemblerFlags::max_factor)
         .def_readwrite("setPoint", &Reassembler::ReassemblerFlags::setPoint)
         .def_readwrite("epoch_ms", &Reassembler::ReassemblerFlags::epoch_ms)
         .def_readwrite("portRange", &Reassembler::ReassemblerFlags::portRange)
         .def_readwrite("withLBHeader", &Reassembler::ReassemblerFlags::withLBHeader)
-        .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms);
+        .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms)
+        .def_readwrite("rcvSocketBufSize", &Reassembler::ReassemblerFlags::rcvSocketBufSize)
+        .def("getFromINI", &Reassembler::ReassemblerFlags::getFromINI);
 
     // Constructor
     reas.def(
-        py::init<const EjfatURI &, size_t, const Reassembler::ReassemblerFlags &>(),
+        py::init<const EjfatURI &, ip::address, u_int16_t, size_t, const Reassembler::ReassemblerFlags &>(),
         "Init the Reassembler object with number of recv threads.",
-        py::arg("uri"),  // must-have arg when init
+        py::arg("uri"),  // must-have args when init
+        py::arg("data_ip"),
+        py::arg("starting_port"),
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
-    // Recv events part. return py::tuple.
+    // Constructor with CPU core list.
+    reas.def(
+        py::init<const EjfatURI &, ip::address, u_int16_t, std::vector<int>, const Reassembler::ReassemblerFlags &>(),
+        "Init the Reassembler object with a list of CPU cores.",
+        py::arg("uri"),  // must-have args when init
+        py::arg("data_ip"),
+        py::arg("starting_port"),
+        py::arg("cpu_core_list"),
+        py::arg("rflags") = Reassembler::ReassemblerFlags());
+
+    // Recv events part. Return py::tuple.
     reas.def("getEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes
         ) -> py::tuple {
@@ -253,9 +271,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
-    /// TODO: to be test
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
+
+    // Return type of resultresult<std::pair<EventNum_t, u_int16_t>>
+    reas.def("get_LostEvent", &Reassembler::get_LostEvent);
 
     // Return type of boost::tuple<>: convert to std::tuple
     reas.def("getStats", [](const Reassembler& reasObj) {

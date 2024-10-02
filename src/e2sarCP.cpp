@@ -709,7 +709,7 @@ namespace e2sar
 
     result<grpc::SslCredentialsOptions> LBManager::makeSslOptionsFromFiles(std::string_view pem_root_certs,
                                                                            std::string_view pem_private_key,
-                                                                           std::string_view pem_cert_chain)
+                                                                           std::string_view pem_cert_chain) noexcept
     {
         auto root = read_file(pem_root_certs);
         auto priv = read_file(pem_private_key);
@@ -726,7 +726,7 @@ namespace e2sar
 
     // just the server root cert (useful for self-signed)
     result<grpc::SslCredentialsOptions> LBManager::makeSslOptionsFromFiles(
-            std::string_view pem_root_certs)
+            std::string_view pem_root_certs) noexcept
     {
         auto root = read_file(pem_root_certs);
 

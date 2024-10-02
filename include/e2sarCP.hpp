@@ -120,6 +120,7 @@ namespace e2sar
     {
     private:
         EjfatURI _cpuri;
+        std::string addr_string;
         std::unique_ptr<LoadBalancer::Stub> _stub;
         std::shared_ptr<grpc::Channel> _channel;
 
@@ -131,16 +132,22 @@ namespace e2sar
          * use makeSslOptions[FromFiles]() methods and pass the output to this constructor.
          * @param cpuri an EjfatURI object parsed from configuration data
          * @param validateServer if false, skip server certificate validation (useful for self-signed testing)
+         * @param useHostAddress even if hostname is provided, use host address as resolved by URI object (with preference for 
+         * IPv4 by default or for IPv6 if explicitly requested)
          * @param opts grpc::SslCredentialsOptions containing some combination of server root certs, client key and client cert
          * use of SSL/TLS is governed by the URI scheme ('ejfat' vs 'ejfats')
          */
-        LBManager(const EjfatURI &cpuri, bool validateServer = true,
+        LBManager(const EjfatURI &cpuri, bool validateServer = true, bool useHostAddress = false,
                   grpc::SslCredentialsOptions opts = grpc::SslCredentialsOptions()) : _cpuri(cpuri)
         {
 
             auto cp_host_r = cpuri.get_cpHost();
-            std::string addr_string;
-            if (!cp_host_r.has_error())
+
+            // using host address automatically disables cert validation
+            if (useHostAddress)
+                validateServer = false;
+
+            if (!useHostAddress && !cp_host_r.has_error())
             {
                 // try hostname
                 auto cp_host_v = cp_host_r.value();
@@ -153,7 +160,10 @@ namespace e2sar
                 if (cp_addr_r.has_error())
                     throw E2SARException("Unable to initialize LBManager due to missing CP address in URI");
                 auto cp_addr_v = cp_addr_r.value();
-                addr_string = cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
+                if (cp_addr_v.first.is_v4())
+                    addr_string = "ipv4:///" + cp_addr_v.first.to_string() + ":" + std::to_string(cp_addr_v.second);
+                else
+                    addr_string = "ipv6:///[" + cp_addr_v.first.to_string() + "]:" + std::to_string(cp_addr_v.second);
             }
 
             if (cpuri.get_useTls())
@@ -500,7 +510,7 @@ namespace e2sar
          */
         static inline result<grpc::SslCredentialsOptions> makeSslOptions(const std::string &pem_root_certs,
                                                                          const std::string &pem_private_key,
-                                                                         const std::string &pem_cert_chain)
+                                                                         const std::string &pem_cert_chain) noexcept
         {
             return grpc::SslCredentialsOptions{std::move(pem_root_certs),
                                                std::move(pem_private_key),
@@ -519,14 +529,24 @@ namespace e2sar
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
             std::string_view pem_root_certs,
             std::string_view pem_private_key,
-            std::string_view pem_cert_chain);
+            std::string_view pem_cert_chain) noexcept;
 
         /**
          * Generate gRPC-compliant custom SSL Options object with just the server root cert 
          * @param pem_root_certs - The file name containing the PEM encoding of the server root certificate.
          */
         static result<grpc::SslCredentialsOptions> makeSslOptionsFromFiles(
-            std::string_view pem_root_certs);
+            std::string_view pem_root_certs) noexcept;
+
+        /**
+         * Return the address string used by gRPC to connect to control plane. Can be
+         * in the format of hostname:port or ipv4:///W.X.Y.Z:port or ipv6:///[XXXX::XX:XXXX]:port
+         * 
+         * @return the string containing the address
+         */
+        inline std::string get_AddrString() {
+            return addr_string;
+        }
     };
 
     /**

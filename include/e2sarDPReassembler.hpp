@@ -14,6 +14,7 @@
 #include <boost/asio/ip/udp.hpp>
 #include <boost/variant.hpp>
 #include <boost/heap/priority_queue.hpp>
+#include <boost/container/flat_set.hpp>
 
 #include <sys/select.h>
 
@@ -129,6 +130,8 @@ namespace e2sar
                 std::atomic<int> dataErrCnt{0};
                 // last e2sar error
                 std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
+                // a limited queue to push lost event numbers to
+                boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
             };
             AtomicStats recvStats;
 
@@ -137,16 +140,20 @@ namespace e2sar
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
             std::atomic<size_t> eventQueueDepth{0};
 
-            // push event on the event queue
-            inline void enqueue(EventQueueItem* item) noexcept
+            // push event on the common event queue
+            // return 1 if event is lost, 0 on success
+            inline int enqueue(EventQueueItem* item) noexcept
             {
+                int ret = 0;
                 if (eventQueue.push(item))
                     eventQueueDepth++;
                 else 
-                    recvStats.enqueueLoss++; // event lost, queue was full
+                    ret = 1; // event lost, queue was full
                 // queue is lock free so we don't lock
                 recvThreadCond.notify_all();
+                return ret;
             }
+
             // pop event off the event queue
             inline EventQueueItem* dequeue() noexcept
             {
@@ -166,6 +173,9 @@ namespace e2sar
             const float Kp; // PID proportional
             const float Ki; // PID integral
             const float Kd; // PID derivative
+            const float weight; // processing power factor
+            const float min_factor;  
+            const float max_factor;
             struct PIDSample {
                 UnixTimeMicro_t sampleTime; // in usec since epoch
                 float error;
@@ -206,6 +216,8 @@ namespace e2sar
                 // segments are transmitted, they are guarangeed to go
                 // to the same port
                 boost::unordered_map<std::pair<EventNum_t, u_int16_t>, EventQueueItem*, pair_hash, pair_equal> eventsInProgress;
+                // thread local instance of events we lost
+                boost::container::flat_set<std::pair<EventNum_t, u_int16_t>> lostEvents;
 
                 // CPU core ids
                 std::vector<int> cpuCoreList;
@@ -225,15 +237,29 @@ namespace e2sar
                 result<int> _close();
                 // thread loop
                 void _threadBody();
+
+                // log a lost event via a set of known lost
+                // and add to lost queue for external inspection
+                inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt)
+                {
+                    if (lostEvents.contains(evt))
+                        return;
+                    // this is thread-local
+                    lostEvents.insert(evt);
+                    // lockfree queue (only takes trivial types)
+                    std::pair<EventNum_t, u_int16_t> *evtPtr = new std::pair<EventNum_t, u_int16_t>(evt.first, evt.second);
+                    reas.recvStats.lostEventsQueue.push(evtPtr);
+                    // this is atomic
+                    reas.recvStats.enqueueLoss++;
+                }
             };
             friend struct RecvThreadState;
             std::list<RecvThreadState> recvThreadState;
 
             // receive related parameters
             const std::vector<int> cpuCoreList;
-            const ip::address dataIP; // from URI
-            const u_int16_t dataPort; // starting receive port from URI
-            const bool dpV6; // prefer V6 over v4 address from URI
+            const ip::address dataIP; 
+            const u_int16_t dataPort; 
             const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
             const size_t numRecvPorts;
@@ -274,14 +300,12 @@ namespace e2sar
                 boost::thread threadObj;
 
                 const u_int16_t period_ms;
-                // flags
-                const bool useV6;
 
                 // UDP sockets
                 int socketFd{0};
 
-                inline SendStateThreadState(Reassembler &r, bool v6, u_int16_t period_ms): 
-                    reas{r}, period_ms{period_ms}, useV6{v6}
+                inline SendStateThreadState(Reassembler &r, u_int16_t period_ms): 
+                    reas{r}, period_ms{period_ms}
                 {}
 
                 // thread loop. all important behavior is encapsulated inside LBManager
@@ -319,9 +343,8 @@ namespace e2sar
         public:
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
-             * - dpV6 - prefer the IPv6 address/port in the URI data address. Reassembler will bind to IPv6 instead of IPv4 address. {false}
-             * - cpV6 - use IPv6 address if cp node specified by name and has IPv4 and IPv6 resolution {false}
              * - useCP - whether to use the control plane (sendState, registerWorker) {true}
+             * - useHostAddress - use IPv4 or IPv6 address for gRPC even if hostname is specified (disables cert validation) {false}
              * - period_ms - period of the send state thread in milliseconds {100}
              * - epoch_ms - period of one epoch in milliseconds {1000}
              * - Ki, Kp, Kd - PID gains (integral, proportional and derivative) {0., 0., 0.}
@@ -336,12 +359,16 @@ namespace e2sar
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              * - rcvSocketBufSize - socket buffer size for receiving set via SO_RCVBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.rmem_max) to be higher. {3MB}
+             * - weight - weight given to this node in terms of processing power
+             * - min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
+             * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
+             * - max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
+             * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
              */
             struct ReassemblerFlags 
             {
-                bool dpV6;
-                bool cpV6;
                 bool useCP;
+                bool useHostAddress;
                 u_int16_t period_ms;
                 bool validateCert;
                 float Ki, Kp, Kd, setPoint;
@@ -350,10 +377,16 @@ namespace e2sar
                 bool withLBHeader;
                 int eventTimeout_ms;
                 int rcvSocketBufSize; 
-                ReassemblerFlags(): dpV6{false}, cpV6{false}, useCP{true}, 
+                float weight, min_factor, max_factor;
+                ReassemblerFlags(): useCP{true}, useHostAddress{false},
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
-                    rcvSocketBufSize{1024*1024*3} {}
+                    rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0} {}
+                /**
+                 * Initialize flags from an INI file
+                 * @param iniFile - path to the INI file
+                 */
+                static result<Reassembler::ReassemblerFlags> getFromINI(const std::string &iniFile) noexcept;
             };
             /**
              * Create a reassembler object to run receive on a specific set of CPU cores
@@ -362,20 +395,25 @@ namespace e2sar
              * the number of cores on the list. For the started receive threads affinity will be 
              * set to these cores. 
              * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
+             * @param data_ip - IP address (v4 or v6) on which we are listening
+             * @param starting_port - starting port number on which we are listening
              * @param cpuCoreList - list of core identifiers to be used for receive threads
              * @param rflags - optional ReassemblerFlags structure with additional flags
              */
-            Reassembler(const EjfatURI &uri, std::vector<int> cpuCoreList, 
+            Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
+                        std::vector<int> cpuCoreList, 
                         const ReassemblerFlags &rflags = ReassemblerFlags());
             /**
              * Create a reassembler object to run on a specified number of receive threads
              * without taking into account thread-to-CPU and CPU-to-NUMA affinity.
              * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
+             * @param data_ip - IP address (v4 or v6) on which we are listening
+             * @param starting_port - starting port number on which we are listening
              * @param numRecvThreads - number of threads 
              * @param rflags - optional ReassemblerFlags structure with additional flags
              */
-            Reassembler(const EjfatURI &uri, size_t numRecvThreads = 1, 
-                        const ReassemblerFlags &rflags = ReassemblerFlags());
+            Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
+                        size_t numRecvThreads = 1, const ReassemblerFlags &rflags = ReassemblerFlags());
             Reassembler(const Reassembler &r) = delete;
             Reassembler & operator=(const Reassembler &o) = delete;
             ~Reassembler()
@@ -398,14 +436,9 @@ namespace e2sar
             /**
              * Register a worker with the control plane 
              * @param node_name - name of this node (any unique string)
-             * @param weight - weight given to this node in terms of processing power
-             * @param min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
-             * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
-             * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
-             * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
              * @return - 0 on success or an error condition
              */
-            result<int> registerWorker(const std::string &node_name, float weight, float min_factor, float max_factor) noexcept;
+            result<int> registerWorker(const std::string &node_name) noexcept;
 
             /**
              * Deregister this worker
@@ -458,6 +491,23 @@ namespace e2sar
                     recvStats.enqueueLoss, recvStats.eventSuccess,
                     recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
                     recvStats.lastE2SARError);
+            }
+
+            /**
+             * Try to pop an event number of a lost event from the queue that stores them
+             * @return result with either (eventNumber,dataId) or E2SARErrorc::NotFound if queue is empty
+             */
+            inline result<std::pair<EventNum_t, u_int16_t>> get_LostEvent() noexcept
+            {
+                std::pair<EventNum_t, u_int16_t> *res = nullptr;
+                if (recvStats.lostEventsQueue.pop(res))
+                {
+                    auto ret{*res};
+                    delete res;
+                    return ret;
+                }
+                else
+                    return E2SARErrorInfo{E2SARErrorc::NotFound, "Lost event queue is empty"};
             }
 
             /**

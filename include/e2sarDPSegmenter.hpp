@@ -286,6 +286,11 @@ namespace e2sar
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
                     useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
+                /**
+                 * Initialize flags from an INI file
+                 * @param iniFile - path to the INI file
+                 */
+                static result<SegmenterFlags> getFromINI(const std::string &iniFile) noexcept;
             };
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
