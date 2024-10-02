@@ -14,10 +14,14 @@ ENV HOME=/home/ubuntu
 ENV LD_LIBRARY_PATH=$HOME/grpc-install/lib/:$HOME/boost-install/lib
 ENV PATH=$HOME/grpc-install/bin:$PATH
 ENV E2SARINSTALL=/e2sar-install
+ENV E2SAR_DEPS_DEB=E2SAR-main-0.1.2-ubuntu-22.04/e2sar-deps_0.1.2_amd64.deb
+ENV E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
 
-RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb
+RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb wget
 
 RUN pip3 install pybind11 scapy meson
+
+RUN wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && dpkg -i ./boost_grpc.deb
 
 #
 # Stage 'compile'
@@ -31,10 +35,8 @@ COPY . /src/
 # blow away build/ if it got copied by accident
 RUN rm -rf build/
 
-# untar boost and grpc
-RUN mkdir -p $E2SARINSTALL && mkdir -p $HOME && tar -zxf /src/binary_artifacts/grpc-v1.54.1-$DISTRO.tar.gz -C $HOME && tar -zxf /src/binary_artifacts/boost-v1.85.0-$DISTRO.tar.gz -C $HOME
-
 # create a build configuration
+RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY_PATH=/usr/local/lib/ meson setup -Dpkg_config_path=/usr/local/lib/pkgconfig/:/usr/lib/lib64/pkgconfig/ --prefix  ${E2SARINSTALL} build && sed -i 's/-std=c++11//g' build/build.ninja
 RUN BOOST_ROOT=$HOME/boost-install meson setup -Dpkg_config_path=$HOME/grpc-install/lib/pkgconfig/:$HOME/grpc-install/lib64/pkgconfig/ --prefix $E2SARINSTALL build
 
 # compile
