@@ -137,12 +137,12 @@ There are several Docker files in the root of the source tree. They build variou
 
 To build [this docker](Dockerfile.cli) use the following command:
 ```
-$ docker build -t cli -f Dockerfile.cli .
+$ docker build --platform linux/amd64 -t cli -f Dockerfile.cli .
 ```
 If you are building for the Docker Hub, then
 ```
 $ docker login
-$ docker build -t <username>/<repo>:<version> [-t <username>/<repo>:latest] -f Dockerfile.cli .
+$ docker build --platform linux/amd64 -t <username>/<repo>:<version> [-t <username>/<repo>:latest] -f Dockerfile.cli .
 $ docker push <username>/<repo>:<version>
 $ docker push <username>/<repo>:latest
 ```

@@ -11,8 +11,9 @@ FROM ubuntu:22.04 AS base
 
 ENV DISTRO=ubuntu22
 ENV HOME=/home/ubuntu
-ENV LD_LIBRARY_PATH=$HOME/grpc-install/lib/:$HOME/boost-install/lib
-ENV PATH=$HOME/grpc-install/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+ENV PATH=/usr/local/bin:$PATH
 ENV E2SARINSTALL=/e2sar-install
 ENV E2SAR_DEPS_DEB=E2SAR-main-0.1.2-ubuntu-22.04/e2sar-deps_0.1.2_amd64.deb
 ENV E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
@@ -36,8 +37,8 @@ COPY . /src/
 RUN rm -rf build/
 
 # create a build configuration
-RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY_PATH=/usr/local/lib/ meson setup -Dpkg_config_path=/usr/local/lib/pkgconfig/:/usr/lib/lib64/pkgconfig/ --prefix  ${E2SARINSTALL} build && sed -i 's/-std=c++11//g' build/build.ninja
-RUN BOOST_ROOT=$HOME/boost-install meson setup -Dpkg_config_path=$HOME/grpc-install/lib/pkgconfig/:$HOME/grpc-install/lib64/pkgconfig/ --prefix $E2SARINSTALL build
+RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY_PATH=${LD_LIBRARY_PATH} meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix  ${E2SARINSTALL} build && sed -i 's/-std=c++11//g' build/build.ninja
+RUN BOOST_ROOT=/usr/local meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix ${E2SARINSTALL} build
 
 # compile
 RUN meson compile -C build
@@ -50,13 +51,13 @@ RUN meson install -C build
 #
 FROM base AS deploy
 
-WORKDIR $E2SARINSTALL
-ENV PATH=$E2SARINSTALL/bin:$PATH
+WORKDIR ${E2SARINSTALL}
+ENV PATH=${E2SARINSTALL}/bin:$PATH
 
 COPY --from=compile $E2SARINSTALL $E2SARINSTALL
 COPY --from=compile $HOME $HOME
 
 # Remove include files and gRPC stub
-RUN rm -rf $E2SARINSTALL/include/
+RUN rm -rf ${E2SARINSTALL}/include/
 
 CMD ["lbadm"]
