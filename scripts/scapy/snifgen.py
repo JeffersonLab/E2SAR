@@ -275,7 +275,11 @@ if __name__ == "__main__":
                 send(p)
     elif args.listen:
         # craft a filter
-        listeningPorts = [x + args.port for x in range(0, args.nports)]
+        listeningPorts = list()
+        if args.lbre or args.re or args.lbresync:
+            listeningPorts = [x + args.port for x in range(0, args.nports)]
+        if args.sync or args.lbresync:
+            listeningPorts.append(args.syncport)
         portFilter = "or".join([f" dst port {port} " for port in listeningPorts])
         if args.ip:
             filter = f'udp and dst host {args.ip} and \\( {portFilter} \\)'
