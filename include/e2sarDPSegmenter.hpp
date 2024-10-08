@@ -94,8 +94,10 @@ namespace e2sar
             boost::atomic<UnixTimeNano_t> currentSyncStartNano{0};
             boost::atomic<EventNum_t> eventsInCurrentSync{0};
 
-            // current event number
-            boost::atomic<EventNum_t> eventNum{0};
+            // currently assigned event number at enqueuing
+            boost::atomic<EventNum_t> assignedEventNum{0};
+            // current event number being sent
+            boost::atomic<EventNum_t> sentEventNum{0};
 
             //
             // atomic struct for stat information for sync and send threads
@@ -453,7 +455,9 @@ namespace e2sar
             // never changes past initialization
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
-                hdr->set(eventSrcId, eventNum, eventRate, tnano);
+                // we use sentEventNum which is updated by the send thread to be
+                // more accurate about event numbers being seen by LB
+                hdr->set(eventSrcId, sentEventNum, eventRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it

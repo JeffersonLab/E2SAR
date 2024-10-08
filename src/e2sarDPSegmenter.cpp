@@ -490,6 +490,9 @@ namespace e2sar
         u_int8_t *eventEnd = event + bytes;
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
+        // update the event number being reported in Sync packets
+        seg.sentEventNum = eventNum;
+
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
         {
@@ -564,12 +567,12 @@ namespace e2sar
         freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
-            eventNum.exchange(_eventNum);
+            assignedEventNum.exchange(_eventNum);
 
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
         // continue incrementing
-            eventNum++, 
+            assignedEventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
             entropy);
     }
@@ -583,7 +586,7 @@ namespace e2sar
         freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
-            eventNum.exchange(_eventNum);
+            assignedEventNum.exchange(_eventNum);
         EventQueueItem *item = queueItemPool.construct();
         item->bytes = bytes;
         item->event = event;
@@ -591,7 +594,7 @@ namespace e2sar
         item->callback = callback;
         item->cbArg = cbArg;
         // continue incrementing 
-        item->eventNum = eventNum++;
+        item->eventNum = assignedEventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
         eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
