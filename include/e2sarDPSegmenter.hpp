@@ -235,7 +235,7 @@ namespace e2sar
             // report zero event number change rate in Sync
             bool zeroRate;
             // use usec clock samples as event numbers in Sync and LB
-            bool clockAsEventNum;
+            bool usecAsEventNum;
 
             /**
              * Check the sanity of constructor parameters
@@ -269,7 +269,7 @@ namespace e2sar
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
              * - zeroRate - don't provide event number change rate in Sync {false}
-             * - clockAsEventNum - use usec clock samples as event numbers in LB and Sync packets {true}
+             * - clockAsEventNum - use usec clock samples as event numbers in LB and Sync packets {false}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
@@ -286,7 +286,7 @@ namespace e2sar
                 bool connectedSocket;
                 bool useCP;
                 bool zeroRate;
-                bool clockAsEventNum;
+                bool usecAsEventNum;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
@@ -294,7 +294,7 @@ namespace e2sar
                 int sndSocketBufSize;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    useCP{true}, zeroRate{false}, clockAsEventNum{true}, 
+                    useCP{true}, zeroRate{false}, usecAsEventNum{false}, 
                     syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
                 /**

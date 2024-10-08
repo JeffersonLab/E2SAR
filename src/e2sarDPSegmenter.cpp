@@ -28,7 +28,7 @@ namespace e2sar
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
         useCP{sflags.useCP},
         zeroRate{sflags.zeroRate},
-        clockAsEventNum{sflags.clockAsEventNum}
+        usecAsEventNum{sflags.usecAsEventNum}
     {
         sanityChecks();
     }
@@ -626,8 +626,8 @@ namespace e2sar
             sFlags.syncPeriodMs);
         sFlags.zeroRate = paramTree.get<bool>("control-plane.zeroRate",
             sFlags.zeroRate);
-        sFlags.clockAsEventNum = paramTree.get<bool>("control-plane.clockAsEventNum",
-            sFlags.clockAsEventNum);
+        sFlags.usecAsEventNum = paramTree.get<bool>("control-plane.usecAsEventNum",
+            sFlags.usecAsEventNum);
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);

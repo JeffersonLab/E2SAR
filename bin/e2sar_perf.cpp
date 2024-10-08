@@ -294,6 +294,8 @@ int main(int argc, char **argv)
     int sockBufSize;
     int durationSec;
     bool withCP;
+    bool zeroRate;
+    bool usecAsEventNum;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -323,6 +325,8 @@ int main(int argc, char **argv)
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate");
+    opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
+    opts("usec", po::bool_switch()->default_value(false),"use usec clock samples as event numbers in Sync and LB messages [s]");
 
     po::variables_map vm;
 
@@ -364,6 +368,8 @@ int main(int argc, char **argv)
     }
 
     withCP = vm["withcp"].as<bool>();
+    zeroRate = vm["zerorate"].as<bool>();
+    usecAsEventNum = vm["usec"].as<bool>();
 
     bool preferV6 = false;
     if (vm.count("ipv6"))
@@ -434,8 +440,12 @@ int main(int argc, char **argv)
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
+                sflags.zeroRate = zeroRate;
+                sflags.usecAsEventNum = usecAsEventNum;
             }
             std::cout << "Control plane will be " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "\tEvent rate reporting " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
+            std::cout << "\tUsing usecs as event numbers " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
