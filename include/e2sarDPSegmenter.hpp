@@ -232,6 +232,10 @@ namespace e2sar
             boost::condition_variable sendThreadCond;
             // use control plane (can be disabled for debugging)
             bool useCP;
+            // report zero event number change rate in Sync
+            bool zeroRate;
+            // use usec clock samples as event numbers in Sync and LB
+            bool clockAsEventNum;
 
             /**
              * Check the sanity of constructor parameters
@@ -264,6 +268,8 @@ namespace e2sar
              * - zeroCopy - use zeroCopy send optimization {false}
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
+             * - zeroRate - don't provide event number change rate in Sync {false}
+             * - clockAsEventNum - use usec clock samples as event numbers in LB and Sync packets {true}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
@@ -279,6 +285,8 @@ namespace e2sar
                 bool zeroCopy;
                 bool connectedSocket;
                 bool useCP;
+                bool zeroRate;
+                bool clockAsEventNum;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
@@ -286,7 +294,8 @@ namespace e2sar
                 int sndSocketBufSize;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    useCP{true}, zeroRate{false}, clockAsEventNum{true}, 
+                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
                 /**
                  * Initialize flags from an INI file
@@ -430,6 +439,9 @@ namespace e2sar
 
             // Calculate the average event rate from circular buffer
             // note that locking lives outside this function, as needed.
+            // NOTE: this is only useful to sync messages if sequential
+            // event IDs are used. When usec timestamp is used for LB event numbers
+            // the event is constant 1 MHz
             inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos) 
             {
                 // no rate to report
@@ -457,7 +469,10 @@ namespace e2sar
             {
                 // we use sentEventNum which is updated by the send thread to be
                 // more accurate about event numbers being seen by LB
-                hdr->set(eventSrcId, sentEventNum, eventRate, tnano);
+                if (zeroRate)
+                    hdr->set(eventSrcId, sentEventNum, 0, tnano);
+                else
+                    hdr->set(eventSrcId, sentEventNum, eventRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it
