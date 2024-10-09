@@ -373,7 +373,7 @@ int main()
     // compute the probabilities and entropy
     float prob{0.0}, probsum{0.0};
     float entropy{0.0};
-    for (int i = 0; i < bins.size(); i++)
+    for (size_t i = 0; i < bins.size(); i++)
     {
         prob = static_cast<float>(bins[i])/(total*1.0);
         entropy += prob * std::log(prob);
