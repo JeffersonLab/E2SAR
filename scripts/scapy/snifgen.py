@@ -204,7 +204,7 @@ if __name__ == "__main__":
     operations = parser.add_mutually_exclusive_group(required=True)
     operations.add_argument("-l", "--listen", action="store_true", help="listen for incoming packets and try to parse and validate them")
     operations.add_argument("-g", "--generate", action="store_true", help="generate new packets of specific types")
-    operations.add_argument("-a", "--parse", action="store_true", help="parse a pcap file. The recommended way to capture is something like this 'sudo tcpdump -s 200 -tttt -i enp7s0 udp \\( dst port 19522 or dst port 19523 \\) -w e2sar.pcap'")
+    operations.add_argument("-a", "--parse", action="store_true", help="parse a pcap file. The recommended way to capture is something like this 'sudo tcpdump -s 200 -tttt -i enp7s0 udp and \\( dst port 19522 or dst port 19523 \\) -w e2sar.pcap'")
     parser.add_argument("-p", "--port", action="store", default=19522, type=int, help="UDP data port (only port for --lbre, starting port for --re)")
     parser.add_argument("-y", "--syncport", action="store", help="UDP sync port", default=19010, type=int)
     parser.add_argument("-n", "--nports", action="store", type=int, default=1, help="number of ports starting with -p to listen on for --re")
