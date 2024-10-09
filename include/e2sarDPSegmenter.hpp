@@ -478,12 +478,18 @@ namespace e2sar
             // never changes past initialization
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
-                // we use sentEventNum which is updated by the send thread to be
-                // more accurate about event numbers being seen by LB
-                if (zeroRate)
-                    hdr->set(eventSrcId, lbEventNum, 0, tnano);
-                else
-                    hdr->set(eventSrcId, lbEventNum, eventRate, tnano);
+                EventRate_t reportedRate{0};
+                if (not zeroRate)
+                    reportedRate = eventRate;
+                EventNum_t reportedEventNum{lbEventNum};
+                if (usecAsEventNum) 
+                {
+                    // figure out what event number would be at this moment, don't worry about its entropy
+                    auto nowT = boost::chrono::system_clock::now();
+                    // Convert the time point to microseconds since the epoch
+                    reportedEventNum = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+                }
+                hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it
