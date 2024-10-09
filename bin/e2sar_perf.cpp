@@ -444,8 +444,8 @@ int main(int argc, char **argv)
                 sflags.usecAsEventNum = usecAsEventNum;
             }
             std::cout << "Control plane will be " << (sflags.useCP ? "ON" : "OFF") << std::endl;
-            std::cout << "\tEvent rate reporting " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
-            std::cout << "\tUsing usecs as event numbers " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
+            std::cout << "Event rate reporting in Sync " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
+            std::cout << "Using usecs as event numbers " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 

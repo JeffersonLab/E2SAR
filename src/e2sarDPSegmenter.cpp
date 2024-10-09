@@ -89,7 +89,7 @@ namespace e2sar
         while(!seg.threadsStop)
         {
             // Get the current time point
-            auto nowT = boost::chrono::high_resolution_clock::now();
+            auto nowT = boost::chrono::system_clock::now();
             // Convert the time point to nanoseconds since the epoch
             auto now = boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count();
             UnixTimeNano_t currentTimeNanos = static_cast<UnixTimeNano_t>(now);

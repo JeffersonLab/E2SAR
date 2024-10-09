@@ -199,7 +199,7 @@ namespace e2sar
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
-                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
                 }
 
@@ -210,7 +210,7 @@ namespace e2sar
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
-                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
                 }
 
