@@ -28,7 +28,8 @@ namespace e2sar
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
         useCP{sflags.useCP},
         zeroRate{sflags.zeroRate},
-        usecAsEventNum{sflags.usecAsEventNum}
+        usecAsEventNum{sflags.usecAsEventNum},
+        addEntropy{(clockEntropyTest() > 6 ? false : true)}
     {
         sanityChecks();
     }
@@ -44,7 +45,10 @@ namespace e2sar
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
-        useCP{sflags.useCP}
+        useCP{sflags.useCP},
+        zeroRate{sflags.zeroRate},
+        usecAsEventNum{sflags.usecAsEventNum},
+        addEntropy{(clockEntropyTest() > 6 ? false : true)}
     {
 
         // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
@@ -492,8 +496,20 @@ namespace e2sar
         u_int8_t *eventEnd = event + bytes;
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
-        // update the event number being reported in Sync packets
-        seg.sentEventNum = eventNum;
+        // update the event number being reported in Sync and LB packets
+        if (seg.usecAsEventNum)
+        {
+            // use microseconds since the UNIX Epoch, but make sure the entropy
+            // of the 8lsb is sufficient (for LB)
+            // Get the current time point
+            auto nowT = boost::chrono::system_clock::now();
+            // Convert the time point to microseconds since the epoch
+            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+            if (seg.addEntropy) 
+                seg.lbEventNum = seg.addClockEntropy(now);
+        } else
+            // use current user-specified or sequential event number
+            seg.lbEventNum = eventNum;
 
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
@@ -503,7 +519,7 @@ namespace e2sar
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
-            hdr->lb.set(entropy, eventNum);
+            hdr->lb.set(entropy, seg.lbEventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -569,12 +585,12 @@ namespace e2sar
         freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
-            assignedEventNum.exchange(_eventNum);
+            userEventNum.exchange(_eventNum);
 
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
         // continue incrementing
-            assignedEventNum++, 
+            userEventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
             entropy);
     }
@@ -588,7 +604,7 @@ namespace e2sar
         freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
-            assignedEventNum.exchange(_eventNum);
+            userEventNum.exchange(_eventNum);
         EventQueueItem *item = queueItemPool.construct();
         item->bytes = bytes;
         item->event = event;
@@ -596,7 +612,7 @@ namespace e2sar
         item->callback = callback;
         item->cbArg = cbArg;
         // continue incrementing 
-        item->eventNum = assignedEventNum++;
+        item->eventNum = userEventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
         eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)

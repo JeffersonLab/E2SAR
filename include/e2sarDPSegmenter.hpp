@@ -94,10 +94,15 @@ namespace e2sar
             boost::atomic<UnixTimeNano_t> currentSyncStartNano{0};
             boost::atomic<EventNum_t> eventsInCurrentSync{0};
 
-            // currently assigned event number at enqueuing
-            boost::atomic<EventNum_t> assignedEventNum{0};
-            // current event number being sent
-            boost::atomic<EventNum_t> sentEventNum{0};
+            // currently user-assigned or sequential event number at enqueuing and reported in RE header
+            boost::atomic<EventNum_t> userEventNum{0};
+            // current event number being sent and reported in LB header
+            boost::atomic<EventNum_t> lbEventNum{0};
+
+            // fast random number generator 
+            boost::random::ranlux24_base ranlux;
+            // to get better entropy in usec clock samples (if needed)
+            boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
             //
             // atomic struct for stat information for sync and send threads
@@ -145,6 +150,8 @@ namespace e2sar
                 result<int> _close();
                 result<int> _send(SyncHdr *hdr);
                 void _threadBody();
+
+
             };
             friend struct SyncThreadState;
 
@@ -192,6 +199,8 @@ namespace e2sar
                 boost::random::uniform_int_distribution<> randDist{0, std::numeric_limits<u_int16_t>::max()};
                 // to get random port numbers we skip low numbered privileged ports
                 boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
+                // to get better entropy in usec clock samples (if needed)
+                boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
@@ -236,6 +245,8 @@ namespace e2sar
             bool zeroRate;
             // use usec clock samples as event numbers in Sync and LB
             bool usecAsEventNum;
+            // use additional entropy in the clock samples
+            bool addEntropy;
 
             /**
              * Check the sanity of constructor parameters
@@ -470,9 +481,9 @@ namespace e2sar
                 // we use sentEventNum which is updated by the send thread to be
                 // more accurate about event numbers being seen by LB
                 if (zeroRate)
-                    hdr->set(eventSrcId, sentEventNum, 0, tnano);
+                    hdr->set(eventSrcId, lbEventNum, 0, tnano);
                 else
-                    hdr->set(eventSrcId, sentEventNum, eventRate, tnano);
+                    hdr->set(eventSrcId, lbEventNum, eventRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it
@@ -481,6 +492,17 @@ namespace e2sar
                 EventQueueItem *item{nullptr};
                 while (returnQueue.pop(item))
                     queueItemPool.free(item);
+            }
+            /**
+             * Add entropy to a clock sample by randomizing the least 8 bits. Runs in the 
+             * context of send thread.
+             * @param clockSample - the sample value
+             * @param ranlux - random number generator
+             * @return 
+             */
+            inline int_least64_t addClockEntropy(int_least64_t clockSample)
+            {
+                return (clockSample & ~0xFF) | lsbDist(ranlux);
             }
     };
 }

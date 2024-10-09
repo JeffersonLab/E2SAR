@@ -14,6 +14,9 @@
 #include <boost/unordered_map.hpp>
 #include <boost/circular_buffer.hpp>
 #include <boost/lockfree/queue.hpp>
+#include <boost/chrono.hpp>
+#include <boost/thread.hpp>
+#include <boost/random.hpp>
 
 #include <boost/pool/object_pool.hpp>
 
@@ -348,5 +351,51 @@ int main()
         std::cout << "Retrieved " << ret.first << ":" << ret.second << std::endl;
         delete res;
     }
+
+    std::cout << "Clock tests" << std::endl;
+
+    // we want to know if system clock usecs produces enough randomness in the bottom 9
+    // bits and if not add randomness in them. 
+
+    std::vector<int_least64_t> points;
+    int total{10000};
+    std::vector<int> bins(256, 0);
+
+    for (int i = 0; i < total; i++)
+    {
+        auto now1 = boost::chrono::system_clock::now();
+        auto now1Usec = boost::chrono::duration_cast<boost::chrono::microseconds>(now1.time_since_epoch()).count();
+        bins[now1Usec & 0xff]++;
+        auto until = now1 + boost::chrono::milliseconds(1);
+        boost::this_thread::sleep_until(until);
+    }
+
+    // compute the probabilities and entropy
+    float prob{0.0}, probsum{0.0};
+    float entropy{0.0};
+    for (int i = 0; i < bins.size(); i++)
+    {
+        prob = static_cast<float>(bins[i])/(total*1.0);
+        entropy += prob * std::log(prob);
+        probsum += prob;
+    }
+
+    entropy *= -1.0/std::log(2);
+
+    std::cout << "Probability sum " << probsum << std::endl;
+    std::cout << "Entropy is " << entropy << " bits" << std::endl;
+
+    // add entropy to a clock sample
+    boost::random::ranlux24_base ranlux;
+    boost::random::uniform_int_distribution<> randDist{0, 255};
+
+    auto now1 = boost::chrono::system_clock::now();
+    auto now1Usec = boost::chrono::duration_cast<boost::chrono::microseconds>(now1.time_since_epoch()).count();
+
+    // replace lower 8 bits
+    auto addedEntropy = (now1Usec & ~0xFF) | randDist(ranlux);
+    std::cout << "Original timestamp " << now1Usec << " with added entropy " << addedEntropy << std::endl;
+    std::cout << "Original & 0xFF " << (now1Usec & 0xFF) << " with added entropy & 0xFF " << (addedEntropy & 0xFF) << std::endl; 
+    
 }
 
