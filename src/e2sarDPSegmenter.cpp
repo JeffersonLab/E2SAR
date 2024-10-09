@@ -507,6 +507,8 @@ namespace e2sar
             auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
             if (seg.addEntropy) 
                 seg.lbEventNum = seg.addClockEntropy(now);
+            else
+                seg.lbEventNum = now;
         } else
             // use current user-specified or sequential event number
             seg.lbEventNum = eventNum;
