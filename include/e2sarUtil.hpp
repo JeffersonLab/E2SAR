@@ -494,7 +494,7 @@ namespace e2sar
 
         // compute the probabilities and entropy
         float entropy{0.0};
-        for (int i = 0; i < bins.size(); i++)
+        for (size_t i = 0; i < bins.size(); i++)
         {
             float prob = static_cast<float>(bins[i])/(totalTests*1.0);
             entropy += prob * std::log(prob);
