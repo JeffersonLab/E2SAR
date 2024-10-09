@@ -488,6 +488,9 @@ namespace e2sar
                     auto nowT = boost::chrono::system_clock::now();
                     // Convert the time point to microseconds since the epoch
                     reportedEventNum = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+                    if (not zeroRate)
+                        // 1 MHz in this case
+                        reportedRate = 1000000;
                 }
                 hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }
