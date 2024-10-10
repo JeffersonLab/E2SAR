@@ -94,8 +94,15 @@ namespace e2sar
             boost::atomic<UnixTimeNano_t> currentSyncStartNano{0};
             boost::atomic<EventNum_t> eventsInCurrentSync{0};
 
-            // current event number
-            boost::atomic<EventNum_t> eventNum{0};
+            // currently user-assigned or sequential event number at enqueuing and reported in RE header
+            boost::atomic<EventNum_t> userEventNum{0};
+            // current event number being sent and reported in LB header
+            boost::atomic<EventNum_t> lbEventNum{0};
+
+            // fast random number generator 
+            boost::random::ranlux24_base ranlux;
+            // to get better entropy in usec clock samples (if needed)
+            boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
             //
             // atomic struct for stat information for sync and send threads
@@ -143,6 +150,8 @@ namespace e2sar
                 result<int> _close();
                 result<int> _send(SyncHdr *hdr);
                 void _threadBody();
+
+
             };
             friend struct SyncThreadState;
 
@@ -190,6 +199,8 @@ namespace e2sar
                 boost::random::uniform_int_distribution<> randDist{0, std::numeric_limits<u_int16_t>::max()};
                 // to get random port numbers we skip low numbered privileged ports
                 boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
+                // to get better entropy in usec clock samples (if needed)
+                boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
                 inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
                     seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
@@ -197,7 +208,7 @@ namespace e2sar
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
-                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
                 }
 
@@ -208,7 +219,7 @@ namespace e2sar
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
-                    auto nowT = boost::chrono::high_resolution_clock::now();
+                    auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
                 }
 
@@ -230,6 +241,12 @@ namespace e2sar
             boost::condition_variable sendThreadCond;
             // use control plane (can be disabled for debugging)
             bool useCP;
+            // report zero event number change rate in Sync
+            bool zeroRate;
+            // use usec clock samples as event numbers in Sync and LB
+            bool usecAsEventNum;
+            // use additional entropy in the clock samples
+            bool addEntropy;
 
             /**
              * Check the sanity of constructor parameters
@@ -262,6 +279,8 @@ namespace e2sar
              * - zeroCopy - use zeroCopy send optimization {false}
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
+             * - zeroRate - don't provide event number change rate in Sync {false}
+             * - clockAsEventNum - use usec clock samples as event numbers in LB and Sync packets {false}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
@@ -277,6 +296,8 @@ namespace e2sar
                 bool zeroCopy;
                 bool connectedSocket;
                 bool useCP;
+                bool zeroRate;
+                bool usecAsEventNum;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
@@ -284,7 +305,8 @@ namespace e2sar
                 int sndSocketBufSize;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    useCP{true}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    useCP{true}, zeroRate{false}, usecAsEventNum{false}, 
+                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
                 /**
                  * Initialize flags from an INI file
@@ -428,6 +450,9 @@ namespace e2sar
 
             // Calculate the average event rate from circular buffer
             // note that locking lives outside this function, as needed.
+            // NOTE: this is only useful to sync messages if sequential
+            // event IDs are used. When usec timestamp is used for LB event numbers
+            // the event is constant 1 MHz
             inline EventRate_t eventRate(UnixTimeNano_t currentTimeNanos) 
             {
                 // no rate to report
@@ -453,7 +478,21 @@ namespace e2sar
             // never changes past initialization
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
-                hdr->set(eventSrcId, eventNum, eventRate, tnano);
+                EventRate_t reportedRate{0};
+                if (not zeroRate)
+                    reportedRate = eventRate;
+                EventNum_t reportedEventNum{lbEventNum};
+                if (usecAsEventNum) 
+                {
+                    // figure out what event number would be at this moment, don't worry about its entropy
+                    auto nowT = boost::chrono::system_clock::now();
+                    // Convert the time point to microseconds since the epoch
+                    reportedEventNum = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+                    if (not zeroRate)
+                        // 1 MHz in this case
+                        reportedRate = 1000000;
+                }
+                hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it
@@ -462,6 +501,17 @@ namespace e2sar
                 EventQueueItem *item{nullptr};
                 while (returnQueue.pop(item))
                     queueItemPool.free(item);
+            }
+            /**
+             * Add entropy to a clock sample by randomizing the least 8 bits. Runs in the 
+             * context of send thread.
+             * @param clockSample - the sample value
+             * @param ranlux - random number generator
+             * @return 
+             */
+            inline int_least64_t addClockEntropy(int_least64_t clockSample)
+            {
+                return (clockSample & ~0xFF) | lsbDist(ranlux);
             }
     };
 }

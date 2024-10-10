@@ -402,7 +402,7 @@ namespace e2sar
     void Reassembler::SendStateThreadState::_threadBody()
     {
         // get the time
-        auto nowT = boost::chrono::high_resolution_clock::now();
+        auto nowT = boost::chrono::system_clock::now();
         auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
         UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
 
@@ -436,7 +436,7 @@ namespace e2sar
             // fillPercent is always reported as sampled in the current moment
 
             // Get the current time point
-            auto nowT = boost::chrono::high_resolution_clock::now();
+            auto nowT = boost::chrono::system_clock::now();
             auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
             UnixTimeMicro_t currentTimeMicros = static_cast<UnixTimeMicro_t>(nowUsec);
 
@@ -522,6 +522,7 @@ namespace e2sar
 
         auto eventItem = dequeue();
 
+        // try to dequeue for a bit
         while (eventItem == nullptr && !threadsStop && !overtime)
         {
             recvThreadCond.wait_for(condLock, boost::chrono::milliseconds(recvWaitTimeout_ms));

@@ -6,6 +6,8 @@
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
+#include <boost/chrono.hpp>
+#include <boost/thread.hpp>
 
 #include "e2sarError.hpp"
 
@@ -467,5 +469,40 @@ namespace e2sar
             return lhs.first == rhs.first && lhs.second == rhs.second;
         }
     };
+
+    /**  
+     * clock entropy test to validate that system clock produces sufficient randomness
+     * in the least 8 bits of the microsecond timestamp (required by LB). Normally runs
+     * for 10 seconds to collect 5k samples
+     * @param totalTests - number of samples to collect
+     * @param sleepMs - number of milliseconds to sleep between each sample
+     * @return entropy in bits
+     */
+    static inline float clockEntropyTest(int totalTests = 5000, int sleepMs = 1) 
+    {
+        std::vector<int_least64_t> points;
+        std::vector<int> bins(256, 0);
+
+        for (int i = 0; i < totalTests; i++)
+        {
+            auto now = boost::chrono::system_clock::now();
+            auto nowUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(now.time_since_epoch()).count();
+            bins[nowUsec & 0xff]++;
+            auto until = now + boost::chrono::milliseconds(sleepMs);
+            boost::this_thread::sleep_until(until);
+        }
+
+        // compute the probabilities and entropy
+        float entropy{0.0};
+        for (size_t i = 0; i < bins.size(); i++)
+        {
+            float prob = static_cast<float>(bins[i])/(totalTests*1.0);
+            entropy += prob * std::log(prob);
+        }
+
+        // normalize into bits
+        entropy *= -1.0/std::log(2);
+        return entropy;
+    }
 };
 #endif
