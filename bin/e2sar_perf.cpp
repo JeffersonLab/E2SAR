@@ -443,7 +443,7 @@ int main(int argc, char **argv)
                 sflags.zeroRate = zeroRate;
                 sflags.usecAsEventNum = usecAsEventNum;
             }
-            std::cout << "Control plane will be " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Control plane                " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Event rate reporting in Sync " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
             std::cout << "Using usecs as event numbers " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
