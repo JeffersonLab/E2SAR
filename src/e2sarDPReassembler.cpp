@@ -53,7 +53,6 @@ namespace e2sar
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
-        condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
@@ -86,7 +85,6 @@ namespace e2sar
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
-        condLock{recvThreadMtx},
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
@@ -525,7 +523,11 @@ namespace e2sar
         // try to dequeue for a bit
         while (eventItem == nullptr && !threadsStop && !overtime)
         {
-            recvThreadCond.wait_for(condLock, boost::chrono::milliseconds(recvWaitTimeout_ms));
+            {
+                // will implicitly unlock; locking needed to properly put waiters on the queue
+                boost::unique_lock<boost::mutex> condLock(recvThreadMtx);
+                recvThreadCond.wait_for(condLock, boost::chrono::milliseconds(recvWaitTimeout_ms));
+            }
             eventItem = dequeue();
             nextTimeT = boost::chrono::steady_clock::now();
 

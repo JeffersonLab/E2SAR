@@ -305,7 +305,7 @@ namespace e2sar
                 int sndSocketBufSize;
 
                 SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
-                    useCP{true}, zeroRate{false}, usecAsEventNum{false}, 
+                    useCP{true}, zeroRate{false}, usecAsEventNum{true}, 
                     syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
                 /**

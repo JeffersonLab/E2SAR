@@ -326,7 +326,7 @@ int main(int argc, char **argv)
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate");
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
-    opts("usec", po::bool_switch()->default_value(false),"use usec clock samples as event numbers in Sync and LB messages [s]");
+    opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages [s]");
 
     po::variables_map vm;
 
@@ -369,7 +369,7 @@ int main(int argc, char **argv)
 
     withCP = vm["withcp"].as<bool>();
     zeroRate = vm["zerorate"].as<bool>();
-    usecAsEventNum = vm["usec"].as<bool>();
+    usecAsEventNum = not vm["seq"].as<bool>();
 
     bool preferV6 = false;
     if (vm.count("ipv6"))
