@@ -215,10 +215,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
         auto nextTimeT = boost::chrono::steady_clock::now();
 
         if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(*durationSec)))
-        {
-            ctrlCHandler(0);
             break;
-        }
 
         if (getEvtRes.has_error())
         {
@@ -509,14 +506,16 @@ int main(int argc, char **argv)
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
                 }
                 // start dequeue read threads
-                boost::thread *lastThread{nullptr};
+                boost::thread lastThread;
                 for(size_t i=0; i < readThreads; i++)
                 {
                     boost::thread syncT(recvEvents, &reas, &durationSec);
-                    lastThread = &syncT;
+                    lastThread = std::move(syncT);
                 }
                 // join the last one
-                lastThread->join();
+                lastThread.join();
+                // unregister/stop threads as needed
+                ctrlCHandler(0);
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create reassembler: " << static_cast<std::string>(e) << std::endl;
             }
