@@ -23,6 +23,9 @@ using namespace e2sar;
 boost::pool<> *evtBufferPool;
 // to avoid locking the pool we use the return queue
 boost::lockfree::queue<u_int8_t*> returnBufferQueue{10000};
+// app-level stats
+std::atomic<u_int64_t> mangledEvents{0};
+std::atomic<u_int64_t> receivedWithError{0};
 
 // event payload
 auto eventPldStart = "This is a start of event payload"s;
@@ -163,14 +166,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     return 0;
 }
 
-result<int> recvEvents(Reassembler &r, int durationSec) {
-
+result<int> prepareToReceive(Reassembler &r)
+{
     std::cout << "Receiving on ports " << r.get_recvPorts().first << ":" << r.get_recvPorts().second << std::endl;
-
-    u_int8_t *evtBuf{nullptr};
-    size_t evtSize;
-    EventNum_t evtNum;
-    u_int16_t dataId;
 
     // register the worker (will be NOOP if withCP is set to false)
     auto hostname_res = NetUtil::getHostName();
@@ -194,6 +192,16 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
     if (openRes.has_error())
         return openRes;
 
+    return 0;
+}
+
+int recvEvents(Reassembler *r, int *durationSec) {
+
+    u_int8_t *evtBuf{nullptr};
+    size_t evtSize;
+    EventNum_t evtNum;
+    u_int16_t dataId;
+
     // to help print large integers
     std::cout.imbue(std::locale(""));
 
@@ -202,29 +210,31 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
     // receive loop
     while(true)
     {
-        auto getEvtRes = r.recvEvent(&evtBuf, &evtSize, &evtNum, &dataId, 1000);
+        auto getEvtRes = r->recvEvent(&evtBuf, &evtSize, &evtNum, &dataId, 1000);
 
         auto nextTimeT = boost::chrono::steady_clock::now();
 
-        if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(durationSec)))
+        if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(*durationSec)))
         {
             ctrlCHandler(0);
             break;
         }
 
         if (getEvtRes.has_error())
-            return getEvtRes;
+        {
+            receivedWithError++;
+            continue;
+        }
 
         if (getEvtRes.value() == -1)
             continue;
 
-        if (memcmp(evtBuf, eventPldStart.c_str(), eventPldStart.size() - 1))
-            return E2SARErrorInfo{E2SARErrorc::MemoryError, "Payload start does not match expected"};
-
-        if (memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
-            return E2SARErrorInfo{E2SARErrorc::MemoryError, "Payload end doesn't match expected"};
+        if (memcmp(evtBuf, eventPldStart.c_str(), eventPldStart.size() - 1) || 
+            memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
+            mangledEvents++;
 
         delete evtBuf;
+        evtBuf = nullptr;
     }
     std::cout << "Completed" << std::endl;
     return 0;
@@ -257,6 +267,7 @@ void recvStatsThread(Reassembler *r)
         */
         std::cout << "Stats:" << std::endl;
         std::cout << "\tEvents Received: " << stats.get<1>() << std::endl;
+        std::cout << "\tEvents Mangled: " << mangledEvents << std::endl;
         std::cout << "\tEvents Lost: " << stats.get<0>() << std::endl;
         std::cout << "\tData Errors: " << stats.get<4>() << std::endl;
         if (stats.get<4>() > 0)
@@ -289,7 +300,7 @@ int main(int argc, char **argv)
     u_int16_t mtu;
     u_int32_t eventSourceId;
     u_int16_t dataId;
-    size_t numThreads, numSockets;
+    size_t numThreads, numSockets, readThreads;
     float rateGbps;
     int sockBufSize;
     int durationSec;
@@ -327,6 +338,7 @@ int main(int argc, char **argv)
     opts("novalidate,v", "don't validate server certificate");
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages [s]");
+    opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of dequeue read threads in receiver (defaults to 1) [r]");
 
     po::variables_map vm;
 
@@ -491,11 +503,20 @@ int main(int argc, char **argv)
                 Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
                 reasPtr = &reas;
                 boost::thread statT(&recvStatsThread, &reas);
-                auto res = recvEvents(reas, durationSec);
+                auto res = prepareToReceive(reas);
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
                 }
+                // start dequeue read threads
+                boost::thread *lastThread{nullptr};
+                for(size_t i=0; i < readThreads; i++)
+                {
+                    boost::thread syncT(recvEvents, &reas, &durationSec);
+                    lastThread = &syncT;
+                }
+                // join the last one
+                lastThread->join();
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create reassembler: " << static_cast<std::string>(e) << std::endl;
             }
