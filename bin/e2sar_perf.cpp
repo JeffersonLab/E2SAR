@@ -307,6 +307,7 @@ int main(int argc, char **argv)
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
+    std::vector<int> coreList;
 
     // parameters
     opts("send,s", "send traffic");
@@ -336,6 +337,7 @@ int main(int argc, char **argv)
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of dequeue read threads in receiver (defaults to 1) [r]");
+    opts("cores", po::value<std::vector<int>>(&cores)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
 
     po::variables_map vm;
 
@@ -347,7 +349,7 @@ int main(int argc, char **argv)
 
     try
     {
-        conflicting_options(vm, "send", "receive");
+        conflicting_options(vm, "send", "recv");
         conflicting_options(vm, "recv", "num");
         conflicting_options(vm, "recv", "enum");
         conflicting_options(vm, "recv", "length");
@@ -361,7 +363,12 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
+        // these are optional
         conflicting_options(vm, "send", "port");
+        conflicting_options(vm, "deq", "send");
+        conflicting_options(vm, "seq", "recv");
+        conflicting_options(vm, "cores", "send");
+        conflicting_options(vm, "cores", "threads");
     }
     catch (const std::logic_error &le)
     {
@@ -497,10 +504,18 @@ int main(int argc, char **argv)
 
             try {
                 ip::address ip = ip::make_address(sndrcvIP);
-                Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
-                reasPtr = &reas;
-                boost::thread statT(&recvStatsThread, &reas);
-                auto res = prepareToReceive(reas);
+                if (vm.count["cores"])
+                {
+                    Reassembler reas(uri, ip, recvStartPort, cores, rflags);
+                    reasPtr = &reas;
+                } else
+                {
+                    Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
+                    reasPtr = &reas;
+                }
+
+                boost::thread statT(&recvStatsThread, reasPtr);
+                auto res = prepareToReceive(*reasPtr);
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
@@ -509,7 +524,7 @@ int main(int argc, char **argv)
                 boost::thread lastThread;
                 for(size_t i=0; i < readThreads; i++)
                 {
-                    boost::thread syncT(recvEvents, &reas, &durationSec);
+                    boost::thread syncT(recvEvents, reasPtr, &durationSec);
                     lastThread = std::move(syncT);
                 }
                 // join the last one

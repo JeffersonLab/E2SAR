@@ -555,10 +555,10 @@ namespace e2sar
                 for(auto core: cpuCoreList)
                     CPU_SET(core, &set);
                 if (sched_setaffinity(0, sizeof(set), &set) == -1)
-                    throw E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
+                    return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
                 return 0;
 #else
-                return -1;
+                return E2SARErrorInfo{E2SARErrorc::SystemError, "Not supported on this system"};
 #endif
             }
 
