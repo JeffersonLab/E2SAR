@@ -337,7 +337,7 @@ int main(int argc, char **argv)
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of dequeue read threads in receiver (defaults to 1) [r]");
-    opts("cores", po::value<std::vector<int>>(&cores)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
+    opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
 
     po::variables_map vm;
 
@@ -504,9 +504,9 @@ int main(int argc, char **argv)
 
             try {
                 ip::address ip = ip::make_address(sndrcvIP);
-                if (vm.count["cores"])
+                if (vm.count("cores"))
                 {
-                    Reassembler reas(uri, ip, recvStartPort, cores, rflags);
+                    Reassembler reas(uri, ip, recvStartPort, coreList, rflags);
                     reasPtr = &reas;
                 } else
                 {
