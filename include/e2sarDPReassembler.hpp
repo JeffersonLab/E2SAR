@@ -275,7 +275,7 @@ namespace e2sar
             // condition variable for recv thread queue
             boost::condition_variable recvThreadCond;
             // lock for the mutex
-            boost::unique_lock<boost::mutex> condLock;
+            //thread_local boost::unique_lock<boost::mutex> condLock(recvThreadMtx, boost::defer_lock);
 
             /**
              * Use port range and starting port to assign UDP ports to threads evenly

@@ -11,7 +11,6 @@
 
 namespace e2sar 
 {
-
     /** Function implementing a PID computation. 
      * Returns a pair of <PID, Current Error>
     */
@@ -53,7 +52,6 @@ namespace e2sar
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
-        condLock(recvThreadMtx, boost::defer_lock),
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
@@ -86,7 +84,6 @@ namespace e2sar
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
-        condLock(recvThreadMtx, boost::defer_lock),
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP}
     {
@@ -516,6 +513,9 @@ namespace e2sar
 
     result<int> Reassembler::recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId, u_int64_t wait_ms) noexcept
     {
+        // lock for the mutex (must be thread-local)
+        thread_local boost::unique_lock<boost::mutex> condLock(recvThreadMtx, boost::defer_lock);
+        
         auto nowT = boost::chrono::steady_clock::now();
         boost::chrono::steady_clock::time_point nextTimeT;
         bool overtime = false;
