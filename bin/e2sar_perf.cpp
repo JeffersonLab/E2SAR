@@ -53,6 +53,7 @@ void ctrlCHandler(int sig)
                 std::cerr << "Unable to remove sender from list on exit: " << rmres.error().message() << std::endl;
         }
         segPtr->stopThreads();
+        delete segPtr;
     }
     if (reasPtr != nullptr)
     {
@@ -61,6 +62,7 @@ void ctrlCHandler(int sig)
         if (deregres.has_error()) 
             std::cerr << "Unable to deregister worker on exit: " << deregres.error().message() << std::endl;
         reasPtr->stopThreads();
+        delete reasPtr;
     }
     threadsRunning = false;
     // instead of join
@@ -466,9 +468,8 @@ int main(int argc, char **argv)
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                Segmenter seg(uri, dataId, eventSourceId, sflags);
-                segPtr = &seg;
-                auto res = sendEvents(seg, startingEventNum, numEvents, eventBufferSize, rateGbps);
+                segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
+                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {
                     std::cerr << "Segmenter encountered an error: " << res.error().message() << std::endl;

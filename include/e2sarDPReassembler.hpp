@@ -231,6 +231,11 @@ namespace e2sar
                     sleep_tv.tv_usec = 10000; // 10 msec max
                 }
 
+                inline ~RecvThreadState()
+                {
+                    recvBufferPool.purge_memory();
+                }
+
                 // open v4/v6 sockets
                 result<int> _open();
                 // close sockets
