@@ -1,37 +1,48 @@
-import org.bytedeco.javacpp.*;
-import org.bytedeco.javacpp.annotation.*;
-import org.bytedeco.javacpp.tools.*;
+package org.jlab.hpdf;
 
-@Properties(
-    value = @Platform(
-        include = {"e2sarUtil.hpp", "e2sar.hpp"},
-        link = "e2sar",
-        includepath = {"/opt/homebrew/include"},
-        linkpath = {"/opt/homebrew/lib"},
-        compiler = "cpp17"
-        )
-)
-@Namespace("e2sar")
-public class EjfatURI extends Pointer {
+/**
+ * This class is a wrapper for EjfatURI present in the native cpp library. To avoid multiple calls to the native library
+ * the raw details are stored in the library needed to create an instance of EjfatURI
+ */
+public class EjfatURI{
 
-    // Declare the native methods for memory allocation and deallocation
-    private native void allocate(@Cast("const std::string&") String uri);
+    enum Token{
+        ADMIN,
+        INSTANCE,
+        SESSION
+    }
+    
+    private Token token;
+    private String uri;
+    private boolean preferv6;
 
-    public native @StdString String get_lbName();
-
-    static {
-        // Load the native library
-        Loader.load();
+    EjfatURI(String uri, Token token, boolean preferv6){
+        this.uri = uri;
+        this.token = token;
+        this.preferv6 = preferv6;
     }
 
-    public EjfatURI(String uri){
-        allocate(uri);
+    EjfatURI(String uri){
+        this(uri, Token.ADMIN, false);
     }
 
-    public static void main(String[] args) {
+    public String getUri(){
+        return uri;
+    }
+
+    public String getToken(){
+        return token.name();
+    }
+
+    public int getTokenInt(){
+        return token.ordinal();
+    }
+
+    public boolean getPreferv6(){
+        return preferv6;
+    }
+
+    public static void main(String args[]){
         EjfatURI ejfatURI = new EjfatURI("ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20");
-        
-        // Get the URI
-        System.out.println("get_lbName: " + ejfatURI.get_lbName());
     }
 }

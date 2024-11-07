@@ -1,0 +1,7 @@
+target/
+builld/
+
+*.class
+*.o
+*.so
+*.jar
