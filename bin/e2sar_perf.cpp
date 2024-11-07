@@ -216,7 +216,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
 
         auto nextTimeT = boost::chrono::steady_clock::now();
 
-        if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(*durationSec)))
+        if ((*durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(*durationSec)))
             break;
 
         if (getEvtRes.has_error())
@@ -337,7 +337,7 @@ int main(int argc, char **argv)
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate");
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
-    opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages [s]");
+    opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of dequeue read threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
 
@@ -501,6 +501,7 @@ int main(int argc, char **argv)
             }
             std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Using " << (vm.count("cores") ? "Assigned Threads To Cores" : "Unassigned Threads") << std::endl;
+            std::cout << "Will run " << (durationSec ? "for " + std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
             std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
