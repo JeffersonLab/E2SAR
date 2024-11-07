@@ -558,7 +558,7 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
                 return 0;
 #else
-                return E2SARErrorInfo{E2SARErrorc::SystemError, "Not supported on this system"};
+                return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not supported on this system"};
 #endif
             }
 

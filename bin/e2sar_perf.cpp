@@ -499,6 +499,7 @@ int main(int argc, char **argv)
                 rflags.validateCert = validate;
             }
             std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Using " << (vm.count("cores") ? "Assigned Threads To Cores" : "Unassigned Threads") << std::endl;
             std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
@@ -506,12 +507,10 @@ int main(int argc, char **argv)
                 ip::address ip = ip::make_address(sndrcvIP);
                 if (vm.count("cores"))
                 {
-                    Reassembler reas(uri, ip, recvStartPort, coreList, rflags);
-                    reasPtr = &reas;
+                    reasPtr = new Reassembler(uri, ip, recvStartPort, coreList, rflags);
                 } else
                 {
-                    Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
-                    reasPtr = &reas;
+                    reasPtr = new Reassembler(uri, ip, recvStartPort, numThreads, rflags);
                 }
 
                 boost::thread statT(&recvStatsThread, reasPtr);
@@ -519,6 +518,8 @@ int main(int argc, char **argv)
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
+                    ctrlCHandler(0);
+                    exit(-1);
                 }
                 // start dequeue read threads
                 boost::thread lastThread;
@@ -533,6 +534,8 @@ int main(int argc, char **argv)
                 ctrlCHandler(0);
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create reassembler: " << static_cast<std::string>(e) << std::endl;
+                ctrlCHandler(0);
+                exit(-1);
             }
         }
     } else

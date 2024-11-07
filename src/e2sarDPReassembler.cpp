@@ -515,7 +515,7 @@ namespace e2sar
     {
         // lock for the mutex (must be thread-local)
         thread_local boost::unique_lock<boost::mutex> condLock(recvThreadMtx, boost::defer_lock);
-        
+
         auto nowT = boost::chrono::steady_clock::now();
         boost::chrono::steady_clock::time_point nextTimeT;
         bool overtime = false;
