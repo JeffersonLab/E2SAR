@@ -114,6 +114,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Inter-event sleep time is " << interEventSleepUsec << " microseconds" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using MTU " << s.getMTU() << std::endl;
+    u_int32_t expectedFrames = numEvents * std::ceil((eventBufSize * 1.0)/(s.getMTU() - TOTAL_HDR_LEN));
 
     if (s.getMaxPldLen() < eventPldStart.size() + eventPldEnd.size())
         return E2SARErrorInfo{E2SARErrorc::LogicError, "MTU is too short to send needed payload"};
@@ -157,10 +158,11 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // sleep to allow small number of frames to leave
     if (durationSec > 0)
     {
+        std::cout << "Waiting additional " << durationSec << " seconds before exit" << std::endl;
         boost::chrono::seconds duration(durationSec);
         boost::this_thread::sleep_for(duration);
     }
-    
+
     auto stats = s.getSendStats();
 
     evtBufferPool->purge_memory();
@@ -169,6 +171,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     {
         std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
     }
+    if (expectedFrames > stats.get<0>())
+        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.get<0>() << " of " << 
+            expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
     return 0;
 }
 
