@@ -99,7 +99,7 @@ void freeBuffer(boost::any a)
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
-    size_t eventBufSize, float rateGbps) {
+    size_t eventBufSize, float rateGbps, int durationSec) {
 
     // convert bit rate to event rate
     float eventRate{rateGbps*1000000000/(eventBufSize*8)};
@@ -155,8 +155,11 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         boost::this_thread::sleep_until(until);
     }
     // sleep to allow small number of frames to leave
-    boost::chrono::seconds duration(1);
-    boost::this_thread::sleep_for(duration);
+    if (durationSec > 0)
+    {
+        boost::chrono::seconds duration(durationSec);
+        boost::this_thread::sleep_for(duration);
+    }
     
     auto stats = s.getSendStats();
 
@@ -328,7 +331,7 @@ int main(int argc, char **argv)
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
-    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)");
+    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed) or sender to wait after sending[s,r]");
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s]] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu and --bufsize");
@@ -470,7 +473,7 @@ int main(int argc, char **argv)
 
             try {
                 segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
-                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
+                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps, durationSec);
 
                 if (res.has_error()) {
                     std::cerr << "Segmenter encountered an error: " << res.error().message() << std::endl;
