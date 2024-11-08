@@ -528,6 +528,7 @@ namespace e2sar
             condLock.lock();
             recvThreadCond.wait_for(condLock, boost::chrono::milliseconds(recvWaitTimeout_ms));
             condLock.unlock();
+ 
             eventItem = dequeue();
             nextTimeT = boost::chrono::steady_clock::now();
 

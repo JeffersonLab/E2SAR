@@ -41,7 +41,9 @@ std::vector<std::string> senders;
 void ctrlCHandler(int sig) 
 {
     std::cout << "Stopping threads" << std::endl;
-
+    threadsRunning = false;
+    boost::chrono::milliseconds duration(1000);
+    boost::this_thread::sleep_for(duration);
     if (segPtr != nullptr) {
         if (lbmPtr != nullptr) {
             std::cout << "Removing senders: ";
@@ -64,9 +66,8 @@ void ctrlCHandler(int sig)
         reasPtr->stopThreads();
         delete reasPtr;
     }
-    threadsRunning = false;
+
     // instead of join
-    boost::chrono::milliseconds duration(1000);
     boost::this_thread::sleep_for(duration);
     exit(0);
 }
@@ -210,7 +211,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
     auto nowT = boost::chrono::steady_clock::now();
 
     // receive loop
-    while(true)
+    while(threadsRunning)
     {
         auto getEvtRes = r->recvEvent(&evtBuf, &evtSize, &evtNum, &dataId, 1000);
 
@@ -477,7 +478,7 @@ int main(int argc, char **argv)
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create segmenter: " << static_cast<std::string>(e) << std::endl;
             }
-
+            ctrlCHandler(0);
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 

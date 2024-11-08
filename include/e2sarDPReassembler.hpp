@@ -428,6 +428,7 @@ namespace e2sar
                     auto res = lbman.deregisterWorker();
 
                 stopThreads();
+                recvThreadCond.notify_all();
 
                 // wait to exit
                 if (useCP)
