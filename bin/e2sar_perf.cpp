@@ -99,7 +99,7 @@ void freeBuffer(boost::any a)
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
-    size_t eventBufSize, float rateGbps, int durationSec) {
+    size_t eventBufSize, float rateGbps) {
 
     // convert bit rate to event rate
     float eventRate{rateGbps*1000000000/(eventBufSize*8)};
@@ -155,15 +155,12 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             evtBufferPool->free(item);
         boost::this_thread::sleep_until(until);
     }
-    // sleep to allow small number of frames to leave
-    if (durationSec > 0)
-    {
-        std::cout << "Waiting additional " << durationSec << " seconds before exit" << std::endl;
-        boost::chrono::seconds duration(durationSec);
-        boost::this_thread::sleep_for(duration);
-    }
 
+    // measure this right after we exit the send loop
     auto stats = s.getSendStats();
+    if (expectedFrames > stats.get<0>())
+        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.get<0>() << " of " << 
+            expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
 
     evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.get<0>() << " frames sent, " << stats.get<1>() << " errors" << std::endl;
@@ -171,9 +168,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     {
         std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
     }
-    if (expectedFrames > stats.get<0>())
-        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.get<0>() << " of " << 
-            expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
+
     return 0;
 }
 
@@ -336,7 +331,7 @@ int main(int argc, char **argv)
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
-    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed) or sender to wait after sending[s,r]");
+    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)[s]");
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s]] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu and --bufsize");
@@ -375,6 +370,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
         // these are optional
+        conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
         conflicting_options(vm, "deq", "send");
         conflicting_options(vm, "seq", "recv");
@@ -478,7 +474,7 @@ int main(int argc, char **argv)
 
             try {
                 segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
-                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps, durationSec);
+                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {
                     std::cerr << "Segmenter encountered an error: " << res.error().message() << std::endl;
