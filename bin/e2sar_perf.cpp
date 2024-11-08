@@ -23,6 +23,9 @@ using namespace e2sar;
 boost::pool<> *evtBufferPool;
 // to avoid locking the pool we use the return queue
 boost::lockfree::queue<u_int8_t*> returnBufferQueue{10000};
+// app-level stats
+std::atomic<u_int64_t> mangledEvents{0};
+std::atomic<u_int64_t> receivedWithError{0};
 
 // event payload
 auto eventPldStart = "This is a start of event payload"s;
@@ -38,7 +41,9 @@ std::vector<std::string> senders;
 void ctrlCHandler(int sig) 
 {
     std::cout << "Stopping threads" << std::endl;
-
+    threadsRunning = false;
+    boost::chrono::milliseconds duration(1000);
+    boost::this_thread::sleep_for(duration);
     if (segPtr != nullptr) {
         if (lbmPtr != nullptr) {
             std::cout << "Removing senders: ";
@@ -50,6 +55,7 @@ void ctrlCHandler(int sig)
                 std::cerr << "Unable to remove sender from list on exit: " << rmres.error().message() << std::endl;
         }
         segPtr->stopThreads();
+        delete segPtr;
     }
     if (reasPtr != nullptr)
     {
@@ -58,10 +64,10 @@ void ctrlCHandler(int sig)
         if (deregres.has_error()) 
             std::cerr << "Unable to deregister worker on exit: " << deregres.error().message() << std::endl;
         reasPtr->stopThreads();
+        delete reasPtr;
     }
-    threadsRunning = false;
+
     // instead of join
-    boost::chrono::milliseconds duration(1000);
     boost::this_thread::sleep_for(duration);
     exit(0);
 }
@@ -108,6 +114,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Inter-event sleep time is " << interEventSleepUsec << " microseconds" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using MTU " << s.getMTU() << std::endl;
+    u_int32_t expectedFrames = numEvents * std::ceil((eventBufSize * 1.0)/(s.getMTU() - TOTAL_HDR_LEN));
 
     if (s.getMaxPldLen() < eventPldStart.size() + eventPldEnd.size())
         return E2SARErrorInfo{E2SARErrorc::LogicError, "MTU is too short to send needed payload"};
@@ -148,11 +155,12 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             evtBufferPool->free(item);
         boost::this_thread::sleep_until(until);
     }
-    // sleep to allow small number of frames to leave
-    boost::chrono::seconds duration(1);
-    boost::this_thread::sleep_for(duration);
-    
+
+    // measure this right after we exit the send loop
     auto stats = s.getSendStats();
+    if (expectedFrames > stats.get<0>())
+        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.get<0>() << " of " << 
+            expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
 
     evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.get<0>() << " frames sent, " << stats.get<1>() << " errors" << std::endl;
@@ -160,17 +168,13 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     {
         std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
     }
+
     return 0;
 }
 
-result<int> recvEvents(Reassembler &r, int durationSec) {
-
+result<int> prepareToReceive(Reassembler &r)
+{
     std::cout << "Receiving on ports " << r.get_recvPorts().first << ":" << r.get_recvPorts().second << std::endl;
-
-    u_int8_t *evtBuf{nullptr};
-    size_t evtSize;
-    EventNum_t evtNum;
-    u_int16_t dataId;
 
     // register the worker (will be NOOP if withCP is set to false)
     auto hostname_res = NetUtil::getHostName();
@@ -194,37 +198,46 @@ result<int> recvEvents(Reassembler &r, int durationSec) {
     if (openRes.has_error())
         return openRes;
 
+    return 0;
+}
+
+int recvEvents(Reassembler *r, int *durationSec) {
+
+    u_int8_t *evtBuf{nullptr};
+    size_t evtSize;
+    EventNum_t evtNum;
+    u_int16_t dataId;
+
     // to help print large integers
     std::cout.imbue(std::locale(""));
 
     auto nowT = boost::chrono::steady_clock::now();
 
     // receive loop
-    while(true)
+    while(threadsRunning)
     {
-        auto getEvtRes = r.recvEvent(&evtBuf, &evtSize, &evtNum, &dataId, 1000);
+        auto getEvtRes = r->recvEvent(&evtBuf, &evtSize, &evtNum, &dataId, 1000);
 
         auto nextTimeT = boost::chrono::steady_clock::now();
 
-        if ((durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(durationSec)))
-        {
-            ctrlCHandler(0);
+        if ((*durationSec != 0) && (nextTimeT - nowT > boost::chrono::seconds(*durationSec)))
             break;
-        }
 
         if (getEvtRes.has_error())
-            return getEvtRes;
+        {
+            receivedWithError++;
+            continue;
+        }
 
         if (getEvtRes.value() == -1)
             continue;
 
-        if (memcmp(evtBuf, eventPldStart.c_str(), eventPldStart.size() - 1))
-            return E2SARErrorInfo{E2SARErrorc::MemoryError, "Payload start does not match expected"};
-
-        if (memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
-            return E2SARErrorInfo{E2SARErrorc::MemoryError, "Payload end doesn't match expected"};
+        if (memcmp(evtBuf, eventPldStart.c_str(), eventPldStart.size() - 1) || 
+            memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
+            mangledEvents++;
 
         delete evtBuf;
+        evtBuf = nullptr;
     }
     std::cout << "Completed" << std::endl;
     return 0;
@@ -257,6 +270,7 @@ void recvStatsThread(Reassembler *r)
         */
         std::cout << "Stats:" << std::endl;
         std::cout << "\tEvents Received: " << stats.get<1>() << std::endl;
+        std::cout << "\tEvents Mangled: " << mangledEvents << std::endl;
         std::cout << "\tEvents Lost: " << stats.get<0>() << std::endl;
         std::cout << "\tData Errors: " << stats.get<4>() << std::endl;
         if (stats.get<4>() > 0)
@@ -289,7 +303,7 @@ int main(int argc, char **argv)
     u_int16_t mtu;
     u_int32_t eventSourceId;
     u_int16_t dataId;
-    size_t numThreads, numSockets;
+    size_t numThreads, numSockets, readThreads;
     float rateGbps;
     int sockBufSize;
     int durationSec;
@@ -299,6 +313,7 @@ int main(int argc, char **argv)
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
+    std::vector<int> coreList;
 
     // parameters
     opts("send,s", "send traffic");
@@ -316,7 +331,7 @@ int main(int argc, char **argv)
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
-    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)");
+    opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)[s]");
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s]] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu and --bufsize");
@@ -326,7 +341,9 @@ int main(int argc, char **argv)
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate");
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
-    opts("usec", po::bool_switch()->default_value(false),"use usec clock samples as event numbers in Sync and LB messages [s]");
+    opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
+    opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of dequeue read threads in receiver (defaults to 1) [r]");
+    opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
 
     po::variables_map vm;
 
@@ -338,7 +355,7 @@ int main(int argc, char **argv)
 
     try
     {
-        conflicting_options(vm, "send", "receive");
+        conflicting_options(vm, "send", "recv");
         conflicting_options(vm, "recv", "num");
         conflicting_options(vm, "recv", "enum");
         conflicting_options(vm, "recv", "length");
@@ -352,7 +369,13 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
+        // these are optional
+        conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
+        conflicting_options(vm, "deq", "send");
+        conflicting_options(vm, "seq", "recv");
+        conflicting_options(vm, "cores", "send");
+        conflicting_options(vm, "cores", "threads");
     }
     catch (const std::logic_error &le)
     {
@@ -369,7 +392,7 @@ int main(int argc, char **argv)
 
     withCP = vm["withcp"].as<bool>();
     zeroRate = vm["zerorate"].as<bool>();
-    usecAsEventNum = vm["usec"].as<bool>();
+    usecAsEventNum = not vm["seq"].as<bool>();
 
     bool preferV6 = false;
     if (vm.count("ipv6"))
@@ -450,9 +473,8 @@ int main(int argc, char **argv)
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                Segmenter seg(uri, dataId, eventSourceId, sflags);
-                segPtr = &seg;
-                auto res = sendEvents(seg, startingEventNum, numEvents, eventBufferSize, rateGbps);
+                segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
+                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {
                     std::cerr << "Segmenter encountered an error: " << res.error().message() << std::endl;
@@ -460,7 +482,7 @@ int main(int argc, char **argv)
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create segmenter: " << static_cast<std::string>(e) << std::endl;
             }
-
+            ctrlCHandler(0);
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 
@@ -483,21 +505,44 @@ int main(int argc, char **argv)
                 rflags.validateCert = validate;
             }
             std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Using " << (vm.count("cores") ? "Assigned Threads To Cores" : "Unassigned Threads") << std::endl;
+            std::cout << "Will run " << (durationSec ? "for " + std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
             std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
                 ip::address ip = ip::make_address(sndrcvIP);
-                Reassembler reas(uri, ip, recvStartPort, numThreads, rflags);
-                reasPtr = &reas;
-                boost::thread statT(&recvStatsThread, &reas);
-                auto res = recvEvents(reas, durationSec);
+                if (vm.count("cores"))
+                {
+                    reasPtr = new Reassembler(uri, ip, recvStartPort, coreList, rflags);
+                } else
+                {
+                    reasPtr = new Reassembler(uri, ip, recvStartPort, numThreads, rflags);
+                }
+
+                boost::thread statT(&recvStatsThread, reasPtr);
+                auto res = prepareToReceive(*reasPtr);
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
+                    ctrlCHandler(0);
+                    exit(-1);
                 }
+                // start dequeue read threads
+                boost::thread lastThread;
+                for(size_t i=0; i < readThreads; i++)
+                {
+                    boost::thread syncT(recvEvents, reasPtr, &durationSec);
+                    lastThread = std::move(syncT);
+                }
+                // join the last one
+                lastThread.join();
+                // unregister/stop threads as needed
+                ctrlCHandler(0);
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create reassembler: " << static_cast<std::string>(e) << std::endl;
+                ctrlCHandler(0);
+                exit(-1);
             }
         }
     } else

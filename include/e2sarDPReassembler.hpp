@@ -231,6 +231,11 @@ namespace e2sar
                     sleep_tv.tv_usec = 10000; // 10 msec max
                 }
 
+                inline ~RecvThreadState()
+                {
+                    recvBufferPool.purge_memory();
+                }
+
                 // open v4/v6 sockets
                 result<int> _open();
                 // close sockets
@@ -274,7 +279,8 @@ namespace e2sar
             boost::mutex recvThreadMtx;
             // condition variable for recv thread queue
             boost::condition_variable recvThreadCond;
-            boost::unique_lock<boost::mutex> condLock;
+            // lock for the mutex
+            //thread_local boost::unique_lock<boost::mutex> condLock(recvThreadMtx, boost::defer_lock);
 
             /**
              * Use port range and starting port to assign UDP ports to threads evenly
@@ -422,6 +428,7 @@ namespace e2sar
                     auto res = lbman.deregisterWorker();
 
                 stopThreads();
+                recvThreadCond.notify_all();
 
                 // wait to exit
                 if (useCP)
@@ -554,10 +561,10 @@ namespace e2sar
                 for(auto core: cpuCoreList)
                     CPU_SET(core, &set);
                 if (sched_setaffinity(0, sizeof(set), &set) == -1)
-                    throw E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
+                    return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
                 return 0;
 #else
-                return -1;
+                return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not supported on this system"};
 #endif
             }
 
