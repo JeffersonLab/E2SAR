@@ -22,9 +22,6 @@ e2sar::EjfatURI parseJavaUri(JNIEnv *env, jobject ejfatUri){
   jmethodID getPreferV6ID = getJMethodId(env, jEjfatUriCls, "getPreferv6", "()Z");
   bool preferV6 =  (bool) env->CallBooleanMethod(ejfatUri, getPreferV6ID);
 
-  std::cout << "Parsed EjfatURI " << cpUri << std::endl;
-  std::cout << "Parsed TokenType " << tokenInt << std::endl;
-  std::cout << "Parsed preferV6 " << preferV6 << std::endl;
   e2sar::EjfatURI cp_uri(cpUri,e2sar::EjfatURI::TokenType(tokenInt),preferV6);
   
   return cp_uri;
