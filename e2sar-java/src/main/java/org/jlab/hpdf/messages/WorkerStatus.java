@@ -3,11 +3,11 @@ package org.jlab.hpdf.messages;
 import java.time.Instant;
 
 public class WorkerStatus {
-    String name;
-    float fillPercent;
-    float controlSignal;
-    int slotsAssigned;
-    Instant lastUpdated;
+    public String name;
+    public float fillPercent;
+    public float controlSignal;
+    public int slotsAssigned;
+    public Instant lastUpdated;
 
     public WorkerStatus(String name, float fillPercent, float controlSignal, int slotsAssigned, Instant lastUpdated){
         this.name = name;

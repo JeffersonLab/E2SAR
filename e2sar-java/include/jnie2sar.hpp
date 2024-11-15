@@ -5,7 +5,9 @@
 
 #ifndef _Jni_e2sar
 #define _Jni_e2sar
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*
  * Class:     org_jlab_hpdf_E2sarUtil
  * Method:    getE2sarVersion
@@ -13,5 +15,7 @@
  */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_E2sarUtil_getE2sarVersion
   (JNIEnv *, jclass);
-  
+#ifdef __cplusplus
+}
+#endif  
 #endif

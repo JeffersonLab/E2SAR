@@ -17,7 +17,7 @@ JNIEXPORT jlong JNICALL Java_EjfatURI_createEjfatURI
   }
 
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_E2sarUtil_getE2sarVersion
-  (JNIEnv *env, jclass j_class){
+  (JNIEnv *env, jclass jCallObj){
       return env->NewStringUTF(e2sar::get_Version().data());
   }
 

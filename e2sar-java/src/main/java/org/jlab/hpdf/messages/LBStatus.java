@@ -4,12 +4,12 @@ import java.time.Instant;
 import java.util.List;
 
 public class LBStatus{
-    Instant timestamp;
-    long currentEpoch;
-    long currentPredictedEventNumber;
-    List<WorkerStatus> workers;
-    List<String> senderAddresses;
-    Instant expiresAt;
+    public Instant timestamp;
+    public long currentEpoch;
+    public long currentPredictedEventNumber;
+    public List<WorkerStatus> workers;
+    public List<String> senderAddresses;
+    public Instant expiresAt;
 
     public LBStatus(Instant timestamp, Instant expiresAt, long currentEpoch, long currentPredictedEventNumber, List<WorkerStatus> workers, 
     List<String> senderAddresses){

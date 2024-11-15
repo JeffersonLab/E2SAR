@@ -366,3 +366,31 @@ jobject convertBoostIpAndPortToInetSocketAddress(JNIEnv *env, const boost::asio:
 
     return inetSocketAddress;
 }
+
+std::pair<boost::asio::ip::address, u_int16_t> convertInetSocketAddress(JNIEnv* env, jobject inetSocketAddress) {
+    // Step 1: Get the InetSocketAddress class and methods
+    jclass inetSocketAddressClass = env->GetObjectClass(inetSocketAddress);
+
+    // Get IP address as a string using getAddress().getHostAddress()
+    jmethodID getAddressMethod = env->GetMethodID(inetSocketAddressClass, "getAddress", "()Ljava/net/InetAddress;");
+    jobject inetAddress = env->CallObjectMethod(inetSocketAddress, getAddressMethod);
+
+    jclass inetAddressClass = env->GetObjectClass(inetAddress);
+    jmethodID getHostAddressMethod = env->GetMethodID(inetAddressClass, "getHostAddress", "()Ljava/lang/String;");
+    jstring ipAddressString = (jstring)env->CallObjectMethod(inetAddress, getHostAddressMethod);
+
+    // Convert the Java IP address string to a C++ std::string
+    const char* ipAddressChars = env->GetStringUTFChars(ipAddressString, nullptr);
+    std::string ipAddress(ipAddressChars);
+    env->ReleaseStringUTFChars(ipAddressString, ipAddressChars);
+
+    // Get the port number from InetSocketAddress
+    jmethodID getPortMethod = env->GetMethodID(inetSocketAddressClass, "getPort", "()I");
+    jint port = env->CallIntMethod(inetSocketAddress, getPortMethod);
+
+    // Step 2: Convert IP address string to boost::asio::ip::address
+    boost::asio::ip::address boostAddress = boost::asio::ip::make_address(ipAddress);
+
+    // Step 3: Return as std::pair<boost::asio::ip::address, uint16_t>
+    return std::make_pair(boostAddress, static_cast<u_int16_t>(port));
+}

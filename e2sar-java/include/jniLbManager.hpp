@@ -148,6 +148,14 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__FFZLjava_time_Ins
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_version
   (JNIEnv *, jobject);   
 
+/*
+ * Class:     org_jlab_hpdf_LbManager
+ * Method:    getAddrString
+ * Signature: ()Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getAddrString
+  (JNIEnv *, jobject);
+
 #ifdef __cplusplus
 }
 #endif

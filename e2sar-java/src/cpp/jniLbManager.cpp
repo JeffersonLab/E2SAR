@@ -29,10 +29,10 @@ e2sar::LBManager* getLBManagerFromField(JNIEnv *env, jobject jLbManager){
 }
 
 JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_initLbManager
-  (JNIEnv *env, jobject jCallObj, jobject jEjfatUuri, jboolean jValidateServer, jboolean jUseHostAddress, jobjectArray jSslCredentialOptions, jboolean jSslCredentialOptionsFromFile){
-    e2sar::EjfatURI cp_uri = parseJavaUri(env, jEjfatUuri);
+  (JNIEnv *env, jobject jCallObj, jobject jEjfatUri, jboolean jValidateServer, jboolean jUseHostAddress, jobjectArray jSslCredentialOptions, jboolean jSslCredentialOptionsFromFile){
+    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
     grpc::SslCredentialsOptions opts = parseSslCredemtialOptions(env,jSslCredentialOptions,jSslCredentialOptionsFromFile);
-    e2sar::LBManager* lbman = new e2sar::LBManager(cp_uri, jValidateServer, jUseHostAddress, opts);
+    e2sar::LBManager* lbman = new e2sar::LBManager(*ejfatUri, jValidateServer, jUseHostAddress, opts);
     return (jlong)lbman;
   } 
   
@@ -366,4 +366,20 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_version
       versionVec.push_back(versionTuple.get<2>());
       return convertStringVectorToArrayList(env, versionVec);
     }
+  }
+
+JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getUri
+  (JNIEnv *env, jobject jLbManager){
+
+    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    std::string uri = lbman->get_URI().to_string();
+    return env->NewStringUTF(uri.data());
+  }
+
+JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getAddrString
+  (JNIEnv *env, jobject jLbManager){
+
+    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    std::string addr = lbman->get_AddrString();
+    return env->NewStringUTF(addr.data());
   }

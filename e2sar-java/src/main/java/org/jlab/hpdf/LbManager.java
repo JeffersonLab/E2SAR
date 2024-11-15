@@ -1,13 +1,12 @@
 package org.jlab.hpdf;
 
 import java.util.List;
-import java.net.InetSocketAddress;
 import java.time.Instant;
-import java.util.ArrayList;
+
+import org.apache.commons.cli.Options;
 import org.jlab.hpdf.exceptions.E2sarNativeException;
 import org.jlab.hpdf.messages.LBOverview;
 import org.jlab.hpdf.messages.LBStatus;
-import org.jlab.hpdf.messages.WorkerStatus;
 /**
  * This is a JNI wrapper class for LBManager in cpp. 
  */
@@ -20,6 +19,7 @@ public class LbManager {
      *  stores the pointer of the native LBManager created.
      */
     private long nativeLbManager;
+    private EjfatURI uri;
     
     /**
      * @param EjfatURI Java object which will be converted to CPP EjfatURI in native method
@@ -42,6 +42,7 @@ public class LbManager {
      */
     public LbManager(EjfatURI uri, boolean validateServer, boolean useHostAddress, String[] sslCredOpts, boolean sslCredOptsFromFile){
         nativeLbManager = initLbManager(uri,validateServer,useHostAddress,sslCredOpts,sslCredOptsFromFile);
+        this.uri = uri;
     }
 
     /**
@@ -157,13 +158,8 @@ public class LbManager {
      */
     public native List<String> version() throws E2sarNativeException;
 
-    public static void main(String args[]) throws E2sarNativeException{
-        EjfatURI uri = new EjfatURI("ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20");
-        LbManager lbManager = new LbManager(uri, false, false);
-        ArrayList<String> senders = new ArrayList<>();
-        senders.add("127.0.0.1");
-        senders.add("127.0.0.2");
-        lbManager.reserveLB("e2esar-java", 2000,senders);
-    }
+    public native String getAddrString();
+
+    public EjfatURI getEjfatURI(){return uri;}
     
 }
