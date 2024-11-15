@@ -9,8 +9,6 @@ extern "C" {
 #endif
 
 const std::string nativeEjfatUri = "nativeEjfatURI";
-e2sar::EjfatURI parseJavaUri(JNIEnv *env, jobject ejfatUri);
-
 e2sar::EjfatURI* getEjfatUriFromField(JNIEnv *env, jobject jEjfatUri);
 
 /*

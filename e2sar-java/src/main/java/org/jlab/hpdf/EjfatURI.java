@@ -9,6 +9,9 @@ import org.jlab.hpdf.exceptions.E2sarNativeException;
  * the raw details are stored in the library needed to create an instance of EjfatURI
  */
 public class EjfatURI{
+    static{
+        System.loadLibrary("jnie2sar");
+    }
 
     public enum Token{
         ADMIN,
