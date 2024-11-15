@@ -1,5 +1,5 @@
 project('E2SAR', 'cpp',
-        version: '0.1.3', default_options : ['cpp_std=c++17'])
+        version: '0.1.4', default_options : ['cpp_std=c++17'])
 
 compiler = meson.get_compiler('cpp')
 
