@@ -37,6 +37,6 @@ add_library(jnie2sar SHARED src/cpp/jnie2sar.cpp src/cpp/jniLbManager.cpp src/cp
 target_link_libraries(jnie2sar ${E2SAR_LIBRARIES}
 ${Boost_LIBRARIES} ${GRPC_LIBRARIES} ${Protobuf_LIBRARIES} Threads::Threads ${JNI_LIBRARIES})
 if (CMAKE_CXX_COMPILER_ID MATCHES Clang)
-  target_compile_options(ersapSegmentor PRIVATE -Wno-return-type-c-linkage)
+  target_compile_options(jnie2sar PRIVATE -Wno-return-type-c-linkage)
 endif()
 install(TARGETS jnie2sar DESTINATION "./") 

@@ -38,7 +38,7 @@ jobject convertJobjectVectorToArrayList(JNIEnv *env, const std::vector<jobject> 
 
 jobject convertStringVectorToArrayList(JNIEnv *env, const std::vector<std::string> &vec);
 
-jobject convertBoostIpToInetAddress(JNIEnv *env, boost::asio::ip::address &address);
+jobject convertBoostIpToInetAddress(JNIEnv *env, const boost::asio::ip::address &address);
 
 jobject convertBoostIpAndPortToInetSocketAddress(JNIEnv *env, const boost::asio::ip::address &address, int port);
 

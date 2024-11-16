@@ -1,4 +1,4 @@
-project('E2SAR', 'cpp',
+project('E2SAR', ['cpp','java'],
         version: '0.1.4', default_options : ['cpp_std=c++17'])
 
 compiler = meson.get_compiler('cpp')
@@ -77,6 +77,7 @@ subdir('src')
 subdir('test')
 subdir('bin')
 subdir('scripts')
+subdir('e2sar-java')
 
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(libraries : libe2sar,
