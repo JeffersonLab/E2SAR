@@ -63,6 +63,3 @@ chmod +x .docker/cli-plugins/docker-compose
 
 curl -SL https://github.com/docker/buildx/releases/download/v0.14.0/buildx-v0.14.0.linux-amd64  -o $DOCKER_CONFIG/cli-plugins/docker-buildx
 chmod +x .docker/cli-plugins/docker-buildx
-
-# put cpnode in etc hosts to enable testing certificate validation
-echo "192.168.0.3 cpnode" | sudo tee -a /etc/hosts
