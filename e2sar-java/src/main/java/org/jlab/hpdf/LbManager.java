@@ -42,7 +42,7 @@ public class LbManager {
      */
     public LbManager(EjfatURI uri, boolean validateServer, boolean useHostAddress, String[] sslCredOpts, boolean sslCredOptsFromFile){
         nativeLbManager = initLbManager(uri,validateServer,useHostAddress,sslCredOpts,sslCredOptsFromFile);
-        this.uri = uri;
+        
     }
 
     /**
@@ -69,7 +69,7 @@ public class LbManager {
      *
      * @return - FPGA LB ID, for use in correlating logs/metrics
      */
-    public native int reserveLB(String lbName, String duration, List<String> senders) throws E2sarNativeException;
+    public native int reserveLB(long nativeLbManager, String lbName, String duration, List<String> senders) throws E2sarNativeException;
 
     /**
      * Native method to reserve a new load balancer with this name of duration in seconds
@@ -80,7 +80,7 @@ public class LbManager {
      *
      * @return - FPGA LB ID, for use in correlating logs/metrics
      */
-    public native int reserveLB(String lbName, double seconds, List<String> senders)throws E2sarNativeException;
+    public native int reserveLB(long nativeLbManager, String lbName, double seconds, List<String> senders)throws E2sarNativeException;
 
     /**
      * Native method to Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
@@ -91,20 +91,20 @@ public class LbManager {
      * the cp address and admin token and it will be updated to contain dataplane and sync addresses.
      * 
      */
-    public native void getLB(String lbid) throws E2sarNativeException;
+    public native void getLB(long nativeLbManager, String lbid) throws E2sarNativeException;
 
     /**
      * Get load balancer info using lb id in the URI object
      * 
      */
-    public native void getLB() throws E2sarNativeException;
+    public native void getLB(long nativeLbManager) throws E2sarNativeException;
 
     /**
      * Native method to get load balancer status including list of workers, sender IP addresses.
      * 
      * @return LBStatus message 
      * */ 
-    public native LBStatus getStatus() throws E2sarNativeException;
+    public native LBStatus getStatus(long nativeLbManager) throws E2sarNativeException;
 
     /**
      * Get load balancer status including list of workers, sender IP addresses.
@@ -114,19 +114,19 @@ public class LbManager {
      * 
      * @return - LBStatus message
      */
-    public native LBStatus getStatus(String lbid) throws E2sarNativeException;
+    public native LBStatus getStatus(long nativeLbManager, String lbid) throws E2sarNativeException;
 
-    public native List<LBOverview> getOverview() throws E2sarNativeException;
+    public native List<LBOverview> getOverview(long nativeLbManager) throws E2sarNativeException;
 
     // public native List<WorkerStatus> getWorkerStatusList() throws E2sarNativeException;
 
-    public native void addSenders(List<String> senders) throws E2sarNativeException;
+    public native void addSenders(long nativeLbManager, List<String> senders) throws E2sarNativeException;
 
-    public native void removeSenders(List<String> senders) throws E2sarNativeException;
+    public native void removeSenders(long nativeLbManager, List<String> senders) throws E2sarNativeException;
 
-    public native void freeLB(String lbid) throws E2sarNativeException;
+    public native void freeLB(long nativeLbManager, String lbid) throws E2sarNativeException;
 
-    public native void freeLB() throws E2sarNativeException;
+    public native void freeLB(long nativeLbManager) throws E2sarNativeException;
     
     /**
      * Register a workernode/backend with an allocated loadbalancer. Note that this call uses
@@ -143,23 +143,26 @@ public class LbManager {
      * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
      * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
      */
-    public native void registerWorker(String nodeName, String nodeIP, int port, float weight, int source_count, float min_factor, float max_factor) throws E2sarNativeException;
+    public native void registerWorker(long nativeLbManager, String nodeName, String nodeIP, int port, float weight, int source_count, float min_factor, float max_factor) throws E2sarNativeException;
 
-    public native void deregisteWorker() throws E2sarNativeException;
+    public native void deregisteWorker(long nativeLbManager, ) throws E2sarNativeException;
 
-    public native void sendState(float fill_percent, float control_signal, boolean isReady) throws E2sarNativeException;
+    public native void sendState(long nativeLbManager, float fill_percent, float control_signal, boolean isReady) throws E2sarNativeException;
 
-    public native void sendState(float fill_percent, float control_signal, boolean isReady, Instant timestamp) throws E2sarNativeException;
+    public native void sendState(long nativeLbManager, float fill_percent, float control_signal, boolean isReady, Instant timestamp) throws E2sarNativeException;
 
     /**
      * Get the version of the load balancer (the commit string)
      *
      * @return the result with commit string, build tag and compatTag in
      */
-    public native List<String> version() throws E2sarNativeException;
+    public native List<String> version(long nativeLbManager) throws E2sarNativeException;
 
-    public native String getAddrString();
+    public native String getAddrString(long nativeLbManager);
 
-    public EjfatURI getEjfatURI(){return uri;}
+    public EjfatURI getEjfatURI(){
+        return uri;
+    }
+    
     
 }

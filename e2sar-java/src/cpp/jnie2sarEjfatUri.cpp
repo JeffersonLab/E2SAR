@@ -1,5 +1,10 @@
 #include "jnie2sarEjfatUri.hpp"
 
+e2sar::EjfatURI* getEjfatUriFromField(JNIEnv *env, jobject jEjfatUri){
+  e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(getLongField(env, jEjfatUri, nativeEjfatUri.data()));
+  return ejfatUri;
+}
+
 JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_EjfatURI_initEjfatUri
   (JNIEnv *env, jclass jEjfatUri, jstring jUri, jint jTokenType, jboolean jPreferv6){
     std::string uri = jstring2string(env, jUri);
@@ -22,40 +27,30 @@ JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_EjfatURI_getUriFromFile
     }
   }
 
-e2sar::EjfatURI* getEjfatUriFromField(JNIEnv *env, jobject jEjfatUri){
-  e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(getLongField(env, jEjfatUri, nativeEjfatUri.data()));
-  return ejfatUri;
-}
-
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_getUseTls
-  (JNIEnv *env, jclass jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jclass jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->get_useTls();
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    setInstanceToken
- * Signature: (Ljava/lang/String;)V
- */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setInstanceToken
-  (JNIEnv *env, jobject jEjfatUri, jstring jInstanceToken){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jstring jInstanceToken){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string instanceToken = jstring2string(env,jInstanceToken);
     ejfatUri->set_InstanceToken(instanceToken);
   }
 
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSessionToken
-  (JNIEnv *env, jobject jEjfatUri, jstring jSessionToken){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jstring jSessionToken){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string sessionToken = jstring2string(env,jSessionToken);
     ejfatUri->set_SessionToken(sessionToken);
   }
 
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionToken
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     auto res = ejfatUri->get_SessionToken();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -69,8 +64,8 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionToken
 
 
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getAdminToken
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     auto res = ejfatUri->get_AdminToken();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -84,22 +79,22 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getAdminToken
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setLbName
-  (JNIEnv *env, jobject jEjfatUri, jstring jLbName){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jstring jLbName){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string lbName = jstring2string(env, jLbName);
     ejfatUri->set_lbName(lbName);
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setLbid
-  (JNIEnv *env, jobject jEjfatUri, jstring jLbid){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jstring jLbid){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string lbid = jstring2string(env, jLbid);
     ejfatUri->set_lbId(lbid);
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSessionId
-  (JNIEnv *env, jobject jEjfatUri, jstring jSessionId){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jstring jSessionId){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string sessionId = jstring2string(env, jSessionId);
     ejfatUri->set_sessionId(sessionId);
   }
@@ -110,8 +105,8 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSessionId
  * Signature: (Ljava/net/InetSocketAddress;)V
  */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSyncAddr
-  (JNIEnv *env, jobject jEjfatUri, jobject jInetSocketAddress){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jobject jInetSocketAddress){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::pair<boost::asio::ip::address, u_int16_t> syncAddr = convertInetSocketAddress(env, jInetSocketAddress);
     ejfatUri->set_syncAddr(syncAddr);
   }
@@ -122,8 +117,8 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSyncAddr
  * Signature: (Ljava/net/InetSocketAddress;)V
  */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setDataAddr
-  (JNIEnv *env, jobject jEjfatUri, jobject jInetSocketAddress){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jobject jInetSocketAddress){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::pair<boost::asio::ip::address, u_int16_t> syncAddr = convertInetSocketAddress(env, jInetSocketAddress);
     ejfatUri->set_dataAddr(syncAddr);
   }
@@ -134,8 +129,8 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setDataAddr
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbName
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string lbName = ejfatUri->get_lbName();
     return env->NewStringUTF(lbName.data());
   }
@@ -146,8 +141,8 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbName
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbid
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string lbid = ejfatUri->get_lbId();
     return env->NewStringUTF(lbid.data());
   }
@@ -158,8 +153,8 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbid
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionId
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     std::string sessionId = ejfatUri->get_sessionId();
     return env->NewStringUTF(sessionId.data());
   }
@@ -170,8 +165,8 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionId
  * Signature: ()Ljava/net/InetSocketAddress;
  */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpAddr
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     auto res = ejfatUri->get_cpAddr();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -189,8 +184,8 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpAddr
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddrv4
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_dataAddrv4();
   }
 
@@ -200,8 +195,8 @@ JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddrv4
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddrv6
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_dataAddrv6();
   }
 
@@ -211,8 +206,8 @@ JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddrv6
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddr
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_dataAddr();
   }
 
@@ -222,8 +217,8 @@ JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddr
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasSyncAddr
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_syncAddr();
   }
 
@@ -233,8 +228,8 @@ JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasSyncAddr
  * Signature: ()Ljava/net/InetSocketAddress;
  */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv4
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     auto res = ejfatUri->get_dataAddrv4();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -252,8 +247,8 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv4
  * Signature: ()Ljava/net/InetSocketAddress;
  */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv6
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     auto res = ejfatUri->get_dataAddrv6();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -271,8 +266,8 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv6
  * Signature: ()Ljava/net/InetSocketAddress;
  */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getSyncAddr
-  (JNIEnv *env, jobject jEjfatUri){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     auto res = ejfatUri->get_syncAddr();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -290,7 +285,13 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getSyncAddr
  * Signature: (I)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_toString
-  (JNIEnv *env, jobject jEjfatUri, jint jToken){
-    e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jint jToken){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return env->NewStringUTF(ejfatUri->to_string(e2sar::EjfatURI::TokenType(jToken)).data());
+  }
+
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_freeNativePointer
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
+    delete ejfatUri;
   }

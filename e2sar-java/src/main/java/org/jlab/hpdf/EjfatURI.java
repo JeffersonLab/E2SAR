@@ -50,52 +50,84 @@ public class EjfatURI{
     private static native long getUriFromFile(String fileName, int t, boolean preferv6) throws E2sarNativeException;
 
      /** check if TLS should be used */
-    public native boolean getUseTls();
+    public boolean getUseTls(){return this.getUseTls(nativeEjfatURI);}
+    private native boolean getUseTls(long nativeEjfatURI);
 
-    public native void setInstanceToken(String t);
+    public void setInstanceToken(String t){setInstanceToken(nativeEjfatURI, t);}
+    private native void setInstanceToken(long nativeEjfatURI, String t);
 
-    public native void setSessionToken(String t);
+    public void setSessionToken(String t){setInstanceToken(nativeEjfatURI, t);}
+    private native void setSessionToken(long nativeEjfatURI, String t);
 
-    public native String getSessionToken() throws E2sarNativeException;
+    public String getSessionToken() throws E2sarNativeException{return getSessionToken(nativeEjfatURI);}
+    private native String getSessionToken(long nativeEjfatURI) throws E2sarNativeException;
 
-    public native String getAdminToken() throws E2sarNativeException;
+    public String getAdminToken() throws E2sarNativeException{return getAdminToken(nativeEjfatURI);}
+    private native String getAdminToken(long nativeEjfatURI) throws E2sarNativeException;
 
-    public native void setLbName(String lbName);
+    public void setLbName(String lbName){setLbName(nativeEjfatURI, lbName);}
+    private native void setLbName(long nativeEjfatURI, String lbName);
 
-    public native void setLbid(String lbid);
+    public void setLbid(String lbid){}
+    private native void setLbid(long nativeEjfatURI, String lbid);
 
-    public native void setSessionId(String sessionId);
+    public void setSessionId(String sessionId){setSessionId(nativeEjfatURI, sessionId);}
+    private native void setSessionId(long nativeEjfatURI, String sessionId);
 
-    public native void setSyncAddr(InetSocketAddress socketAddress);
+    public void setSyncAddr(InetSocketAddress socketAddress){setSyncAddr(nativeEjfatURI, socketAddress);}
+    private native void setSyncAddr(long nativeEjfatURI, InetSocketAddress socketAddress);
 
-    public native void setDataAddr(InetSocketAddress socketAddress);
+    public void setDataAddr(InetSocketAddress socketAddress){setDataAddr(nativeEjfatURI, socketAddress);}
+    private native void setDataAddr(long nativeEjfatURI, InetSocketAddress socketAddress);
 
-    public native String getLbName();
+    public String getLbName(){return getLbName(nativeEjfatURI);}
+    private native String getLbName(long nativeEjfatURI);
 
-    public native String getLbid();
+    public String getLbid(){return getLbid();}
+    private native String getLbid(long nativeEjfatURI);
 
-    public native String getSessionId();
+    public String getSessionId(){return getSessionId(nativeEjfatURI);}
+    private native String getSessionId(long nativeEjfatURI);
 
-    public native InetSocketAddress getCpAddr() throws E2sarNativeException;
+    public InetSocketAddress getCpAddr() throws E2sarNativeException{return getCpAddr(nativeEjfatURI);}
+    private native InetSocketAddress getCpAddr(long nativeEjfatURI) throws E2sarNativeException;
 
-    public native boolean hasDataAddrv4();
+    public boolean hasDataAddrv4(){return hasDataAddr(nativeEjfatURI);}
+    private native boolean hasDataAddrv4(long nativeEjfatURI);
 
-    public native boolean hasDataAddrv6();
+    public boolean hasDataAddrv6(){return hasDataAddr(nativeEjfatURI);}
+    private native boolean hasDataAddrv6(long nativeEjfatURI);
 
-    public native boolean hasDataAddr();
+    public boolean hasDataAddr(){return hasDataAddr(nativeEjfatURI);}
+    private native boolean hasDataAddr(long nativeEjfatURI);
 
-    public native boolean hasSyncAddr();
+    public boolean hasSyncAddr(){return hasSyncAddr(nativeEjfatURI);}
+    private native boolean hasSyncAddr(long nativeEjfatURI);
 
-    public native InetSocketAddress getDataAddrv4() throws E2sarNativeException;
+    public InetSocketAddress getDataAddrv4() throws E2sarNativeException{return getDataAddrv4(nativeEjfatURI);}
+    private native InetSocketAddress getDataAddrv4(long nativeEjfatURI) throws E2sarNativeException;
 
-    public native InetSocketAddress getDataAddrv6() throws E2sarNativeException;
+    public InetSocketAddress getDataAddrv6() throws E2sarNativeException{return getDataAddrv6(nativeEjfatURI);}
+    private native InetSocketAddress getDataAddrv6(long nativeEjfatURI) throws E2sarNativeException;
 
-    public native InetSocketAddress getSyncAddr() throws E2sarNativeException;
+    public InetSocketAddress getSyncAddr() throws E2sarNativeException{return getSyncAddr(nativeEjfatURI);}
+    private native InetSocketAddress getSyncAddr(long nativeEjfatURI) throws E2sarNativeException;
 
     public String toString(Token t){
-        return toString(t.ordinal());
+        return toString(nativeEjfatURI, t.ordinal());
     }
 
-    private native String toString(int t);
+    private native String toString(long nativeEjfatURI, int t);
+
+    private native void freeNativePointer(long nativeEjfatURI);
+
+    public void free(){
+        if(nativeEjfatURI != 0){
+            freeNativePointer(nativeEjfatURI);
+            nativeEjfatURI = 0;
+        }
+    }
+
+
 
 }
