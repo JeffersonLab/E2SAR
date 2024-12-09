@@ -420,8 +420,8 @@ namespace e2sar
             // CP requires PID signal and queue fill state in order to come up
             // with a schedule  for a new epoch. The CP and receiver nodes running
             // Reassembler are not synchronized so the start of the epoch is not known
-            // to the worker node. For this reason the Segmenter
-            // or rather this thread running in Segmenter context on a worker node
+            // to the worker node. For this reason the Reassembler
+            // or rather this thread running in Reassembler context on a worker node
             // samples the queue and computes the PID at 10Hz/100ms 
             // over a sliding 1 sec window sending the update to CP each time.
             //
