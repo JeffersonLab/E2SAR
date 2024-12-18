@@ -28,7 +28,7 @@ namespace e2sar
          * @param interfaceName - name of the interface
          * @return MTU or 1500 as the best guess
          */
-        static u_int16_t getMTU(const std::string &interfaceName);
+        static size_t getMTU(const std::string &interfaceName);
         /**
          * Get the hostname of the host
          */
