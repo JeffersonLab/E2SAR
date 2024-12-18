@@ -33,7 +33,7 @@ BOOST_AUTO_TEST_CASE(NetUtilTest3)
 {
     #ifdef NETLINK_CAPABLE
     // test getting outgoing interface and MTU for a given destination
-    std::string destination{'8.8.8.8'};
+    std::string destination{"8.8.8.8"};
     auto res = NetUtil::getInterfaceAndMTU(ip::make_address(destination));
 
     BOOST_CHECK(!res.has_error());
