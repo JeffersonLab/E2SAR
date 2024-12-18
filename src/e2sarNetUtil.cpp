@@ -84,12 +84,13 @@ namespace e2sar
             struct rtattr *rta = RTM_RTA(rtm);
             int rta_len = RTM_PAYLOAD(nlh);
 
+            // walk RTNETLINK attributes
             for (; RTA_OK(rta, rta_len); rta = RTA_NEXT(rta, rta_len)) {
                 if (rta->rta_type == RTA_OIF) {
                     int ifindex = *(int *)RTA_DATA(rta);
                     char ifname[IFNAMSIZ];
                     if_indextoname(ifindex, ifname);
-
+                    // TODO: Call getMTU instead
                     struct ifreq ifr;
                     memset(&ifr, 0, sizeof(ifr));
                     strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
