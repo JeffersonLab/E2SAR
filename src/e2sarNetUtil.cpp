@@ -6,9 +6,9 @@ namespace e2sar
      * Get MTU of a given interface. Used in constructors, so doesn't
      * return error.
      */
-    u_int16_t NetUtil::getMTU(const std::string &interfaceName) {
+    size_t NetUtil::getMTU(const std::string &interfaceName) {
         // Default MTU
-        u_int16_t mtu = 1500;
+        size_t mtu = 1500;
 
         int sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
         struct ifreq ifr;
