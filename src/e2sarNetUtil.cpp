@@ -90,17 +90,10 @@ namespace e2sar
                     int ifindex = *(int *)RTA_DATA(rta);
                     char ifname[IFNAMSIZ];
                     if_indextoname(ifindex, ifname);
-                    // TODO: Call getMTU instead
-                    struct ifreq ifr;
-                    memset(&ifr, 0, sizeof(ifr));
-                    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
-
-                    if (ioctl(sock, SIOCGIFMTU, &ifr) < 0) 
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-
-                    //printf("MTU of interface %s (index %d) to %s is %d\n", ifname, ifindex, dest_ip, ifr.ifr_mtu);
+                    
+                    auto mtu = getMTU(ifname);
                     close(sock);
-                    return boost::make_tuple<std::string, u_int16_t>(ifname, ifr.ifr_mtu);
+                    return boost::make_tuple<std::string, u_int16_t>(ifname, mtu);
                 }
             }   
         }
