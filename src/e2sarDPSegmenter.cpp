@@ -53,7 +53,7 @@ namespace e2sar
         auto destintfres = NetUtil::getInterfaceAndMTU(dataaddr);
 
         if (destintfres.has_error())
-            throw E2SARException("Unable to determine outgoing interface for ")
+            throw E2SARException("Unable to determine outgoing interface for ");
 
         destinfmtu = destintfres.value().second;
         sendThreadState.iface = destintfres.value().first;
