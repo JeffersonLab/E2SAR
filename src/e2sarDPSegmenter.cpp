@@ -55,8 +55,8 @@ namespace e2sar
         if (destintfres.has_error())
             throw E2SARException("Unable to determine outgoing interface for ")
 
-        destinfmtu = desintfres.value().second;
-        sendThreadState.iface = desintfres.value().first;
+        destinfmtu = destintfres.value().second;
+        sendThreadState.iface = destintfres.value().first;
 
         if (sflags.mtu == 0)
             mtu = destinfmtu;
