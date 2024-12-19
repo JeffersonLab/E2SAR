@@ -55,13 +55,13 @@ namespace e2sar
         if (destintfres.has_error())
             throw E2SARException("Unable to determine outgoing interface for ");
 
-        destinfmtu = destintfres.value().second;
+        auto destintfmtu = destintfres.value().second;
         sendThreadState.iface = destintfres.value().first;
 
         if (sflags.mtu == 0)
-            mtu = destinfmtu;
+            mtu = destintfmtu;
         else
-            if (sflags.mtu <= destinfmtu)
+            if (sflags.mtu <= destintfmtu)
                 mtu = sflags.mtu;
             else
                 throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU");
