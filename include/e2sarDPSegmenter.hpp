@@ -175,8 +175,8 @@ namespace e2sar
                 const bool useZerocopy;
 
                 // transmit parameters
-                const size_t mtu; // must accommodate typical IP, UDP, LB+RE headers and payload
-                const std::string iface; // outgoing interface
+                size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
+                std::string iface{""}; // outgoing interface - we may set it if possible
                 const size_t maxPldLen;
 
                 // UDP sockets and matching sockaddr structures (local and remote)
@@ -212,17 +212,6 @@ namespace e2sar
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
                 }
 
-                inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
-                    seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
-                    mtu{NetUtil::getMTU(iface)}, iface{iface},
-                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
-                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
-                {
-                    // this way every segmenter send thread has a unique PRNG sequence
-                    auto nowT = boost::chrono::system_clock::now();
-                    ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
-                }
-
                 // open v4/v6 sockets
                 result<int> _open();
                 // close sockets
@@ -246,6 +235,7 @@ namespace e2sar
             // use usec clock samples as event numbers in Sync and LB
             bool usecAsEventNum;
             // use additional entropy in the clock samples
+#define MIN_CLOCK_ENTROPY 6
             bool addEntropy;
 
             /**
@@ -280,11 +270,12 @@ namespace e2sar
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
              * - zeroRate - don't provide event number change rate in Sync {false}
-             * - clockAsEventNum - use usec clock samples as event numbers in LB and Sync packets {false}
+             * - usecAsEventNum - use usec clock samples as event numbers in LB and Sync packets {true}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
-             * IP, UDP and LBRE headers) {1500}
+             * IP, UDP and LBRE headers). Value of 0 means auto-detect based on MTU of outgoing interface
+             * - Linux only {1500}
              * - numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
@@ -321,26 +312,10 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param sfalags - SegmenterFlags 
+             * @param sflags - SegmenterFlags 
              */
             Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId,  
                 const SegmenterFlags &sflags=SegmenterFlags());
-#if 0
-            /**
-             * Initialize segmenter state. Call openAndStart() to begin operation.
-             * @param uri - EjfatURI initialized for sender with sync address and data address(es)
-             * @param dataId - unique identifier of the originating segmentation point (e.g. a DAQ), 
-             * carried in SAR header
-             * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
-             * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param iface - use the following interface for data.
-             * (get MTU from the interface and, if possible, set it as outgoing - available on Linux)
-             * @param sflags - SegmenterFlags
-             */
-            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, 
-                std::string iface=""s, 
-                const SegmenterFlags &sflags=SegmenterFlags());
-#endif
 
             /**
              * Don't want to be able to copy these objects normally
@@ -417,6 +392,14 @@ namespace e2sar
             inline const boost::tuple<u_int64_t, u_int64_t, int> getSendStats() const noexcept
             {
                 return getStats(sendStats);
+            }
+
+            /**
+             * Get the outgoing interface (if available)
+             */
+            inline const std::string getIntf() const noexcept
+            {
+                return sendThreadState.iface;
             }
 
             /**

@@ -113,6 +113,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Event rate is " << eventRate << " Hz" << std::endl;
     std::cout << "Inter-event sleep time is " << interEventSleepUsec << " microseconds" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
+    std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
     std::cout << "Using MTU " << s.getMTU() << std::endl;
     u_int32_t expectedFrames = numEvents * std::ceil((eventBufSize * 1.0)/(s.getMTU() - TOTAL_HDR_LEN));
 
