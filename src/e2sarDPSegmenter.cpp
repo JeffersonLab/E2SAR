@@ -16,7 +16,7 @@ namespace e2sar
     // a condition for new events
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid,  
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, 
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
@@ -29,33 +29,52 @@ namespace e2sar
         useCP{sflags.useCP},
         zeroRate{sflags.zeroRate},
         usecAsEventNum{sflags.usecAsEventNum},
-        addEntropy{(clockEntropyTest() > 6 ? false : true)}
+        addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
     {
-        sanityChecks();
-    }
+        size_t mtu = 0;
+#if NETLINK_CAPABLE
+        // determine the outgoing interface and its MTU based on URI data address 
+        ip::address dataaddr;
+        if (sflags.dpV6) 
+        {
+            // use dataplane v6 address for a routing query
+            auto data = dpuri.get_dataAddrv6();
+            if (data.has_error())
+                throw E2SARException("IPV6 Data address is not present in the URI");
+            dataaddr = data.value().first;
+        } else  
+        {
+            // use dataplane v4 address for a routing query
+            auto data = dpuri.get_dataAddrv4();
+            if (data.has_error())
+                throw E2SARException("IPV4 Data address is not present in the URI");
+            dataaddr = data.value().first;
+        }
+        auto destintfres = NetUtil::getInterfaceAndMTU(dataaddr);
 
-#if 0
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, 
-        const std::string iface, 
-        const SegmenterFlags &sflags): 
-        dpuri{uri}, 
-        dataId{did},
-        eventSrcId{esid},
-        numSendSockets{sflags.numSendSockets},
-        eventStatsBuffer{sflags.syncPeriods},
-        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
-        useCP{sflags.useCP},
-        zeroRate{sflags.zeroRate},
-        usecAsEventNum{sflags.usecAsEventNum},
-        addEntropy{(clockEntropyTest() > 6 ? false : true)}
-    {
+        if (destintfres.has_error())
+            throw E2SARException("Unable to determine outgoing interface for ")
 
-        // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
-        // set maxPldLen
-        sanityChecks();
-    }
+        destinfmtu = desintfres.value().second;
+        sendThreadState.iface = desintfres.value().first;
+
+        if (sflags.mtu == 0)
+            mtu = destinfmtu;
+        else
+            if (sflags.mtu <= destinfmtu)
+                mtu = sflags.mtu;
+            else
+                throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU");
+#else
+        if (sflags.mtu == 0)
+            throw E2SARException("Unable to detect outgoing interface MTU on this platform");
+        else
+            mtu = sflags.mtu;
 #endif
+        // override the value set in constructor
+        sendThreadState.mtu = mtu;
+        sanityChecks();
+    }
 
     result<int> Segmenter::openAndStart() noexcept
     {
