@@ -71,7 +71,6 @@ void init_e2sarDP_segmenter(py::module_ &m)
     py::class_<Segmenter::SegmenterFlags>(m, "SegmenterFlags")
         .def(py::init<>())  // The default values will be the same in Python after binding.
         .def_readwrite("dpV6", &Segmenter::SegmenterFlags::dpV6)
-        .def_readwrite("zeroCopy", &Segmenter::SegmenterFlags::zeroCopy)
         .def_readwrite("connectedSocket", &Segmenter::SegmenterFlags::connectedSocket)
         .def_readwrite("useCP", &Segmenter::SegmenterFlags::useCP)
         .def_readwrite("zeroRate", &Segmenter::SegmenterFlags::zeroRate)

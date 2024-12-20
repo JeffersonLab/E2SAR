@@ -172,7 +172,6 @@ namespace e2sar
 
                 // flags
                 const bool useV6;
-                const bool useZerocopy;
 
                 // transmit parameters
                 size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
@@ -202,8 +201,8 @@ namespace e2sar
                 // to get better entropy in usec clock samples (if needed)
                 boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
-                inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
-                    seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
+                inline SendThreadState(Segmenter &s, bool v6, u_int16_t mtu, bool cnct=true): 
+                    seg{s}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
                     maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
@@ -266,7 +265,6 @@ namespace e2sar
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
              * - dpV6 - prefer V6 dataplane if the URI specifies both data=<ipv4>&data=<ipv6> addresses {false}
-             * - zeroCopy - use zeroCopy send optimization {false}
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
              * - zeroRate - don't provide event number change rate in Sync {false}
@@ -284,7 +282,6 @@ namespace e2sar
             struct SegmenterFlags 
             {
                 bool dpV6; 
-                bool zeroCopy;
                 bool connectedSocket;
                 bool useCP;
                 bool zeroRate;
@@ -295,7 +292,7 @@ namespace e2sar
                 size_t numSendSockets;
                 int sndSocketBufSize;
 
-                SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
+                SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, zeroRate{false}, usecAsEventNum{true}, 
                     syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
