@@ -25,7 +25,7 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
+        sendThreadState(*this, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
         useCP{sflags.useCP},
         zeroRate{sflags.zeroRate},
         usecAsEventNum{sflags.usecAsEventNum},
@@ -280,9 +280,6 @@ namespace e2sar
 
         // Open v4 and v6 sockets for sending data message via DP
 
-#ifdef ZEROCOPY_AVIALABLE
-        int zerocopy = 1;
-#endif
         // check that MTU setting was sane
         if (mtu <= TOTAL_HDR_LEN)
             return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
@@ -340,25 +337,6 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                }
-                
-                // set SO_ZEROCOPY on Linux
-                if (useZerocopy) {
-#ifdef ZEROCOPY_AVAILABLE
-                    int zerocopy = 1;
-                    int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
-                    if (errz < 0) {
-                        close(fd);
-                        seg.sendStats.errCnt++;
-                        seg.sendStats.lastErrno = errno;
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                    }
-#else
-                    close(fd);
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = errno;
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
-#endif
                 }
 
                 sockaddr_in6 dataAddrStruct6{};
@@ -430,25 +408,6 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
 
-                // set SO_ZEROCOPY if needed
-                if (useZerocopy) {
-#ifdef ZEROCOPY_AVAILABLE
-                   int zerocopy = 1;
-                    int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
-                    if (errz < 0) {
-                        close(fd);
-                        seg.sendStats.errCnt++;
-                        seg.sendStats.lastErrno = errno;
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                    }
-#else
-                    close(fd);
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = errno;
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
-#endif
-                }
-
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
                 dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
@@ -479,11 +438,8 @@ namespace e2sar
         int sendSocket{0};
         // having our own copy on the stack means we can call _send off-thread
         struct msghdr sendhdr{};
-#ifdef ZEROCOPY_AVAILABLE
-        int flags{(useZerocopy ? MSG_ZEROCOPY: 0)};
-#else   
         int flags{0};
-#endif
+
         // new random entropy generated for each event buffer, unless user specified it
         if (entropy == 0)
             entropy = randDist(ranlux);
@@ -556,21 +512,7 @@ namespace e2sar
             curOffset += curLen;
             curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
 
-#ifdef ZEROCOPY_AVIALABLE
-            if (useZerocopy)
             {
-                // do recvmsg to get notification of successful transmission so header buffers
-                // can be freed up. Also to signal user via callback this is finished and event buffer
-                // can be reclaimed. Take care of both immediate send and queued send scenarios.
-                // To be continued.
-                err = (int) sendmsg(sendSocket, &sendhdr, flags);
-            }
-            else
-#endif
-            // Note: we don't need to check useZerocopy here - socket would've been closed
-            // in _open() call
-            {
-                // non zerocopy method
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 if (err == -1)
@@ -668,7 +610,6 @@ namespace e2sar
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
-        sFlags.zeroCopy = paramTree.get<bool>("data-plane.zeroCopy", sFlags.zeroCopy);
         sFlags.connectedSocket = paramTree.get<bool>("data-plane.connectedSocket", 
             sFlags.connectedSocket);
         sFlags.mtu = paramTree.get<u_int16_t>("data-plane.mtu", sFlags.mtu);

@@ -348,7 +348,6 @@ BOOST_AUTO_TEST_CASE(DPSegTest5)
 
     // fill in the parameters
     paramTree.put<bool>("general.useCP", false);
-    paramTree.put<bool>("data-plane.zeroCopy", true);
     paramTree.put<int>("data-plane.sndSocketBufSize", 10000);
 
     try {
@@ -365,7 +364,6 @@ BOOST_AUTO_TEST_CASE(DPSegTest5)
     readFlags = res.value();
 
     BOOST_CHECK(readFlags.useCP == paramTree.get<bool>("general.useCP"));
-    BOOST_CHECK(readFlags.zeroCopy == paramTree.get<bool>("data-plane.zeroCopy"));
     BOOST_CHECK(readFlags.dpV6 == segDefaults.dpV6);
     BOOST_CHECK(readFlags.sndSocketBufSize == paramTree.get<int>("data-plane.sndSocketBufSize"));
 
