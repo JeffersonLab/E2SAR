@@ -176,7 +176,7 @@ namespace e2sar
                 // transmit parameters
                 size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
                 std::string iface{""}; // outgoing interface - we may set it if possible
-                const size_t maxPldLen;
+                size_t maxPldLen; // not a const because mtu is not a const
 
                 // UDP sockets and matching sockaddr structures (local and remote)
                 // <socket fd, local address, remote address>
@@ -256,6 +256,9 @@ namespace e2sar
 
                 if (!dpuri.has_dataAddr())
                     throw E2SARException("Data address is not present in the URI");
+
+                if (sendThreadState.mtu <= TOTAL_HDR_LEN)
+                    throw E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
             }
 
             /** Threads keep running while this is false */

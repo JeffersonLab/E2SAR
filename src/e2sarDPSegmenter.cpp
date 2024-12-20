@@ -71,8 +71,9 @@ namespace e2sar
         else
             mtu = sflags.mtu;
 #endif
-        // override the value set in constructor
+        // override the values set in constructor
         sendThreadState.mtu = mtu;
+        sendThreadState.maxPldLen = mtu - TOTAL_HDR_LEN;
         sanityChecks();
     }
 
@@ -279,10 +280,6 @@ namespace e2sar
     {
 
         // Open v4 and v6 sockets for sending data message via DP
-
-        // check that MTU setting was sane
-        if (mtu <= TOTAL_HDR_LEN)
-            return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
 
         // create numSendSocket bound sockets either v6 or v4. With each socket
         // we save the sockaddr structure in case they are of not connected variety
