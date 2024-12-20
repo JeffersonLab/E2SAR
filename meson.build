@@ -3,21 +3,13 @@ project('E2SAR', 'cpp',
 
 compiler = meson.get_compiler('cpp')
 
-
 if compiler.has_header('linux/netlink.h')
         add_project_arguments('-DNETLINK_CAPABLE', language: ['cpp'])
 endif
 
-zccode = '''
-#include<sys/socket.h>
-void f() {
-int fd = 0;
-int zerocopy = 1;
-int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));}
-'''
-
-if compiler.compiles(zccode, name: 'ZC check')
-        add_project_arguments('-DZEROCOPY_AVAILABLE', language: ['cpp'])
+# check for both kernel capability and liburing-dev presence
+if compiler.has_header('liburing.h') and compiler.has_header('linux/io_uring.h')
+        add_project_arguments('-DLIBURING_CAPABLE', language: ['cpp'])
 endif
 
 affcode = '''
@@ -33,6 +25,19 @@ if compiler.compiles(affcode, name: 'CPU Affinity check')
         add_project_arguments('-DAFFINITY_AVAILABLE', language: ['cpp'])
 endif
 
+
+mmsgcode = '''
+#define _GNU_SOURCE
+#include <sys/socket.h>
+#include <stddef.h>
+void f() {
+  int ret = sendmmsg(0, NULL, 1, 0);
+}
+'''
+
+if compiler.compiles(mmsgcode, name: 'sendmmsg check')
+        add_project_arguments('-DSENDMMSG_AVAILABLE', language: ['cpp'])
+endif
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
