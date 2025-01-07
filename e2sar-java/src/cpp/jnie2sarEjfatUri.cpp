@@ -99,11 +99,6 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSessionId
     ejfatUri->set_sessionId(sessionId);
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    setSyncAddr
- * Signature: (Ljava/net/InetSocketAddress;)V
- */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSyncAddr
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jobject jInetSocketAddress){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -111,11 +106,6 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSyncAddr
     ejfatUri->set_syncAddr(syncAddr);
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    setDataAddr
- * Signature: (Ljava/net/InetSocketAddress;)V
- */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setDataAddr
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jobject jInetSocketAddress){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -123,11 +113,6 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setDataAddr
     ejfatUri->set_dataAddr(syncAddr);
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getLbName
- * Signature: ()Ljava/lang/String;
- */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbName
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -135,11 +120,6 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbName
     return env->NewStringUTF(lbName.data());
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getLbid
- * Signature: ()Ljava/lang/String;
- */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbid
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -147,11 +127,6 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getLbid
     return env->NewStringUTF(lbid.data());
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getSessionId
- * Signature: ()Ljava/lang/String;
- */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionId
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -159,11 +134,6 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionId
     return env->NewStringUTF(sessionId.data());
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getCpAddr
- * Signature: ()Ljava/net/InetSocketAddress;
- */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpAddr
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -178,55 +148,32 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpAddr
     }
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    hasDataAddrv4
- * Signature: ()Z
- */
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddrv4
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_dataAddrv4();
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    hasDataAddrv6
- * Signature: ()Z
- */
+
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddrv6
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_dataAddrv6();
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    hasDataAddr
- * Signature: ()Z
- */
+
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasDataAddr
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_dataAddr();
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    hasSyncAddr
- * Signature: ()Z
- */
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_hasSyncAddr
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->has_syncAddr();
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getDataAddrv4
- * Signature: ()Ljava/net/InetSocketAddress;
- */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv4
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -241,11 +188,6 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv4
     }
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getDataAddrv6
- * Signature: ()Ljava/net/InetSocketAddress;
- */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv6
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -260,11 +202,6 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getDataAddrv6
     }
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    getSyncAddr
- * Signature: ()Ljava/net/InetSocketAddress;
- */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getSyncAddr
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
@@ -279,11 +216,6 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getSyncAddr
     }
   }
 
-/*
- * Class:     org_jlab_hpdf_EjfatURI
- * Method:    toString
- * Signature: (I)Ljava/lang/String;
- */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_toString
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer, jint jToken){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);

@@ -33,6 +33,10 @@ public class EjfatURI{
         return createInstance(uri, Token.ADMIN, false);
     }
 
+    public static EjfatURI getInternalInstance(long nativeEjfatURI){
+        return new EjfatURI(nativeEjfatURI);
+    }
+
     public static EjfatURI getFromEnv(String envVariable, Token token, boolean preferv6) throws E2sarNativeException{
         String uri = System.getenv(envVariable);
         if(uri == null || uri.isEmpty()){
