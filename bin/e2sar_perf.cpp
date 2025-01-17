@@ -87,7 +87,7 @@ void option_dependency(const po::variables_map &vm,
                        const std::string &for_what, const std::string &required_option)
 {
     if (vm.count(for_what) && !vm[for_what].defaulted())
-        if (vm.count(required_option) == 0 || vm[required_option].defaulted())
+        if (vm.count(required_option) == 0)
             throw std::logic_error(std::string("Option '") + for_what + "' requires option '" + required_option + "'.");
 }
 
