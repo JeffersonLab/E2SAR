@@ -9,7 +9,7 @@ endif
 
 # check for both kernel capability and liburing-dev presence
 if compiler.has_header('liburing.h') and compiler.has_header('linux/io_uring.h')
-        add_project_arguments('-DLIBURING_CAPABLE', language: ['cpp'])
+        add_project_arguments('-DLIBURING_AVAILABLE', language: ['cpp'])
 endif
 
 affcode = '''
