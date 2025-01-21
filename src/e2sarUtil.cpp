@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <set>
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -17,6 +18,83 @@ namespace e2sar
     const std::string& get_Version() 
     {
         return E2SARVersion;
+    }
+
+    const std::string available_optimizations[] = 
+    {
+#ifdef LIBURING_AVAILABLE
+        "liburing-send"s,
+        "liburing-recv"s,
+#elif defined(SENDMMSG_AVAILABLE)
+        "sendmmsg"s,
+#endif
+    };
+
+    std::set<std::string> selected_optimizations;
+
+    /**
+     * Get a string showing available optimizations for send/and/or/receive
+     */
+    const std::string get_Optimizations() noexcept
+    {
+        std::string ret; 
+
+        for(std::string s: available_optimizations)
+        {
+            ret += s + ", ";
+        }
+        return (ret.length() == 0 ? "none" : ret);
+    }
+
+    /**
+     * Provide a list of optimizations we want to use. It will be checked
+     * for compatibility and availability of these options. Use get_Optimizations()
+     * to get the available optimizations
+     * @throws E2SARException
+     */
+    result<int> select_Optimizations(std::vector<std::string>& opts)
+    {
+        // check this is available
+        for(auto r: opts)
+        {
+            bool found = false;
+            for(auto a: available_optimizations)
+            {
+                if (a == r) 
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (not found)
+                return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + r + " is not available on this platform"s};
+            selected_optimizations.insert(r);
+        }
+
+        // check options for conflict
+        if (selected_optimizations.count("sendmmsg") and 
+            selected_optimizations.count("liburing-send"))
+            return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
+        return 0;
+    }
+
+    std::string get_SelectedOptimizations()
+    {
+        std::string ret; 
+
+        for(std::string s: selected_optimizations)
+        {
+            ret += s + ", ";
+        }
+        return (ret.length() == 0 ? "none" : ret);
+    }
+
+    /**
+     * Returns true if the named optimization is selected
+     */
+    bool is_SelectedOptimization(std::string s) noexcept
+    {
+        return selected_optimizations.count(s) == 1;
     }
 
     /**
