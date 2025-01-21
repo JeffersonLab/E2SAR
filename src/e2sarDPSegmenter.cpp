@@ -431,11 +431,21 @@ namespace e2sar
         EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy)
     {
         int err;
-        struct iovec iov[2];
         int sendSocket{0};
         // having our own copy on the stack means we can call _send off-thread
         struct msghdr sendhdr{};
         int flags{0};
+#ifdef SENDMMSG_AVAILABLE
+        // allocate mmsg vector based on event buffer size using fast int ceiling
+        struct mmsghdr *mmsgvec = nullptr;
+        size_t numBuffers = 0;
+        size_t packetIndex = 0;
+        if (is_SelectedOptimization("sendmmsg"))
+        {
+            numBuffers = (bytes + maxPldLen - 1)/ maxPldLen;
+            mmsgvec = static_cast<struct msghdr*>(mmsgPool.malloc_n(1, numBuffers));
+        }
+#endif
 
         // new random entropy generated for each event buffer, unless user specified it
         if (entropy == 0)
@@ -490,6 +500,8 @@ namespace e2sar
         {
             // fill out LB and RE headers
             auto hdr = lbreHdrPool.construct();
+            // allocate iov (this returns two entries)
+            auto iov = static_cast<struct iovec*>(iovecPool.malloc());
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
@@ -509,19 +521,49 @@ namespace e2sar
             curOffset += curLen;
             curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
 
+#ifdef SENDMMSG_AVAILABLE
+            if (is_SelectedOptimization("sendmmsg"))
             {
+                // copy the contents of sendhdr into appropriate index of mmsgvec
+                memcpy(&mmsgvec[packetIndex].msg_hdr, &sendhdr, sizeof(sendhdr));
+                packetIndex++;
+            }
+            else 
+#endif
+            {
+                // just regular sendmsg
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
+                // free the header here for this situation
+                lbreHdrPool.free(hdr);
+                iovecPool.free(iov);
                 if (err == -1)
                 {
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-                // free the header here for this situation
-                lbreHdrPool.free(hdr);
             } 
         }
+#ifdef SENDMMSG_AVAILABLE
+        if (is_SelectedOptimization("sendmmsg"))
+        {
+            // send using vector of msg_hdrs via sendmmsg
+            seg.sendStats.msgCnt++;
+            // this is a blocking version so send everything or error out
+            err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
+            // free up mmsgvec and included iovecs
+            for(int i = 0; i < numBuffers; i++)
+                iovecPool.free(mmsgvec[i].msg_iov);
+            mmsgPool.free_n(mmsgvec, 1, numBuffers);
+            if (err = -1)
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastErrno = errno;
+                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+            }
+        }
+#endif
         // update the event send stats
         seg.eventsInCurrentSync++;
 

@@ -315,6 +315,7 @@ int main(int argc, char **argv)
     std::string iniFile;
     u_int16_t recvStartPort;
     std::vector<int> coreList;
+    std::vector<std::string> optimizations;
 
     // parameters
     opts("send,s", "send traffic");
@@ -345,6 +346,7 @@ int main(int argc, char **argv)
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
+    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
 
     po::variables_map vm;
 
@@ -385,11 +387,21 @@ int main(int argc, char **argv)
     }
 
     std::cout << "E2SAR Version: " << get_Version() << std::endl;
+    std::cout << "E2SAR Available Optimizations: " << get_Optimizations() << std::endl;
+    
     if (vm.count("help"))
     {
         std::cout << od << std::endl;
         return 0;
     }
+
+    auto ropt = select_Optimizations(optimizations);
+    if (ropt.has_error())
+    {
+        std::cerr << ropt.error().message() << std::endl;
+        return -1;
+    }
+    std::cout << "E2SAR Selected Optimizations: " << get_SelectedOptimizations() << std::endl;
 
     withCP = vm["withcp"].as<bool>();
     zeroRate = vm["zerorate"].as<bool>();

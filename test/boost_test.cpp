@@ -397,5 +397,29 @@ int main()
     std::cout << "Original timestamp " << now1Usec << " with added entropy " << addedEntropy << std::endl;
     std::cout << "Original & 0xFF " << (now1Usec & 0xFF) << " with added entropy & 0xFF " << (addedEntropy & 0xFF) << std::endl; 
     
+    std::string ar[] = 
+    {
+        "string1",
+        "string2"
+    };
+
+    std::string sum;
+
+    for (std::string s: ar)
+    {
+        sum += s + ", ";
+    }
+
+    std::cout << "The sum of strings: " << sum << std::endl;
+
+    // round-up integer divide
+    size_t maxPldLen = 9000;
+
+    for(size_t bytes = 35998; bytes < 36002; bytes++)
+    {
+        auto numFrames = (bytes + maxPldLen -1)/ maxPldLen;
+
+        std::cout << "Number of frames for even of size " << bytes << " and payload length " << maxPldLen << " is " << numFrames << std::endl;
+    }
 }
 
