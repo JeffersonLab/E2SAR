@@ -560,7 +560,7 @@ namespace e2sar
             }
             delete[] mmsgvec;
             // sendmmsg returns the number of updated mmsgvec[i].msg_len entries
-            if (err =! (int)numBuffers)
+            if (err != (int)numBuffers)
             {
                 seg.sendStats.errCnt += numBuffers - err;
                 seg.sendStats.lastErrno = errno;
