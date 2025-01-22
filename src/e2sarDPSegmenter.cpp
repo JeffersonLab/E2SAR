@@ -442,8 +442,9 @@ namespace e2sar
         size_t packetIndex = 0;
         if (is_SelectedOptimization("sendmmsg"))
         {
+            // round up
             numBuffers = (bytes + maxPldLen - 1)/ maxPldLen;
-            mmsgvec = static_cast<struct msghdr*>(mmsgPool.malloc_n(1, numBuffers));
+            mmsgvec = new struct mmsghdr[numBuffers];
         }
 #endif
 
@@ -553,9 +554,9 @@ namespace e2sar
             // this is a blocking version so send everything or error out
             err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
             // free up mmsgvec and included iovecs
-            for(int i = 0; i < numBuffers; i++)
+            for(size_t i = 0; i < numBuffers; i++)
                 iovecPool.free(mmsgvec[i].msg_iov);
-            mmsgPool.free_n(mmsgvec, 1, numBuffers);
+            delete[] mmsgvec;
             if (err = -1)
             {
                 seg.sendStats.errCnt++;
