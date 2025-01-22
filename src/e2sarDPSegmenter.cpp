@@ -563,7 +563,9 @@ namespace e2sar
             if (err != (int)numBuffers)
             {
                 seg.sendStats.errCnt += numBuffers - err;
-                seg.sendStats.lastErrno = errno;
+                // don't override with ESUCCESS
+                if (errno != 0)
+                    seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
         }
