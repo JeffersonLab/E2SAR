@@ -555,9 +555,9 @@ namespace e2sar
             err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
             // free up mmsgvec and included iovecs
             for(size_t i = 0; i < numBuffers; i++)
-                iovecPool.free(mmsgvec[i].msg_iov);
+                iovecPool.free(mmsgvec[i].msg_hdr.msg_iov);
             delete[] mmsgvec;
-            if (err = -1)
+            if (err == -1)
             {
                 seg.sendStats.errCnt++;
                 seg.sendStats.lastErrno = errno;
