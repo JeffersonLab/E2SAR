@@ -1,6 +1,8 @@
 #include <iostream>
 #include <system_error>
 #include <ctime>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/select.h>
 #include <boost/asio.hpp>
 #include <boost/outcome.hpp>
