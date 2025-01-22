@@ -554,18 +554,15 @@ namespace e2sar
             // this is a blocking version so send everything or error out
             err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
             // free up mmsgvec and included iovecs
-            size_t errorFreeSends = 0;
             for(size_t i = 0; i < numBuffers; i++)
             {
                 iovecPool.free(mmsgvec[i].msg_hdr.msg_iov);
-                // count successful sends in the bunch
-                if (mmsgvec[i].msg_len > 0)
-                    errorFreeSends++;
             }
             delete[] mmsgvec;
-            if (err == -1)
+            // sendmmsg returns the number of updated mmsgvec[i].msg_len entries
+            if (err =! (int)numBuffers)
             {
-                seg.sendStats.errCnt += numBuffers - errorFreeSends;
+                seg.sendStats.errCnt += numBuffers - err;
                 seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
