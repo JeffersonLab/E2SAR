@@ -1,6 +1,9 @@
 #ifndef E2SARDSEGMENTERPHPP
 #define E2SARDSEGMENTERPHPP
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #include <boost/asio.hpp>
 #include <boost/lockfree/queue.hpp>
 #include <boost/pool/pool.hpp>
@@ -193,12 +196,8 @@ namespace e2sar
                 // pool of LB+RE headers for sending
                 boost::object_pool<LBREHdr> lbreHdrPool{32,0};
 
-                // pool of iovec[2] items
-                boost::pool<> iovecPool{sizeof(struct iovec) * 2};
-#ifdef SENDMMSG_AVAILABLE
-                // pool of mmsg items
-                boost::pool<> mmsgPool{sizeof(struct mmsg)};
-#endif
+                // pool of iovec items (we grab two at a time)
+                boost::pool<> iovecPool{sizeof(struct iovec)*2};
 
                 // fast random number generator to create entropy values for events
                 // this entropy value is held the same for all packets of a given
