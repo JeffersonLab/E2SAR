@@ -25,7 +25,8 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         "liburing-send"s,
         "liburing-recv"s,
-#elif defined(SENDMMSG_AVAILABLE)
+#endif
+#ifdef SENDMMSG_AVAILABLE
         "sendmmsg"s,
 #endif
     };
