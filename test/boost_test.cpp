@@ -423,5 +423,17 @@ int main()
 
         std::cout << "Number of frames for even of size " << bytes << " and payload length " << maxPldLen << " is " << numFrames << std::endl;
     }
+
+    std::vector<std::string> strs = {"one", "two", "three"};
+    auto it = strs.begin();
+    std::string rets{};
+    while(it != strs.end())
+    {
+        rets += *it;
+        it++;
+        if (it != strs.end())
+            rets += ", ";
+    }
+    std::cout << "Return string " << rets << std::endl;
 }
 

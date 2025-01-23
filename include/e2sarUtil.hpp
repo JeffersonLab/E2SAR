@@ -504,5 +504,20 @@ namespace e2sar
         entropy *= -1.0/std::log(2);
         return entropy;
     }
+
+    template<typename Container>
+    std::string concatWithSeparator(const Container& c, const std::string& sep)
+    {
+        typename Container::const_iterator it = c.begin();
+        std::string rets{};
+        while(it != c.end())
+        {
+            rets += *it;
+            it++;
+            if (it != c.end())
+                rets += sep;
+        }
+        return rets;
+    }
 };
 #endif
