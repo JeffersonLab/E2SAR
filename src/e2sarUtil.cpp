@@ -20,7 +20,7 @@ namespace e2sar
         return E2SARVersion;
     }
 
-    const std::string available_optimizations[] = 
+    const std::vector<std::string> available_optimizations = 
     {
 #ifdef LIBURING_AVAILABLE
         "liburing-send"s,
@@ -37,12 +37,8 @@ namespace e2sar
      */
     const std::string get_Optimizations() noexcept
     {
-        std::string ret; 
+        std::string ret = concatWithSeparator(available_optimizations, ", "s); 
 
-        for(std::string s: available_optimizations)
-        {
-            ret += s + ", ";
-        }
         return (ret.length() == 0 ? "none" : ret);
     }
 
@@ -80,12 +76,8 @@ namespace e2sar
 
     std::string get_SelectedOptimizations()
     {
-        std::string ret; 
+        std::string ret = concatWithSeparator(selected_optimizations, ", "s); 
 
-        for(std::string s: selected_optimizations)
-        {
-            ret += s + ", ";
-        }
         return (ret.length() == 0 ? "none" : ret);
     }
 
