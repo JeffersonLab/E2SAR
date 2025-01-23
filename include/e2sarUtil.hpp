@@ -513,8 +513,7 @@ namespace e2sar
         while(it != c.end())
         {
             rets += *it;
-            it++;
-            if (it != c.end())
+            if (++it != c.end())
                 rets += sep;
         }
         return rets;
