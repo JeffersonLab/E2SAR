@@ -23,7 +23,8 @@ const size_t maxPldLen = 8192;
 const size_t numBuffers = (eventSize + maxPldLen - 1)/ maxPldLen;
 
 // pool of LB+RE headers for sending
-boost::object_pool<LBREHdr> lbreHdrPool{32,0};
+//boost::object_pool<LBREHdr> lbreHdrPool;
+boost::pool<> lbreHdrPool{sizeof(LBREHdr)};
 // pool of iovec items (we grab two at a time)
 boost::pool<> iovecPool{sizeof(struct iovec)*2};
 
@@ -34,7 +35,7 @@ void usePools()
 {
     for(size_t i = 0; i < numBuffers; i++)
     {
-        hdrs[i] = lbreHdrPool.malloc();
+        hdrs[i] = static_cast<LBREHdr*>(lbreHdrPool.malloc());
         iovecs[i] = static_cast<struct iovec*>(iovecPool.malloc());
     }
     for(size_t i = 0; i < numBuffers; i++)
@@ -84,7 +85,7 @@ void doIters(void (*func)(), size_t iters)
 
 int main(int argc, char **argv)
 {
-    size_t numIters = 1000;
+    size_t numIters = 10000;
 
     u_int64_t start, end; 
     
