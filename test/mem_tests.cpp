@@ -18,68 +18,60 @@ inline u_int64_t getMicros()
         return static_cast<u_int64_t>(nowUsec);
 }
 
-size_t eventSize = 1000000;
-size_t maxPldLen = 8192;
-size_t numBuffers = (eventSize + maxPldLen - 1)/ maxPldLen;
+const size_t eventSize = 1000000;
+const size_t maxPldLen = 8192;
+const size_t numBuffers = (eventSize + maxPldLen - 1)/ maxPldLen;
 
 // pool of LB+RE headers for sending
 boost::object_pool<LBREHdr> lbreHdrPool{32,0};
 // pool of iovec items (we grab two at a time)
 boost::pool<> iovecPool{sizeof(struct iovec)*2};
 
-std::vector<LBREHdr*> hdrs;
-std::vector<struct iovec*> iovecs;
+LBREHdr* hdrs[numBuffers];
+struct iovec* iovecs[numBuffers];
 
 void usePools()
 {
     for(size_t i = 0; i < numBuffers; i++)
     {
-        hdrs.push_back(lbreHdrPool.malloc());
-        iovecs.push_back(static_cast<struct iovec*>(iovecPool.malloc()));
+        hdrs[i] = lbreHdrPool.malloc();
+        iovecs[i] = static_cast<struct iovec*>(iovecPool.malloc());
     }
-    for(auto hdr: hdrs)
-        lbreHdrPool.free(hdr);
-
-    for(auto iov: iovecs)
-        iovecPool.free(iov);
-
-    hdrs.clear();
-    iovecs.clear();
+    for(size_t i = 0; i < numBuffers; i++)
+    {
+        lbreHdrPool.free(hdrs[i]);
+        iovecPool.free(iovecs[i]);
+    }
 }
 
 void useMallocs()
 {
     for(size_t i = 0; i < numBuffers; i++)
     {
-        hdrs.push_back(static_cast<LBREHdr*>(malloc(sizeof(LBREHdr))));
-        iovecs.push_back(static_cast<struct iovec*>(calloc(2, sizeof(struct iovec))));
+        hdrs[i] = static_cast<LBREHdr*>(malloc(sizeof(LBREHdr)));
+        iovecs[i] = static_cast<struct iovec*>(calloc(2, sizeof(struct iovec)));
     }
 
-    for(auto hdr: hdrs)
-        free(hdr);
-
-    for(auto iov: iovecs)
-        free(iov);
-
-    hdrs.clear();
-    iovecs.clear();
+    for(size_t i = 0; i < numBuffers; i++)
+    {
+        free(hdrs[i]);
+        free(iovecs[i]);
+    }
 }
 
 void useNew()
 {
     for(size_t i = 0; i < numBuffers; i++)
     {
-        hdrs.push_back(new LBREHdr);
-        iovecs.push_back(new struct iovec[2]);
+        hdrs[i] = new LBREHdr;
+        iovecs[i] = new struct iovec[2];
     }
-    for(auto hdr: hdrs)
-        delete hdr;
 
-    for(auto iov: iovecs)
-        delete[] iov;
-
-    hdrs.clear();
-    iovecs.clear();
+    for(size_t i = 0; i < numBuffers; i++)
+    {
+        delete hdrs[i];
+        delete[] iovecs[i];
+    }
 }
 
 void doIters(void (*func)(), size_t iters)
@@ -97,10 +89,10 @@ int main(int argc, char **argv)
     u_int64_t start, end; 
     
     start = getMicros();
-    doIters(usePools, numIters);
+    doIters(useNew, numIters);
     end = getMicros();
 
-    std::cout << "Pools took " << end - start << " microseconds" << std::endl;
+    std::cout << "New took " << end - start << " microseconds" << std::endl;
 
     start = getMicros();
     doIters(useMallocs, numIters);
@@ -109,8 +101,8 @@ int main(int argc, char **argv)
     std::cout << "Mallocs took " << end - start << " microseconds" << std::endl;
 
     start = getMicros();
-    doIters(useNew, numIters);
+    doIters(usePools, numIters);
     end = getMicros();
 
-    std::cout << "New took " << end - start << " microseconds" << std::endl;
+    std::cout << "Pools took " << end - start << " microseconds" << std::endl;
 }
