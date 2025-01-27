@@ -506,7 +506,7 @@ namespace e2sar
     }
 
     template<typename Container>
-    std::string concatWithSeparator(const Container& c, const std::string& sep)
+    std::string concatWithSeparator(const Container& c, const std::string& sep=","s)
     {
         typename Container::const_iterator it = c.begin();
         std::string rets{};
@@ -518,5 +518,85 @@ namespace e2sar
         }
         return rets;
     }
+
+    // go as powers of 2 to make calculations easier
+    enum class Optimizations {
+        none = 0,
+        sendmmsg = 1,
+        liburing_send = 2,
+        liburing_recv = 3,
+        // always last
+        unknown = 15
+    };
+
+    using OptimizationsWord = u_int16_t;
+
+    inline OptimizationsWord optimizationToValue(Optimizations o)
+    {
+        return 1 >> static_cast<int>(o);
+    }
+
+    inline std::string optimizationToString(Optimizations o)
+    {
+        switch(o)
+        {
+            case Optimizations::none: return "none"s; 
+            case Optimizations::sendmmsg: return "sendmmsg";
+            case Optimizations::liburing_recv: return "liburing_recv";
+            case Optimizations::liburing_send: return "liburing_send";
+            default: "unknown"s;
+        }
+        return "unknown"s;
+    }
+
+    inline Optimizations stringToOptimization(const std::string& opt)
+    {
+        if (opt == "none"s)
+            return Optimizations::none;
+        else if (opt == "sendmmsg"s)
+            return Optimizations::sendmmsg;
+        else if (opt == "liburing_recv"s)
+            return Optimizations::liburing_recv;
+        else if (opt == "liburing_send"s)
+            return Optimizations::liburing_send;
+        return Optimizations::unknown;
+    }
+
+    /**
+     * List of strings of available optimizations that are compiled in
+     */
+    const std::vector<std::string> get_OptimizationsAsStrings() noexcept;
+
+    /**
+     * Get a single 16-bit word with OR of all compiled-in optimizations
+     */
+    OptimizationsWord get_OptimizationsAsWord() noexcept;
+
+    /**
+     * Select optimizations based on names and add them to internal
+     * state
+     */
+    result<int> select_Optimizations(std::vector<std::string>& opt) noexcept;
+
+    /**
+     * Select optimizations based on enum value names and add them to internal
+     * state
+     */
+    result <int> select_Optimizations(std::vector<Optimizations> &opt) noexcept;
+
+    /**
+     * List of strings of selected optimizations
+     */
+    const std::vector<std::string> get_SelectedOptimizationsAsStrings() noexcept;
+
+    /**
+     * List of selected optimizations
+     */
+    const std::vector<Optimizations> get_SelectedOptimizations() noexcept;
+
+    /**
+     * Is this optimization selected?
+     */
+    bool is_SelectedOptimization(Optimizations o) noexcept;
 };
 #endif
