@@ -198,7 +198,7 @@ namespace e2sar
                 size_t roundRobinIndex{0};
 
 #ifdef LIBURING_AVAILABLE
-                struct io_uring *ring;
+                struct io_uring ring;
                 // each ring has to have a predefined size - we want to
                 // put at least 2*eventSize/bufferSize entries onto it
                 const size_t uringSize 1000;
