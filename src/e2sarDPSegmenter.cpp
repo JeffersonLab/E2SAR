@@ -261,9 +261,14 @@ namespace e2sar
                 auto res = _send(item->event, item->bytes, 
                     item->eventNum, item->dataId,
                     item->entropy);
+
                 // FIXME: do something with result? 
-                // maybe not - it should be taken care by lastErrno in
-                // the stats block
+                // it IS  taken care by lastErrno in the stats block. 
+                // Note that in the case of liburing
+                // result cannot reflect the status of any of the send
+                // operations since it is asynchronous - that is collected 
+                // by a separate thread that looks at completion queue
+                // and reflects into the stats block
 
                 // call the callback
                 if (item->callback != nullptr)
@@ -500,7 +505,7 @@ namespace e2sar
         while (curOffset < eventEnd)
         {
             // fill out LB and RE headers
-            auto hdr = lbreHdrPool.construct();
+            auto hdr = static_cast<LBREHdr*>(lbreHdrPool.malloc());
             // allocate iov (this returns two entries)
             auto iov = static_cast<struct iovec*>(iovecPool.malloc());
 
@@ -553,9 +558,10 @@ namespace e2sar
             seg.sendStats.msgCnt += numBuffers;
             // this is a blocking version so send everything or error out
             err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
-            // free up mmsgvec and included iovecs
+            // free up mmsgvec and included headers and iovecs
             for(size_t i = 0; i < numBuffers; i++)
             {
+                lbreHdrPool.free(mmsgvec[i].msg_hdr.msg_iov[0].iov_base);
                 iovecPool.free(mmsgvec[i].msg_hdr.msg_iov);
             }
             delete[] mmsgvec;
