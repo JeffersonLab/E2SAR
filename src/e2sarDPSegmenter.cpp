@@ -445,7 +445,7 @@ namespace e2sar
         struct mmsghdr *mmsgvec = nullptr;
         size_t numBuffers = 0;
         size_t packetIndex = 0;
-        if (is_SelectedOptimization("sendmmsg"))
+        if (is_SelectedOptimization(Optimizations::sendmmsg)
         {
             // round up
             numBuffers = (bytes + maxPldLen - 1)/ maxPldLen;
@@ -528,7 +528,7 @@ namespace e2sar
             curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
 
 #ifdef SENDMMSG_AVAILABLE
-            if (is_SelectedOptimization("sendmmsg"))
+            if (is_SelectedOptimization(Optimizations::sendmmsg))
             {
                 // copy the contents of sendhdr into appropriate index of mmsgvec
                 memcpy(&mmsgvec[packetIndex].msg_hdr, &sendhdr, sizeof(sendhdr));
@@ -552,7 +552,7 @@ namespace e2sar
             } 
         }
 #ifdef SENDMMSG_AVAILABLE
-        if (is_SelectedOptimization("sendmmsg"))
+        if (is_SelectedOptimization(Optimizations::sendmmsg))
         {
             // send using vector of msg_hdrs via sendmmsg
             seg.sendStats.msgCnt += numBuffers;

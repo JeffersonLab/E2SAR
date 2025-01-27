@@ -20,74 +20,116 @@ namespace e2sar
         return E2SARVersion;
     }
 
-    const std::vector<std::string> available_optimizations = 
-    {
-#ifdef LIBURING_AVAILABLE
-        "liburing-send"s,
- //       "liburing-recv"s,
-#endif
+    // vector of possible options
+    std::vector<Optimizations> available_optimizations {
+        Optimizations::none
 #ifdef SENDMMSG_AVAILABLE
-        "sendmmsg"s,
+        , Optimizations::sendmmsg
+#endif
+#ifdef LIBURING_AVAILABLE
+        , Optimizations::liburing_send, Optimizations::liburing_recv
 #endif
     };
 
-    std::set<std::string> selected_optimizations;
+    // this is where we store selected optimizations;
+    OptimizationsWord selected_optimizations{0};
 
     /**
-     * Get a string showing available optimizations for send/and/or/receive
+     * List of strings of available optimizations that are compiled in
      */
-    const std::string get_Optimizations() noexcept
+    const std::vector<std::string> get_OptimizationsAsStrings() noexcept 
     {
-        std::string ret = concatWithSeparator(available_optimizations, ", "s); 
-
-        return (ret.length() == 0 ? "none" : ret);
+        std::vector<std::string> all_strings;
+        for(auto o: available_optimizations)
+        {
+            all_strings.push_back(optimizationToString(o));
+        }
+        return all_strings;
     }
 
     /**
-     * Provide a list of optimizations we want to use. It will be checked
-     * for compatibility and availability of these options. Use get_Optimizations()
-     * to get the available optimizations
-     * @throws E2SARException
+     * A word bit-wise ORing all available optimizationsn
      */
-    result<int> select_Optimizations(std::vector<std::string>& opts)
+    OptimizationsWord get_OptimizationsAsWord() noexcept 
     {
-        // check this is available
-        for(auto r: opts)
+        OptimizationsWord ow{0};
+        for(auto o: available_optimizations)
         {
-            bool found = false;
-            for(auto a: available_optimizations)
-            {
-                if (a == r) 
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if (not found)
-                return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + r + " is not available on this platform"s};
-            selected_optimizations.insert(r);
+            ow = ow | optimizationToValue(o);
+        }
+        return ow;
+    }
+
+    /**
+     * Select optimizations based on names
+     */
+    result<int> select_Optimizations(std::vector<std::string>& opts) noexcept
+    {
+        std::vector<Optimizations> v;
+        for(auto o: opts) 
+        {
+            v.push_back(stringToOptimization(o));
+        }
+        return select_Optimizations(v);
+    }
+
+    /**
+     * Select optimizations based on enum value names
+     */
+    result <int> select_Optimizations(std::vector<Optimizations> &opt) noexcept 
+    {
+        OptimizationsWord ow = get_OptimizationsAsWord();
+        for (auto o: opt)
+        {
+            OptimizationsWord ov= optimizationToValue(o);
+            if (not (ov | ow))
+                return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + optimizationToString(o) + 
+                    " is not available on this platform"s};
+            selected_optimizations = selected_optimizations | ov;
         }
 
-        // check options for conflict
-        if (selected_optimizations.count("sendmmsg") and 
-            selected_optimizations.count("liburing-send"))
+        // check for conflict
+        if (is_SelectedOptimization(Optimizations::sendmmsg) and
+            (is_SelectedOptimization(Optimizations::liburing_recv) or 
+            is_SelectedOptimization(Optimizations::liburing_send)))
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
         return 0;
     }
 
-    std::string get_SelectedOptimizations()
+    /**
+     * List of strings of selected optimizations
+     */
+    const std::vector<std::string> get_SelectedOptimizationsAsStrings() noexcept
     {
-        std::string ret = concatWithSeparator(selected_optimizations, ", "s); 
-
-        return (ret.length() == 0 ? "none" : ret);
+        std::vector<Optimizations> opts = get_SelectedOptimizations();
+        std::vector<std::string> ret;
+        for(auto o: opts)
+        {
+            ret.push_back(optimizationToString(o));
+        }
+        return ret;
     }
 
     /**
-     * Returns true if the named optimization is selected
+     * A word bitwise ORing all selected optimizations
      */
-    bool is_SelectedOptimization(std::string s) noexcept
+    const std::vector<Optimizations> get_SelectedOptimizations() noexcept 
     {
-        return selected_optimizations.count(s) == 1;
+        std::vector<Optimizations> ret;
+        for(auto o: available_optimizations) 
+        {
+            if (optimizationToValue(o) | selected_optimizations)
+                ret.push_back(o);
+        }
+        return ret;
+    }
+
+    /**
+     * Is this optimization selected?
+     */
+    bool is_SelectedOptimization(Optimizations o) noexcept
+    {
+        return optimizationToValue(o) | selected_optimizations;
     }
 
     /**
