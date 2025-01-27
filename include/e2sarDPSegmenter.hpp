@@ -201,7 +201,7 @@ namespace e2sar
                 struct io_uring *ring;
                 // each ring has to have a predefined size - we want to
                 // put at least 2*eventSize/bufferSize entries onto it
-                size_t uringSize;
+                const size_t uringSize 1000;
 #endif
 
                 // pool of LB+RE headers for sending
@@ -229,7 +229,7 @@ namespace e2sar
                     auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
 #ifdef LIBURING_AVAILABLE
-                    int ret = io_uring_queue_init()
+                    int ret = io_uring_queue_init(uringSize, &ring, 0);
 #endif
                 }
 

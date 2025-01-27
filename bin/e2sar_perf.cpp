@@ -387,7 +387,7 @@ int main(int argc, char **argv)
     }
 
     std::cout << "E2SAR Version: " << get_Version() << std::endl;
-    std::cout << "E2SAR Available Optimizations: " << get_Optimizations() << std::endl;
+    std::cout << "E2SAR Available Optimizations: " << concatWithSeparator(get_OptimizationsAsStrings()) << std::endl;
     
     if (vm.count("help"))
     {
@@ -401,7 +401,7 @@ int main(int argc, char **argv)
         std::cerr << ropt.error().message() << std::endl;
         return -1;
     }
-    std::cout << "E2SAR Selected Optimizations: " << get_SelectedOptimizations() << std::endl;
+    std::cout << "E2SAR Selected Optimizations: " << concatWithSeparator(get_SelectedOptimizationsAsStrings()) << std::endl;
 
     withCP = vm["withcp"].as<bool>();
     zeroRate = vm["zerorate"].as<bool>();
