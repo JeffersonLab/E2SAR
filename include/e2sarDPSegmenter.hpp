@@ -4,6 +4,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#ifdef LIBURING_AVAILABLE
+#include <liburing.h>
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/lockfree/queue.hpp>
 #include <boost/pool/pool.hpp>
@@ -193,8 +197,15 @@ namespace e2sar
                 // we RR through these FDs
                 size_t roundRobinIndex{0};
 
+#ifdef LIBURING_AVAILABLE
+                struct io_uring *ring;
+                // each ring has to have a predefined size - we want to
+                // put at least 2*eventSize/bufferSize entries onto it
+                size_t uringSize;
+#endif
+
                 // pool of LB+RE headers for sending
-                boost::object_pool<LBREHdr> lbreHdrPool{32,0};
+                boost::pool<> lbreHdrPool{sizeof(LBREHdr)};
 
                 // pool of iovec items (we grab two at a time)
                 boost::pool<> iovecPool{sizeof(struct iovec)*2};
@@ -217,6 +228,9 @@ namespace e2sar
                     // this way every segmenter send thread has a unique PRNG sequence
                     auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
+#ifdef LIBURING_AVAILABLE
+                    int ret = io_uring_queue_init()
+#endif
                 }
 
                 // open v4/v6 sockets
@@ -487,6 +501,8 @@ namespace e2sar
             }
 
             // process backlog in return queue and free event queue item blocks on it
+            // so long as new events keep coming, backlog will be cleared, for last
+            // event the backlog gets cleared when the pool goes away (as part of object destruction)
             inline void freeEventItemBacklog() 
             {
                 EventQueueItem *item{nullptr};
