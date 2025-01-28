@@ -229,7 +229,7 @@ namespace e2sar
                     auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
 #ifdef LIBURING_AVAILABLE
-                    int ret = io_uring_queue_init(uringSize, &ring, 0);
+                    io_uring_queue_init(uringSize, &ring, 0);
 #endif
                 }
 
