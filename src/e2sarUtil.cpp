@@ -79,7 +79,6 @@ namespace e2sar
     result <int> select_Optimizations(std::vector<Optimizations> &opt) noexcept 
     {
         OptimizationsWord ow = get_OptimizationsAsWord();
-        selected_optimizations = 0;
         for (auto o: opt)
         {
             OptimizationsWord ov= optimizationToValue(o);
@@ -100,6 +99,10 @@ namespace e2sar
             selected_optimizations = optimizationToValue(Optimizations::none);
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
         }
+
+        // remove 'none' if other optimizations are selected
+        if (selected_optimizations ^ optimizationToValue(Optimizations::none))
+            selected_optimizations = selected_optimizations ^ optimizationToValue(Optimizations::none);
         return 0;
     }
 
