@@ -118,18 +118,15 @@ namespace e2sar
         std::vector<Optimizations> ret;
         for(auto o: available_optimizations) 
         {
-            if (optimizationToValue(o) | selected_optimizations)
+            if (is_SelectedOptimization(o))
                 ret.push_back(o);
         }
         return ret;
     }
 
-    /**
-     * Is this optimization selected?
-     */
-    bool is_SelectedOptimization(Optimizations o) noexcept
+    bool is_SelectedOptimization(Optimizations o) noexcept 
     {
-        return optimizationToValue(o) | selected_optimizations;
+        return optimizationToValue(o) & selected_optimizations;
     }
 
     /**
