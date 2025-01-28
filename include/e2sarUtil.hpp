@@ -533,7 +533,7 @@ namespace e2sar
 
     inline OptimizationsWord optimizationToValue(Optimizations o)
     {
-        return 1 >> static_cast<int>(o);
+        return 1 << static_cast<int>(o);
     }
 
     inline std::string optimizationToString(Optimizations o)
