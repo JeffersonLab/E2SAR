@@ -445,7 +445,7 @@ namespace e2sar
         struct mmsghdr *mmsgvec = nullptr;
         size_t numBuffers = 0;
         size_t packetIndex = 0;
-        if (is_SelectedOptimization(Optimizations::sendmmsg)
+        if (is_SelectedOptimization(Optimizations::sendmmsg))
         {
             // round up
             numBuffers = (bytes + maxPldLen - 1)/ maxPldLen;
