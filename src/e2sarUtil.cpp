@@ -32,7 +32,7 @@ namespace e2sar
     };
 
     // this is where we store selected optimizations;
-    OptimizationsWord selected_optimizations{0};
+    OptimizationsWord selected_optimizations{optimizationToValue(Optimizations::none)};
 
     /**
      * List of strings of available optimizations that are compiled in
@@ -79,12 +79,16 @@ namespace e2sar
     result <int> select_Optimizations(std::vector<Optimizations> &opt) noexcept 
     {
         OptimizationsWord ow = get_OptimizationsAsWord();
+        selected_optimizations = 0;
         for (auto o: opt)
         {
             OptimizationsWord ov= optimizationToValue(o);
-            if (not (ov | ow))
+            if (not (ov & ow))
+            {
+                selected_optimizations = optimizationToValue(Optimizations::none);
                 return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + optimizationToString(o) + 
                     " is not available on this platform"s};
+            }
             selected_optimizations = selected_optimizations | ov;
         }
 
@@ -92,7 +96,10 @@ namespace e2sar
         if (is_SelectedOptimization(Optimizations::sendmmsg) and
             (is_SelectedOptimization(Optimizations::liburing_recv) or 
             is_SelectedOptimization(Optimizations::liburing_send)))
+        {
+            selected_optimizations = optimizationToValue(Optimizations::none);
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
+        }
         return 0;
     }
 
