@@ -70,6 +70,20 @@ namespace e2sar
             // how long data send thread spends sleeping
             static const boost::chrono::milliseconds sleepTime;
 
+#ifdef LIBURING_AVAILABLE
+            struct io_uring ring;
+            // each ring has to have a predefined size - we want to
+            // put at least 2*eventSize/bufferSize entries onto it
+            const size_t uringSize = 256;
+
+            // data carried in sqe, returned in cqe
+            // mainly for memory management
+            struct SQEData {
+                struct iovec *iov; // generally a 2-entry array
+                LBREHdr *hdr;
+            };
+#endif
+
             // Structure to hold each send-queue item
             struct EventQueueItem {
                 uint32_t bytes;
@@ -165,8 +179,6 @@ namespace e2sar
             friend struct SyncThreadState;
 
             SyncThreadState syncThreadState;
-            // lock with sync thread
-            //boost::mutex syncThreadMtx;
 
             /**
              * This thread sends data to the LB to be distributed to different processing
@@ -197,18 +209,28 @@ namespace e2sar
                 // we RR through these FDs
                 size_t roundRobinIndex{0};
 
-#ifdef LIBURING_AVAILABLE
-                struct io_uring ring;
-                // each ring has to have a predefined size - we want to
-                // put at least 2*eventSize/bufferSize entries onto it
-                const size_t uringSize = 1000;
-#endif
-
                 // pool of LB+RE headers for sending
                 boost::pool<> lbreHdrPool{sizeof(LBREHdr)};
 
                 // pool of iovec items (we grab two at a time)
                 boost::pool<> iovecPool{sizeof(struct iovec)*2};
+
+#ifdef LIBURING_AVAILABLE
+                boost::pool<> sqeDataPool{sizeof(SQEData)};
+
+                // free the data allocated for SQE from various pools
+                inline void _freeSQEBacklog()
+                {
+                    SQEData *sqeData{nullptr};
+                    while (returnQueue.pop(sqeData))
+                    {
+                        lbreHdrPool.free(sqeData->hdr);
+                        iovecPool.free(sqeData->iov);
+                        sqedataPool.free(sqeData);
+                    }
+
+                }
+#endif
 
                 // fast random number generator to create entropy values for events
                 // this entropy value is held the same for all packets of a given
@@ -228,9 +250,6 @@ namespace e2sar
                     // this way every segmenter send thread has a unique PRNG sequence
                     auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
-#ifdef LIBURING_AVAILABLE
-                    io_uring_queue_init(uringSize, &ring, 0);
-#endif
                 }
 
                 // open v4/v6 sockets
@@ -258,6 +277,27 @@ namespace e2sar
             // use additional entropy in the clock samples
 #define MIN_CLOCK_ENTROPY 6
             bool addEntropy;
+
+#ifdef LIBURING_AVAILABLE
+            // this thread reaps completions off the uring
+            // and updates stat counters
+            struct CQEThreadState {
+                // owner object
+                Segmenter &seg;
+                boost::thread threadObj;
+
+                inline CQEThreadState(Segmenter &s) {seg(s)} 
+                {
+                }
+            };
+            friend struct CQEThreadState;
+
+            CQEThreadState cqeThreadState;
+            // this queue is for SQEData items that carry
+            // pointers to data allocated via pools that need
+            // to be freed without locking
+            boost::lockfree::queue<SQEData*> sqeReturnQueue{QSIZE};
+#endif
 
             /**
              * Check the sanity of constructor parameters
@@ -353,11 +393,23 @@ namespace e2sar
              */
             ~Segmenter()
             {
+#ifdef LIBURING_AVAILABLE
+                if (is_SelectedOptimization(Optimizations::liburing_send))
+                {
+                    io_uring_unregister_files(&ring);
+                    // deallocate the ring
+                    io_uring_queue_exit(&ring);
+                }
+#endif
                 stopThreads();
 
                 // wait to exit
                 syncThreadState.threadObj.join();
                 sendThreadState.threadObj.join();
+#ifdef LIBURING_AVAILABLE
+                if (is_SelectedOptimization(Optimizations::liburing_send))
+                    cqeThreadState.threadObj.join();
+#endif
 
                 // pool memory is implicitly freed when pool goes out of scope
             }
