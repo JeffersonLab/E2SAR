@@ -8,7 +8,13 @@ e2sar::EjfatURI* getEjfatUriFromField(JNIEnv *env, jobject jEjfatUri){
 JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_EjfatURI_initEjfatUri
   (JNIEnv *env, jclass jEjfatUri, jstring jUri, jint jTokenType, jboolean jPreferv6){
     std::string uri = jstring2string(env, jUri);
-    e2sar::EjfatURI* ejfatUri = new e2sar::EjfatURI(uri, e2sar::EjfatURI::TokenType(jTokenType), jPreferv6);
+    e2sar::EjfatURI* ejfatUri;
+    try{
+      ejfatUri = new e2sar::EjfatURI(uri, e2sar::EjfatURI::TokenType(jTokenType), jPreferv6);
+    }
+    catch(const e2sar::E2SARException& e){
+      throwJavaException(env, e);
+    }
     return (jlong)ejfatUri;
   }
 
@@ -28,7 +34,7 @@ JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_EjfatURI_getUriFromFile
   }
 
 JNIEXPORT jboolean JNICALL Java_org_jlab_hpdf_EjfatURI_getUseTls
-  (JNIEnv *env, jclass jEjfatUri, jlong jNativePointer){
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
     return ejfatUri->get_useTls();
   }
@@ -145,6 +151,20 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpAddr
     else{
       auto cpAddr = res.value();
       return convertBoostIpAndPortToInetSocketAddress(env, cpAddr.first, cpAddr.second);
+    }
+  }
+
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpHost
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
+    auto res = ejfatUri->get_cpHost();
+    if(res.has_error()){
+      throwJavaException(env, res.error().message());
+      return nullptr;
+    }
+    else{
+      auto cpHost = res.value();
+      return convertHostNameAndPortToInetSocketAddress(env, cpHost);
     }
   }
 

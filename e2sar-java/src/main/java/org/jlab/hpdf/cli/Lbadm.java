@@ -152,7 +152,8 @@ public class Lbadm {
                 logger.debug("[ name=" + wStatus.name + ", controlsignal=" + wStatus.controlSignal + ", fillpercent=" + wStatus.fillPercent 
                 + ", slotsassigned=" + wStatus.slotsAssigned + ", lastupdated=" + wStatus.lastUpdated.toString() + "] ");
             }
-            logger.debug("LB details: expiresat=" + lbStatus.expiresAt.toString() + ", currentepoch=" + lbStatus.currentEpoch + ", predictedeventnum="
+            String expiresAt = lbStatus.expiresAt != null ? lbStatus.expiresAt.toString() : "This did not work";
+            logger.debug("LB details: expiresat=" + expiresAt + ", currentepoch=" + lbStatus.currentEpoch + ", predictedeventnum="
             + lbStatus.currentPredictedEventNumber);
         }
         catch(E2sarNativeException e){
@@ -299,18 +300,18 @@ public class Lbadm {
         try{
             cmd = parser.parse(options, args);
             optionDependency(cmd, "reserve", "lbname");
-            optionDependency(cmd, "reserve", "duration");
+            // optionDependency(cmd, "reserve", "duration");
             optionDependency(cmd, "reserve", "address");
             optionDependency(cmd, "register", "name");
             optionDependency(cmd, "register", "address");
             optionDependency(cmd, "register", "port");
-            optionDependency(cmd, "register", "weight");
-            optionDependency(cmd, "register", "count");
-            optionDependency(cmd, "register", "minfactor");
-            optionDependency(cmd, "register", "maxfactor");
-            optionDependency(cmd, "state", "queue");
-            optionDependency(cmd, "state", "ctrl");   
-            optionDependency(cmd, "state", "ready");
+            // optionDependency(cmd, "register", "weight");
+            // optionDependency(cmd, "register", "count");
+            // optionDependency(cmd, "register", "minfactor");
+            // optionDependency(cmd, "register", "maxfactor");
+            // optionDependency(cmd, "state", "queue");
+            // optionDependency(cmd, "state", "ctrl");   
+            // optionDependency(cmd, "state", "ready");
             optionDependency(cmd,"addsenders", "address");
             optionDependency(cmd,"removesenders", "address");
             conflictingOptions(cmd, "root", "novalidate");
@@ -366,16 +367,17 @@ public class Lbadm {
             preferHostAddr = true;
         
         EjfatURI uri;
-        if(cmd.hasOption("uri")){
-            uri = EjfatURI.createInstance(cmd.getOptionValue("uri"), tt, preferV6);        }
-        else{
-            try{
+        try{
+            if(cmd.hasOption("uri")){
+                uri = EjfatURI.createInstance(cmd.getOptionValue("uri"), tt, preferV6);       
+            }
+            else{
                 uri = EjfatURI.getFromEnv("EJFAT_URI", tt, preferV6);
             }
-            catch(E2sarNativeException e){
-                logger.error("EJFAT_URI env variable not set", e);
-                return;
-            }
+        }
+        catch(E2sarNativeException e){
+            logger.error("EJFAT_URI env variable not set", e);
+            return;
         }
 
         // remember to override session if provided
@@ -386,24 +388,32 @@ public class Lbadm {
         if (cmd.hasOption("lbid")) 
             uri.setLbid(cmd.getOptionValue("lbid"));
 
-        LbManager lbManager = new LbManager(uri, true, preferHostAddr);
-        if (cmd.hasOption("root") && !uri.getUseTls()){
-            logger.warn("Root certificate passed in, but URL doesn't require TLS/SSL, ignoring");
-        }
-        else{
-            if (cmd.hasOption("root")) {
-                String rootFile = cmd.getOptionValue("root");
-                String[] sslCredOpts = new String[3];
-                sslCredOpts[0] = rootFile;
-                lbManager = new LbManager(uri, true, preferHostAddr, sslCredOpts, true);
+        LbManager lbManager;
+        try{
+            lbManager = new LbManager(uri, true, preferHostAddr);
+            if (cmd.hasOption("root") && !uri.getUseTls()){
+                logger.warn("Root certificate passed in, but URL doesn't require TLS/SSL, ignoring");
             }
             else{
-                if (cmd.hasOption("novalidate")){
-                    logger.info("Skipping server certificate validation");
-                    lbManager = new LbManager(uri, false, preferHostAddr);
+                if (cmd.hasOption("root")) {
+                    String rootFile = cmd.getOptionValue("root");
+                    String[] sslCredOpts = new String[3];
+                    sslCredOpts[0] = rootFile;
+                    lbManager = new LbManager(uri, true, preferHostAddr, sslCredOpts, true);
+                }
+                else{
+                    if (cmd.hasOption("novalidate")){
+                        logger.info("Skipping server certificate validation");
+                        lbManager = new LbManager(uri, false, preferHostAddr);
+                    }
                 }
             }
         }
+        catch(E2sarNativeException e){
+            logger.error("Unable to initialize LbManager", e);
+            return;
+        }
+        
 
         if(cmd.hasOption("reserve")){
             String lbname = cmd.getOptionValue("lbname", "");

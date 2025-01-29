@@ -11,28 +11,34 @@
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>17</maven.compiler.release>
-    <slf4j-version>2.0.16</slf4j-version>
-    <junit-version>4.13.2</junit-version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <maven.compiler-plugin.version>3.8.1</maven.compiler-plugin.version>
+    <maven.assembly-plugin.version>3.7.1</maven.assembly-plugin.version>
+    <maven.surefire-plugin.version>3.5.2</maven.surefire-plugin.version>
+
+    <slf4j.version>2.0.16</slf4j.version>
+    <junit.jupiter-engine.version>5.11.4</junit.jupiter-engine.version>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit-version}</version>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.jupiter-engine.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency> 
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>${slf4j-version}</version>
+      <version>${slf4j.version}</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
-      <version>${slf4j-version}</version>
-      <scope>test</scope>
+      <version>${slf4j.version}</version>
+      <!-- <scope>test</scope> -->
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>
@@ -46,7 +52,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>${maven.compiler-plugin.version}</version>
           <configuration>
                 <compilerArgs>
                     <arg>-h</arg>
@@ -59,6 +65,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
+          <version>${maven.assembly-plugin.version}</version>
           <configuration>
             <descriptorRefs>
                 <descriptorRef>jar-with-dependencies</descriptorRef>
@@ -77,7 +84,24 @@
                   <goal>single</goal>
                 </goals>
             </execution>
-        </executions>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven.surefire-plugin.version}</version>
+          <dependencies>
+              <dependency>
+                  <groupId>org.junit.jupiter</groupId>
+                  <artifactId>junit-jupiter-engine</artifactId>
+                  <version>${junit.jupiter-engine.version}</version>
+              </dependency>
+          </dependencies>
+          <configuration>
+            <environmentVariables>
+              <EJFAT_URI><![CDATA[ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20]]></EJFAT_URI>
+            </environmentVariables>
+          </configuration>
         </plugin>
       </plugins>
   </build>

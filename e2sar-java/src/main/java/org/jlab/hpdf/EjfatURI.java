@@ -25,15 +25,15 @@ public class EjfatURI{
         this.nativeEjfatURI = nativeEjfatURI;
     }
 
-    public static EjfatURI createInstance(String uri, Token token, boolean preferv6){
+    public static EjfatURI createInstance(String uri, Token token, boolean preferv6)throws E2sarNativeException{
         return new EjfatURI(initEjfatUri(uri, token.ordinal(), preferv6));
     }
 
-    public static EjfatURI createInstance(String uri){
+    public static EjfatURI createInstance(String uri)throws E2sarNativeException{
         return createInstance(uri, Token.ADMIN, false);
     }
 
-    public static EjfatURI getInternalInstance(long nativeEjfatURI){
+    protected static EjfatURI getInternalInstance(long nativeEjfatURI){
         return new EjfatURI(nativeEjfatURI);
     }
 
@@ -87,7 +87,7 @@ public class EjfatURI{
     public String getLbName(){return getLbName(nativeEjfatURI);}
     private native String getLbName(long nativeEjfatURI);
 
-    public String getLbid(){return getLbid();}
+    public String getLbid(){return getLbid(nativeEjfatURI);}
     private native String getLbid(long nativeEjfatURI);
 
     public String getSessionId(){return getSessionId(nativeEjfatURI);}
@@ -96,10 +96,13 @@ public class EjfatURI{
     public InetSocketAddress getCpAddr() throws E2sarNativeException{return getCpAddr(nativeEjfatURI);}
     private native InetSocketAddress getCpAddr(long nativeEjfatURI) throws E2sarNativeException;
 
-    public boolean hasDataAddrv4(){return hasDataAddr(nativeEjfatURI);}
+    public InetSocketAddress getCpHost() throws E2sarNativeException {return getCpHost(nativeEjfatURI);}
+    private native InetSocketAddress getCpHost(long nativeEjfatURI) throws E2sarNativeException;
+
+    public boolean hasDataAddrv4(){return hasDataAddrv4(nativeEjfatURI);}
     private native boolean hasDataAddrv4(long nativeEjfatURI);
 
-    public boolean hasDataAddrv6(){return hasDataAddr(nativeEjfatURI);}
+    public boolean hasDataAddrv6(){return hasDataAddrv6(nativeEjfatURI);}
     private native boolean hasDataAddrv6(long nativeEjfatURI);
 
     public boolean hasDataAddr(){return hasDataAddr(nativeEjfatURI);}

@@ -6,6 +6,7 @@ grpc::SslCredentialsOptions parseSslCredemtialOptions(JNIEnv *env, jobjectArray 
   if(jSslCredentialOptionsFromFile){
     auto res = e2sar::LBManager::makeSslOptionsFromFiles(stringVector[0],stringVector[1],stringVector[2]);
     if(!res.has_error()){
+      throwJavaException(env, res.error().message());
       return res.value();
     }
     else{
@@ -28,6 +29,7 @@ e2sar::LBManager* getLBManagerFromField(JNIEnv *env, jobject jLbManager){
   return lbman;
 }
 
+
 JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_initLbManager
   (JNIEnv *env, jobject jCallObj, jobject jEjfatUri, jboolean jValidateServer, jboolean jUseHostAddress, jobjectArray jSslCredentialOptions, jboolean jSslCredentialOptionsFromFile){
     e2sar::EjfatURI* ejfatUri = getEjfatUriFromField(env, jEjfatUri);
@@ -35,11 +37,11 @@ JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_initLbManager
     e2sar::LBManager* lbman = new e2sar::LBManager(*ejfatUri, jValidateServer, jUseHostAddress, opts);
     return (jlong)lbman;
   } 
-  
-JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String_2Ljava_lang_String_2Ljava_util_List_2
-  (JNIEnv *env, jobject jLbManager, jstring jLbid, jstring jDuration, jobject jSenders){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__JLjava_lang_String_2Ljava_lang_String_2Ljava_util_List_2
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jstring jLbid, jstring jDuration, jobject jSenders){
+
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string lbid = jstring2string(env, jLbid);
     std::string duration = jstring2string(env, jDuration);
     boost::posix_time::time_duration timeDuration;
@@ -50,7 +52,6 @@ JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String
       throwJavaException(env, "Unable to convert duration string " + duration);
       return -1;
     }
-    std::cout << timeDuration << std::endl;
 
     std::vector<std::string> senders = jstringList2Vector(env, jSenders);
     
@@ -62,10 +63,10 @@ JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String
     return res.value();
   }
 
-JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String_2DLjava_util_List_2
-  (JNIEnv *env, jobject jLbManager, jstring jLbid, jdouble jSeconds, jobject jSenders){
+JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__JLjava_lang_String_2DLjava_util_List_2
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jstring jLbid, jdouble jSeconds, jobject jSenders){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string lbid = jstring2string(env, jLbid);
     double seconds = jSeconds;
 
@@ -80,10 +81,10 @@ JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String
 
   }   
 
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__Ljava_lang_String_2
-  (JNIEnv *env, jobject jLbManager, jstring jLbid){
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__JLjava_lang_String_2
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jstring jLbid){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string lbid = jstring2string(env, jLbid);
     
     auto res = lbman->getLB(lbid);
@@ -93,20 +94,15 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__Ljava_lang_String_2
     }
   }
 
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__
-  (JNIEnv *env, jobject jLbManager){
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__J
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     auto res = lbman->getLB();
     if (res.has_error()){
       throwJavaException(env, res.error().message());
       return;
     }
   }
-
-// JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getWorkerStatusList
-//   (JNIEnv *env, jobject jLbManager){
-
-//   }
 
 jobject convertToJWorkerStatus(JNIEnv *env, WorkerStatus wstatus){
   jstring jName = env->NewStringUTF(wstatus.name().data());
@@ -122,7 +118,7 @@ jobject convertToJWorkerStatus(JNIEnv *env, WorkerStatus wstatus){
 
     jmethodID constructor = env->GetMethodID(jWorkerStatusClass, "<init>", "(Ljava/lang/String;FFILjava/time/Instant;)V");
     if (constructor == nullptr) {
-        std::cerr << "Error: Could not find the constructor." << std::endl;
+      throwJavaException(env, "Could not find the constructor of class: " + javaWorkerStatusClass);
         return nullptr;
     }
     jobject myObject = env->NewObject(jWorkerStatusClass, constructor, jName, jFillPercent, jControlSignal, jSlotsAssigned, jLastUpdated);
@@ -154,11 +150,12 @@ jobject convertToJLBStatus(JNIEnv *env, e2sar::LBStatus lbstatus){
   jclass jLBStatusClass = env->FindClass(javaLBStatusClass.data());
   if (jLBStatusClass == nullptr) {
       throwJavaException(env, "Could not find class: " + javaWorkerStatusClass);
+      return nullptr;
   }
 
   jmethodID constructor = env->GetMethodID(jLBStatusClass, "<init>", "(Ljava/time/Instant;Ljava/time/Instant;JJLjava/util/List;Ljava/util/List;)V");
   if (constructor == nullptr) {
-      std::cerr << "Error: Could not find the constructor." << std::endl;
+      throwJavaException(env, "Could not find the constructor of class: " + javaWorkerStatusClass);
       return nullptr;
   }
   jobject myObject = env->NewObject(jLBStatusClass, constructor, jInstantTimestamp, jExpiresAt, jCurrentEpoch, jCurrentPredictedEventNumber, jWorkerArrayList, jSenderAddresses);
@@ -169,11 +166,11 @@ jobject convertToJLBStatus(JNIEnv *env, e2sar::LBStatus lbstatus){
   return myObject;
 }
 
-JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__
-  (JNIEnv *env, jobject jLbManager){
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__J
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
     
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
-
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
+    
     auto res = lbman->getLBStatus();
     if (res.has_error()){
       throwJavaException(env, res.error().message());
@@ -185,10 +182,10 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__
     }
   }
 
-  JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__Ljava_lang_String_2
-  (JNIEnv *env, jobject jLbManager, jstring jlbid){
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__JLjava_lang_String_2
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jstring jlbid){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string lbid = jstring2string(env, jlbid);
 
     auto res = lbman->getLBStatus(lbid);
@@ -213,14 +210,14 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__
 
     jclass jOverviewClass = env->FindClass(javaLBOverviewClass.data());
     if (jOverviewClass == nullptr) {
-        std::cerr << "Error: Could not find Java class com/example/MyClass." << std::endl;
+        throwJavaException(env, "Could not find class: " + javaLBOverviewClass);
         return nullptr;
     }
 
     // Step 2: Get the constructor ID with the specified signature
-    jmethodID constructor = env->GetMethodID(jOverviewClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/net/InetSocketAddress;Ljava/net/InetAddress;Ljava/net/InetAddress;ILBStatus;)V");
+    jmethodID constructor = env->GetMethodID(jOverviewClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/net/InetSocketAddress;Ljava/net/InetAddress;Ljava/net/InetAddress;ILorg/jlab/hpdf/messages/LBStatus;)V");
     if (constructor == nullptr) {
-        std::cerr << "Error: Could not find the specified constructor." << std::endl;
+        throwJavaException(env, "Could not find the constructor of class: " + javaLBOverviewClass);
         return nullptr;
     }
 
@@ -239,11 +236,11 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__
     return jLBOveriew;
   }
 
-  JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getOverview
-  (JNIEnv *env, jobject jLbManager){
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getOverview
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
-
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
+    
     auto res = lbman->overview();
     if (res.has_error()){
       throwJavaException(env, res.error().message());
@@ -261,9 +258,9 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_addSenders
-  (JNIEnv *env, jobject jLbManager, jobject jSenderList){
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jobject jSenderList){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::vector<std::string> senders = jstringList2Vector(env, jSenderList);
     auto res = lbman->addSenders(senders);
     if(res.has_error()){
@@ -272,9 +269,9 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_addSenders
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_removeSenders
-  (JNIEnv *env, jobject jLbManager, jobject jSenderList){
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jobject jSenderList){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::vector<std::string> senders = jstringList2Vector(env, jSenderList);
     auto res = lbman->removeSenders(senders);
     if(res.has_error()){
@@ -282,10 +279,10 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_removeSenders
     }
   }
 
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__Ljava_lang_String_2
-  (JNIEnv *env, jobject jLbManager, jstring jLbid){
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__JLjava_lang_String_2
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jstring jLbid){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string lbid = jstring2string(env, jLbid);
     auto res = lbman->freeLB(lbid);
     if(res.has_error()){
@@ -293,10 +290,10 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__Ljava_lang_String_2
     }
   }
 
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__
-  (JNIEnv *env, jobject jLbManager){
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__J
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     auto res = lbman->freeLB();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -304,10 +301,10 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_registerWorker
-  (JNIEnv *env, jobject jLbManager, jstring jNodeName, jstring jNodeIp, jint jNodePort, 
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jstring jNodeName, jstring jNodeIp, jint jNodePort, 
   jfloat jWeight, jint jSourceCount, jfloat jMinFactor, jfloat jMaxFactor){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string nodeName = jstring2string(env, jNodeName);
     std::string ipAddressStr = jstring2string(env, jNodeIp);
     std::pair<boost::asio::ip::address,u_int16_t> node_ip_port = std::make_pair(boost::asio::ip::make_address(ipAddressStr),jNodePort);
@@ -319,29 +316,29 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_registerWorker
   }
 
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_deregisteWorker
-  (JNIEnv *env, jobject jLbManager){
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     auto res = lbman->deregisterWorker();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
     }
   }
 
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__FFZ
-  (JNIEnv *env, jobject jLbManager, jfloat fill_percent, jfloat control_signal, jboolean is_ready){
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__JFFZ
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jfloat fill_percent, jfloat control_signal, jboolean is_ready){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     auto res = lbman->sendState(fill_percent, control_signal, is_ready);
     if(res.has_error()){
       throwJavaException(env, res.error().message());
     }
   }
 
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__FFZLjava_time_Instant_2
-  (JNIEnv *env, jobject jLbManager, jfloat fill_percent, jfloat control_signal, jboolean is_ready, jobject jInstant){
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__JFFZLjava_time_Instant_2
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer, jfloat fill_percent, jfloat control_signal, jboolean is_ready, jobject jInstant){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     google::protobuf::Timestamp ts = convertInstantToTimestamp(env, jInstant);
     auto res = lbman->sendState(fill_percent, control_signal, is_ready, ts);
     if(res.has_error()){
@@ -350,9 +347,9 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__FFZLjava_time_Ins
   }
 
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_version
-  (JNIEnv *env, jobject jLbManager){
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     auto res = lbman->version();
     if(res.has_error()){
       throwJavaException(env, res.error().message());
@@ -369,17 +366,23 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_version
   }
 
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getUri
-  (JNIEnv *env, jobject jLbManager){
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string uri = lbman->get_URI().to_string();
     return env->NewStringUTF(uri.data());
   }
 
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getAddrString
-  (JNIEnv *env, jobject jLbManager){
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
 
-    e2sar::LBManager* lbman = getLBManagerFromField(env, jLbManager);
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     std::string addr = lbman->get_AddrString();
     return env->NewStringUTF(addr.data());
+  }
+
+JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_getInternalUri
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
+    return (long)&lbman->get_URI();
   }

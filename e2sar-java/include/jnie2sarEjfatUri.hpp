@@ -141,6 +141,14 @@ JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpAddr
 
 /*
  * Class:     org_jlab_hpdf_EjfatURI
+ * Method:    getCpHost
+ * Signature: (J)Ljava/net/InetSocketAddress;
+ */
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_EjfatURI_getCpHost
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     org_jlab_hpdf_EjfatURI
  * Method:    hasDataAddrv4
  * Signature: (J)Z
  */

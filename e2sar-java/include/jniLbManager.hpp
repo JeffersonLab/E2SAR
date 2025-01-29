@@ -22,139 +22,146 @@ JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_initLbManager
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    reserveLB
- * Signature: (Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V
+ * Signature: (JLjava/lang/String;Ljava/lang/String;Ljava/util/List;)I
  */
-JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String_2Ljava_lang_String_2Ljava_util_List_2
-  (JNIEnv *, jobject, jstring, jstring, jobject);
+JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__JLjava_lang_String_2Ljava_lang_String_2Ljava_util_List_2
+  (JNIEnv *, jobject, jlong, jstring, jstring, jobject);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    reserveLB
- * Signature: (Ljava/lang/String;D[Ljava/lang/String;)V
+ * Signature: (JLjava/lang/String;DLjava/util/List;)I
  */
-JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__Ljava_lang_String_2DLjava_util_List_2
-  (JNIEnv *, jobject, jstring, jdouble, jobject);   
+JNIEXPORT jint JNICALL Java_org_jlab_hpdf_LbManager_reserveLB__JLjava_lang_String_2DLjava_util_List_2
+  (JNIEnv *, jobject, jlong, jstring, jdouble, jobject);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    getLB
- * Signature: (Ljava/lang/String;)V
+ * Signature: (JLjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__Ljava_lang_String_2
-  (JNIEnv *, jobject, jstring);
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__JLjava_lang_String_2
+  (JNIEnv *, jobject, jlong, jstring);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    getLB
- * Signature: ()V
+ * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__
-  (JNIEnv *, jobject);
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_getLB__J
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    getStatus
- * Signature: ()Lorg/jlab/hpdf/messages/LBStatus;
+ * Signature: (J)Lorg/jlab/hpdf/messages/LBStatus;
  */
-JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__
-  (JNIEnv *, jobject);
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__J
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    getStatus
- * Signature: (Ljava/lang/String;)Lorg/jlab/hpdf/messages/LBStatus;
+ * Signature: (JLjava/lang/String;)Lorg/jlab/hpdf/messages/LBStatus;
  */
-JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__Ljava_lang_String_2
-  (JNIEnv *, jobject, jstring);
+JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getStatus__JLjava_lang_String_2
+  (JNIEnv *, jobject, jlong, jstring);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    getOverview
- * Signature: ()Lorg/jlab/hpdf/messages/LBOverview;
+ * Signature: (J)Ljava/util/List;
  */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_getOverview
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    addSenders
- * Signature: (Ljava/util/List;)V
+ * Signature: (JLjava/util/List;)V
  */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_addSenders
-  (JNIEnv *, jobject, jobject);
+  (JNIEnv *, jobject, jlong, jobject);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    removeSenders
- * Signature: (Ljava/util/List;)V
+ * Signature: (JLjava/util/List;)V
  */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_removeSenders
-  (JNIEnv *, jobject, jobject);
+  (JNIEnv *, jobject, jlong, jobject);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    freeLB
- * Signature: (Ljava/lang/String;)V
+ * Signature: (JLjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__Ljava_lang_String_2
-  (JNIEnv *, jobject, jstring);
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__JLjava_lang_String_2
+  (JNIEnv *, jobject, jlong, jstring);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    freeLB
- * Signature: ()V
+ * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__
-  (JNIEnv *, jobject);
-
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeLB__J
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    registerWorker
- * Signature: (Ljava/lang/String;Ljava/net/InetSocketAddress;FIFF)V
+ * Signature: (JLjava/lang/String;Ljava/lang/String;IFIFF)V
  */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_registerWorker
-  (JNIEnv *, jobject, jstring, jstring, jint, jfloat, jint, jfloat, jfloat);
+  (JNIEnv *, jobject, jlong, jstring, jstring, jint, jfloat, jint, jfloat, jfloat);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    deregisteWorker
- * Signature: ()V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_deregisteWorker
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    sendState
- * Signature: (FFZ)V
+ * Signature: (JFFZ)V
  */
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__FFZ
-  (JNIEnv *, jobject, jfloat, jfloat, jboolean);
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__JFFZ
+  (JNIEnv *, jobject, jlong, jfloat, jfloat, jboolean);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    sendState
- * Signature: (FFZLjava/time/Instant;)V
+ * Signature: (JFFZLjava/time/Instant;)V
  */
-JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__FFZLjava_time_Instant_2
-  (JNIEnv *, jobject, jfloat, jfloat, jboolean, jobject);
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_sendState__JFFZLjava_time_Instant_2
+  (JNIEnv *, jobject, jlong, jfloat, jfloat, jboolean, jobject);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    version
- * Signature: ()Ljava/util/List;
+ * Signature: (J)Ljava/util/List;
  */
 JNIEXPORT jobject JNICALL Java_org_jlab_hpdf_LbManager_version
-  (JNIEnv *, jobject);   
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     org_jlab_hpdf_LbManager
  * Method:    getAddrString
- * Signature: ()Ljava/lang/String;
+ * Signature: (J)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getAddrString
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     org_jlab_hpdf_LbManager
+ * Method:    getInternalUri
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_getInternalUri
+  (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
 }

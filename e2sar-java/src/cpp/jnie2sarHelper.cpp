@@ -4,14 +4,14 @@ std::string getClassName(JNIEnv *env, jclass cls) {
     // Get the Class class
     jclass classClass = env->FindClass("java/lang/Class");
     if (classClass == nullptr) {
-        std::cerr << "Error: Could not find java.lang.Class" << std::endl;
+        throwJavaException(env, "Could not find java.lang.Class"); 
         return "";
     }
 
     // Get the getName method ID
     jmethodID getNameMethodID = env->GetMethodID(classClass, "getName", "()Ljava/lang/String;");
     if (getNameMethodID == nullptr) {
-        std::cerr << "Error: Could not find getName method" << std::endl;
+        throwJavaException(env, "Could not find getName method of java.lang.Class"); 
         return "";
     }
 
@@ -142,14 +142,14 @@ std::vector<std::string> jstringArray2Vector(JNIEnv *env, jobjectArray javaStrin
 long getLongField(JNIEnv *env, jobject javaObject, const char* fieldName){
     jclass cls = env->GetObjectClass(javaObject);
     if (cls == nullptr) {
-        std::cerr << "Error: Class not found." << std::endl;
+        throwJavaException(env, "Could not find class for javaObject"); 
         return -1;
     }
 
     // Get the field ID of the private long field
     jfieldID fieldID = env->GetFieldID(cls, fieldName, "J");
     if (fieldID == nullptr) {
-        std::cerr << "Error: Field " << fieldName << " not found." << std::endl;
+        throwJavaException(env, "Error: Field " + std::string(fieldName) + " not found."); 
         return -1;
     }
 
@@ -213,13 +213,13 @@ jobject convertTimestampToInstant(JNIEnv *env, const google::protobuf::Timestamp
     // Find the Instant class and method ID for ofEpochSecond
     jclass instantClass = env->FindClass(javaInstantClass.data());
     if (instantClass == nullptr) {
-        throwJavaException(env, "Error: Could not find java.time.Instant class");
+        throwJavaException(env, "Could not find " +  javaInstantClass);
         return nullptr;
     }
 
     jmethodID ofEpochSecondMethod = env->GetStaticMethodID(instantClass, "ofEpochSecond", "(JJ)Ljava/time/Instant;");
     if (ofEpochSecondMethod == nullptr) {
-        std::cerr << "Error: Could not find ofEpochSecond method in java.time.Instant class." << std::endl;
+        throwJavaException(env, "Could not find ofEpochSecond method in java.time.Instant class" );
         return nullptr;
     }
 
@@ -363,6 +363,33 @@ jobject convertBoostIpAndPortToInetSocketAddress(JNIEnv *env, const boost::asio:
 
     // Clean up local references
     env->DeleteLocalRef(jIpStr);
+
+    return inetSocketAddress;
+}
+
+jobject convertHostNameAndPortToInetSocketAddress(JNIEnv *env, std::pair<std::string, u_int16_t> cpHost){
+    std::string hostName = cpHost.first;
+    // Step 2: Convert std::string to jstring
+    jstring jHostName = env->NewStringUTF(hostName.c_str());
+
+    int port = cpHost.second;
+
+    // Step 3: Find the InetSocketAddress class
+    jclass inetSocketAddressClass = env->FindClass(javaInetSocketAddressClass.data());
+    if (inetSocketAddressClass == nullptr) {
+        throwJavaException(env, "Error: Could not find java.net.InetSocketAddress class.");
+        env->DeleteLocalRef(jHostName);
+    }
+
+    jmethodID inetSocketAddressConstructor = env->GetMethodID(inetSocketAddressClass, "<init>", "(Ljava/lang/String;I)V");
+    if (inetSocketAddressConstructor == nullptr) {
+        throwJavaException(env, "Error: Could not find InetSocketAddress constructor." );
+        env->DeleteLocalRef(jHostName);
+        return nullptr;
+    }
+
+    jobject inetSocketAddress = env->NewObject(inetSocketAddressClass, inetSocketAddressConstructor, jHostName, port);
+    env->DeleteLocalRef(jHostName);
 
     return inetSocketAddress;
 }

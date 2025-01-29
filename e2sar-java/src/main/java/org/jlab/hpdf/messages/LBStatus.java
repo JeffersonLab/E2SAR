@@ -14,6 +14,7 @@ public class LBStatus{
     public LBStatus(Instant timestamp, Instant expiresAt, long currentEpoch, long currentPredictedEventNumber, List<WorkerStatus> workers, 
     List<String> senderAddresses){
         this.timestamp = timestamp;
+        this.expiresAt = expiresAt;
         this.currentEpoch = currentEpoch;
         this.currentPredictedEventNumber = currentPredictedEventNumber;
         this.workers = workers;

@@ -27,7 +27,7 @@ public class LbManager {
      * @param useHostAddress even if hostname is provided, use host address as resolved by URI object (with preference for 
      * IPv4 by default or for IPv6 if explicitly requested)
      */
-    public LbManager(EjfatURI uri, boolean validateServer, boolean useHostAddress){
+    public LbManager(EjfatURI uri, boolean validateServer, boolean useHostAddress)throws E2sarNativeException{
         this(uri,validateServer,useHostAddress, new String[3], false);
     }
 
@@ -40,7 +40,7 @@ public class LbManager {
      * use of SSL/TLS is governed by the URI scheme ('ejfat' vs 'ejfats').
      * @param sslCredentialOptionsfromFile (Optional) if true, assumes the contents of sslCredentialOptions are filepaths to the certificates
      */
-    public LbManager(EjfatURI uri, boolean validateServer, boolean useHostAddress, String[] sslCredOpts, boolean sslCredOptsFromFile){
+    public LbManager(EjfatURI uri, boolean validateServer, boolean useHostAddress, String[] sslCredOpts, boolean sslCredOptsFromFile)throws E2sarNativeException{
         nativeLbManager = initLbManager(uri,validateServer,useHostAddress,sslCredOpts,sslCredOptsFromFile);
     }
 

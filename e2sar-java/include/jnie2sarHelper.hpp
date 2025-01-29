@@ -42,5 +42,7 @@ jobject convertBoostIpToInetAddress(JNIEnv *env, const boost::asio::ip::address 
 
 jobject convertBoostIpAndPortToInetSocketAddress(JNIEnv *env, const boost::asio::ip::address &address, int port);
 
+jobject convertHostNameAndPortToInetSocketAddress(JNIEnv *env, std::pair<std::string, u_int16_t> cpHost);
+
 std::pair<boost::asio::ip::address, u_int16_t> convertInetSocketAddress(JNIEnv* env, jobject inetSocketAddress);
 #endif
