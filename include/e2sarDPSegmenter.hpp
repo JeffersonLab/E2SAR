@@ -222,11 +222,11 @@ namespace e2sar
                 inline void _freeSQEBacklog()
                 {
                     SQEData *sqeData{nullptr};
-                    while (returnQueue.pop(sqeData))
+                    while (seg.sqeReturnQueue.pop(sqeData))
                     {
                         lbreHdrPool.free(sqeData->hdr);
                         iovecPool.free(sqeData->iov);
-                        sqedataPool.free(sqeData);
+                        sqeDataPool.free(sqeData);
                     }
 
                 }
@@ -264,6 +264,30 @@ namespace e2sar
             friend struct SendThreadState;
 
             SendThreadState sendThreadState;
+
+#ifdef LIBURING_AVAILABLE
+            // this thread reaps completions off the uring
+            // and updates stat counters
+            struct CQEThreadState {
+                // owner object
+                Segmenter &seg;
+                boost::thread threadObj;
+
+                inline CQEThreadState(Segmenter &s): seg{s} 
+                {
+                    ;
+                }
+                void _threadBody();
+            };
+            friend struct CQEThreadState;
+
+            CQEThreadState cqeThreadState;
+            // this queue is for SQEData items that carry
+            // pointers to data allocated via pools that need
+            // to be freed without locking
+            boost::lockfree::queue<SQEData*> sqeReturnQueue{QSIZE};
+#endif
+
             // lock with send thread
             boost::mutex sendThreadMtx;
             // condition variable for send thread
@@ -277,27 +301,6 @@ namespace e2sar
             // use additional entropy in the clock samples
 #define MIN_CLOCK_ENTROPY 6
             bool addEntropy;
-
-#ifdef LIBURING_AVAILABLE
-            // this thread reaps completions off the uring
-            // and updates stat counters
-            struct CQEThreadState {
-                // owner object
-                Segmenter &seg;
-                boost::thread threadObj;
-
-                inline CQEThreadState(Segmenter &s) {seg(s)} 
-                {
-                }
-            };
-            friend struct CQEThreadState;
-
-            CQEThreadState cqeThreadState;
-            // this queue is for SQEData items that carry
-            // pointers to data allocated via pools that need
-            // to be freed without locking
-            boost::lockfree::queue<SQEData*> sqeReturnQueue{QSIZE};
-#endif
 
             /**
              * Check the sanity of constructor parameters
