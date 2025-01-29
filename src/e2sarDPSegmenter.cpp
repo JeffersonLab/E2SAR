@@ -8,6 +8,7 @@
 #include "portable_endian.h"
 
 #include "e2sarDPSegmenter.hpp"
+#include "e2sarUtil.hpp"
 
 
 namespace e2sar 
@@ -53,7 +54,8 @@ namespace e2sar
         auto destintfres = NetUtil::getInterfaceAndMTU(dataaddr);
 
         if (destintfres.has_error())
-            throw E2SARException("Unable to determine outgoing interface for ");
+            throw E2SARException("Unable to determine outgoing interface for LB destination address " + 
+                dataaddr);
 
         auto destintfmtu = destintfres.value().get<1>();
         sendThreadState.iface = destintfres.value().get<0>();
@@ -64,7 +66,8 @@ namespace e2sar
             if (sflags.mtu <= destintfmtu)
                 mtu = sflags.mtu;
             else
-                throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU");
+                throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU of " + 
+                    destintfres.value().get<0>());
 #else
         if (sflags.mtu == 0)
             throw E2SARException("Unable to detect outgoing interface MTU on this platform");
@@ -74,6 +77,22 @@ namespace e2sar
         // override the values set in constructor
         sendThreadState.mtu = mtu;
         sendThreadState.maxPldLen = mtu - TOTAL_HDR_LEN;
+        
+#ifdef LIBURING_AVAILABLE
+        if (is_SelectedOptimization(Optimizations::liburing_send))
+        {
+            // probe for SENDMSG
+            struct io_uring_probe *probe = io_uring_get_probe();
+            if (not io_uring_opcode_supported(probe, "IORING_OP_SENDMSG"))
+                throw E2SARException("Your kernel does not support the expected IO_URING operations (IORING_OP_SENDMSG)");
+            free(probe);
+            // init ring
+            int err = io_uring_queue_init(uringSize, &ring, 0);
+            if (err)
+                throw E2SARException("Unable to allocate uring due to " + strerror(errno));
+        }
+#endif
+
         sanityChecks();
     }
 
@@ -105,8 +124,48 @@ namespace e2sar
         boost::thread sendT(&Segmenter::SendThreadState::_threadBody, &sendThreadState);
         sendThreadState.threadObj = std::move(sendT);
 
+#ifdef LIBURING_AVAILABLE
+        if (is_SelectedOptimization(Optimizations::liburing_send))
+        {
+            boost::thread CQET(&Segmenter::CQEThreadState::_threadBody, &cqeThreadState);
+            cqeThreadState.threadObj = std::move(CQET);
+        }
+#endif
+
         return 0;
     }
+
+#ifdef LIBURING_AVAILABLE
+    void Segmenter::CQEThreadState::_threadBody()
+    {
+        struct io_uring_cqe *cqe;
+        while(!seg.threadsStop)
+        {
+            cqe = nullptr;
+            // reap CQEs and update the stats
+            // should exit when the ring is deleted
+            int ret = io_uring_wait_cqe(&seg.ring, &cqe);
+            if (ret < 0)
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastErrno = errno;
+                continue;
+            } 
+            if (cqe->res < 0)
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastErrno = cqe->res;
+            }
+            if (cqe)
+            {
+                // put sqe data on the queue to be processed by send thread
+                // when it has time (deallocate memory from pools)
+                sqeReturnQueue.push(static_cast<SQEData*>(cqe->user_data));
+            }
+            io_uring_cqe_seen(&ring, cqe);
+        }
+    }
+#endif
 
     void Segmenter::SyncThreadState::_threadBody()
     {
@@ -283,7 +342,11 @@ namespace e2sar
 
     result<int> Segmenter::SendThreadState::_open()
     {
-
+#ifdef LIBURING_AVAILABLE
+        // allocate int[] for passing FDs into the ring
+        int ringFds[socketFd4.size()];
+        unsigned int fdCount = 0;
+#endif
         // Open v4 and v6 sockets for sending data message via DP
 
         // create numSendSocket bound sockets either v6 or v4. With each socket
@@ -356,6 +419,9 @@ namespace e2sar
                     }
                 }
                 *i = boost::make_tuple<int, sockaddr_in6, sockaddr_in6>(fd, localAddrStruct6, dataAddrStruct6);
+#ifdef LIBURING_AVAILABLE
+                ringFds[fdCount++] = fd;
+#endif
             }
         } else 
         {
@@ -425,8 +491,17 @@ namespace e2sar
                     }
                 }
                 *i = boost::make_tuple<int, sockaddr_in, sockaddr_in>(fd, localAddrStruct4, dataAddrStruct4);
+#ifdef LIBURING_AVAILABLE
+                ringFds[fdCount++] = fd;
+#endif
             }
         }
+
+#ifdef LIBURING_AVAILABLE
+        // register open file descriptors with the ring
+        if (is_SelectedOptimization(Optimizations::liburing_send))
+            io_uring_register_files(&seg.ring, ringFds, fdCount);
+#endif
 
         return 0;
     }
@@ -440,17 +515,13 @@ namespace e2sar
         // having our own copy on the stack means we can call _send off-thread
         struct msghdr sendhdr{};
         int flags{0};
-#ifdef SENDMMSG_AVAILABLE
+#ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
         struct mmsghdr *mmsgvec = nullptr;
-        size_t numBuffers = 0;
+        size_t numBuffers = (bytes + maxPldLen - 1)/ maxPldLen; // round up
         size_t packetIndex = 0;
         if (is_SelectedOptimization(Optimizations::sendmmsg))
-        {
-            // round up
-            numBuffers = (bytes + maxPldLen - 1)/ maxPldLen;
             mmsgvec = new struct mmsghdr[numBuffers];
-        }
 #endif
 
         // new random entropy generated for each event buffer, unless user specified it
@@ -477,6 +548,11 @@ namespace e2sar
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
+#ifdef LIBURING_AVAILABLE
+        int currentFdIndex = roundRobinIndex; // since we registered fds with the ring, we need their indices
+        // take a moment to freeSQEData backlog
+        _freeSQEBacklog();
+#endif
         roundRobinIndex++;
 
         // fragment event, update/set iov and send in a loop
@@ -535,6 +611,28 @@ namespace e2sar
                 packetIndex++;
             }
             else 
+#endif
+#ifdef LIBURING_AVAILABLE
+            if (is_SelectedOptimization(Optimizations::liburing_send))
+            {
+                // get an SQE and fill it out
+                struct io_uring_sqe *sqe;
+                sqe = io_uring_get_sqe(ring);
+                if (!sqe) 
+                {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to acquire SQE"};
+                }
+                io_uring_prep_sendmsg(sqe, currentFdIndex, &sendhdr, 0);
+                SQEData *sqeData = static_cast<SQEData*>(sqeDataPool.malloc());
+                sqeData->iov = iov;
+                sqeData->hdr = hdr;
+                io_uring_sqe_set_data(sqe, sqeData);
+                // submit for processing
+                io_uring_submit(&seg.ring);
+            }
+            else
 #endif
             {
                 // just regular sendmsg
