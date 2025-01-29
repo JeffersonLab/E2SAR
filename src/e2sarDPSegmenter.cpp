@@ -27,6 +27,9 @@ namespace e2sar
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         sendThreadState(*this, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
+#ifdef LIBURING_AVAILABLE
+        cqeThreadState(*this),
+#endif
         useCP{sflags.useCP},
         zeroRate{sflags.zeroRate},
         usecAsEventNum{sflags.usecAsEventNum},
@@ -41,21 +44,21 @@ namespace e2sar
             // use dataplane v6 address for a routing query
             auto data = dpuri.get_dataAddrv6();
             if (data.has_error())
-                throw E2SARException("IPV6 Data address is not present in the URI");
+                throw E2SARException("IPV6 Data address is not present in the URI"s);
             dataaddr = data.value().first;
         } else  
         {
             // use dataplane v4 address for a routing query
             auto data = dpuri.get_dataAddrv4();
             if (data.has_error())
-                throw E2SARException("IPV4 Data address is not present in the URI");
+                throw E2SARException("IPV4 Data address is not present in the URI"s);
             dataaddr = data.value().first;
         }
         auto destintfres = NetUtil::getInterfaceAndMTU(dataaddr);
 
         if (destintfres.has_error())
-            throw E2SARException("Unable to determine outgoing interface for LB destination address " + 
-                dataaddr);
+            throw E2SARException("Unable to determine outgoing interface for LB destination address "s + 
+                dataaddr.to_string());
 
         auto destintfmtu = destintfres.value().get<1>();
         sendThreadState.iface = destintfres.value().get<0>();
@@ -66,11 +69,11 @@ namespace e2sar
             if (sflags.mtu <= destintfmtu)
                 mtu = sflags.mtu;
             else
-                throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU of " + 
+                throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU of "s + 
                     destintfres.value().get<0>());
 #else
         if (sflags.mtu == 0)
-            throw E2SARException("Unable to detect outgoing interface MTU on this platform");
+            throw E2SARException("Unable to detect outgoing interface MTU on this platform"s);
         else
             mtu = sflags.mtu;
 #endif
@@ -83,13 +86,13 @@ namespace e2sar
         {
             // probe for SENDMSG
             struct io_uring_probe *probe = io_uring_get_probe();
-            if (not io_uring_opcode_supported(probe, "IORING_OP_SENDMSG"))
-                throw E2SARException("Your kernel does not support the expected IO_URING operations (IORING_OP_SENDMSG)");
+            if (not io_uring_opcode_supported(probe, IORING_OP_SENDMSG))
+                throw E2SARException("Your kernel does not support the expected IO_URING operations (IORING_OP_SENDMSG)"s);
             free(probe);
             // init ring
             int err = io_uring_queue_init(uringSize, &ring, 0);
             if (err)
-                throw E2SARException("Unable to allocate uring due to " + strerror(errno));
+                throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
         }
 #endif
 
@@ -160,9 +163,9 @@ namespace e2sar
             {
                 // put sqe data on the queue to be processed by send thread
                 // when it has time (deallocate memory from pools)
-                sqeReturnQueue.push(static_cast<SQEData*>(cqe->user_data));
+                seg.sqeReturnQueue.push(reinterpret_cast<SQEData*>(cqe->user_data));
             }
-            io_uring_cqe_seen(&ring, cqe);
+            io_uring_cqe_seen(&seg.ring, cqe);
         }
     }
 #endif
@@ -617,7 +620,7 @@ namespace e2sar
             {
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe;
-                sqe = io_uring_get_sqe(ring);
+                sqe = io_uring_get_sqe(&seg.ring);
                 if (!sqe) 
                 {
                     seg.sendStats.errCnt++;
