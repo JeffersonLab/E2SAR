@@ -152,7 +152,6 @@ namespace e2sar
             condLock.unlock();
 
             // empty cqe queue
-            u_int32_t servedCount{0};
             while(seg.outstandingSends > 0)
             {
                 cqe = nullptr;
@@ -161,15 +160,13 @@ namespace e2sar
                 int ret = io_uring_peek_cqe(&seg.ring, &cqe);
                 if (ret < 0)
                 {
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = -ret;
+                    // don't log error here - it is usually a temporary resource availability
                     break;
                 }
                 // peek returned nothing
                 if (cqe == nullptr)
                     break;
                 // we have a CQE now
-                servedCount++;
                 if (cqe->res < 0)
                 {
                     seg.sendStats.errCnt++;
@@ -182,8 +179,8 @@ namespace e2sar
                     seg.sqeReturnQueue.push(reinterpret_cast<SQEData*>(cqe->user_data));
                 }
                 io_uring_cqe_seen(&seg.ring, cqe);
+                seg.outstandingSends--;
             }
-            seg.outstandingSends -= servedCount;
         }
     }
 #endif
@@ -646,14 +643,8 @@ namespace e2sar
             {
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
-                struct io_uring_sqe *sqe;
-                sqe = io_uring_get_sqe(&seg.ring);
-                if (!sqe) 
-                {
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = errno;
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Unable to acquire SQE"};
-                }
+                struct io_uring_sqe *sqe{nullptr};
+                while(not(sqe = io_uring_get_sqe(&seg.ring)));
                 io_uring_prep_sendmsg(sqe, currentFdIndex, &sendhdr, 0);
                 SQEData *sqeData = static_cast<SQEData*>(sqeDataPool.malloc());
                 sqeData->iov = iov;
