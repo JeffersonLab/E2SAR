@@ -286,6 +286,17 @@ namespace e2sar
             // pointers to data allocated via pools that need
             // to be freed without locking
             boost::lockfree::queue<SQEData*> sqeReturnQueue{QSIZE};
+
+            // between send and CQE reaping thread
+            boost::mutex cqeThreadMtx;
+            // condition variable for CQE thread waiting on new submissions
+            boost::condition_variable cqeThreadCond;
+            // wait time in ms before CQE thread checks if its time to stop
+            // we can't wait for too long - it only takes about 300usec
+            // to exhaust 256 SQEs using 1500 byte MTU at 10Gbps
+            cqeWaitTime_us{200}
+            // atomic counter of outstanging sends
+            boost::atomic<u_int32_t> outstandingSends{0};
 #endif
 
             // lock with send thread
@@ -396,24 +407,25 @@ namespace e2sar
              */
             ~Segmenter()
             {
-#ifdef LIBURING_AVAILABLE
-                if (is_SelectedOptimization(Optimizations::liburing_send))
-                {
-                    io_uring_unregister_files(&ring);
-                    // deallocate the ring
-                    io_uring_queue_exit(&ring);
-                }
-#endif
                 stopThreads();
+#ifdef LIBURING_AVAILABLE
+                // release CQE thread one last time so it can quit in peace
+                if (is_SelectedOptimization(Optimizations::liburing_send))
+                    seg.cqeThreadCond.notify_all();
+#endif
 
                 // wait to exit
                 syncThreadState.threadObj.join();
                 sendThreadState.threadObj.join();
 #ifdef LIBURING_AVAILABLE
                 if (is_SelectedOptimization(Optimizations::liburing_send))
+                {
                     cqeThreadState.threadObj.join();
+                    io_uring_unregister_files(&ring);
+                    // deallocate the ring
+                    io_uring_queue_exit(&ring);
+                }
 #endif
-
                 // pool memory is implicitly freed when pool goes out of scope
             }
 
