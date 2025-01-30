@@ -141,31 +141,49 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
     void Segmenter::CQEThreadState::_threadBody()
     {
+        // lock for the mutex (must be thread-local)
+        thread_local boost::unique_lock<boost::mutex> condLock(cqeThreadMtx, boost::defer_lock);
+
         struct io_uring_cqe *cqe;
         while(!seg.threadsStop)
         {
-            cqe = nullptr;
-            // reap CQEs and update the stats
-            // should exit when the ring is deleted
-            int ret = io_uring_wait_cqe(&seg.ring, &cqe);
-            if (ret < 0)
+            condLock.lock();
+            recvThreadCond.wait_for(condLock, boost::chrono::microseconds(cqeWaitTime_us));
+            condLock.unlock();
+
+            // empty cqe queue
+            u_int32_t servedCount{0};
+            while(outstandingSends > 0)
             {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = errno;
-                continue;
-            } 
-            if (cqe->res < 0)
-            {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = cqe->res;
+                cqe = nullptr;
+                // reap CQEs and update the stats
+                // should exit when the ring is deleted
+                int ret = io_uring_peek_cqe(&seg.ring, &cqe);
+                if (ret < 0)
+                {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = -ret;
+                    break;
+                }
+                // peek returned nothing
+                if (cqe == nullptr)
+                    break;
+                // we have a CQE now
+                servedCount++;
+                if (cqe->res < 0)
+                {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = cqe->res;
+                }
+                if (cqe)
+                {
+                    // put sqe data on the queue to be processed by send thread
+                    // when it has time (deallocate memory from pools)
+                    seg.sqeReturnQueue.push(reinterpret_cast<SQEData*>(cqe->user_data));
+                }
+                io_uring_cqe_seen(&seg.ring, cqe);
             }
-            if (cqe)
-            {
-                // put sqe data on the queue to be processed by send thread
-                // when it has time (deallocate memory from pools)
-                seg.sqeReturnQueue.push(reinterpret_cast<SQEData*>(cqe->user_data));
-            }
-            io_uring_cqe_seen(&seg.ring, cqe);
+            outstandingSends -= servedCount;
         }
     }
 #endif
@@ -348,7 +366,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         // allocate int[] for passing FDs into the ring
         int ringFds[socketFd4.size()];
-        unsigned int fdCount = 0;
+        unsigned int fdCount{0};
 #endif
         // Open v4 and v6 sockets for sending data message via DP
 
@@ -503,7 +521,14 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         // register open file descriptors with the ring
         if (is_SelectedOptimization(Optimizations::liburing_send))
-            io_uring_register_files(&seg.ring, ringFds, fdCount);
+        {
+            int ret = io_uring_register_files(&seg.ring, ringFds, fdCount);
+            if (ret < 0)
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastErrno = ret;
+            }
+        }
 #endif
 
         return 0;
@@ -518,10 +543,11 @@ namespace e2sar
         // having our own copy on the stack means we can call _send off-thread
         struct msghdr sendhdr{};
         int flags{0};
+        // number of buffers we will send
+        size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
         struct mmsghdr *mmsgvec = nullptr;
-        size_t numBuffers = (bytes + maxPldLen - 1)/ maxPldLen; // round up
         size_t packetIndex = 0;
         if (is_SelectedOptimization(Optimizations::sendmmsg))
             mmsgvec = new struct mmsghdr[numBuffers];
@@ -618,6 +644,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (is_SelectedOptimization(Optimizations::liburing_send))
             {
+                seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe;
                 sqe = io_uring_get_sqe(&seg.ring);
@@ -632,6 +659,8 @@ namespace e2sar
                 sqeData->iov = iov;
                 sqeData->hdr = hdr;
                 io_uring_sqe_set_data(sqe, sqeData);
+                // index to previously registered fds, not fds themselves
+                io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
                 io_uring_submit(&seg.ring);
             }
@@ -677,10 +706,20 @@ namespace e2sar
             }
         }
 #endif
+#ifdef LIBURING_AVAILABLE
+        if (is_SelectedOptimization(Optimizations::liburing_send))
+        {
+            // increment atomic counter so CQE reaping thread
+            // knows there's work to do
+            outstandingSends += numBuffers;
+            cqeThreadCond.notify_all();
+        }
+#endif
         // update the event send stats
         seg.eventsInCurrentSync++;
 
-        return 0;
+        // keeps compiler quiet about numBuffers not used
+        return numBuffers * 0;
     }
 
     result<int> Segmenter::SendThreadState::_close()
