@@ -294,7 +294,7 @@ namespace e2sar
             // wait time in ms before CQE thread checks if its time to stop
             // we can't wait for too long - it only takes about 300usec
             // to exhaust 256 SQEs using 1500 byte MTU at 10Gbps
-            cqeWaitTime_us{200}
+            const int cqeWaitTime_us{200};
             // atomic counter of outstanging sends
             boost::atomic<u_int32_t> outstandingSends{0};
 #endif
@@ -411,7 +411,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
                 // release CQE thread one last time so it can quit in peace
                 if (is_SelectedOptimization(Optimizations::liburing_send))
-                    seg.cqeThreadCond.notify_all();
+                    cqeThreadCond.notify_all();
 #endif
 
                 // wait to exit

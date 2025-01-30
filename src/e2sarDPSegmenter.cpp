@@ -142,18 +142,18 @@ namespace e2sar
     void Segmenter::CQEThreadState::_threadBody()
     {
         // lock for the mutex (must be thread-local)
-        thread_local boost::unique_lock<boost::mutex> condLock(cqeThreadMtx, boost::defer_lock);
+        thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
 
         struct io_uring_cqe *cqe;
         while(!seg.threadsStop)
         {
             condLock.lock();
-            recvThreadCond.wait_for(condLock, boost::chrono::microseconds(cqeWaitTime_us));
+            seg.cqeThreadCond.wait_for(condLock, boost::chrono::microseconds(seg.cqeWaitTime_us));
             condLock.unlock();
 
             // empty cqe queue
             u_int32_t servedCount{0};
-            while(outstandingSends > 0)
+            while(seg.outstandingSends > 0)
             {
                 cqe = nullptr;
                 // reap CQEs and update the stats
@@ -183,7 +183,7 @@ namespace e2sar
                 }
                 io_uring_cqe_seen(&seg.ring, cqe);
             }
-            outstandingSends -= servedCount;
+            seg.outstandingSends -= servedCount;
         }
     }
 #endif
@@ -711,8 +711,8 @@ namespace e2sar
         {
             // increment atomic counter so CQE reaping thread
             // knows there's work to do
-            outstandingSends += numBuffers;
-            cqeThreadCond.notify_all();
+            seg.outstandingSends += numBuffers;
+            seg.cqeThreadCond.notify_all();
         }
 #endif
         // update the event send stats
