@@ -78,9 +78,9 @@ jobs:
           echo Updating pkgconfig files prefix from ${IDIR} to ${{ env.FINAL_INSTALL }}
           for file in `ls -1 ${IDIR}/lib/pkgconfig`; do sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
           echo Updating E2SAR pkgconfig
-          sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
+          sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib64/pkgconfig/e2sar.pc
 
-      - name: Package project into .deb or .rpm
+      - name: Package project .rpm
         run: |
           pushd package/ && tar -zcf ../e2sar.tar.gz usr/ && popd
           fpm -s tar -t rpm -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
@@ -88,7 +88,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rhel9-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          name: rocky9-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
           path: |
             *.deb
             *.rpm
