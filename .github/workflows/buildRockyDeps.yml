@@ -1,0 +1,21 @@
+name: Build E2SAR dependency artifacts on Rocky 9
+
+on:
+  workflow_dispatch:
+
+env:
+  GRPC_VER: 1.54.1
+  BOOST_VER: 1.85.0
+  E2SAR_VER: 0.1.5
+
+jobs:
+  distribution-check:
+    runs-on: ubuntu-latest
+    container:
+      image: ockylinux/rockylinux:9
+    steps:
+    - uses: actions/checkout@v1
+    - name: Are we on rocky linux?
+      run: |
+        cat /etc/os-release
+
