@@ -29,7 +29,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v6
         with:
-          workflow: deps2rpms.yml
+          workflow: deps2rpm.yml
           name: e2sar-deps-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
