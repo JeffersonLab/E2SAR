@@ -23,5 +23,71 @@ jobs:
           dnf -yq install git wget
           dnf -yq install ruby-devel gcc make rpm-build libffi-devel
           gem install fpm
-          update-alternatives --set python /usr/bin/python3.9
-          update-alternatives --set python3 /usr/bin/python3.9
+
+      - name: Install Python dependencies
+        run: |
+          pip3 install meson pybind11
+
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: true
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
+
+      - name: Create install directories
+        run: |
+          mkdir -p package/usr/local/include/
+          mkdir -p package/usr/local/lib
+          mkdir -p package/usr/local/lib64
+
+      - name: Download built boost and grpc artifact
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: builddeps.yml
+          name: rhel9-package-e2sar-deps-${{ env.E2SAR_VER }}
+          path: ./
+
+      - name: Untar the grpc and boost install tree
+        run: |
+          ls ./
+          tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
+          ls -l package/usr/local/bin
+
+      - name: Build E2SAR using Meson
+        run: |
+          . ~/venv/bin/activate
+          export IDIR=`pwd`/package/usr/local
+          cd E2SAR
+          BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson compile -C build
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson test -C build --suite=unit --timeout=0
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson install -C build
+
+      - name: Update pkgconfig prefix files for final installation
+        run: |
+          # update pkgconfig files for the install location. DESTDIR didn't work
+          export IDIR=`pwd`/package/usr/local
+          echo Updating pkgconfig files prefix from ${IDIR} to ${{ env.FINAL_INSTALL }}
+          for file in `ls -1 ${IDIR}/lib/pkgconfig`; do sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
+          echo Updating E2SAR pkgconfig
+          sed -i "s|${IDIR}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
+
+      - name: Package project into .deb or .rpm
+        run: |
+          pushd package/ && tar -zcf ../e2sar.tar.gz usr/ && popd
+          fpm -s tar -t rpm -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rhel9-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          path: |
+            *.deb
+            *.rpm
