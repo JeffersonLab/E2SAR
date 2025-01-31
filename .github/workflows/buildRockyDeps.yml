@@ -16,10 +16,11 @@ jobs:
       - name: Are we on rocky linux?
         run: |
           cat /etc/os-release
+          dnf search python3
+          dnf search python3 | grep devel
 
       - name: Set up environment
         run: |
-          dnf -y groupinstall "Development Tools"
           dnf -yq install epel-release
           dnf -yq --enablerepo=devel update
           dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
