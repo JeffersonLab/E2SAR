@@ -11,7 +11,7 @@ jobs:
   distribution-check:
     runs-on: ubuntu-latest
     container:
-      image: ockylinux/rockylinux:9
+      image: rockylinux/rockylinux:9
     steps:
     - uses: actions/checkout@v1
     - name: Are we on rocky linux?
