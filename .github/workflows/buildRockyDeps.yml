@@ -8,7 +8,7 @@ env:
   E2SAR_VER: 0.1.5
 
 jobs:
-  distribution-check:
+  build:
     runs-on: ubuntu-latest
     container:
       image: rockylinux/rockylinux:9
@@ -19,9 +19,9 @@ jobs:
 
       - name: Set up environment
         run: |
-          sudo yum -yq install epel-release
-          sudo yum -yq --enablerepo=devel update
-          sudo yum -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-          sudo yum -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
+          dnf -yq install epel-release
+          dnf -yq --enablerepo=devel update
+          dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+          dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
         
 
