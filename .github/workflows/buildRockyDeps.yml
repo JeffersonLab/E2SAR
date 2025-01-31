@@ -16,8 +16,6 @@ jobs:
       - name: Are we on rocky linux?
         run: |
           cat /etc/os-release
-          dnf search python3
-          dnf search python3 | grep devel
 
       - name: Set up environment
         run: |
@@ -25,5 +23,64 @@ jobs:
           dnf -yq --enablerepo=devel update
           dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
           dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
-          ls /usr/bin | grep python
+          update-alternatives --set python /usr/bin/python3.9 && \
+          update-alternatives --set python3 /usr/bin/python3.9
+
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Create install directories
+        run: |
+          mkdir -p package/usr/local/include/
+          mkdir -p package/usr/local/lib
+          mkdir -p package/usr/local/lib64
+
+      - name: Checkout gRPC
+        uses: actions/checkout@v3
+        with:
+          repository: grpc/grpc  
+          path: grpc  
+          ref: v${{ env.GRPC_VER }}
+          submodules: true  
+
+      - name: Build grpc
+        run: |
+          # note that with this, all prefixes in pkgconfig files will be ${IDIR} instead of /usr/local 
+          # which is what is normally needed. This is OK to build e2sar, but not OK if you want to biuld
+          # debs out of these. We will fix in in the other workflow.
+          export IDIR=`pwd`/package/usr/local
+          mkdir -p grpc/cmake/build
+          pushd grpc/cmake/build
+          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
+          make -j 4
+          make install
+          popd
+
+      - name: Download and build boost
+        if: steps.cache.outputs.cache-hit != 'true' 
+        run: |
+          export IDIR=`pwd`/package/usr/local
+          # produce 1_85_0 from 1.85.0
+          export BOOST_SUB_VER=`echo ${{ env.BOOST_VER }} | sed s/\\\./_/g`
+          echo Preparing to download from https://archives.boost.io/release/${{ env.BOOST_VER }}/source/boost_${BOOST_SUB_VER}.tar.gz
+          wget -q https://archives.boost.io/release/${{ env.BOOST_VER }}/source/boost_${BOOST_SUB_VER}.tar.gz
+          echo Downloaded source, untarring
+          tar -zxf boost_${BOOST_SUB_VER}.tar.gz
+          echo Descending into build directory boost_${BOOST_SUB_VER} and starting build 
+          ls .
+          cd boost_${BOOST_SUB_VER}
+          ./bootstrap.sh
+          ./b2
+          ./b2 install --prefix=${IDIR}
+
+      - name: Tar the packaged files
+        run: |
+          tar -zcf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz package/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: rhel9-package-e2sar-deps-${{ env.E2SAR_VER }}
+          path: package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
 
