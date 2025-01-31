@@ -59,7 +59,6 @@ jobs:
           ls ./
           tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
           ls -l package/usr/local/bin
-          ls /__w/E2SAR/E2SAR/package/usr/local/lib
 
       - name: Build E2SAR using Meson
         run: |
@@ -68,9 +67,9 @@ jobs:
           export LD_LIBRARY_PATH=${IDIR}/lib64
           echo $LD_LIBRARY_PATH
           BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
-          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson compile -C build
-          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson test -C build --suite=unit --timeout=0
-          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson install -C build
+          PATH=${IDIR}/bin:$PATH meson compile -C build
+          PATH=${IDIR}/bin:$PATH meson test -C build --suite=unit --timeout=0
+          PATH=${IDIR}/bin:$PATH meson install -C build
 
       - name: Update pkgconfig prefix files for final installation
         run: |
