@@ -19,9 +19,9 @@ jobs:
 
       - name: Set up environment
         run: |
-        sudo yum -yq install epel-release
-        sudo yum -yq --enablerepo=devel update
-        sudo yum -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-        sudo yum -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
+          sudo yum -yq install epel-release
+          sudo yum -yq --enablerepo=devel update
+          sudo yum -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+          sudo yum -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
         
 
