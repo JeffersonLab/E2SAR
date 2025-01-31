@@ -23,7 +23,7 @@ jobs:
           dnf -yq --enablerepo=devel update
           dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
           dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
-          dnf -yq install git
+          dnf -yq install git wget
           
       - name: Set up authentication for HTTPS
         run: |
