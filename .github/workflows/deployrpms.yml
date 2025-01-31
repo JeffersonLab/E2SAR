@@ -17,6 +17,12 @@ jobs:
     permissions:
       contents: write
     steps:
+
+      - name: Install gh
+        run: |
+          curl -fsSL https://cli.github.com/packages/rpm/gh-cli.repo | tee /etc/yum.repos.d/github-cli.repo
+          dnf -y install gh
+          gh --version
       - name: Checkout E2SAR code
         uses: actions/checkout@v4
         with:
@@ -45,7 +51,6 @@ jobs:
       - name: create GH release
         run: |
           cd E2SAR
-          dnf install -yq gh
           gh release create E2SAR-${{ github.ref_name }}-${{ env.E2SAR_VER }}-rocky9 ./*.deb
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
