@@ -29,8 +29,8 @@ controller:
   interval: 1s
   offset: 800ms
 server:
-  host: "0.0.0.0"
-  port: 18347
+  listen:
+    - 0.0.0.0:18347
   auth_token: "udplbd"
   tls:
     enable: true
