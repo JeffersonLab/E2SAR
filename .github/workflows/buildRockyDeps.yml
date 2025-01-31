@@ -23,7 +23,8 @@ jobs:
           dnf -yq --enablerepo=devel update
           dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
           dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
-
+          dnf -yq install git
+          
       - name: Set up authentication for HTTPS
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
