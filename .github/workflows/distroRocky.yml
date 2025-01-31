@@ -59,6 +59,7 @@ jobs:
           ls ./
           tar -zxf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
           ls -l package/usr/local/bin
+          ls /__w/E2SAR/E2SAR/package/usr/local/lib
 
       - name: Build E2SAR using Meson
         run: |
