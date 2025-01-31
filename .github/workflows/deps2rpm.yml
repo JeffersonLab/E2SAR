@@ -1,0 +1,25 @@
+name: Build gRPC+Boost .rpms
+
+on: [push, pull_request]
+
+env:
+  GRPC_VER: 1.54.1
+  BOOST_VER: 1.85.0
+  E2SAR_VER: 0.1.5
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:9.0
+    steps:
+      - name: Set up environment
+        run: |
+          dnf -yq install epel-release
+          dnf -yq --enablerepo=devel update
+          dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+          dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
+          dnf -yq install git wget
+          dnf -yq ruby-devel gcc make rpm-build libffi-devel
+          gem install fpm
+    
