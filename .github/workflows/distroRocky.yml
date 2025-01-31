@@ -64,7 +64,7 @@ jobs:
         run: |
           export IDIR=`pwd`/package/usr/local
           cd E2SAR
-          export LD_LIBRARY_PATH = ${IDIR}/lib64:${IDIR}/lib
+          export LD_LIBRARY_PATH=${IDIR}/lib64:${IDIR}/lib
           echo $LD_LIBRARY_PATH
           BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
           PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson compile -C build
