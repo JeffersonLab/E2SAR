@@ -1,0 +1,52 @@
+permissions:
+  contents: write
+
+name: Deploy E2sar rpms and dependency rpms to releases
+on: [push, pull_request]
+
+env:
+  GRPC_VER: 1.54.1
+  BOOST_VER: 1.85.0
+  E2SAR_VER: 0.1.5
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:9.0
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: false
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
+
+      - name: Download built boost and grpc artifact
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: deps2rpms.yml
+          name: e2sar-deps-${{ env.E2SAR_VER }}-package
+          path: E2SAR
+
+      - name: Download built e2sar deb
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-e2sar-deb
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: distroRocky.yml
+          name: rocky9-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          path: E2SAR
+
+      - name: create GH release
+        run: |
+          cd E2SAR
+          dnf install -yq gh
+          gh release create E2SAR-${{ github.ref_name }}-${{ env.E2SAR_VER }}-rocky9 ./*.deb
+        env:
+          GITHUB_TOKEN: ${{ github.TOKEN }}
+        shell: bash
