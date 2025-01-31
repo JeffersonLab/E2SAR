@@ -24,6 +24,6 @@ jobs:
           dnf -yq install epel-release
           dnf -yq --enablerepo=devel update
           dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-          dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
-        
+          dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
+          ls /usr/bin | grep python
 
