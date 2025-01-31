@@ -50,7 +50,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v6
         with:
-          workflow: builddeps.yml
+          workflow: buildRockyDeps.yml
           name: rhel9-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: ./
 
