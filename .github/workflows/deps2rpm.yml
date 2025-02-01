@@ -1,6 +1,7 @@
 name: Build gRPC+Boost .rpms
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
 
 env:
   GRPC_VER: 1.54.1

@@ -83,7 +83,7 @@ jobs:
           tar -zcf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz package/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz

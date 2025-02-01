@@ -2,7 +2,8 @@ permissions:
   contents: write
 
 name: Deploy E2sar rpms and dependency rpms to releases
-on: [push, pull_request]
+on:
+  workflow_dispatch:
 
 env:
   GRPC_VER: 1.54.1
