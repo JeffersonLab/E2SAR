@@ -40,9 +40,9 @@ jobs:
           name: e2sar-deps-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
-      - name: Download built e2sar deb
+      - name: Download built e2sar rpm
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
-        id: download-e2sar-deb
+        id: download-e2sar-rpm
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: distroRocky.yml
