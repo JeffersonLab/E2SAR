@@ -1,4 +1,4 @@
-name: Build E2SAR dependency artifacts
+name: Build E2SAR dependency artifacts on Rocky 9
 
 on:
   workflow_dispatch:
@@ -10,25 +10,21 @@ env:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
-    
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:9.0
     steps:
-        
+      - name: Are we on rocky linux?
+        run: |
+          cat /etc/os-release
+
       - name: Set up environment
         run: |
-          if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
-            sudo apt-get -yq update
-            sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
-          elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
-            sudo yum -yq install epel-release
-            sudo yum -yq --enablerepo=devel update
-            sudo yum -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-            sudo yum -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python39-devel python39
-          fi
+          dnf -yq install epel-release
+          dnf -yq --enablerepo=devel update
+          dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+          dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
+          dnf -yq install git wget
           
       - name: Set up authentication for HTTPS
         run: |
@@ -39,7 +35,7 @@ jobs:
           mkdir -p package/usr/local/include/
           mkdir -p package/usr/local/lib
           mkdir -p package/usr/local/lib64
-            
+
       - name: Checkout gRPC
         uses: actions/checkout@v3
         with:
@@ -77,7 +73,7 @@ jobs:
           ./bootstrap.sh
           ./b2
           ./b2 install --prefix=${IDIR}
-          
+
       - name: Tar the packaged files
         run: |
           tar -zcf package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz package/
@@ -85,5 +81,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-package-e2sar-deps-${{ env.E2SAR_VER }}
+          name: rhel9-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: package-e2sar-deps-${{ env.E2SAR_VER }}.tar.gz
+
