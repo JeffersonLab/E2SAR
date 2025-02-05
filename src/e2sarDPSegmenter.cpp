@@ -174,9 +174,11 @@ namespace e2sar
                 }
                 if (cqe)
                 {
-                    // put sqe data on the queue to be processed by send thread
-                    // when it has time (deallocate memory from pools)
-                    seg.sqeReturnQueue.push(reinterpret_cast<SQEData*>(cqe->user_data));
+                    // free the memory
+                    auto sqeData = reinterpret_cast<SQEData*>(cqe->user_data);
+                    free(sqeData->iov);
+                    free(sqeData->hdr);
+                    free(sqeData);
                 }
                 io_uring_cqe_seen(&seg.ring, cqe);
                 seg.outstandingSends--;
@@ -547,7 +549,8 @@ namespace e2sar
         struct mmsghdr *mmsgvec = nullptr;
         size_t packetIndex = 0;
         if (is_SelectedOptimization(Optimizations::sendmmsg))
-            mmsgvec = new struct mmsghdr[numBuffers];
+            // don't need calloc to spend time initializing it
+            mmsgvec = malloc(numBuffers*sizeof(struct mmsghdr));
 #endif
 
         // new random entropy generated for each event buffer, unless user specified it
@@ -607,9 +610,9 @@ namespace e2sar
         while (curOffset < eventEnd)
         {
             // fill out LB and RE headers
-            auto hdr = static_cast<LBREHdr*>(lbreHdrPool.malloc());
+            auto hdr = static_cast<LBREHdr*>(malloc(sizeof(LBREHdr)));
             // allocate iov (this returns two entries)
-            auto iov = static_cast<struct iovec*>(iovecPool.malloc());
+            auto iov = static_cast<struct iovec*>(malloc(2*sizeof(struct iovec)));
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
@@ -646,7 +649,7 @@ namespace e2sar
                 struct io_uring_sqe *sqe{nullptr};
                 while(not(sqe = io_uring_get_sqe(&seg.ring)));
                 io_uring_prep_sendmsg(sqe, currentFdIndex, &sendhdr, 0);
-                SQEData *sqeData = static_cast<SQEData*>(sqeDataPool.malloc());
+                SQEData *sqeData = static_cast<SQEData*>(malloc(sizeof(SQEData)));
                 sqeData->iov = iov;
                 sqeData->hdr = hdr;
                 io_uring_sqe_set_data(sqe, sqeData);
@@ -662,8 +665,8 @@ namespace e2sar
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 // free the header here for this situation
-                lbreHdrPool.free(hdr);
-                iovecPool.free(iov);
+                free(hdr);
+                free(iov);
                 if (err == -1)
                 {
                     seg.sendStats.errCnt++;
@@ -682,10 +685,10 @@ namespace e2sar
             // free up mmsgvec and included headers and iovecs
             for(size_t i = 0; i < numBuffers; i++)
             {
-                lbreHdrPool.free(mmsgvec[i].msg_hdr.msg_iov[0].iov_base);
-                iovecPool.free(mmsgvec[i].msg_hdr.msg_iov);
+                free(mmsgvec[i].msg_hdr.msg_iov[0].iov_base);
+                free(mmsgvec[i].msg_hdr.msg_iov);
             }
-            delete[] mmsgvec;
+            free(mmsgvec);
             // sendmmsg returns the number of updated mmsgvec[i].msg_len entries
             if (err != (int)numBuffers)
             {
