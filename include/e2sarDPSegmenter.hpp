@@ -209,29 +209,6 @@ namespace e2sar
                 // we RR through these FDs
                 size_t roundRobinIndex{0};
 
-                // pool of LB+RE headers for sending
-                boost::pool<> lbreHdrPool{sizeof(LBREHdr)};
-
-                // pool of iovec items (we grab two at a time)
-                boost::pool<> iovecPool{sizeof(struct iovec)*2};
-
-#ifdef LIBURING_AVAILABLE
-                boost::pool<> sqeDataPool{sizeof(SQEData)};
-
-                // free the data allocated for SQE from various pools
-                inline void _freeSQEBacklog()
-                {
-                    SQEData *sqeData{nullptr};
-                    while (seg.sqeReturnQueue.pop(sqeData))
-                    {
-                        lbreHdrPool.free(sqeData->hdr);
-                        iovecPool.free(sqeData->iov);
-                        sqeDataPool.free(sqeData);
-                    }
-
-                }
-#endif
-
                 // fast random number generator to create entropy values for events
                 // this entropy value is held the same for all packets of a given
                 // event guaranteeing the same destination UDP port for all of them
@@ -282,10 +259,6 @@ namespace e2sar
             friend struct CQEThreadState;
 
             CQEThreadState cqeThreadState;
-            // this queue is for SQEData items that carry
-            // pointers to data allocated via pools that need
-            // to be freed without locking
-            boost::lockfree::queue<SQEData*> sqeReturnQueue{QSIZE};
 
             // between send and CQE reaping thread
             boost::mutex cqeThreadMtx;
