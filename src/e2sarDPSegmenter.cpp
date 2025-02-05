@@ -550,7 +550,7 @@ namespace e2sar
         size_t packetIndex = 0;
         if (is_SelectedOptimization(Optimizations::sendmmsg))
             // don't need calloc to spend time initializing it
-            mmsgvec = malloc(numBuffers*sizeof(struct mmsghdr));
+            mmsgvec = static_cast<struct mmsghdr*>(malloc(numBuffers*sizeof(struct mmsghdr)));
 #endif
 
         // new random entropy generated for each event buffer, unless user specified it
@@ -579,8 +579,6 @@ namespace e2sar
         }
 #ifdef LIBURING_AVAILABLE
         int currentFdIndex = roundRobinIndex; // since we registered fds with the ring, we need their indices
-        // take a moment to freeSQEData backlog
-        _freeSQEBacklog();
 #endif
         roundRobinIndex++;
 
