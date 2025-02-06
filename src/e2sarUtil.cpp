@@ -5,6 +5,15 @@
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 
+#ifdef AFFINITY_AVAILABLE
+#include <sched.h>
+#include <unistd.h>
+#endif
+
+#ifdef THRD_AFFINITY_AVAILABLE
+#include <pthread.h>
+#endif
+
 #include "e2sarUtil.hpp"
 
 namespace e2sar
@@ -379,5 +388,36 @@ namespace e2sar
                (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
                (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
                (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
+    }
+
+    result<int> setProcessAffinity(const std::vector<int> &cores) noexcept
+    {
+#ifdef AFFINITY_AVAILABLE
+        // set this process affinity to the indicated set of cores
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+
+        for(auto core: cpuCoreList)
+            CPU_SET(core, &cpuset);
+        if (sched_setaffinity(0, sizeof(cpuset), &cpuset) == -1)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
+        return 0;
+#else
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting process affinity not supported on this system"};
+#endif
+    }
+
+    result<int> setThreadAffinity(int core) noexcept
+    {
+#ifdef THRD_AFFINITY_AVAILABLE
+        cpu_set_t cpuset;
+
+        CPU_ZERO(&cpuset);
+        CPU_SET(core, &cpuset);
+        if ((int err = pthread_set_affinity_np(pthread_self(), sizeof(cpuset), &cpuset)) < 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(err)};
+#else
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not supported on this system"};
+#endif
     }
 }

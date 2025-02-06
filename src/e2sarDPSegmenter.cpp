@@ -18,6 +18,13 @@ namespace e2sar
     const boost::chrono::milliseconds Segmenter::sleepTime(10);
 
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, 
+        const SegmenterFlags &sflags):
+        Segmenter(uri, did, esid, std::vector<int>(), sflags)
+    {
+    }
+
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, 
+        std::vector<int> cpuCoreList,
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
@@ -26,7 +33,7 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
+        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
 #ifdef LIBURING_AVAILABLE
         cqeThreadState(*this),
 #endif
@@ -95,7 +102,6 @@ namespace e2sar
                 throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
         }
 #endif
-
         sanityChecks();
     }
 
@@ -327,6 +333,11 @@ namespace e2sar
     void Segmenter::SendThreadState::_threadBody()
     {
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
+        // set sending thread affinity if core list is provided
+        if (seg.cpuCoreList.size())
+        {
+            auto res = setThreadAffinity(seg.cpuCoreList[threadIndex]);
+        }
         while(!seg.threadsStop)
         {
             // block to get event off the queue and send

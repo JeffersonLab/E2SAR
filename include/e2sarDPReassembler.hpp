@@ -22,11 +22,6 @@
 #include <linux/rtnetlink.h>
 #endif
 
-#ifdef AFFINITY_AVAILABLE
-#include <sched.h>
-#include <unistd.h>
-#endif
-
 #include <atomic>
 
 #include "e2sarError.hpp"
@@ -551,22 +546,7 @@ namespace e2sar
         protected:
         private:
 
-            result<int> setAffinity()
-            {
-#ifdef AFFINITY_AVAILABLE
-                // set this process affinity to the indicated set of cores
-                cpu_set_t set;
-                CPU_ZERO(&set);
 
-                for(auto core: cpuCoreList)
-                    CPU_SET(core, &set);
-                if (sched_setaffinity(0, sizeof(set), &set) == -1)
-                    return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
-                return 0;
-#else
-                return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not supported on this system"};
-#endif
-            }
 
     };
 }

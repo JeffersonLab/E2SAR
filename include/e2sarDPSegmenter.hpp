@@ -188,6 +188,8 @@ namespace e2sar
                 // owner object
                 Segmenter &seg;
                 boost::thread threadObj;
+                // thread index (to help pick core)
+                int threadIndex;
                 // connect socket flag (usually true)
                 const bool connectSocket{true};
 
@@ -219,8 +221,8 @@ namespace e2sar
                 // to get better entropy in usec clock samples (if needed)
                 boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
-                inline SendThreadState(Segmenter &s, bool v6, u_int16_t mtu, bool cnct=true): 
-                    seg{s}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
+                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool cnct=true): 
+                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
                     maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
@@ -241,6 +243,12 @@ namespace e2sar
             friend struct SendThreadState;
 
             SendThreadState sendThreadState;
+            const size_t numSendThreads{1};
+            // list of cores we can use to run threads
+            // can be longer than the number of threads
+            // thread at index i uses core cpuCoreList[i]
+            // we don't check cores are unique
+            const std::vector<int> cpuCoreList;
 
 #ifdef LIBURING_AVAILABLE
             // this thread reaps completions off the uring
@@ -354,6 +362,20 @@ namespace e2sar
                  */
                 static result<SegmenterFlags> getFromINI(const std::string &iniFile) noexcept;
             };
+            /**
+             * Initialize segmenter state. Call openAndStart() to begin operation.
+             * @param uri - EjfatURI initialized for sender with sync address and data address(es)
+             * @param dataId - unique identifier of the originating segmentation point (e.g. a DAQ), 
+             * carried in SAR header
+             * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
+             * 32-bit to accommodate IP addresses more easily, carried in Sync header
+             * @param cpuCoreList - list of cores that can be used by sending threads
+             * @param sflags - SegmenterFlags 
+             */
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId,  
+                std::vector<int> cpuCoreList,
+                const SegmenterFlags &sflags=SegmenterFlags());
+
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)

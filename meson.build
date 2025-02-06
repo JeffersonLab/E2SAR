@@ -27,6 +27,18 @@ if compiler.compiles(affcode, name: 'CPU Affinity check')
         add_project_arguments('-DAFFINITY_AVAILABLE', language: ['cpp'])
 endif
 
+thaffcode = '''
+define _GNU_SOURCE
+#include <pthread.h>
+void f() {
+cpu_set_t set;
+pthread_t thread = pthread_self();
+sched_setaffinity(thread, sizeof(set), &set); }
+'''
+
+if compiler.compiles(thaffcode, name: 'Thread Affinity check')
+        add_project_arguments('-DTHRD_AFFINITY_AVAILABLE', language: ['cpp'])
+endif
 
 mmsgcode = '''
 #define _GNU_SOURCE
