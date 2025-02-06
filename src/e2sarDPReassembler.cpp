@@ -56,7 +56,7 @@ namespace e2sar
         useCP{rflags.useCP}
     {
         sanityChecks();
-        auto afres = setAffinity();
+        auto afres = setProcessAffinity(cpuCoreList);
         if (afres.has_error())
             throw E2SARException(afres.error().message());
         // note if the user chooses to override portRange in rflags, 

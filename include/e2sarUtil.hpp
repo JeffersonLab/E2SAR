@@ -598,5 +598,15 @@ namespace e2sar
      * Is this optimization selected?
      */
     bool is_SelectedOptimization(Optimizations o) noexcept;
+
+    /**
+     * Set the affinity of the entire process to the cores in the vector
+     */
+    result<int> setProcessAffinity(const std::vector<int> &cores) noexcept;
+
+    /**
+     * Set calling thread affinity to specified core
+     */
+    result<int> setThreadAffinity(int core) noexcept;
 };
 #endif
