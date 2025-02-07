@@ -28,12 +28,12 @@ if compiler.compiles(affcode, name: 'CPU Affinity check')
 endif
 
 thaffcode = '''
-define _GNU_SOURCE
+#define _GNU_SOURCE
 #include <pthread.h>
 void f() {
 cpu_set_t set;
 pthread_t thread = pthread_self();
-sched_setaffinity(thread, sizeof(set), &set); }
+pthread_setaffinity_np(thread, sizeof(set), &set); }
 '''
 
 if compiler.compiles(thaffcode, name: 'Thread Affinity check')
