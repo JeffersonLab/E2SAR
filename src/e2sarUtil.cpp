@@ -414,8 +414,10 @@ namespace e2sar
 
         CPU_ZERO(&cpuset);
         CPU_SET(core, &cpuset);
-        if ((int err = pthread_set_affinity_np(pthread_self(), sizeof(cpuset), &cpuset)) < 0)
+        int err{0};
+        if ((err = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset)) < 0)
             return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(err)};
+        return err;
 #else
         return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not supported on this system"};
 #endif
