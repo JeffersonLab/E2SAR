@@ -12,8 +12,11 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5"]
     container:
-      image: rockylinux/rockylinux:9.0
+      image: ${{ matrix.container }}
     steps:
       - name: Set up environment
         run: |
@@ -52,7 +55,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: buildRockyDeps.yml
-          name: rhel9-package-e2sar-deps-${{ env.E2SAR_VER }}
+          name: ${{ matrix.container }}-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: ./
 
       - name: Untar the grpc and boost install tree
@@ -89,7 +92,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rocky9-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          name: ${{ matrix.container }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
           path: |
             *.deb
             *.rpm
