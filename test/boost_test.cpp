@@ -421,7 +421,7 @@ int main()
     {
         auto numFrames = (bytes + maxPldLen -1)/ maxPldLen;
 
-        std::cout << "Number of frames for even of size " << bytes << " and payload length " << maxPldLen << " is " << numFrames << std::endl;
+        std::cout << "Number of frames for event of size " << bytes << " and payload length " << maxPldLen << " is " << numFrames << std::endl;
     }
 
     std::vector<std::string> strs = {"one", "two", "three"};
@@ -435,5 +435,9 @@ int main()
             rets += ", ";
     }
     std::cout << "Return string " << rets << std::endl;
+
+    std::string duration{"00:00:00"};
+    auto duration_v = boost::posix_time::duration_from_string(duration);
+    std::cout << "Duration string " << duration << " converts to " << duration_v << std::endl;
 }
 
