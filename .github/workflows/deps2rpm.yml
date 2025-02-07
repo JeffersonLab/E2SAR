@@ -35,6 +35,21 @@ jobs:
           mkdir -p package/usr/local/include/
           mkdir -p package/usr/local/lib
           mkdir -p package/usr/local/lib64
+      
+      - name: Prepare a unique name for Artifacts
+        id: prep_artifact_name
+        run: |
+          # Calculate a unique string which applies to the matrix entry
+          # that we can use to construct unique and valid artifact names.
+          # We achieve that by squashing runs of characters are invalid
+          # in artifact names, and also whitespace and dashes, into a
+          # single dash character.  The unique string will appear as
+          # the environment variable ARTIFACT_NAME in subsequent actions.
+          
+          name="${{ matrix.container }}"
+          # The option to enable + in sed regexps differs by OS so we avoid it
+          name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
 
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
@@ -42,7 +57,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: buildRockyDeps.yml
-          name: ${{ matrix.container }}-package-e2sar-deps-${{ env.E2SAR_VER }}
+          name: ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-${{ env.E2SAR_VER }}
           path: ./
 
       - name: Untar the grpc and boost install tree
@@ -65,7 +80,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.container }}-e2sar-deps-${{ env.E2SAR_VER }}-package
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-deps-${{ env.E2SAR_VER }}-package
           path: |
             *.deb
             *.rpm

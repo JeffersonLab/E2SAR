@@ -32,6 +32,21 @@ jobs:
           path: E2SAR
           submodules: false
           token: ${{ secrets.CLASSIC_REPO_PAT }}
+      
+      - name: Prepare a unique name for Artifacts
+        id: prep_artifact_name
+        run: |
+          # Calculate a unique string which applies to the matrix entry
+          # that we can use to construct unique and valid artifact names.
+          # We achieve that by squashing runs of characters are invalid
+          # in artifact names, and also whitespace and dashes, into a
+          # single dash character.  The unique string will appear as
+          # the environment variable ARTIFACT_NAME in subsequent actions.
+          
+          name="${{ matrix.container }}"
+          # The option to enable + in sed regexps differs by OS so we avoid it
+          name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
 
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
@@ -39,7 +54,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: deps2rpm.yml
-          name: ${{ matrix.container }}-e2sar-deps-${{ env.E2SAR_VER }}-package
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-deps-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
       - name: Download built e2sar rpm
@@ -48,13 +63,13 @@ jobs:
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: distroRocky.yml
-          name: ${{ matrix.container }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
           path: E2SAR
 
       - name: create GH release
         run: |
           cd E2SAR
-          gh release create E2SAR-${{ github.ref_name }}-${{ env.E2SAR_VER }}-${{ matrix.container }} ./*.rpm
+          gh release create E2SAR-${{ github.ref_name }}-${{ env.E2SAR_VER }}-${{ env.ARTIFACT_NAME }} ./*.rpm
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
         shell: bash
