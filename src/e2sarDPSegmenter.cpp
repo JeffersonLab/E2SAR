@@ -339,9 +339,12 @@ namespace e2sar
         if (seg.cpuCoreList.size())
         {
             auto res = setThreadAffinity(seg.cpuCoreList[threadIndex]);
-            seg.sendStats.errCnt++;
-            seg.sendStats.lastE2SARError = E2SARErrorc::SystemError;
-            return;
+            if (res.has_error())
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastE2SARError = res.error().code();
+                return;
+            }
         }
         while(!seg.threadsStop)
         {
