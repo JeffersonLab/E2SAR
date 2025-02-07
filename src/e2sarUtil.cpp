@@ -397,7 +397,7 @@ namespace e2sar
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
 
-        for(auto core: cpuCoreList)
+        for(auto core: cores)
             CPU_SET(core, &cpuset);
         if (sched_setaffinity(0, sizeof(cpuset), &cpuset) == -1)
             return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
