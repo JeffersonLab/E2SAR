@@ -33,7 +33,9 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
+        // set thread index to 0 for a single send thread
         sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
+        cpuCoreList{cpuCoreList},
 #ifdef LIBURING_AVAILABLE
         cqeThreadState(*this),
 #endif
@@ -337,6 +339,9 @@ namespace e2sar
         if (seg.cpuCoreList.size())
         {
             auto res = setThreadAffinity(seg.cpuCoreList[threadIndex]);
+            seg.sendStats.errCnt++;
+            seg.sendStats.lastE2SARError = E2SARErrorc::SystemError;
+            return;
         }
         while(!seg.threadsStop)
         {
