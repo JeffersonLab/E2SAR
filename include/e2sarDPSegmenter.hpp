@@ -137,6 +137,8 @@ namespace e2sar
                 std::atomic<u_int64_t> errCnt{0};
                 // last error code
                 std::atomic<int> lastErrno{0};
+                // last e2sar error
+                std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
             };
             // independent stats for each thread
             AtomicStats syncStats;
@@ -463,7 +465,7 @@ namespace e2sar
              * Get a tuple <sync msg cnt, sync err cnt, last errno> of sync statistics.
              * Stat structures have atomic members, no additional locking needed.
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getSyncStats() const noexcept
+            inline const boost::tuple<u_int64_t, u_int64_t, int, E2SARErrorc> getSyncStats() const noexcept
             {
                 return getStats(syncStats);
             }
@@ -473,7 +475,7 @@ namespace e2sar
              * of send statistics. Stat structure have atomic members, no additional
              * locking needed
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getSendStats() const noexcept
+            inline const boost::tuple<u_int64_t, u_int64_t, int, E2SARErrorc> getSendStats() const noexcept
             {
                 return getStats(sendStats);
             }
@@ -509,10 +511,10 @@ namespace e2sar
                 threadsStop = true;
             }
         private:
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getStats(const AtomicStats &s) const
+            inline const boost::tuple<u_int64_t, u_int64_t, int, E2SARErrorc> getStats(const AtomicStats &s) const
             {
-                return boost::make_tuple<u_int64_t, u_int64_t, int>(s.msgCnt, 
-                    s.errCnt, s.lastErrno);
+                return boost::make_tuple<u_int64_t, u_int64_t, int, E2SARErrorc>(s.msgCnt, 
+                    s.errCnt, s.lastErrno, s.lastE2SARError);
             }
 
             // Calculate the average event rate from circular buffer

@@ -167,7 +167,12 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Completed, " << stats.get<0>() << " frames sent, " << stats.get<1>() << " errors" << std::endl;
     if (stats.get<1>() != 0)
     {
-        std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
+        if (stats.get<3>() != E2SARErrorc::NoError)
+        {
+            std::cout << "Last E2SARError code: " << make_error_code(stats.get<3>()).message() << std::endl;
+        }
+        else
+            std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
     }
 
     return 0;
@@ -278,7 +283,7 @@ void recvStatsThread(Reassembler *r)
             std::cout << "\tLast Data Error: " << strerror(stats.get<2>()) << std::endl;
         std::cout << "\tgRPC Errors: " << stats.get<3>() << std::endl;
         if (stats.get<5>() != E2SARErrorc::NoError)
-            std::cout << "\tLast E2SARError code: " << stats.get<5>() << std::endl;
+            std::cout << "\tLast E2SARError code: " << make_error_code(stats.get<5>()).message() << std::endl;
 
         std::cout << "\tEvents lost so far: ";
         for(auto evt: lostEvents)
@@ -345,7 +350,7 @@ int main(int argc, char **argv)
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
-    opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind receiver threads to; number of threads is equal to the number of cores [r]");
+    opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
 
     po::variables_map vm;
@@ -377,7 +382,6 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "port");
         conflicting_options(vm, "deq", "send");
         conflicting_options(vm, "seq", "recv");
-        conflicting_options(vm, "cores", "send");
         conflicting_options(vm, "cores", "threads");
     }
     catch (const std::logic_error &le)
@@ -480,13 +484,14 @@ int main(int argc, char **argv)
                 sflags.usecAsEventNum = usecAsEventNum;
             }
             std::cout << "Control plane                " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Using " << (vm.count("cores") ? "Assigned Threads To Cores" : "Unassigned Threads") << std::endl;
             std::cout << "Event rate reporting in Sync " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
             std::cout << "Using usecs as event numbers " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
+                segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
                 auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {
