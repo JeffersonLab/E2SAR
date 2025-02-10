@@ -1,0 +1,13 @@
+dist: bionic
+# uncomment the following lines to set this project for go
+# language: go
+# go:
+#   - 1.x
+
+jobs:
+  include:
+  - stage: create a regression test
+    script:
+    - echo "Uncomment out the appropriate sections to make this do something useful"
+    # run go tests
+    # - go test -v ./...
