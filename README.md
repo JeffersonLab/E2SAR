@@ -1,10 +1,14 @@
 # Packet RS-FEC
 
-Getting started:
+# Getting started:
 
-1. Use the following command to update the project name:
+install the following dependancies
 
-    sed -i '' -e 's/Packet RS-FEC/Project Name/g' README.md LICENSE
+```
+pip install galois
+```
 
-2. Remove these steps and add a meaningful description of the project in this
-   file.
+# Learning from prototypes
+
+There are various scripts in the prototypes/python directory.  They are mostly self explanatory for learning how RS works.
+
