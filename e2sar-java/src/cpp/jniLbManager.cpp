@@ -386,3 +386,9 @@ JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_getInternalUri
     e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
     return (long)&lbman->get_URI();
   }
+
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeNativePointer
+  (JNIEnv *env, jobject jLbManager, jlong jNativeLbPointer){
+    e2sar::LBManager* lbman = reinterpret_cast<e2sar::LBManager*>(jNativeLbPointer);
+    delete lbman;
+  }

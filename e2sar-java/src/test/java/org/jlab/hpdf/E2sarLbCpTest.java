@@ -32,6 +32,7 @@ public class E2sarLbCpTest{
             EjfatURI ejfatUri = EjfatURI.createInstance(uriString);
             LbManager lbManager = new LbManager(ejfatUri, false, false, sslOpts, false);
             ejfatUri.free();
+            lbManager.free();
         } 
         catch(E2sarNativeException e){
             e.printStackTrace();
@@ -45,6 +46,7 @@ public class E2sarLbCpTest{
             EjfatURI ejfatUri = EjfatURI.createInstance(uriString);
             LbManager lbManager = new LbManager(ejfatUri, true, false);
             ejfatUri.free();
+            lbManager.free();
         } 
         catch(E2sarNativeException e){
             e.printStackTrace();

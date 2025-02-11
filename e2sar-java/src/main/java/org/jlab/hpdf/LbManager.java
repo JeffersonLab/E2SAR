@@ -188,5 +188,13 @@ public class LbManager {
         return uri;
     }
     
+    private native void freeNativePointer(long nativeLbManager);
+
+    public void free(){
+        if(nativeLbManager != 0){
+            freeNativePointer(nativeLbManager);
+            nativeLbManager = 0;
+        }
+    }
     
 }

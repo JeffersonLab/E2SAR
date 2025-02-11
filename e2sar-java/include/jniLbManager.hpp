@@ -163,6 +163,14 @@ JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_LbManager_getAddrString
 JNIEXPORT jlong JNICALL Java_org_jlab_hpdf_LbManager_getInternalUri
   (JNIEnv *, jobject, jlong);
 
+/*
+ * Class:     org_jlab_hpdf_LbManager
+ * Method:    freeNativePointer
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_org_jlab_hpdf_LbManager_freeNativePointer
+  (JNIEnv *, jobject, jlong);
+
 #ifdef __cplusplus
 }
 #endif

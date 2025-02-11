@@ -421,3 +421,15 @@ std::pair<boost::asio::ip::address, u_int16_t> convertInetSocketAddress(JNIEnv* 
     // Step 3: Return as std::pair<boost::asio::ip::address, uint16_t>
     return std::make_pair(boostAddress, static_cast<u_int16_t>(port));
 }
+
+u_int8_t* getDirectByteBufferPointer(JNIEnv* env, jobject jByteBuffer){
+    // Get the direct pointer to the ByteBuffer memory
+    void* ptr = env->GetDirectBufferAddress(jByteBuffer);
+    
+    if (ptr == nullptr) {
+        throwJavaException(env, "Error: Failed to get direct buffer address");
+        return nullptr;
+    }
+
+    return (u_int8_t*) ptr;
+}
