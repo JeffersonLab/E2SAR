@@ -53,6 +53,14 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSessionToken
 
 /*
  * Class:     org_jlab_hpdf_EjfatURI
+ * Method:    getInstanceToken
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getInstanceToken
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     org_jlab_hpdf_EjfatURI
  * Method:    getSessionToken
  * Signature: (J)Ljava/lang/String;
  */

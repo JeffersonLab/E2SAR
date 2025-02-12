@@ -8,6 +8,10 @@ import org.jlab.hpdf.exceptions.E2sarNativeException;
 import java.nio.ByteBuffer;
 
 public class Segmenter{
+
+    static{
+        System.loadLibrary("jnie2sar");
+    }
     
     private long nativeSegmenter;
 

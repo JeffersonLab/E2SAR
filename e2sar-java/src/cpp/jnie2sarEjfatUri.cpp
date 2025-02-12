@@ -54,6 +54,21 @@ JNIEXPORT void JNICALL Java_org_jlab_hpdf_EjfatURI_setSessionToken
     ejfatUri->set_SessionToken(sessionToken);
   }
 
+JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getInstanceToken
+  (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
+    e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);
+
+    auto res = ejfatUri->get_InstanceToken();
+    if(res.has_error()){
+      throwJavaException(env, res.error().message());
+      return nullptr;
+    }
+    else{
+      std::string instanceToken = res.value();
+      return env->NewStringUTF(instanceToken.data());
+    }
+  }
+
 JNIEXPORT jstring JNICALL Java_org_jlab_hpdf_EjfatURI_getSessionToken
   (JNIEnv *env, jobject jEjfatUri, jlong jNativePointer){
     e2sar::EjfatURI* ejfatUri = reinterpret_cast<e2sar::EjfatURI*>(jNativePointer);

@@ -4,6 +4,7 @@
 #include <vector>
 #include <google/protobuf/util/time_util.h>
 #include <boost/asio.hpp>
+#include <optional>
 
 #ifndef _Jni_e2sar_helper
 #define _Jni_e2sar_helper
@@ -30,6 +31,8 @@ void throwJavaException(JNIEnv *env, std::string message="");
 
 std::vector<std::string> jstringList2Vector(JNIEnv *env, jobject javaList); 
 
+std::vector<int> jIntList2Vector(JNIEnv *env, jobject javaList);
+
 jobject convertTimestampToInstant(JNIEnv *env, const google::protobuf::Timestamp &timestamp);
 
 google::protobuf::Timestamp convertInstantToTimestamp(JNIEnv *env, jobject jInstant);
@@ -37,6 +40,8 @@ google::protobuf::Timestamp convertInstantToTimestamp(JNIEnv *env, jobject jInst
 jobject convertJobjectVectorToArrayList(JNIEnv *env, const std::vector<jobject> &jVec);
 
 jobject convertStringVectorToArrayList(JNIEnv *env, const std::vector<std::string> &vec);
+
+jobject convertIntVectorToArrayList(JNIEnv *env, const std::vector<int> &vec);
 
 jobject convertBoostIpToInetAddress(JNIEnv *env, const boost::asio::ip::address &address);
 
@@ -47,4 +52,6 @@ jobject convertHostNameAndPortToInetSocketAddress(JNIEnv *env, std::pair<std::st
 std::pair<boost::asio::ip::address, u_int16_t> convertInetSocketAddress(JNIEnv* env, jobject inetSocketAddress);
 
 u_int8_t* getDirectByteBufferPointer(JNIEnv* env, jobject jByteBuffer);
+
+std::optional<boost::asio::ip::address> convertInetAddressToBoostIp(JNIEnv* env, jobject inetAddressObj);
 #endif

@@ -206,6 +206,42 @@ std::vector<std::string> jstringList2Vector(JNIEnv *env, jobject javaList){
     return stringVector;
 }
 
+std::vector<int> jIntList2Vector(JNIEnv *env, jobject javaList){
+    std::vector<int> intVector;
+
+    // Get the List and Iterator classes and their methods
+    jclass listClass = env->FindClass("java/util/List");
+    jmethodID iteratorMethodID = env->GetMethodID(listClass, "iterator", "()Ljava/util/Iterator;");
+
+    jclass iteratorClass = env->FindClass("java/util/Iterator");
+    jmethodID hasNextMethodID = env->GetMethodID(iteratorClass, "hasNext", "()Z");
+    jmethodID nextMethodID = env->GetMethodID(iteratorClass, "next", "()Ljava/lang/Object;");
+
+    // Get the iterator for the Java list
+    jobject iterator = env->CallObjectMethod(javaList, iteratorMethodID);
+
+    // Get Integer class and intValue() method
+    jclass integerClass = env->FindClass("java/lang/Integer");
+    jmethodID intValueMethod = env->GetMethodID(integerClass, "intValue", "()I");
+
+    // Loop through the iterator
+    while (env->CallBooleanMethod(iterator, hasNextMethodID)) {
+        // Get the next element in the iterator
+        jobject jIntegerObject = (jstring) env->CallObjectMethod(iterator, nextMethodID);
+
+        // Convert Integer to int
+        jint value = env->CallIntMethod(jIntegerObject, intValueMethod);
+        intVector.push_back(static_cast<int>(value));
+
+        env->DeleteLocalRef(jIntegerObject);  // Clean up the local reference
+    }
+
+    // Clean up the iterator local reference
+    env->DeleteLocalRef(iterator);
+
+    return intVector;
+}
+
 jobject convertTimestampToInstant(JNIEnv *env, const google::protobuf::Timestamp &timestamp){
     int64_t seconds = timestamp.seconds();
     int32_t nanos = timestamp.nanos();
@@ -294,6 +330,23 @@ jobject convertStringVectorToArrayList(JNIEnv *env, const std::vector<std::strin
         // Convert std::string to jstring
         jobject jStr = env->NewStringUTF(str.c_str());
         jObjectVec.push_back(jStr);
+    }
+    jobject jArrayList = convertJobjectVectorToArrayList(env, jObjectVec);
+
+    //cleanup
+    for(jobject obj : jObjectVec){
+        env->DeleteLocalRef(obj);
+    }
+
+    return jArrayList;
+}
+
+jobject convertIntVectorToArrayList(JNIEnv *env, const std::vector<int> &vec){
+    std::vector<jobject> jObjectVec;
+
+    for(const int& value : vec){
+        jobject integerObj = env->NewObject(env->FindClass("java/lang/Integer"), env->GetMethodID(env->FindClass("java/lang/Integer"), "<init>", "(I)V"), value);
+        jObjectVec.push_back(integerObj);
     }
     jobject jArrayList = convertJobjectVectorToArrayList(env, jObjectVec);
 
@@ -432,4 +485,49 @@ u_int8_t* getDirectByteBufferPointer(JNIEnv* env, jobject jByteBuffer){
     }
 
     return (u_int8_t*) ptr;
+}
+
+std::optional<boost::asio::ip::address> convertInetAddressToBoostIp(JNIEnv* env, jobject inetAddressObj){
+    // Get the InetAddress class
+    jclass inetAddressClass = env->GetObjectClass(inetAddressObj);
+
+    // Get the method ID for getAddress()
+    jmethodID getAddressMethod = env->GetMethodID(inetAddressClass, "getAddress", "()[B");
+    if (!getAddressMethod) {
+        throwJavaException(env, "Failed to find InetAddress.getAddress() method");
+        return std::nullopt;
+    }
+
+    // Call getAddress() and get the byte array
+    jbyteArray addressBytes = (jbyteArray)env->CallObjectMethod(inetAddressObj, getAddressMethod);
+    if (!addressBytes) {
+        throwJavaException(env, "Failed to get address bytes from InetAddress");
+        return std::nullopt;
+    }
+
+    // Get the byte array length
+    jsize length = env->GetArrayLength(addressBytes);
+    
+    // Read bytes from the array
+    std::vector<jbyte> buffer(length);
+    env->GetByteArrayRegion(addressBytes, 0, length, buffer.data());
+    std::reverse(buffer.begin(), buffer.end());
+
+
+    // Convert to boost::asio::ip::address
+    try {
+        if (length == 4) { // IPv4 address
+            return boost::asio::ip::address_v4(*reinterpret_cast<uint32_t*>(buffer.data()));
+        } else if (length == 16) { // IPv6 address
+            boost::asio::ip::address_v6::bytes_type ipv6Bytes;
+            std::copy(buffer.begin(), buffer.end(), ipv6Bytes.begin());
+            return boost::asio::ip::address_v6(ipv6Bytes);
+        } else {
+            throwJavaException(env, "Invalid address length");
+            return std::nullopt;
+        }
+    } catch (const std::exception& e) {
+        throwJavaException(env, "Error converting address:" + std::string(e.what()));
+    }
+    return std::nullopt;
 }

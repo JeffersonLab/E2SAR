@@ -1,15 +1,11 @@
-package org.jlab.hpdf;
+package org.jlab.hpdf.unit;
 
 import org.jlab.hpdf.EjfatURI;
 import org.jlab.hpdf.LbManager;
 import org.jlab.hpdf.exceptions.E2sarNativeException;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
-
-import java.util.List;
-import java.util.ArrayList;
 
 
 /**

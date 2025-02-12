@@ -11,7 +11,6 @@
 extern "C" {
 #endif
 
-const std::string nativeSegmenterField = "nativeSegmenter";
 const std::string javaSegmenterFlagsClass = "org/jlab/hpdf/config/SegmenterFlags";
 const std::string javaSyncStatsClass = "org/jlab/hpdf/messages/SyncStats";
 const std::string javaSendStatsClass = "org/jlab/hpdf/messages/SendStats";

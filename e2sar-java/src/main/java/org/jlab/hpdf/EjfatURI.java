@@ -63,6 +63,10 @@ public class EjfatURI{
     public void setSessionToken(String t){setInstanceToken(nativeEjfatURI, t);}
     private native void setSessionToken(long nativeEjfatURI, String t);
 
+
+    public String getInstanceToken() throws E2sarNativeException{return getInstanceToken(nativeEjfatURI);}
+    private native String getInstanceToken(long nativeEjfatURI) throws E2sarNativeException;
+
     public String getSessionToken() throws E2sarNativeException{return getSessionToken(nativeEjfatURI);}
     private native String getSessionToken(long nativeEjfatURI) throws E2sarNativeException;
 

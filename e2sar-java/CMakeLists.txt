@@ -33,7 +33,7 @@ message(STATUS "E2SAR linker flags: ${E2SAR_LIBRARIES}")
 message(STATUS "GRPC linker flags: ${GRPC_LIBRARIES}")
 message(STATUS "Protobuf linker flags: ${Protobuf_LIBRARIES}")
 
-add_library(jnie2sar SHARED src/cpp/jnie2sar.cpp src/cpp/jniLbManager.cpp src/cpp/jnie2sarHelper.cpp src/cpp/jnie2sarEjfatUri.cpp src/cpp/jniDpSegmenter.cpp)
+add_library(jnie2sar SHARED src/cpp/jnie2sar.cpp src/cpp/jniLbManager.cpp src/cpp/jnie2sarHelper.cpp src/cpp/jnie2sarEjfatUri.cpp src/cpp/jniDpSegmenter.cpp src/cpp/jniDpReassembler.cpp)
 target_link_libraries(jnie2sar ${E2SAR_LIBRARIES}
 ${Boost_LIBRARIES} ${GRPC_LIBRARIES} ${Protobuf_LIBRARIES} Threads::Threads ${JNI_LIBRARIES})
 if (CMAKE_CXX_COMPILER_ID MATCHES Clang)
