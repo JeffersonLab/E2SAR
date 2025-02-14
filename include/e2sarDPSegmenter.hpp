@@ -67,6 +67,9 @@ namespace e2sar
             // Max size of internal queue holding events to be sent. 
             static const size_t QSIZE{2047};
 
+            // size of CQE batch we peek
+            static const unsigned cqeBatchSize{100};
+
             // how long data send thread spends sleeping
             static const boost::chrono::milliseconds sleepTime;
 
@@ -310,10 +313,10 @@ namespace e2sar
                 if (sendThreadState.mtu > 9000)
                     throw E2SARException("MTU set too long, limit 9000");
 
-                if (!dpuri.has_syncAddr())
+                if (useCP and not dpuri.has_syncAddr())
                     throw E2SARException("Sync address not present in the URI");
 
-                if (!dpuri.has_dataAddr())
+                if (not dpuri.has_dataAddr())
                     throw E2SARException("Data address is not present in the URI");
 
                 if (sendThreadState.mtu <= TOTAL_HDR_LEN)
