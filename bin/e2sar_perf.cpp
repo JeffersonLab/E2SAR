@@ -321,6 +321,7 @@ int main(int argc, char **argv)
     u_int16_t recvStartPort;
     std::vector<int> coreList;
     std::vector<std::string> optimizations;
+    int numaNode;
 
     // parameters
     opts("send,s", "send traffic");
@@ -352,6 +353,7 @@ int main(int argc, char **argv)
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
+    opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
 
     po::variables_map vm;
 
@@ -390,7 +392,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    std::cout << "E2SAR Version: " << get_Version() << std::endl;
+    std::cout << "E2SAR Version:                 " << get_Version() << std::endl;
     std::cout << "E2SAR Available Optimizations: " << concatWithSeparator(get_OptimizationsAsStrings()) << std::endl;
     
     if (vm.count("help"))
@@ -405,7 +407,18 @@ int main(int argc, char **argv)
         std::cerr << ropt.error().message() << std::endl;
         return -1;
     }
-    std::cout << "E2SAR Selected Optimizations: " << concatWithSeparator(get_SelectedOptimizationsAsStrings()) << std::endl;
+    std::cout << "E2SAR Selected Optimizations:  " << concatWithSeparator(get_SelectedOptimizationsAsStrings()) << std::endl;
+
+    // deal with NUMA memory binding before going further
+    if (numaNode >= 0)
+    {
+        auto numaRes = setNUMABind(numaNode);
+        if (numaRes.has_error())
+        {
+            std::cout << "Unable to bind to specified NUMA node: " << numaRes.error().message() << std::endl;
+            return -1;
+        }
+    }
 
     withCP = vm["withcp"].as<bool>();
     zeroRate = vm["zerorate"].as<bool>();
@@ -483,10 +496,11 @@ int main(int argc, char **argv)
                 sflags.zeroRate = zeroRate;
                 sflags.usecAsEventNum = usecAsEventNum;
             }
-            std::cout << "Control plane                " << (sflags.useCP ? "ON" : "OFF") << std::endl;
-            std::cout << "Using " << (vm.count("cores") ? "Assigned Threads To Cores" : "Unassigned Threads") << std::endl;
-            std::cout << "Event rate reporting in Sync " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
-            std::cout << "Using usecs as event numbers " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
+            std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
+            std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
+            std::cout << "Event rate reporting in Sync:  " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
+            std::cout << "Using usecs as event numbers:  " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 

@@ -608,5 +608,16 @@ namespace e2sar
      * Set calling thread affinity to specified core
      */
     result<int> setThreadAffinity(int core) noexcept;
+
+    /**
+     * Set calling thread affinity to exclude named cores
+     */
+    result<int> setThreadAffinityXOR(const std::vector<int> &cores) noexcept;
+
+    /**
+     * Bind process memory allocation to specified NUMA node
+     * Error out if node is invalid or NUMA not supported
+     */
+    result<int> setNUMABind(int node) noexcept;
 };
 #endif

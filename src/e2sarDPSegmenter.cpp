@@ -96,7 +96,10 @@ namespace e2sar
             // probe for SENDMSG
             struct io_uring_probe *probe = io_uring_get_probe();
             if (not io_uring_opcode_supported(probe, IORING_OP_SENDMSG))
+            {
+                free(probe);
                 throw E2SARException("Your kernel does not support the expected IO_URING operations (IORING_OP_SENDMSG)"s);
+            }
             free(probe);
             // init ring
             int err = io_uring_queue_init(uringSize, &ring, 0);
@@ -151,8 +154,21 @@ namespace e2sar
     {
         // lock for the mutex (must be thread-local)
         thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
+        struct io_uring_cqe *cqes[cqeBatchSize];
 
-        struct io_uring_cqe *cqe;
+        // set this thread to run on any core not named in the vector
+        // those cores are reserved for send threads only
+        if (seg.cpuCoreList.size())
+        {
+            auto res = setThreadAffinityXOR(seg.cpuCoreList);
+            if (res.has_error())
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastE2SARError = res.error().code();
+                return;
+            }
+        }
+
         while(!seg.threadsStop)
         {
             condLock.lock();
@@ -165,31 +181,33 @@ namespace e2sar
                 cqe = nullptr;
                 // reap CQEs and update the stats
                 // should exit when the ring is deleted
-                int ret = io_uring_peek_cqe(&seg.ring, &cqe);
-                if (ret < 0)
+
+                memset(static_cast<void*>cqes, 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
+                int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, sqeBatchSize);
+                // error or returned nothing
+                if (ret <= 0)
                 {
                     // don't log error here - it is usually a temporary resource availability
                     break;
                 }
-                // peek returned nothing
-                if (cqe == nullptr)
-                    break;
-                // we have a CQE now
-                if (cqe->res < 0)
+                for(int idx = 0; i < ret; ++idx)
                 {
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = cqe->res;
-                }
-                if (cqe)
-                {
+                    // we have a CQE now
+                    // check for errors from sendmsg
+                    if (cqes[idx]->res < 0)
+                    {
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = cqes[idx]->res;
+                    }
                     // free the memory
-                    auto sqeData = reinterpret_cast<SQEData*>(cqe->user_data);
+                    auto sqeData = reinterpret_cast<SQEData*>(cqes[idx]->user_data);
                     free(sqeData->iov);
                     free(sqeData->hdr);
                     free(sqeData);
+                    io_uring_cqe_seen(&seg.ring, cqes[idx]);
                 }
-                io_uring_cqe_seen(&seg.ring, cqe);
-                seg.outstandingSends--;
+
+                seg.outstandingSends -= ret;
             }
         }
     }
