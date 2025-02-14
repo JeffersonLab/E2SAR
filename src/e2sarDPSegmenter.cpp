@@ -178,11 +178,10 @@ namespace e2sar
             // empty cqe queue
             while(seg.outstandingSends > 0)
             {
-                cqe = nullptr;
                 // reap CQEs and update the stats
                 // should exit when the ring is deleted
 
-                memset(static_cast<void*>cqes, 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
+                memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
                 int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, sqeBatchSize);
                 // error or returned nothing
                 if (ret <= 0)
@@ -190,7 +189,7 @@ namespace e2sar
                     // don't log error here - it is usually a temporary resource availability
                     break;
                 }
-                for(int idx = 0; i < ret; ++idx)
+                for(int idx = 0; idx < ret; ++idx)
                 {
                     // we have a CQE now
                     // check for errors from sendmsg

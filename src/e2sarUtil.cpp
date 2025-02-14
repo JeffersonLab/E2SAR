@@ -463,7 +463,7 @@ namespace e2sar
 
         int nr_nodes = numa_max_node() + 1;
 
-        if (numa_available()) < 0)
+        if (numa_available() < 0)
             return E2SARErrorInfo{E2SARErrorc::SystemError, "NUMA management not supported on this system"};
         
         if ((node > nr_nodes - 1) or (node < 0))
@@ -473,10 +473,9 @@ namespace e2sar
         numa_bitmask_setbit(numa_mask, node);
 
         // makes sure all memory allocations come from the specified NUMA node
-        if (numa_set_membind(numa_mask) < 0) 
-            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to bind to the specified NUMA node"};
+        numa_set_membind(numa_mask);
 
-        numa_bitmask_free(nr_nodes);
+        numa_bitmask_free(numa_mask);
         return 0;
 #else
         return E2SARErrorInfo{E2SARErrorc::SystemError, "NUMA management not available on this system"};
