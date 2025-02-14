@@ -95,6 +95,10 @@ namespace e2sar
         {
             // probe for SENDMSG
             struct io_uring_probe *probe = io_uring_get_probe();
+
+            if (probe == nullptr)
+                throw E2SARException("Unable to allocate io_uring probe, unable to proceed using liburing"s);
+
             if (not io_uring_opcode_supported(probe, IORING_OP_SENDMSG))
             {
                 free(probe);
@@ -182,7 +186,7 @@ namespace e2sar
                 // should exit when the ring is deleted
 
                 memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
-                int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, sqeBatchSize);
+                int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, cqeBatchSize);
                 // error or returned nothing
                 if (ret <= 0)
                 {
