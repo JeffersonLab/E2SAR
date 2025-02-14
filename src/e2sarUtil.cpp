@@ -14,6 +14,10 @@
 #include <pthread.h>
 #endif
 
+#ifdef NUMA_AVAILABLE
+#include <numa.h>
+#endif
+
 #include "e2sarUtil.hpp"
 
 namespace e2sar
@@ -403,7 +407,7 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
         return 0;
 #else
-        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting process affinity not supported on this system"};
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting process affinity not available on this system"};
 #endif
     }
 
@@ -419,7 +423,63 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(err)};
         return err;
 #else
-        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not supported on this system"};
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not available on this system"};
+#endif
+    }
+
+    result<int> setThreadAffinityXOR(const std::vector<int> &cores) noexcept
+    {
+#ifdef THRD_AFFINITY_AVAILABLE
+        cpu_set_t cpuset, curset, xorset;
+
+        // set the mast that we will XOR with
+        CPU_ZERO(&cpuset);
+        for(int core: cores) 
+            CPU_SET(core, &cpuset);
+        
+        // get the current mask of the thread
+        auto thread = pthread_self();
+        CPU_ZERO(&curset);
+        int err{0};
+        if ((err = pthread_getaffinity_np(thread, sizeof(curset), &curset)) < 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(err)};
+
+        // do the XOR
+        CPU_ZERO(&xorset);
+        CPU_XOR(&xorset, &cpuset, &curset);
+        // set thread to use the xorset which now excludes cores we don't want
+        if ((err = pthread_setaffinity_np(thread, sizeof(xorset), &xorset)) < 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(err)};
+        return err;
+#else
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Setting thread affinity not available on this system"};
+#endif
+    }
+
+    result<int> setNUMABind(int node) noexcept
+    {
+#ifdef NUMA_AVAILABLE
+        struct bitmask *numa_mask;
+
+        int nr_nodes = numa_max_node() + 1;
+
+        if (numa_available()) < 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "NUMA management not supported on this system"};
+        
+        if ((node > nr_nodes - 1) or (node < 0))
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Requested NUMA node not valid"};
+
+        numa_mask = numa_bitmask_alloc(numa_max_node() + 1);
+        numa_bitmask_setbit(numa_mask, node);
+
+        // makes sure all memory allocations come from the specified NUMA node
+        if (numa_set_membind(numa_mask) < 0) 
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to bind to the specified NUMA node"};
+
+        numa_bitmask_free(nr_nodes);
+        return 0;
+#else
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "NUMA management not available on this system"};
 #endif
     }
 }

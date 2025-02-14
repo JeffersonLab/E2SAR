@@ -11,7 +11,20 @@ endif
 linker_flags = []
 if compiler.has_header('liburing.h') and compiler.has_header('linux/io_uring.h')
         add_project_arguments('-DLIBURING_AVAILABLE', language: ['cpp'])
-	linker_flags = ['-luring']
+	linker_flags += ['-luring']
+endif
+
+numacode = '''
+#include <numa.h>
+
+void f() {
+  int res = numa_available();
+}
+'''
+
+if compiler.compiles(numacode, name: 'NUMA library check')
+        add_project_arguments('-DNUMA_AVAILABLE', language: ['cpp'])
+        linker_flags += ['-lnuma']
 endif
 
 affcode = '''
