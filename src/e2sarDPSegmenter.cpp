@@ -102,7 +102,13 @@ namespace e2sar
             }
             free(probe);
             // init ring
-            int err = io_uring_queue_init(uringSize, &ring, 0);
+            struct io_uring_params params;
+            memset(&params, 0, sizeof(params));
+            // setup the kernel polling thread (it goes to sleep and restarts as needed under the covers)
+            // note we will register the file descriptors with the ring a bit later
+            params.flags |= IORING_SETUP_SQPOLL;
+            params.sq_thread_idle = pollWaitTime;
+            int err = io_uring_queue_init(uringSize, &ring, &params);
             if (err)
                 throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
         }
