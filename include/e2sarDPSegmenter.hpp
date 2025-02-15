@@ -281,6 +281,9 @@ namespace e2sar
             // we can't wait for too long - it only takes about 300usec
             // to exhaust 256 SQEs using 1500 byte MTU at 10Gbps
             static constexpr boost::chrono::microseconds cqeWaitTime{200};
+            // this is the sleep time for kernel thread in poll mode
+            // it is in milliseconds
+            static constexpr unsigned pollWaitTime{2000};
             // atomic counter of outstanging sends
             boost::atomic<u_int32_t> outstandingSends{0};
 #endif
