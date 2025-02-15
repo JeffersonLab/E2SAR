@@ -13,10 +13,6 @@
 
 namespace e2sar 
 {
-    // set the sleep timer for the send thread - how long it waits on
-    // a condition for new events
-    const boost::chrono::milliseconds Segmenter::sleepTime(10);
-
     Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, 
         const SegmenterFlags &sflags):
         Segmenter(uri, did, esid, std::vector<int>(), sflags)
@@ -176,7 +172,7 @@ namespace e2sar
         while(!seg.threadsStop)
         {
             condLock.lock();
-            seg.cqeThreadCond.wait_for(condLock, boost::chrono::microseconds(seg.cqeWaitTime_us));
+            seg.cqeThreadCond.wait_for(condLock, seg.cqeWaitTime);
             condLock.unlock();
 
             // empty cqe queue

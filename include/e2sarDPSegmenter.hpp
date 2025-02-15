@@ -65,13 +65,13 @@ namespace e2sar
             const int sndSocketBufSize;
 
             // Max size of internal queue holding events to be sent. 
-            static const size_t QSIZE{2047};
+            static constexpr size_t QSIZE{2047};
 
             // size of CQE batch we peek
-            static const unsigned cqeBatchSize{100};
+            static constexpr unsigned cqeBatchSize{100};
 
             // how long data send thread spends sleeping
-            static const boost::chrono::milliseconds sleepTime;
+            static constexpr boost::chrono::milliseconds sleepTime{1};
 
 #ifdef LIBURING_AVAILABLE
             struct io_uring ring;
@@ -280,7 +280,7 @@ namespace e2sar
             // wait time in ms before CQE thread checks if its time to stop
             // we can't wait for too long - it only takes about 300usec
             // to exhaust 256 SQEs using 1500 byte MTU at 10Gbps
-            const int cqeWaitTime_us{200};
+            static constexpr boost::chrono::microseconds cqeWaitTime{200};
             // atomic counter of outstanging sends
             boost::atomic<u_int32_t> outstandingSends{0};
 #endif
