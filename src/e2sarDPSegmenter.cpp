@@ -108,7 +108,7 @@ namespace e2sar
             // note we will register the file descriptors with the ring a bit later
             params.flags |= IORING_SETUP_SQPOLL;
             params.sq_thread_idle = pollWaitTime;
-            int err = io_uring_queue_init(uringSize, &ring, &params);
+            int err = io_uring_queue_init_params(uringSize, &ring, &params);
             if (err)
                 throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
         }
