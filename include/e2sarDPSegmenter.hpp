@@ -73,13 +73,6 @@ namespace e2sar
             // how long data send thread spends sleeping
             static constexpr boost::chrono::milliseconds sleepTime{1};
 
-#ifdef LIBURING_AVAILABLE
-            struct io_uring ring;
-            // each ring has to have a predefined size - we want to
-            // put at least 2*eventSize/bufferSize entries onto it
-            const size_t uringSize = 1000;
-#endif
-
             // Structure to hold each send-queue item
             struct EventQueueItem {
                 uint32_t bytes;
@@ -99,6 +92,22 @@ namespace e2sar
             // to avoid locking the item pool send thread puts processed events 
             // on this queue so they can be freed opportunistically by main thread
             boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
+
+#ifdef LIBURING_AVAILABLE
+            struct io_uring ring;
+            // each ring has to have a predefined size - we want to
+            // put at least 2*eventSize/bufferSize entries onto it
+            const size_t uringSize = 1000;
+
+            // we need to be able to call the callback from the CQE thread
+            // instead of send thread when liburing optimization is turned on
+            struct SQEUserData 
+            {
+                struct msghdr* msghdr;
+                void (*callback)(boost::any);
+                boost::any cbArg;
+            }
+#endif
 
             // structure that maintains send stats
             struct SendStats {
@@ -234,7 +243,8 @@ namespace e2sar
                 // close sockets
                 result<int> _close();
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, u_int16_t entropy);
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
+                    u_int16_t entropy, void (*callback)(boost::any), boost::any cbArg);
                 // thread loop
                 void _threadBody();
             };
