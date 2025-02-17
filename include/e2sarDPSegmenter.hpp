@@ -106,7 +106,7 @@ namespace e2sar
                 struct msghdr* msghdr;
                 void (*callback)(boost::any);
                 boost::any cbArg;
-            }
+            };
 #endif
 
             // structure that maintains send stats
