@@ -204,18 +204,25 @@ namespace e2sar
                         seg.sendStats.errCnt++;
                         seg.sendStats.lastErrno = cqes[idx]->res;
                     }
+                    auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
+                    auto callback = sqeUserData->callback;
+                    auto cbArg = sqeUserData->cbArg;
                     // free the memory
-                    auto sqeMsgHdr = reinterpret_cast<struct msghdr*>(cqes[idx]->user_data);
+                    auto sqeMsgHdr = sqeUserData->msghdr;
                     // deallocate the LBRE header
                     free(sqeMsgHdr->msg_iov[0].iov_base);
                     // deallocate the iovec itself
                     free(sqeMsgHdr->msg_iov);
                     // deallocate struct msghdr
                     free(sqeMsgHdr);
+                    // deallocate sqeUserData
+                    free(sqeUserData);
                     // mark CQE as done
                     io_uring_cqe_seen(&seg.ring, cqes[idx]);
+                    // call the callback if not null (would happen at the end of the event buffer)
+                    if (callback != nullptr)
+                        callback(cbArg);
                 }
-
                 seg.outstandingSends -= ret;
             }
         }
@@ -385,7 +392,7 @@ namespace e2sar
                 // call send overriding event number as needed
                 auto res = _send(item->event, item->bytes, 
                     item->eventNum, item->dataId,
-                    item->entropy);
+                    item->entropy, item->callback, item->cbArg);
 
                 // FIXME: do something with result? 
                 // it IS  taken care by lastErrno in the stats block. 
@@ -395,9 +402,20 @@ namespace e2sar
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
 
-                // call the callback
-                if (item->callback != nullptr)
-                    item->callback(item->cbArg);
+                // call the callback 
+#ifdef LIBURING_AVAILABLE
+                if (is_SelectedOptimization(Optimizations::liburing_send))
+                {
+                    // do nothing - it will be called from CQE Reaping Thread
+                    ;
+                }
+                else
+#else
+                {
+                    if (item->callback != nullptr)
+                        item->callback(item->cbArg);
+                }
+#endif
 
                 // push the item back to return queue
                 seg.returnQueue.push(item);    
@@ -581,7 +599,8 @@ namespace e2sar
 
     // fragment and send the event
     result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
-        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy)
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy,
+        void (*callback)(boost::any), boost::any cbArg)
     {
         int err;
         int sendSocket{0};
@@ -691,13 +710,27 @@ namespace e2sar
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
+                // busy-wait for a free sqe to become available
                 while(not(sqe = io_uring_get_sqe(&seg.ring)));
                 // allocate struct msghdr - we can't use the stack version here
                 struct msghdr *sqeMsgHdr = static_cast<struct msghdr*>(malloc(sizeof(struct msghdr)));
                 memcpy(sqeMsgHdr, &sendhdr, sizeof(struct msghdr));
+                // allocate SQEUserData
+                SQEUserData *sqeUserData = static_cast<SQEUserData*>(malloc(sizeof(SQEUserData)));
+                sqeUserData->msghdr = sqeMsgHdr;
+                if (curOffset >= eventEnd)
+                {
+                    // this is the last segment, so we give this to CQE
+                    sqeUserData->callback = callback;
+                    sqeUserData->cbArg = cbArg;
+                } else
+                {
+                    // this is not the last segment
+                    sqeUserData->callback = nullptr;
+                }
                 io_uring_prep_sendmsg(sqe, currentFdIndex, sqeMsgHdr, 0);
                 // so we can free up the memory later
-                io_uring_sqe_set_data(sqe, sqeMsgHdr);
+                io_uring_sqe_set_data(sqe, sqeUserData);
                 // index to previously registered fds, not fds themselves
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
@@ -782,10 +815,10 @@ namespace e2sar
 
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
-        // continue incrementing
+            // continue incrementing
             userEventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
-            entropy);
+            entropy, nullptr, 0);
     }
 
     // Non-blocking call specifying explicit event number.
