@@ -78,14 +78,6 @@ namespace e2sar
             // each ring has to have a predefined size - we want to
             // put at least 2*eventSize/bufferSize entries onto it
             const size_t uringSize = 1000;
-
-            // data carried in sqe, returned in cqe
-            // mainly for memory management
-            struct SQEData {
-                struct iovec *iov; // generally a 2-entry array
-                LBREHdr *hdr;
-                struct msghdr *sendhdr;
-            };
 #endif
 
             // Structure to hold each send-queue item

@@ -205,11 +205,14 @@ namespace e2sar
                         seg.sendStats.lastErrno = cqes[idx]->res;
                     }
                     // free the memory
-                    auto sqeData = reinterpret_cast<SQEData*>(cqes[idx]->user_data);
-                    free(sqeData->iov);
-                    free(sqeData->hdr);
-                    free(sqeData->sendhdr);
-                    free(sqeData);
+                    auto sqeMsgHdr = reinterpret_cast<struct msghdr*>(cqes[idx]->user_data);
+                    // deallocate the LBRE header
+                    free(sqeMsgHdr->msg_iov[0].iov_base);
+                    // deallocate the iovec itself
+                    free(sqeMsgHdr->msg_iov);
+                    // deallocate struct msghdr
+                    free(sqeMsgHdr);
+                    // mark CQE as done
                     io_uring_cqe_seen(&seg.ring, cqes[idx]);
                 }
 
@@ -693,11 +696,8 @@ namespace e2sar
                 struct msghdr *sqeMsgHdr = static_cast<struct msghdr*>(malloc(sizeof(struct msghdr)));
                 memcpy(sqeMsgHdr, &sendhdr, sizeof(struct msghdr));
                 io_uring_prep_sendmsg(sqe, currentFdIndex, sqeMsgHdr, 0);
-                SQEData *sqeData = static_cast<SQEData*>(malloc(sizeof(SQEData)));
-                sqeData->iov = iov;
-                sqeData->hdr = hdr;
-                sqeData->sendhdr = sqeMsgHdr;
-                io_uring_sqe_set_data(sqe, sqeData);
+                // so we can free up the memory later
+                io_uring_sqe_set_data(sqe, sqeMsgHdr);
                 // index to previously registered fds, not fds themselves
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
