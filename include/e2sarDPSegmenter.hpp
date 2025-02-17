@@ -84,6 +84,7 @@ namespace e2sar
             struct SQEData {
                 struct iovec *iov; // generally a 2-entry array
                 LBREHdr *hdr;
+                struct msghdr *sendhdr;
             };
 #endif
 
@@ -477,7 +478,8 @@ namespace e2sar
             }
 
             /**
-             * Get a tuple <event datagrams cnt, event datagrams err cnt, last errno>
+             * Get a tuple <event datagrams cnt, event datagrams err cnt, last errno,
+             * last E2SAR error>
              * of send statistics. Stat structure have atomic members, no additional
              * locking needed
              */
