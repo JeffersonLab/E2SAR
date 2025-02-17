@@ -727,6 +727,7 @@ namespace e2sar
                 {
                     // this is not the last segment
                     sqeUserData->callback = nullptr;
+                    sqeUserData->cbArg = 0;
                 }
                 io_uring_prep_sendmsg(sqe, currentFdIndex, sqeMsgHdr, 0);
                 // so we can free up the memory later
