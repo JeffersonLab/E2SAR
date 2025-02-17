@@ -244,7 +244,7 @@ namespace e2sar
                 result<int> _close();
                 // fragment and send the event
                 result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
-                    u_int16_t entropy, void (*callback)(boost::any), boost::any cbArg);
+                    u_int16_t entropy, void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
                 // thread loop
                 void _threadBody();
             };
