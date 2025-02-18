@@ -414,7 +414,7 @@ int main(int argc, char **argv)
     // deal with NUMA memory binding before going further
     if (numaNode >= 0)
     {
-        auto numaRes = setNUMABind(numaNode);
+        auto numaRes = Affinity::setNUMABind(numaNode);
         if (numaRes.has_error())
         {
             std::cout << "Unable to bind to specified NUMA node: " << numaRes.error().message() << std::endl;

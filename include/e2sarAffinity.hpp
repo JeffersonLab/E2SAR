@@ -5,28 +5,32 @@
 
 namespace e2sar {
 
-
     /**
-     * Set the affinity of the entire process to the cores in the vector
+     * Static methods to manipuate affinity of memory and CPUs
      */
-    result<int> setProcessAffinity(const std::vector<int> &cores) noexcept;
+    class Affinity {
+        public: 
+            /**
+             * Set the affinity of the entire process to the cores in the vector
+             */
+            static result<int> setProcess(const std::vector<int> &cores) noexcept;
 
-    /**
-     * Set calling thread affinity to specified core
-     */
-    result<int> setThreadAffinity(int core) noexcept;
+            /**
+             * Set calling thread affinity to specified core
+             */
+            static result<int> setThread(int core) noexcept;
 
-    /**
-     * Set calling thread affinity to exclude named cores
-     */
-    result<int> setThreadAffinityXOR(const std::vector<int> &cores) noexcept;
+            /**
+             * Set calling thread affinity to exclude named cores
+             */
+            static result<int> setThreadXOR(const std::vector<int> &cores) noexcept;
 
-    /**
-     * Bind process memory allocation to specified NUMA node
-     * Error out if node is invalid or NUMA not supported
-     */
-    result<int> setNUMABind(int node) noexcept;
-
+            /**
+             * Bind process memory allocation to specified NUMA node
+             * Error out if node is invalid or NUMA not supported
+             */
+            static result<int> setNUMABind(int node) noexcept;
+    };
 };
 
 #endif
