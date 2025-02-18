@@ -410,12 +410,11 @@ namespace e2sar
                     ;
                 }
                 else
-#else
+#endif
                 {
                     if (item->callback != nullptr)
                         item->callback(item->cbArg);
                 }
-#endif
 
                 // push the item back to return queue
                 seg.returnQueue.push(item);    
