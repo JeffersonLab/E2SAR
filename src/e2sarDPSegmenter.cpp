@@ -9,6 +9,7 @@
 
 #include "e2sarDPSegmenter.hpp"
 #include "e2sarUtil.hpp"
+#include "e2sarAffinity.hpp"
 
 
 namespace e2sar 
