@@ -779,7 +779,7 @@ namespace e2sar
         }
 #endif
 #ifdef LIBURING_AVAILABLE
-        if (Optimizations::isSelected(Optimizations::Codeliburing_send))
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
             // increment atomic counter so CQE reaping thread
             // knows there's work to do
