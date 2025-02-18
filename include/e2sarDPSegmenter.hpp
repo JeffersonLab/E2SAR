@@ -416,7 +416,7 @@ namespace e2sar
                 stopThreads();
 #ifdef LIBURING_AVAILABLE
                 // release CQE thread one last time so it can quit in peace
-                if (is_SelectedOptimization(Optimizations::liburing_send))
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                     cqeThreadCond.notify_all();
 #endif
 
@@ -424,7 +424,7 @@ namespace e2sar
                 syncThreadState.threadObj.join();
                 sendThreadState.threadObj.join();
 #ifdef LIBURING_AVAILABLE
-                if (is_SelectedOptimization(Optimizations::liburing_send))
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
                     cqeThreadState.threadObj.join();
                     io_uring_unregister_files(&ring);

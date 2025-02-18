@@ -519,85 +519,114 @@ namespace e2sar
         return rets;
     }
 
-    // go as powers of 2 to make calculations easier
-    enum class Optimizations {
-        none = 0,
-        sendmmsg = 1,
-        liburing_send = 2,
-        liburing_recv = 3,
-        // always last
-        unknown = 15
-    };
 
     using OptimizationsWord = u_int16_t;
-
-    inline OptimizationsWord optimizationToValue(Optimizations o)
-    {
-        return 1 << static_cast<int>(o);
-    }
-
-    inline std::string optimizationToString(Optimizations o)
-    {
-        switch(o)
-        {
-            case Optimizations::none: return "none"s; 
-            case Optimizations::sendmmsg: return "sendmmsg";
-            case Optimizations::liburing_recv: return "liburing_recv";
-            case Optimizations::liburing_send: return "liburing_send";
-            default: "unknown"s;
-        }
-        return "unknown"s;
-    }
-
-    inline Optimizations stringToOptimization(const std::string& opt)
-    {
-        if (opt == "none"s)
-            return Optimizations::none;
-        else if (opt == "sendmmsg"s)
-            return Optimizations::sendmmsg;
-        else if (opt == "liburing_recv"s)
-            return Optimizations::liburing_recv;
-        else if (opt == "liburing_send"s)
-            return Optimizations::liburing_send;
-        return Optimizations::unknown;
-    }
-
     /**
-     * List of strings of available optimizations that are compiled in
+     * This class encompasses the definition, encoding and selection of optimizations
+     * There are two types of optimizations - available (compiled in) and selected (chosen)
      */
-    const std::vector<std::string> get_OptimizationsAsStrings() noexcept;
+    class Optimizations {
+        public:
+            // go as powers of 2 to make calculations easier
+            enum class Code {
+                none = 0,
+                sendmmsg = 1,
+                liburing_send = 2,
+                liburing_recv = 3,
+                // always last
+                unknown = 15
+            };
+        public:
+            inline static OptimizationsWord toWord(Code o)
+            {
+                return 1 << static_cast<int>(o);
+            }
+            inline static std::string toString(Code o)
+            {
+                switch(o)
+                {
+                    case Code::none: return "none"s; 
+                    case Code::sendmmsg: return "sendmmsg";
+                    case Code::liburing_recv: return "liburing_recv";
+                    case Code::liburing_send: return "liburing_send";
+                    default: "unknown"s;
+                }
+                return "unknown"s;
+            }
+            inline static Code fromString(const std::string& opt)
+            {
+                if (opt == "none"s)
+                    return Code::none;
+                else if (opt == "sendmmsg"s)
+                    return Code::sendmmsg;
+                else if (opt == "liburing_recv"s)
+                    return Code::liburing_recv;
+                else if (opt == "liburing_send"s)
+                    return Code::liburing_send;
+                return Code::unknown;
+            }
+            /**
+             * List of strings of available optimizations that are compiled in
+             */
+            const static std::vector<std::string> availableAsStrings() noexcept;
 
-    /**
-     * Get a single 16-bit word with OR of all compiled-in optimizations
-     */
-    OptimizationsWord get_OptimizationsAsWord() noexcept;
+            /**
+             * Get a single 16-bit word with OR of all compiled-in optimizations
+             */
+            const static OptimizationsWord availableAsWord() noexcept;
 
-    /**
-     * Select optimizations based on names and add them to internal
-     * state
-     */
-    result<int> select_Optimizations(std::vector<std::string>& opt) noexcept;
+            /**
+             * Select optimizations based on names and add them to internal
+             * state
+             */
+            static result<int> select(std::vector<std::string>& opt) noexcept;
 
-    /**
-     * Select optimizations based on enum value names and add them to internal
-     * state
-     */
-    result <int> select_Optimizations(std::vector<Optimizations> &opt) noexcept;
+            /**
+             * Select optimizations based on enum value names and add them to internal
+             * state
+             */
+            static result <int> select(std::vector<Code> &opt) noexcept;
 
-    /**
-     * List of strings of selected optimizations
-     */
-    const std::vector<std::string> get_SelectedOptimizationsAsStrings() noexcept;
+            /**
+             * List of strings of selected optimizations
+             */
+            const static std::vector<std::string> selectedAsStrings() noexcept;
 
-    /**
-     * List of selected optimizations
-     */
-    const std::vector<Optimizations> get_SelectedOptimizations() noexcept;
+            /**
+             * List of selected optimizations as a word
+             */
+            const static OptimizationsWord selectedAsWord() noexcept;
 
-    /**
-     * Is this optimization selected?
-     */
-    bool is_SelectedOptimization(Optimizations o) noexcept;
+            /**
+             * List of selected optimizations as a vector
+             */
+            const static std::vector<Code> selectedAsList() noexcept;
+
+            /**
+             * Is this optimization selected?
+             */
+            const static bool isSelected(Code o) noexcept;
+        private:
+            // all available compiled in optimizations
+            static const std::vector<Optimizations::Code> available;
+
+            // this is where we store selected optimizations;
+            OptimizationsWord selected_optimizations;
+
+            // c-tor is private
+            Optimizations():selected_optimizations{toWord(Code::none)}
+            {}
+            // d-tor doesn't exist
+            ~Optimizations() = delete;
+            
+            static Optimizations* instance;
+            static inline Optimizations* _get()
+            {
+                if (not instance)
+                    instance = new Optimizations();
+                return instance;
+            }
+    };
 
     /**
      * Set the affinity of the entire process to the cores in the vector

@@ -87,7 +87,7 @@ namespace e2sar
         sendThreadState.maxPldLen = mtu - TOTAL_HDR_LEN;
         
 #ifdef LIBURING_AVAILABLE
-        if (is_SelectedOptimization(Optimizations::liburing_send))
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
             // probe for SENDMSG
             struct io_uring_probe *probe = io_uring_get_probe();
@@ -145,7 +145,7 @@ namespace e2sar
         sendThreadState.threadObj = std::move(sendT);
 
 #ifdef LIBURING_AVAILABLE
-        if (is_SelectedOptimization(Optimizations::liburing_send))
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
             boost::thread CQET(&Segmenter::CQEThreadState::_threadBody, &cqeThreadState);
             cqeThreadState.threadObj = std::move(CQET);
@@ -404,7 +404,7 @@ namespace e2sar
 
                 // call the callback 
 #ifdef LIBURING_AVAILABLE
-                if (is_SelectedOptimization(Optimizations::liburing_send))
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
                     // do nothing - it will be called from CQE Reaping Thread
                     ;
@@ -582,7 +582,7 @@ namespace e2sar
 
 #ifdef LIBURING_AVAILABLE
         // register open file descriptors with the ring
-        if (is_SelectedOptimization(Optimizations::liburing_send))
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
             int ret = io_uring_register_files(&seg.ring, ringFds, fdCount);
             if (ret < 0)
@@ -612,7 +612,7 @@ namespace e2sar
         // allocate mmsg vector based on event buffer size using fast int ceiling
         struct mmsghdr *mmsgvec = nullptr;
         size_t packetIndex = 0;
-        if (is_SelectedOptimization(Optimizations::sendmmsg))
+        if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
             // don't need calloc to spend time initializing it
             mmsgvec = static_cast<struct mmsghdr*>(malloc(numBuffers*sizeof(struct mmsghdr)));
 #endif
@@ -695,7 +695,7 @@ namespace e2sar
             curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
 
 #ifdef SENDMMSG_AVAILABLE
-            if (is_SelectedOptimization(Optimizations::sendmmsg))
+            if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
             {
                 // copy the contents of sendhdr into appropriate index of mmsgvec
                 memcpy(&mmsgvec[packetIndex].msg_hdr, &sendhdr, sizeof(sendhdr));
@@ -704,7 +704,7 @@ namespace e2sar
             else 
 #endif
 #ifdef LIBURING_AVAILABLE
-            if (is_SelectedOptimization(Optimizations::liburing_send))
+            if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
@@ -754,7 +754,7 @@ namespace e2sar
             } 
         }
 #ifdef SENDMMSG_AVAILABLE
-        if (is_SelectedOptimization(Optimizations::sendmmsg))
+        if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
         {
             // send using vector of msg_hdrs via sendmmsg
             seg.sendStats.msgCnt += numBuffers;
@@ -779,7 +779,7 @@ namespace e2sar
         }
 #endif
 #ifdef LIBURING_AVAILABLE
-        if (is_SelectedOptimization(Optimizations::liburing_send))
+        if (Optimizations::isSelected(Optimizations::Codeliburing_send))
         {
             // increment atomic counter so CQE reaping thread
             // knows there's work to do

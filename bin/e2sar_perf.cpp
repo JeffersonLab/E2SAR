@@ -393,7 +393,8 @@ int main(int argc, char **argv)
     }
 
     std::cout << "E2SAR Version:                 " << get_Version() << std::endl;
-    std::cout << "E2SAR Available Optimizations: " << concatWithSeparator(get_OptimizationsAsStrings()) << std::endl;
+    std::cout << "E2SAR Available Optimizations: " << 
+        concatWithSeparator(Optimizations::availableAsStrings()) << std::endl;
     
     if (vm.count("help"))
     {
@@ -401,13 +402,14 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    auto ropt = select_Optimizations(optimizations);
+    auto ropt = Optimizations::select(optimizations);
     if (ropt.has_error())
     {
         std::cerr << ropt.error().message() << std::endl;
         return -1;
     }
-    std::cout << "E2SAR Selected Optimizations:  " << concatWithSeparator(get_SelectedOptimizationsAsStrings()) << std::endl;
+    std::cout << "E2SAR Selected Optimizations:  " << 
+        concatWithSeparator(Optimizations::selectedAsStrings()) << std::endl;
 
     // deal with NUMA memory binding before going further
     if (numaNode >= 0)
