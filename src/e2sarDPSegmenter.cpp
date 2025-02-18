@@ -167,7 +167,7 @@ namespace e2sar
         // those cores are reserved for send threads only
         if (seg.cpuCoreList.size())
         {
-            auto res = setThreadAffinityXOR(seg.cpuCoreList);
+            auto res = Affinity::setThreadXOR(seg.cpuCoreList);
             if (res.has_error())
             {
                 seg.sendStats.errCnt++;
