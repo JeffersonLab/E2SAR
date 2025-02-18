@@ -14,7 +14,7 @@
 #include "e2sarAffinity.hpp"
 
 namespace e2sar {
-    result<int> setProcessAffinity(const std::vector<int> &cores) noexcept
+    result<int> Affinity::setProcess(const std::vector<int> &cores) noexcept
     {
 #ifdef AFFINITY_AVAILABLE
         // set this process affinity to the indicated set of cores
@@ -35,7 +35,7 @@ namespace e2sar {
 #endif
     }
 
-    result<int> setThreadAffinity(int core) noexcept
+    result<int> Affinity::setThread(int core) noexcept
     {
 #ifdef THRD_AFFINITY_AVAILABLE
         cpu_set_t cpuset;
@@ -52,7 +52,7 @@ namespace e2sar {
 #endif
     }
 
-    result<int> setThreadAffinityXOR(const std::vector<int> &cores) noexcept
+    result<int> Affinity::setThreadXOR(const std::vector<int> &cores) noexcept
     {
 #ifdef THRD_AFFINITY_AVAILABLE
         cpu_set_t cpuset, curset, xorset;
@@ -85,7 +85,7 @@ namespace e2sar {
 #endif
     }
 
-    result<int> setNUMABind(int node) noexcept
+    result<int> Affinity::setNUMABind(int node) noexcept
     {
 #ifdef NUMA_AVAILABLE
         struct bitmask *numa_mask;

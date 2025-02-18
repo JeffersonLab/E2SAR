@@ -373,7 +373,7 @@ namespace e2sar
         // set sending thread affinity if core list is provided
         if (seg.cpuCoreList.size())
         {
-            auto res = setThreadAffinity(seg.cpuCoreList[threadIndex]);
+            auto res = Affinity::setThread(seg.cpuCoreList[threadIndex]);
             if (res.has_error())
             {
                 seg.sendStats.errCnt++;
