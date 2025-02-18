@@ -26,7 +26,11 @@ if [[ ${distro} == 'ubuntu' ]]; then
     sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb docker.io firewalld
     
     # install meson
-    pip3 install --user meson pybind11
+    if [[ ${version} == '24.04' ]]; then
+        pip3 install --user --break-system-packages meson pybind11
+    else
+        pip3 install --user meson pybind11
+    fi
     # install scapy system-wide as root needs to run it
     pip3 install scapy
 
