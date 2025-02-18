@@ -34,28 +34,27 @@ namespace e2sar
     }
 
     // vector of possible options
-    std::vector<Optimizations> available_optimizations {
-        Optimizations::none
+    const std::vector<Optimizations::Code> Optimizations::available {
+        Optimizations::Code::none
 #ifdef SENDMMSG_AVAILABLE
-        , Optimizations::sendmmsg
+        , Optimizations::Code::sendmmsg
 #endif
 #ifdef LIBURING_AVAILABLE
-        , Optimizations::liburing_send, Optimizations::liburing_recv
+        , Optimizations::Code::liburing_send, Optimizations::Code::liburing_recv
 #endif
     };
 
-    // this is where we store selected optimizations;
-    OptimizationsWord selected_optimizations{optimizationToValue(Optimizations::none)};
+    Optimizations* Optimizations::instance{nullptr};
 
     /**
      * List of strings of available optimizations that are compiled in
      */
-    const std::vector<std::string> get_OptimizationsAsStrings() noexcept 
+    const std::vector<std::string> Optimizations::availableAsStrings() noexcept 
     {
         std::vector<std::string> all_strings;
-        for(auto o: available_optimizations)
+        for(auto o: available)
         {
-            all_strings.push_back(optimizationToString(o));
+            all_strings.push_back(toString(o));
         }
         return all_strings;
     }
@@ -63,12 +62,12 @@ namespace e2sar
     /**
      * A word bit-wise ORing all available optimizationsn
      */
-    OptimizationsWord get_OptimizationsAsWord() noexcept 
+    const OptimizationsWord Optimizations::availableAsWord() noexcept 
     {
         OptimizationsWord ow{0};
-        for(auto o: available_optimizations)
+        for(auto o: available)
         {
-            ow = ow | optimizationToValue(o);
+            ow = ow | toWord(o);
         }
         return ow;
     }
@@ -76,59 +75,61 @@ namespace e2sar
     /**
      * Select optimizations based on names
      */
-    result<int> select_Optimizations(std::vector<std::string>& opts) noexcept
+    result<int> Optimizations::select(std::vector<std::string>& opts) noexcept
     {
-        std::vector<Optimizations> v;
+        std::vector<Optimizations::Code> v;
         for(auto o: opts) 
         {
-            v.push_back(stringToOptimization(o));
+            v.push_back(fromString(o));
         }
-        return select_Optimizations(v);
+        return select(v);
     }
 
     /**
      * Select optimizations based on enum value names
      */
-    result <int> select_Optimizations(std::vector<Optimizations> &opt) noexcept 
+    result <int> Optimizations::select(std::vector<Code> &opt) noexcept 
     {
-        OptimizationsWord ow = get_OptimizationsAsWord();
+        OptimizationsWord ow = availableAsWord();
+        Optimizations *inst = _get();
+
         for (auto o: opt)
         {
-            OptimizationsWord ov= optimizationToValue(o);
+            OptimizationsWord ov = toWord(o);
             if (not (ov & ow))
             {
-                selected_optimizations = optimizationToValue(Optimizations::none);
-                return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + optimizationToString(o) + 
+                inst->selected_optimizations = toWord(Code::none);
+                return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + toString(o) + 
                     " is not available on this platform"s};
             }
-            selected_optimizations = selected_optimizations | ov;
+            inst->selected_optimizations = inst->selected_optimizations | ov;
         }
 
         // check for conflict
-        if (is_SelectedOptimization(Optimizations::sendmmsg) and
-            (is_SelectedOptimization(Optimizations::liburing_recv) or 
-            is_SelectedOptimization(Optimizations::liburing_send)))
+        if (isSelected(Code::sendmmsg) and
+            (isSelected(Code::liburing_recv) or 
+            isSelected(Code::liburing_send)))
         {
-            selected_optimizations = optimizationToValue(Optimizations::none);
+            inst->selected_optimizations = toWord(Code::none);
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
         }
 
         // remove 'none' if other optimizations are selected
-        if (selected_optimizations ^ optimizationToValue(Optimizations::none))
-            selected_optimizations = selected_optimizations ^ optimizationToValue(Optimizations::none);
+        if (inst->selected_optimizations ^ inst->toWord(Code::none))
+            inst->selected_optimizations = inst->selected_optimizations ^ toWord(Code::none);
         return 0;
     }
 
     /**
      * List of strings of selected optimizations
      */
-    const std::vector<std::string> get_SelectedOptimizationsAsStrings() noexcept
+    const std::vector<std::string> Optimizations::selectedAsStrings() noexcept
     {
-        std::vector<Optimizations> opts = get_SelectedOptimizations();
+        std::vector<Code> opts = selectedAsList();
         std::vector<std::string> ret;
         for(auto o: opts)
         {
-            ret.push_back(optimizationToString(o));
+            ret.push_back(toString(o));
         }
         return ret;
     }
@@ -136,20 +137,32 @@ namespace e2sar
     /**
      * A word bitwise ORing all selected optimizations
      */
-    const std::vector<Optimizations> get_SelectedOptimizations() noexcept 
+    const std::vector<Optimizations::Code> Optimizations::selectedAsList() noexcept 
     {
-        std::vector<Optimizations> ret;
-        for(auto o: available_optimizations) 
+        std::vector<Code> ret;
+        Optimizations *inst = _get();
+        for(auto o: inst->available) 
         {
-            if (is_SelectedOptimization(o))
+            if (isSelected(o))
                 ret.push_back(o);
         }
         return ret;
     }
 
-    bool is_SelectedOptimization(Optimizations o) noexcept 
+    const OptimizationsWord Optimizations::selectedAsWord() noexcept
     {
-        return optimizationToValue(o) & selected_optimizations;
+        std::vector<Code> codes = selectedAsList();
+        OptimizationsWord ow{0};
+
+        for(auto c: codes)
+            ow = ow | toWord(c);
+        return ow;
+    }
+
+    const bool Optimizations::isSelected(Code o) noexcept 
+    {
+        Optimizations *inst = _get();
+        return toWord(o) & inst->selected_optimizations;
     }
 
     /**
