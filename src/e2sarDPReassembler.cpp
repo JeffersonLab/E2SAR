@@ -6,6 +6,7 @@
 
 #include "portable_endian.h"
 
+#include "e2sarAffinity.hpp"
 #include "e2sarDPReassembler.hpp"
 
 
