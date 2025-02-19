@@ -136,10 +136,19 @@ namespace e2sar
                                      const boost::posix_time::time_duration &duration,
                                      const std::vector<std::string> &senders) noexcept 
     {
+        google::protobuf::Timestamp ts1;
+        if (duration.is_zero())
+        {
+            // duration of 0 means indefinite reservation
+            ts1.set_seconds(0);
+            ts1.set_nanos(0);
 
-        auto pt = second_clock::universal_time();
-        auto pt1 = pt + duration;
-        auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
+        } else 
+        {
+            auto pt = second_clock::universal_time();
+            auto pt1 = pt + duration;
+            ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
+        }
         return reserveLB(lb_name, ts1, senders);
     }
 
