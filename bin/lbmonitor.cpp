@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 
     uint64_t update_time = 5000;
     if (vm.count("time")){
-        update_time = vm["count"].as<uint64_t>();
+        update_time = vm["time"].as<uint64_t>();
     }
 
     std::string lbid;
