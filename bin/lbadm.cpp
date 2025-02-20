@@ -401,7 +401,6 @@ int main(int argc, char **argv)
     {
         option_dependency(vm, "reserve", "lbname");
         option_dependency(vm, "reserve", "duration");
-        option_dependency(vm, "reserve", "address");
         option_dependency(vm, "register", "name");
         option_dependency(vm, "register", "address");
         option_dependency(vm, "register", "port");
