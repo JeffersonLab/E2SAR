@@ -520,7 +520,7 @@ int main(int argc, char **argv)
     {
         // execute command
         auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
-                               vm["address"].as<std::vector<std::string>>(),
+                               (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()),
                                duration, suppress);
         if (uri_r.has_error())
         {
