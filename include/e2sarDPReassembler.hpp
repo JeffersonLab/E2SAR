@@ -258,7 +258,7 @@ namespace e2sar
 
             // receive related parameters
             const std::vector<int> cpuCoreList;
-            const ip::address dataIP; 
+            ip::address dataIP; 
             const u_int16_t dataPort; 
             const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
@@ -415,6 +415,39 @@ namespace e2sar
              */
             Reassembler(const EjfatURI &uri, ip::address data_ip, u_int16_t starting_port,
                         size_t numRecvThreads = 1, const ReassemblerFlags &rflags = ReassemblerFlags());
+
+            /**
+             * Create a reassembler object to run receive on a specific set of CPU cores
+             * We assume you picked the CPU core list by studying CPU-to-NUMA affinity for the receiver
+             * NIC on the target system. The number of started receive threads will match
+             * the number of cores on the list. For the started receive threads affinity will be 
+             * set to these cores. 
+             * This method attempts to auto-detect the outgoing IP address 
+             * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
+             * @param starting_port - starting port number on which we are listening
+             * @param cpuCoreList - list of core identifiers to be used for receive threads
+             * @param rflags - optional ReassemblerFlags structure with additional flags
+             * @param v6 - use IPv6 dataplane
+             */
+            Reassembler(const EjfatURI &uri, u_int16_t starting_port,
+                        std::vector<int> cpuCoreList, 
+                        const ReassemblerFlags &rflags = ReassemblerFlags(),
+                        bool v6 = false);
+            /**
+             * Create a reassembler object to run on a specified number of receive threads
+             * without taking into account thread-to-CPU and CPU-to-NUMA affinity.
+             * This method attempts to auto-detect the outgoing IP address 
+             * @param uri - EjfatURI with lb_id and instance token, so we can register a worker and then SendState
+             * @param starting_port - starting port number on which we are listening
+             * @param numRecvThreads - number of threads 
+             * @param rflags - optional ReassemblerFlags structure with additional flags
+             * @param v6 - use IPv6 dataplane
+             */
+            Reassembler(const EjfatURI &uri, u_int16_t starting_port,
+                        size_t numRecvThreads = 1, 
+                        const ReassemblerFlags &rflags = ReassemblerFlags(),
+                        bool v6 = false);
+
             Reassembler(const Reassembler &r) = delete;
             Reassembler & operator=(const Reassembler &o) = delete;
             ~Reassembler()
@@ -535,6 +568,14 @@ namespace e2sar
             inline const int get_portRange() const noexcept
             {
                 return portRange;
+            }
+
+            /**
+             * Get the data IP address to be used for communicating to the dataplane
+             */
+            inline const ip::address get_dataIP() const noexcept
+            {
+                return dataIP;
             }
             /**
              * Tell threads to stop. Also causes recvEvent to exit with (-1) 
