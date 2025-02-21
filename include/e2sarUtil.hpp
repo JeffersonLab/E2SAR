@@ -343,6 +343,13 @@ namespace e2sar
             }
             return E2SARErrorInfo{E2SARErrorc::NotFound, "Unable to find file "s + fileName};
         }
+
+        /**
+         * Figure out the local outgoing dataplane addresses based on data= entries
+         * in the URI. This only works where NETLINK is available (Linux)
+         * @param v6 - if true look for v6 (default false)
+         */
+        result<std::vector<ip::address>> getDataplaneLocalAddresses(bool v6=false) noexcept;
     };
 
     /**
