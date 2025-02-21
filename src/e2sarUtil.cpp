@@ -403,15 +403,17 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have dataplane IP addresses"};
 
         ip::address dpAddress;
-        if (v6 and has_dataAddrv6())
-            dpAddress = get_dataAddrv6().value().first;
-        else
-            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv6 dataplane IP address"};
+        if (v6)
+            if (has_dataAddrv6())
+                dpAddress = get_dataAddrv6().value().first;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv6 dataplane IP address"};
 
-        if (not v6 and has_dataAddrv4())
-            dpAddress = get_dataAddrv4().value().first;
-        else
-            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv4 dataplane IP address"};
+        if (not v6) 
+            if (has_dataAddrv4())
+                dpAddress = get_dataAddrv4().value().first;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv4 dataplane IP address"};
 
         auto intfRes = NetUtil::getInterfaceAndMTU(dpAddress); 
 
