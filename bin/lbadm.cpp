@@ -427,8 +427,13 @@ int main(int argc, char **argv)
 
     po::variables_map vm;
 
-    po::store(po::parse_command_line(argc, argv, od), vm);
-    po::notify(vm);
+    try {
+        po::store(po::parse_command_line(argc, argv, od), vm);
+        po::notify(vm);
+    } catch (const boost::program_options::unknown_option& e) {
+            std::cout << "Unable to parse command line: " << e.what() << std::endl;
+            return -1;
+    }
 
     // specify all options dependencies here
     try
