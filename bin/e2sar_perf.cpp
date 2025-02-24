@@ -445,7 +445,7 @@ int main(int argc, char **argv)
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
         std::cout << "One of --ip or --autoip must be specified. --autoip attempts to auto-detect the address" <<
-            " of the outgoing interface using 'data=' portion of the EJFAT_URI" << std::endl;
+            " of the outgoing or incoming interface using 'data=' portion of the EJFAT_URI" << std::endl;
         return -1;
     }
 
@@ -482,10 +482,6 @@ int main(int argc, char **argv)
             // if using control plane
             if (withCP)
             {
-                // add to senders list of 1 element
-                if (not autoIP)
-                    senders.push_back(sndrcvIP);
-
                 // create LBManager
                 lbmPtr = new LBManager(uri, validate, preferHostAddr);
 
@@ -493,6 +489,7 @@ int main(int argc, char **argv)
                 std::cout << "Adding senders to LB: ";
                 if (not autoIP)
                 {
+                    senders.push_back(sndrcvIP);
                     for (auto s: senders)
                         std::cout << s << " ";
                     std::cout << std::endl;
@@ -582,17 +579,23 @@ int main(int argc, char **argv)
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                ip::address ip = ip::make_address(sndrcvIP);
+
                 if (vm.count("cores"))
                 {
                     if (not autoIP)
+                    {
+                        ip::address ip = ip::make_address(sndrcvIP);
                         reasPtr = new Reassembler(uri, ip, recvStartPort, coreList, rflags);
+                    }
                     else
                         reasPtr = new Reassembler(uri, recvStartPort, coreList, rflags);
                 } else
                 {
                     if (not autoIP)
+                    {
+                        ip::address ip = ip::make_address(sndrcvIP);
                         reasPtr = new Reassembler(uri, ip, recvStartPort, numThreads, rflags);
+                    }
                     else
                         reasPtr = new Reassembler(uri, recvStartPort, numThreads, rflags);
                 }
