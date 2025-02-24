@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <pybind11/operators.h>
 
 #include "e2sarUtil.hpp"
@@ -8,6 +9,7 @@ using namespace e2sar;
 
 void init_e2sarUtil(py::module_ &m) {
 
+    //..............................................................
     // Bind the EjfatURI class in the main module
     py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
 
@@ -93,4 +95,33 @@ void init_e2sarUtil(py::module_ &m) {
         py::arg("preferV6") = false,
         "Create EjfatURI object from a path indicated by a string."
     );
+
+    //..............................................................
+    // Bind the Optimizations class in the main module
+    //
+    // pybind11 non-public destructors:
+    // https://pybind11.readthedocs.io/en/stable/advanced/classes.html#non-public-destructors
+    py::class_<Optimizations, std::unique_ptr<Optimizations, py::nodelete>> optimizations(m, "Optimizations");
+
+    optimizations
+        .def_static("toWord", &Optimizations::toWord)
+        .def_static("toString", &Optimizations::toString)
+        .def_static("fromString", &Optimizations::fromString)
+        .def_static("availableAsStrings", &Optimizations::availableAsStrings)
+        .def_static("availableAsWord", &Optimizations::availableAsWord)
+        .def_static("select", py::overload_cast<std::vector<std::string>&>(&Optimizations::select), py::arg("opt"))
+        .def_static("select", py::overload_cast<std::vector<Optimizations::Code>&>(
+                                                                &Optimizations::select), py::arg("opt"))
+        .def_static("selectedAsStrings", &Optimizations::selectedAsStrings)
+        .def_static("selectedAsWord", &Optimizations::selectedAsWord)
+        .def_static("selectedAsList", &Optimizations::selectedAsList)
+        .def_static("isSelected", &Optimizations::isSelected);
+
+    py::enum_<Optimizations::Code>(optimizations, "Code")
+        .value("none", Optimizations::Code::none)
+        .value("sendmmsg", Optimizations::Code::sendmmsg)
+        .value("liburing_send", Optimizations::Code::liburing_send)
+        .value("liburing_recv", Optimizations::Code::liburing_recv)
+        .value("unknown", Optimizations::Code::unknown)
+        .export_values();
 }
