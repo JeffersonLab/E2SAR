@@ -352,7 +352,7 @@ int main(int argc, char **argv)
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu, --sockets, --zerorate, --seq, --novalidate, --ip[46] and --bufsize");
-    opts("ip", po::value<std::string>(&sndrcvIP)->default_value("127.0.0.1"), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens. Defaults to 127.0.0.1. [s,r]");
+    opts("ip", po::value<std::string>(&sndrcvIP)->default_value(""), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens (conflicts with --autoip) [s,r]");
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
@@ -441,6 +441,13 @@ int main(int argc, char **argv)
     zeroRate = vm["zerorate"].as<bool>();
     usecAsEventNum = not vm["seq"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
+
+    if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
+    {
+        std::cout << "One of --ip or --autoip must be specified. --autoip attempts to auto-detect the address" <<
+            " of the outgoing interface using 'data=' portion of the EJFAT_URI" << std::endl;
+        return -1;
+    }
 
     bool preferV6 = false;
     if (vm.count("ipv6"))
