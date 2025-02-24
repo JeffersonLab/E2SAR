@@ -44,7 +44,7 @@ For python dependencies minimum Python 3.9 is required. It is recommended you cr
 ```bash
 $ python3 -m venv /path/to/e2sar/venv
 $ . /path/to/e2sar/venv/bin/activate
-$ pip install pybind11
+$ pip install pybind11 pytest
 
 # To bridge the C++ google::protobuf datatypes, install the Python protobuf package
 $ pip install protobuf

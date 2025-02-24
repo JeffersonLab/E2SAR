@@ -1,5 +1,8 @@
 #### Python bindings
+# The module name to import in Python
 pybind11_module_name = 'e2sar_py'
+
+# message('Linker flags in Pybind11: ' + ' '.join(linker_flags) + '\n')
 
 pybind11_src = [
     'py_e2sar.cpp',
@@ -33,5 +36,6 @@ py_install.extension_module(pybind11_module_name,
         'cpp_rtti=true'
     ],
     link_with: libe2sar,
+    link_args: linker_flags,  # Ensure linker flags are not empty
     install: true
 )
