@@ -414,13 +414,13 @@ int main(int argc, char **argv)
     opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
     opts("free", "free a load balancer. Uses instance or admin token.");
     opts("version", "report the version of the LB. Uses admin or instance token.");
-    opts("register", "register a worker (-n, -a, -p, -w, -c required), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
+    opts("register", "register a worker (-n, -p, -w, -c required; either use -a to specify receive address, or auto-detection will register incoming interface address), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
     opts("deregister", "deregister worker. Uses instance or session token.");
     opts("status", "get and print LB status. Uses admin or instance token.");
     opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses session token.");
     opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
-    opts("addsenders","add 'safe' sender IP addresses to CP (one or more -a required). Uses instance token.");
-    opts("removesenders","remove 'safe' sender IP addresses from CP (one or more -a required). Uses instance token.");
+    opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
+    opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
 
     std::vector<std::string> commands{"reserve", "free", "version", "register", 
         "deregister", "status", "state", "overview", "addsenders", "removesenders"};
