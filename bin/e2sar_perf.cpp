@@ -58,6 +58,7 @@ void ctrlCHandler(int sig)
             } else
             {
                 auto rmres = lbmPtr->removeSenderSelf();
+                std::cout << "self" << std::endl;
                 if (rmres.has_error()) 
                     std::cerr << "Unable to remove auto-detected sender from list on exit: " << rmres.error().message() << std::endl;
             }
