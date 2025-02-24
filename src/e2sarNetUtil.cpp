@@ -1,3 +1,12 @@
+#ifdef NETLINK_CAPABLE
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#endif
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+
 #include "e2sarNetUtil.hpp"
 
 namespace e2sar
@@ -6,7 +15,8 @@ namespace e2sar
      * Get MTU of a given interface. Used in constructors, so doesn't
      * return error.
      */
-    size_t NetUtil::getMTU(const std::string &interfaceName) {
+    size_t NetUtil::getMTU(const std::string &interfaceName) noexcept 
+    {
         // Default MTU
         size_t mtu = 1500;
 
@@ -20,7 +30,8 @@ namespace e2sar
         return mtu;
     }
 
-    result<std::string> NetUtil::getHostName() {
+    result<std::string> NetUtil::getHostName() noexcept 
+    {
         char nameBuf[255];
 
         if (!gethostname(nameBuf, 255)) 
@@ -29,6 +40,35 @@ namespace e2sar
             return ret;
         } else 
             return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to retrieve hostname"};
+    }
+
+    result<std::vector<ip::address>> NetUtil::getInterfaceIPs(const std::string &interfaceName, bool v6) noexcept 
+    {
+        struct ifaddrs *ifaddr;
+        std::vector<ip::address> ips;
+
+        if (getifaddrs(&ifaddr) == -1)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
+        
+        // walk the list, multiple answers are possible
+        for (struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
+        {
+            if (ifa->ifa_addr == NULL)
+                continue;
+
+            std::string ifa_name{ifa->ifa_name};
+            if (ifa_name == interfaceName)
+            {
+                if ((not v6 and (ifa->ifa_addr->sa_family == AF_INET)) 
+                    || (v6 and (ifa->ifa_addr->sa_family == AF_INET6)))
+                {
+                    auto ifa_addr = (struct sockaddr_in*) ifa->ifa_addr;
+                    ips.push_back(ip::make_address(inet_ntoa(ifa_addr->sin_addr)));
+                }
+            }
+        }
+        freeifaddrs(ifaddr);
+        return ips;
     }
 #ifdef NETLINK_CAPABLE
     /**

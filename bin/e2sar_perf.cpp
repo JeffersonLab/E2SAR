@@ -47,12 +47,21 @@ void ctrlCHandler(int sig)
     if (segPtr != nullptr) {
         if (lbmPtr != nullptr) {
             std::cout << "Removing senders: ";
-            for (auto s: senders)
-                std::cout << s << " ";
-            std::cout << std::endl;
-            auto rmres = lbmPtr->removeSenders(senders);
-            if (rmres.has_error()) 
-                std::cerr << "Unable to remove sender from list on exit: " << rmres.error().message() << std::endl;
+            if (senders.size() > 0)
+            {
+                for (auto s: senders)
+                    std::cout << s << " ";
+                std::cout << std::endl;
+                auto rmres = lbmPtr->removeSenders(senders);
+                if (rmres.has_error()) 
+                    std::cerr << "Unable to remove sender from list on exit: " << rmres.error().message() << std::endl;
+            } else
+            {
+                auto rmres = lbmPtr->removeSenderSelf();
+                std::cout << "self" << std::endl;
+                if (rmres.has_error()) 
+                    std::cerr << "Unable to remove auto-detected sender from list on exit: " << rmres.error().message() << std::endl;
+            }
         }
         segPtr->stopThreads();
         delete segPtr;
@@ -316,6 +325,7 @@ int main(int argc, char **argv)
     bool withCP;
     bool zeroRate;
     bool usecAsEventNum;
+    bool autoIP;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -343,11 +353,12 @@ int main(int argc, char **argv)
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s] or ReassemblerFlags [r]."
         " Values found in the file override --withcp, --mtu, --sockets, --zerorate, --seq, --novalidate, --ip[46] and --bufsize");
-    opts("ip", po::value<std::string>(&sndrcvIP)->default_value("127.0.0.1"), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens. Defaults to 127.0.0.1. [s,r]");
+    opts("ip", po::value<std::string>(&sndrcvIP)->default_value(""), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens (conflicts with --autoip) [s,r]");
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate [s,r]");
+    opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip) [s,r]");
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
@@ -357,8 +368,13 @@ int main(int argc, char **argv)
 
     po::variables_map vm;
 
-    po::store(po::parse_command_line(argc, argv, od), vm);
-    po::notify(vm);
+    try {
+        po::store(po::parse_command_line(argc, argv, od), vm);
+        po::notify(vm);
+    } catch (const boost::program_options::unknown_option& e) {
+            std::cout << "Unable to parse command line: " << e.what() << std::endl;
+            return -1;
+    }
 
     // for ctrl-C
     signal(SIGINT, ctrlCHandler);
@@ -425,6 +441,14 @@ int main(int argc, char **argv)
     withCP = vm["withcp"].as<bool>();
     zeroRate = vm["zerorate"].as<bool>();
     usecAsEventNum = not vm["seq"].as<bool>();
+    autoIP = vm["autoip"].as<bool>();
+
+    if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
+    {
+        std::cout << "One of --ip or --autoip must be specified. --autoip attempts to auto-detect the address" <<
+            " of the outgoing or incoming interface using 'data=' portion of the EJFAT_URI" << std::endl;
+        return -1;
+    }
 
     bool preferV6 = false;
     if (vm.count("ipv6"))
@@ -459,23 +483,34 @@ int main(int argc, char **argv)
             // if using control plane
             if (withCP)
             {
-                // add to senders list of 1 element
-                senders.push_back(sndrcvIP);
-
                 // create LBManager
                 lbmPtr = new LBManager(uri, validate, preferHostAddr);
 
                 // register senders
                 std::cout << "Adding senders to LB: ";
-                for (auto s: senders)
-                    std::cout << s << " ";
-                std::cout << std::endl;
-                auto addres = lbmPtr->addSenders(senders);
-                if (addres.has_error()) 
+                if (not autoIP)
                 {
-                    std::cerr << "Unable to add a sender due to error " << addres.error().message() 
-                        << ", exiting" << std::endl;
-                    return -1;
+                    senders.push_back(sndrcvIP);
+                    for (auto s: senders)
+                        std::cout << s << " ";
+                    std::cout << std::endl;
+                    auto addres = lbmPtr->addSenders(senders);
+                    if (addres.has_error()) 
+                    {
+                        std::cerr << "Unable to add a sender due to error " << addres.error().message() 
+                            << ", exiting" << std::endl;
+                        return -1;
+                    }
+                } else
+                {
+                    std::cout << "autodetected" << std::endl;
+                    auto addres = lbmPtr->addSenderSelf();
+                    if (addres.has_error()) 
+                    {
+                        std::cerr << "Unable to add a auto-detected sender address due to error " << addres.error().message() 
+                            << ", exiting" << std::endl;
+                        return -1;
+                    }
                 }
             }
 
@@ -538,20 +573,32 @@ int main(int argc, char **argv)
                 rflags.useHostAddress = preferHostAddr;
                 rflags.validateCert = validate;
             }
-            std::cout << "Control plane will be " << (rflags.useCP ? "ON" : "OFF") << std::endl;
-            std::cout << "Using " << (vm.count("cores") ? "Assigned Threads To Cores" : "Unassigned Threads") << std::endl;
-            std::cout << "Will run " << (durationSec ? "for " + std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
+            std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
+            std::cout << "Will run for:                  " << (durationSec ? std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
             std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                ip::address ip = ip::make_address(sndrcvIP);
+
                 if (vm.count("cores"))
                 {
-                    reasPtr = new Reassembler(uri, ip, recvStartPort, coreList, rflags);
+                    if (not autoIP)
+                    {
+                        ip::address ip = ip::make_address(sndrcvIP);
+                        reasPtr = new Reassembler(uri, ip, recvStartPort, coreList, rflags);
+                    }
+                    else
+                        reasPtr = new Reassembler(uri, recvStartPort, coreList, rflags);
                 } else
                 {
-                    reasPtr = new Reassembler(uri, ip, recvStartPort, numThreads, rflags);
+                    if (not autoIP)
+                    {
+                        ip::address ip = ip::make_address(sndrcvIP);
+                        reasPtr = new Reassembler(uri, ip, recvStartPort, numThreads, rflags);
+                    }
+                    else
+                        reasPtr = new Reassembler(uri, recvStartPort, numThreads, rflags);
                 }
 
                 boost::thread statT(&recvStatsThread, reasPtr);

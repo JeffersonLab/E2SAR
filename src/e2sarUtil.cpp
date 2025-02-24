@@ -6,6 +6,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "e2sarUtil.hpp"
+#include "e2sarNetUtil.hpp"
 
 namespace e2sar
 {
@@ -392,5 +393,38 @@ namespace e2sar
                (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
                (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
                (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
+    }
+
+    // determine local outgoing address towards the dataplane
+    result<std::vector<ip::address>> EjfatURI::getDataplaneLocalAddresses(bool v6) noexcept
+    {
+#ifdef NETLINK_CAPABLE
+        if (not has_dataAddr())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have dataplane IP addresses"};
+
+        ip::address dpAddress;
+        if (v6)
+        {
+            if (has_dataAddrv6())
+                dpAddress = get_dataAddrv6().value().first;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv6 dataplane IP address"};
+        } else 
+        {
+            if (has_dataAddrv4())
+                dpAddress = get_dataAddrv4().value().first;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv4 dataplane IP address"};
+        }
+
+        auto intfRes = NetUtil::getInterfaceAndMTU(dpAddress); 
+
+        if (intfRes.has_error())
+            return intfRes.error();
+
+        return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+#else
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Capability to determine outgoing address not supported on this platform"};
+#endif
     }
 }

@@ -96,6 +96,83 @@ namespace e2sar
         assignPortsToThreads();
     }
 
+    Reassembler::Reassembler(const EjfatURI &uri,  u_int16_t starting_port,
+        std::vector<int> cpuCoreList,
+        const ReassemblerFlags &rflags, bool v6):
+        dpuri(uri),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
+        epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
+        Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
+        pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        cpuCoreList{cpuCoreList}, 
+        dataPort{starting_port},
+        portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
+        numRecvThreads{cpuCoreList.size()}, // as many as there are cores
+        numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
+        portsToThreads(numRecvThreads),
+        withLBHeader{rflags.withLBHeader},
+        eventTimeout_ms{rflags.eventTimeout_ms},
+        rcvSocketBufSize{rflags.rcvSocketBufSize},
+        sendStateThreadState(*this, rflags.period_ms),
+        useCP{rflags.useCP}
+    {
+        auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
+        if (dpRes.has_error())
+            throw E2SARException(dpRes.error().message());
+
+        if (dpRes.value().size() == 0)
+            throw E2SARException("Unable to determine outgoing dataplane address");
+
+        dataIP = dpRes.value()[0];
+        sanityChecks();
+        auto afres = Affinity::setProcess(cpuCoreList);
+        if (afres.has_error())
+            throw E2SARException(afres.error().message());
+        // note if the user chooses to override portRange in rflags, 
+        // we can end up in a silly situation where the number of receive ports is smaller
+        // than the number of receive threads, but we handle it
+        // Need to break up M ports into at most N bins.
+        assignPortsToThreads();
+    }
+
+    Reassembler::Reassembler(const EjfatURI &uri,  u_int16_t starting_port,
+        size_t numRecvThreads, const ReassemblerFlags &rflags, bool v6):
+        dpuri(uri),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
+        epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
+        Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
+        pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        cpuCoreList{std::vector<int>()}, // no core list given
+        dataPort{starting_port},
+        portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
+        numRecvThreads{numRecvThreads},
+        numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
+        portsToThreads(numRecvThreads),
+        withLBHeader{rflags.withLBHeader},
+        eventTimeout_ms{rflags.eventTimeout_ms},
+        rcvSocketBufSize{rflags.rcvSocketBufSize},
+        sendStateThreadState(*this, rflags.period_ms),
+        useCP{rflags.useCP}
+    {
+        auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
+        if (dpRes.has_error())
+            throw E2SARException(dpRes.error().message());
+
+        if (dpRes.value().size() == 0)
+            throw E2SARException("Unable to determine outgoing dataplane address");
+            
+        dataIP = dpRes.value()[0];
+        sanityChecks();
+        // note if the user chooses to override portRange in rflags, 
+        // we can end up in a silly situation where the number of receive ports is smaller
+        // than the number of receive threads, but we handle it
+        // Need to break up M ports into at most N bins.
+        assignPortsToThreads();
+    }
+
+
     result<int> Reassembler::openAndStart() noexcept
     {
         for(size_t i=0; i<numRecvThreads; i++)
