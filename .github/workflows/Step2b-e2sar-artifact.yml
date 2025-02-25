@@ -1,0 +1,164 @@
+name: Step 2b - e2sar artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      grpc_ver:
+        description: 'GRPC Version'
+        default: '1.54.1'
+        type: string
+        required: true
+      boost_ver: 
+        description: 'BOOST Version'
+        default: '1.85.0'
+        type: string
+        required: true
+      e2sar_ver:
+        description: 'E2SAR Version'
+        default: '0.1.4'
+        type: string
+        required: true
+
+env:
+  FINAL_INSTALL: /usr/local
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: Set up environment
+        run: |
+            DISTRO=`awk 'BEGIN { FS = "=" } ; /^ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+            DISTRO_VER=`awk 'BEGIN { FS = "=" } ; /^VERSION_ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+            # set them in the environment
+            echo "DISTRO=${DISTRO}" >> $GITHUB_ENV
+            echo "DISTRO_VER=${DISTRO_VER}" >> $GITHUB_ENV
+            # set BOOST_VER and GRPC_VER environment variables
+            echo "BOOST_VER=${{ inputs.boost_ver }}" >> $GITHUB_ENV
+            echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
+            echo "E2SAR_VER=${{ inputs.e2sar_ver }}" >> $GITHUB_ENV
+            if [ "${DISTRO}" = "ubuntu" ]; then
+                echo Installing for Ubuntu
+                export DEBIAN_FRONTEND=noninteractive
+                apt-get -yq update
+                apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools git wget
+                if [ "${DISTRO_VER}" = "20.04" ]; then
+                  gem install dotenv -v 2.8.1
+                fi
+                gem install fpm
+            elif [ "${DISTRO}" = "rocky" ]; then
+                echo Installing for Rocky
+                dnf -yq install epel-release
+                dnf -yq --enablerepo=devel update
+                dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+                dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl zlib-devel protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3 git wget
+                dnf -yq install git wget
+                dnf -yq install ruby-devel gcc make rpm-build libffi-devel
+                gem install fpm
+            fi
+
+      - name: Install Python dependencies
+        run: |
+          if [ "${{ env.DISTRO }}" = "ubuntu" ]; then
+            echo "Python for Ubuntu"
+            if [ "${{ env.DISTRO_VER }}" = "20.04" ]; then
+              echo Installing Python3.10
+              apt-get -yq update
+              apt-get install -yq software-properties-common
+              add-apt-repository -y ppa:deadsnakes/ppa
+              apt-get -yq update
+              apt-get -yq install python3.10 python3.10-venv libpython3.10-dev
+              update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+              update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 2
+            elif [ "${{ env.DISTRO_VER }}" = "22.04" ]; then
+              apt-get install -yq python3-venv libpython3-dev
+            elif [ "${{ env.DISTRO_VER }}" = "24.04" ]; then
+              apt-get install -yq python3-venv libpython3-dev
+            fi
+          elif [ "${{ env.DISTRO }}" = "rocky" ]; then
+            echo "Python for Rocky"
+            # NOOP
+          fi
+          python3 -m venv ~/venv
+          . ~/venv/bin/activate
+          pip3 install meson pybind11
+
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Create install directories
+        run: |
+          mkdir -p package/usr/local/include/
+          mkdir -p package/usr/local/lib
+          mkdir -p package/usr/local/lib64
+
+      - name: Prepare a unique name for Artifacts
+        id: prep_artifact_name
+        run: |
+          # Calculate a unique string which applies to the matrix entry
+          # that we can use to construct unique and valid artifact names.
+          # We achieve that by squashing runs of characters are invalid
+          # in artifact names, and also whitespace and dashes, into a
+          # single dash character.  The unique string will appear as
+          # the environment variable ARTIFACT_NAME in subsequent actions.
+          
+          name="${{ env.DISTRO }}-${{ env.DISTRO_VER }}"
+          # The option to enable + in sed regexps differs by OS so we avoid it
+          name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
+
+      - name: Download built boost and grpc artifact
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: Step1-dep-artifacts.yml
+          name: ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}
+          path: ./
+
+      - name: Untar the grpc and boost install tree
+        run: |
+          ls ./
+          tar -zxf ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}.tar.gz
+          ls -l package/usr/local/bin
+
+      - name: Build E2SAR using Meson
+        run: |
+          . ~/venv/bin/activate
+          export IDIR=`pwd`/package/usr/local
+          echo "IDIR=${IDIR}" >> $GITHUB_ENV
+          cd E2SAR
+          BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson compile -C build
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson install -C build
+
+      - name: Update pkgconfig prefix files for final installation
+        run: |
+          # update pkgconfig files for the install location. DESTDIR didn't work
+          echo Updating pkgconfig files prefix from ${{ env.IDIR }} to ${{ env.FINAL_INSTALL }}
+          for file in `ls -1 ${{ env.IDIR }}/lib/pkgconfig`; do sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
+          echo Updating E2SAR pkgconfig
+          sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
+
+      - name: Package project into .deb or .rpm
+        run: |
+          cd package/ && tar -zcf ../e2sar.tar.gz usr/ && cd ..
+          if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
+            fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
+          elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
+            fpm -s tar -t rpm -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          path: |
+            *.deb
+            *.rpm
