@@ -28,6 +28,7 @@ jobs:
     steps:
       - name: Set up environment
         run: |
+            cat /etc/*-release
             DISTRO=`awk 'BEGIN { FS = "=" } ; /^ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
             DISTRO_VER=`awk 'BEGIN { FS = "=" } ; /^DISTRIB_RELEASE=/ {gsub(/"/, ""); print $2}' /etc/*-release`
             # set them in the environment
