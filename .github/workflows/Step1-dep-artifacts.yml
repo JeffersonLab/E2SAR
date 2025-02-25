@@ -72,8 +72,7 @@ jobs:
             fi
           elif [ "${{ env.DISTRO }}" = "rocky" ]; then
             echo "Python for Rocky"
-            update-alternatives --set python /usr/bin/python3.9
-            update-alternatives --set python3 /usr/bin/python3.9
+            # NOOP
           fi
           python3 -m venv ~/venv
           . ~/venv/bin/activate
