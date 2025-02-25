@@ -1,4 +1,4 @@
-name: Step 1 - Build E2SAR dependency artifacts
+name: Step 1 - dependency artifacts
 
 on:
   workflow_dispatch:
