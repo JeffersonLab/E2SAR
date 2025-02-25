@@ -107,7 +107,7 @@ jobs:
           cd package/ && tar -zcf ../e2sar-deps.tar.gz usr/ && cd ..
           if [ "${{ env.DISTRO }}" = "ubuntu" ]; then
             fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
-          elif [ "${{ env.DISTRO }} = "rocky" ]; then
+          elif [ "${{ env.DISTRO }}" = "rocky" ]; then
            fpm -s tar -t rpm -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           fi
 
