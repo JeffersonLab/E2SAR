@@ -120,7 +120,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}-package
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-${{env.E2SAR_VER}}-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}-package
           path: |
             *.deb
             *.rpm
