@@ -15,7 +15,7 @@ on:
         required: true
       e2sar_ver:
         description: 'E2SAR Version'
-        default: '0.1.4'
+        default: '0.1.5'
         type: string
         required: true
 
@@ -91,6 +91,14 @@ jobs:
       - name: Set up authentication for HTTPS
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: true
+          ref: ${{ env.E2SAR_VER }}
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
 
       - name: Create install directories
         run: |
