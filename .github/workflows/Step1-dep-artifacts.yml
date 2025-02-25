@@ -70,8 +70,10 @@ jobs:
               pip install --break-system-packages meson pybind11
             else
               pip install meson pybind11
+            fi
           else
             pip install meson pybind11
+          fi
 
       - name: Set up authentication for HTTPS
         run: |
