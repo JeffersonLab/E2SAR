@@ -1,0 +1,141 @@
+name: Step 1 - Build E2SAR dependency artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      grpc_ver:
+        description: 'GRPC Version'
+        default: '1.54.1'
+        type: string
+        required: true
+      boost_ver: 
+        description: 'BOOST Version'
+        default: '1.85.0'
+        type: string
+        required: true
+
+env:
+  FINAL_INSTALL: /usr/local
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: Set up environment
+        run: |
+            DISTRO=`awk 'BEGIN { FS = "=" } ; /^ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+            DISTRO_VER=`awk 'BEGIN { FS = "=" } ; /^DISTRIB_RELEASE=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+            # set them in the environment
+            echo "DISTRO=${DISTRO} >> $GITHUB_ENV"
+            echo "DISTRO_VER=${DISTRO_VER} >> $GITHUB_ENV"
+            # set BOOST_VER and GRPC_VER environment variables
+            echo "BOOST_VER=${{ inputs.boost_ver }} >> $GITHUB_ENV"
+            echo "GRPC_VER=${{ inputs.grpc_ver }} >> $GITHUB_ENV"
+            if [[ ${ DISTRO } == *"ubuntu"* ]]; then
+                echo Installing for Ubuntu
+                if [[ ${DISTRO_VER} == '20.04' ]]; then
+                    echo Installing python3.10 for Ubuntu 20.04
+                    sudo apt-get -yq update
+                    sudo apt-get install -yq software-properties-common
+                    sudo add-apt-repository -y ppa:deadsnakes/ppa
+                    sudo apt-get -yq update
+                    sudo apt-get -yq install python3.10
+                    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+                    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 2
+                fi
+                sudo apt-get -yq update
+                sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
+            elif [[ ${ DISTRO } == *"rocky"* ]]; then
+                echo Installing for Rocky
+                dnf -yq install epel-release
+                dnf -yq --enablerepo=devel update
+                dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
+                dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
+                dnf -yq install git wget
+                dnf -yq install ruby-devel gcc make rpm-build libffi-devel
+                sudo update-alternatives --set python /usr/bin/python3.9
+                sudo update-alternatives --set python3 /usr/bin/python3.9
+                gem install fpm
+            fi
+
+      - name: Install Python dependencies
+        run: |
+          pip3 install meson pybind11
+
+      - name: Set up authentication for HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"  # Force HTTPS to use PAT
+
+      - name: Create install directories
+        run: |
+          mkdir -p package/usr/local/include/
+          mkdir -p package/usr/local/lib
+          mkdir -p package/usr/local/lib64
+
+      - name: Prepare a unique name for Artifacts
+        id: prep_artifact_name
+        run: |
+          # Calculate a unique string which applies to the matrix entry
+          # that we can use to construct unique and valid artifact names.
+          # We achieve that by squashing runs of characters are invalid
+          # in artifact names, and also whitespace and dashes, into a
+          # single dash character.  The unique string will appear as
+          # the environment variable ARTIFACT_NAME in subsequent actions.
+          
+          name="${{ env.DISTRO }}-${{ env.DISTRO_VER }}"
+          # The option to enable + in sed regexps differs by OS so we avoid it
+          name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
+
+      - name: Checkout gRPC
+        uses: actions/checkout@v3
+        with:
+            repository: grpc/grpc  
+            path: grpc  
+            ref: v${{ env.GRPC_VER }}
+            submodules: true  
+  
+      - name: Build grpc
+        run: |
+            # note that with this, all prefixes in pkgconfig files will be ${IDIR} instead of /usr/local 
+            # which is what is normally needed. This is OK to build e2sar, but not OK if you want to biuld
+            # debs out of these. We will fix in in the other workflow.
+                export IDIR=`pwd`/package/usr/local
+                mkdir -p grpc/cmake/build
+                pushd grpc/cmake/build
+                cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
+                make -j 4
+                make install
+                popd
+  
+      - name: Download and build boost
+        if: steps.cache.outputs.cache-hit != 'true' 
+        run: |
+            export IDIR=`pwd`/package/usr/local
+            # produce 1_85_0 from 1.85.0
+            export BOOST_SUB_VER=`echo ${{ env.BOOST_VER }} | sed s/\\\./_/g`
+            echo Preparing to download from https://archives.boost.io/release/${{ env.BOOST_VER }}/source/boost_${BOOST_SUB_VER}.tar.gz
+            wget -q https://archives.boost.io/release/${{ env.BOOST_VER }}/source/boost_${BOOST_SUB_VER}.tar.gz
+            echo Downloaded source, untarring
+            tar -zxf boost_${BOOST_SUB_VER}.tar.gz
+            echo Descending into build directory boost_${BOOST_SUB_VER} and starting build 
+            ls .
+            cd boost_${BOOST_SUB_VER}
+            ./bootstrap.sh
+            ./b2
+            ./b2 install --prefix=${IDIR}
+
+      - name: Tar the packaged files
+        run: |
+            tar -zcf package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}.tar.gz package/
+    
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+            name: ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}
+            path: ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}.tar.gz
