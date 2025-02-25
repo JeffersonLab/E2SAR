@@ -39,14 +39,14 @@ jobs:
             if [ "${DISTRO}" = "ubuntu" ]; then
                 echo Installing for Ubuntu
                 apt-get -yq update
-                apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools git wget
+                apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools git wget
                 gem install fpm
             elif [ "${DISTRO}" = "rocky" ]; then
                 echo Installing for Rocky
                 dnf -yq install epel-release
                 dnf -yq --enablerepo=devel update
                 dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-                dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3 git wget
+                dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl zlib-devel protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3 git wget
                 dnf -yq install git wget
                 dnf -yq install ruby-devel gcc make rpm-build libffi-devel
                 gem install fpm
@@ -119,7 +119,7 @@ jobs:
                 export IDIR=`pwd`/package/usr/local
                 mkdir -p grpc/cmake/build
                 cd grpc/cmake/build
-                cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
+                cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DgRPC_RE2_PROVIDER=package -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package -DBUILD_SHARED_LIBS=ON ../..
                 make -j 4
                 make install
                 cd ../../..
@@ -143,7 +143,7 @@ jobs:
 
       - name: Tar the packaged files
         run: |
-            tar -zcf package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}.tar.gz package/
+            tar -zcf ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}.tar.gz package/
     
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
