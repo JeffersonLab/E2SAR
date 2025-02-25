@@ -72,8 +72,8 @@ jobs:
             fi
           elif [ "${{ env.DISTRO }}" = "rocky" ]; then
             echo "Python for Rocky"
-            sudo update-alternatives --set python /usr/bin/python3.9
-            sudo update-alternatives --set python3 /usr/bin/python3.9
+            update-alternatives --set python /usr/bin/python3.9
+            update-alternatives --set python3 /usr/bin/python3.9
           fi
           python3 -m venv ~/venv
           . ~/venv/bin/activate
@@ -119,11 +119,11 @@ jobs:
             # debs out of these. We will fix in in the other workflow.
                 export IDIR=`pwd`/package/usr/local
                 mkdir -p grpc/cmake/build
-                pushd grpc/cmake/build
+                cd grpc/cmake/build
                 cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${IDIR} -DBUILD_SHARED_LIBS=ON ../..
                 make -j 4
                 make install
-                popd
+                cd ../../..
   
       - name: Download and build boost
         if: steps.cache.outputs.cache-hit != 'true' 
