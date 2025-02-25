@@ -13,6 +13,11 @@ on:
         default: '1.85.0'
         type: string
         required: true
+      e2sar_ver:
+        description: 'E2SAR Version'
+        default: '0.1.4'
+        type: string
+        required: true
 
 env:
   FINAL_INSTALL: /usr/local
@@ -36,6 +41,7 @@ jobs:
             # set BOOST_VER and GRPC_VER environment variables
             echo "BOOST_VER=${{ inputs.boost_ver }}" >> $GITHUB_ENV
             echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
+            echo "E2SAR_VER=${{ inputs.e2sar_ver }}" >> $GITHUB_ENV
             if [ "${DISTRO}" = "ubuntu" ]; then
                 echo Installing for Ubuntu
                 export DEBIAN_FRONTEND=noninteractive
