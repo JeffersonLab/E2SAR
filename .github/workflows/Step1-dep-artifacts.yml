@@ -38,42 +38,46 @@ jobs:
             echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
             if [ "${DISTRO}" = "ubuntu" ]; then
                 echo Installing for Ubuntu
-                if [ "${DISTRO_VER}" = "20.04" ]; then
-                    echo Installing python3.10 for Ubuntu 20.04
-                    apt-get -yq update
-                    apt-get install -yq software-properties-common
-                    add-apt-repository -y ppa:deadsnakes/ppa
-                    apt-get -yq update
-                    apt-get -yq install python3.10
-                    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
-                    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 2
-                fi
                 apt-get -yq update
-                apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev git
+                apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev rubygems build-essential squashfs-tools git
+                gem install fpm
             elif [ "${DISTRO}" = "rocky" ]; then
                 echo Installing for Rocky
                 dnf -yq install epel-release
                 dnf -yq --enablerepo=devel update
                 dnf -yq --enablerepo=devel install gcc gcc-c++ kernel-devel make
-                dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3
+                dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3 git
                 dnf -yq install git wget
                 dnf -yq install ruby-devel gcc make rpm-build libffi-devel
-                sudo update-alternatives --set python /usr/bin/python3.9
-                sudo update-alternatives --set python3 /usr/bin/python3.9
                 gem install fpm
             fi
 
       - name: Install Python dependencies
         run: |
           if [ "${{ env.DISTRO }}" = "ubuntu" ]; then
-            if [ "${{ env.DISTRO_VER }}" = "24.04" ]; then
-              pip install --break-system-packages meson pybind11
-            else
-              pip3 install meson pybind11
+            echo "Python for Ubuntu"
+            if [ "${{ env.DISTRO_VER }}" = "20.04" ]; then
+              echo Installing Python3.10
+              apt-get -yq update
+              apt-get install -yq software-properties-common
+              add-apt-repository -y ppa:deadsnakes/ppa
+              apt-get -yq update
+              apt-get -yq install python3.10 python3.10-venv libpython3.10-dev
+              update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+              update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 2
+            elif [ "${{ env.DISTRO_VER }}" = "22.04" ]; then
+              apt-get install -yq python3-venv libpython3-dev
+            elif [ "${{ env.DISTRO_VER }}" = "24.04" ]; then
+              apt-get install -yq python3-venv libpython3-dev
             fi
-          else
-            pip install meson pybind11
+          elif [ "${{ env.DISTRO }}" = "rocky" ]; then
+            echo "Python for Rocky"
+            sudo update-alternatives --set python /usr/bin/python3.9
+            sudo update-alternatives --set python3 /usr/bin/python3.9
           fi
+          python3 -m venv ~/venv
+          . ~/venv/bin/activate
+          pip3 install meson pybind11
 
       - name: Set up authentication for HTTPS
         run: |
