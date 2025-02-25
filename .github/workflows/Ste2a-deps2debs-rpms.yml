@@ -1,4 +1,4 @@
-name: Step 2a - Build E2SAR dependency RPMs and DEBs
+name: Step 2a - dependency RPMs and DEBs
 
 on:
   workflow_dispatch:
