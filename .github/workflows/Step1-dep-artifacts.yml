@@ -38,7 +38,7 @@ jobs:
             echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
             if [ "${DISTRO}" = "ubuntu" ]; then
                 echo Installing for Ubuntu
-                if [ "${DISTRO_VER}" = '20.04' ]; then
+                if [ "${DISTRO_VER}" = "20.04" ]; then
                     echo Installing python3.10 for Ubuntu 20.04
                     apt-get -yq update
                     apt-get install -yq software-properties-common
@@ -65,7 +65,13 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install --break-system-packages meson pybind11
+          if [ "${{ env.DISTRO }}" = "ubuntu" ]; then
+            if [ "${{ env.DISTRO_VER }}" = "24.04" ]; then
+              pip install --break-system-packages meson pybind11
+            else
+              pip install meson pybind11
+          else
+            pip install meson pybind11
 
       - name: Set up authentication for HTTPS
         run: |
