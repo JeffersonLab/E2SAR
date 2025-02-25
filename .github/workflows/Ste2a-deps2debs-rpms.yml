@@ -15,7 +15,7 @@ on:
         required: true
       e2sar_ver:
         description: 'E2SAR Version'
-        default: '0.1.4'
+        default: '0.1.5'
         type: string
         required: true
 
