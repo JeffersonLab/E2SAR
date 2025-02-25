@@ -69,7 +69,7 @@ jobs:
             if [ "${{ env.DISTRO_VER }}" = "24.04" ]; then
               pip install --break-system-packages meson pybind11
             else
-              pip install meson pybind11
+              pip3 install meson pybind11
             fi
           else
             pip install meson pybind11
