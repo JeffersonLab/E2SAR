@@ -31,11 +31,11 @@ jobs:
             DISTRO=`awk 'BEGIN { FS = "=" } ; /^ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
             DISTRO_VER=`awk 'BEGIN { FS = "=" } ; /^DISTRIB_RELEASE=/ {gsub(/"/, ""); print $2}' /etc/*-release`
             # set them in the environment
-            echo "DISTRO=${DISTRO} >> $GITHUB_ENV"
-            echo "DISTRO_VER=${DISTRO_VER} >> $GITHUB_ENV"
+            echo "DISTRO=${DISTRO}" >> $GITHUB_ENV
+            echo "DISTRO_VER=${DISTRO_VER}" >> $GITHUB_ENV
             # set BOOST_VER and GRPC_VER environment variables
-            echo "BOOST_VER=${{ inputs.boost_ver }} >> $GITHUB_ENV"
-            echo "GRPC_VER=${{ inputs.grpc_ver }} >> $GITHUB_ENV"
+            echo "BOOST_VER=${{ inputs.boost_ver }}" >> $GITHUB_ENV
+            echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
             if [[ ${ DISTRO } == *"ubuntu"* ]]; then
                 echo Installing for Ubuntu
                 if [[ ${DISTRO_VER} == '20.04' ]]; then
