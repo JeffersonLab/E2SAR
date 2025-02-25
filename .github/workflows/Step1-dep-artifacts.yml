@@ -36,7 +36,7 @@ jobs:
             # set BOOST_VER and GRPC_VER environment variables
             echo "BOOST_VER=${{ inputs.boost_ver }}" >> $GITHUB_ENV
             echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
-            if [[ ${ DISTRO } == *"ubuntu"* ]]; then
+            if [[ ${DISTRO} == *"ubuntu"* ]]; then
                 echo Installing for Ubuntu
                 if [[ ${DISTRO_VER} == '20.04' ]]; then
                     echo Installing python3.10 for Ubuntu 20.04
@@ -50,7 +50,7 @@ jobs:
                 fi
                 sudo apt-get -yq update
                 sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev 
-            elif [[ ${ DISTRO } == *"rocky"* ]]; then
+            elif [[ ${DISTRO} == *"rocky"* ]]; then
                 echo Installing for Rocky
                 dnf -yq install epel-release
                 dnf -yq --enablerepo=devel update
