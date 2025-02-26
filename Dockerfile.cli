@@ -15,7 +15,7 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 ENV PATH=/usr/local/bin:$PATH
 ENV E2SARINSTALL=/e2sar-install
-ENV E2SAR_DEPS_DEB=E2SAR-main-0.1.2-ubuntu-22.04/e2sar-deps_0.1.2_amd64.deb
+ENV E2SAR_DEPS_DEB=E2SAR-main-0.1.5-ubuntu-22.04/e2sar-deps_0.1.5_amd64.deb
 ENV E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
 
 RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb wget
@@ -41,7 +41,7 @@ RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY
 RUN BOOST_ROOT=/usr/local meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix ${E2SARINSTALL} build
 
 # compile
-RUN meson compile -C build
+RUN meson compile -C build -j 2
 
 # install
 RUN meson install -C build
