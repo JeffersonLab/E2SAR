@@ -98,6 +98,7 @@ jobs:
           path: E2SAR
           submodules: true
           ref: v${{ env.E2SAR_VER }}
+          fetch-tags: true
           token: ${{ secrets.CLASSIC_REPO_PAT }}
 
       - name: Create install directories
