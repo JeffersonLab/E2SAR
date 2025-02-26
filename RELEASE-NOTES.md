@@ -1,3 +1,7 @@
+# E2SAR Release Notes
+
+API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
+
 ## v0.2.0
 
 Compared to 0.1.X this version introduces a number of enhancements, although it remains backward-compatible with 0.1.X releases. The list of enhancements/changes includes:
