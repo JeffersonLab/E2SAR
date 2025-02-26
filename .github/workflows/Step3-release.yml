@@ -1,0 +1,106 @@
+name: Step 3 - publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      grpc_ver:
+        description: 'GRPC Version'
+        default: '1.54.1'
+        type: string
+        required: true
+      boost_ver: 
+        description: 'BOOST Version'
+        default: '1.85.0'
+        type: string
+        required: true
+      e2sar_ver:
+        description: 'E2SAR Version'
+        default: '0.1.5'
+        type: string
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: Set up environment
+        run: |
+            DISTRO=`awk 'BEGIN { FS = "=" } ; /^ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+            DISTRO_VER=`awk 'BEGIN { FS = "=" } ; /^VERSION_ID=/ {gsub(/"/, ""); print $2}' /etc/*-release`
+            # set them in the environment
+            echo "DISTRO=${DISTRO}" >> $GITHUB_ENV
+            echo "DISTRO_VER=${DISTRO_VER}" >> $GITHUB_ENV
+            # set BOOST_VER and GRPC_VER environment variables
+            echo "BOOST_VER=${{ inputs.boost_ver }}" >> $GITHUB_ENV
+            echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
+            echo "E2SAR_VER=${{ inputs.e2sar_ver }}" >> $GITHUB_ENV
+            
+      - name: Install GH CLI tools
+        run: |
+          if [ "${{ env.DISTRO }}" = "rocky" ]; then
+            curl -fsSL https://cli.github.com/packages/rpm/gh-cli.repo | tee /etc/yum.repos.d/github-cli.repo
+            dnf -y install gh
+            gh --version
+          else
+            gh --version
+          fi
+
+      - name: Prepare a unique name for Artifacts
+        id: prep_artifact_name
+        run: |
+          # Calculate a unique string which applies to the matrix entry
+          # that we can use to construct unique and valid artifact names.
+          # We achieve that by squashing runs of characters are invalid
+          # in artifact names, and also whitespace and dashes, into a
+          # single dash character.  The unique string will appear as
+          # the environment variable ARTIFACT_NAME in subsequent actions.
+          
+          name="${{ matrix.container }}"
+          # The option to enable + in sed regexps differs by OS so we avoid it
+          name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
+
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: false
+          ref: v${{ env.E2SAR_VER }}
+          fetch-tags: true
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
+
+      - name: Download built boost and grpc artifact
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: Step2a-deps2debs-rpms.yml
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-${{env.E2SAR_VER}}-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}-package
+          path: E2SAR
+
+      - name: Download built e2sar rpm
+        if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
+        id: download-e2sar-rpm
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: Step2b-e2sar-artifact.yml
+          name: ${{ env.ARTIFACT_NAME }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
+          path: E2SAR
+
+      - name: create GH release
+        run: |
+          cd E2SAR
+          if [ "${{ env.DISTRO }}" = "rocky" ]; then
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.rpm
+          elif [ "${{ env.DISTRO }}" = "ubuntu" ]; then
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
+          fi
+        env:
+          GITHUB_TOKEN: ${{ github.TOKEN }}
+        shell: bash
+        
