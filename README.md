@@ -182,11 +182,23 @@ $ docker exec -ti <container id> bash
 ```
 To connect VSCode be sure to install the `Dev Containers`  VSCode extension. To connect click `<F1>` then in the command prompt search for `Dev Containers: Attach to Running Container`. Select that, then select the running container. A new window will open connected to this container. You can open the `/src/E2SAR` folder in this workspace to find the source code. Compiling the code requires opening a terminal from inside VSCode. Locate `/src/E2SAR` directory then issue `meson compile -C build` command like explained above to build inside the container.
 
-## Installing and creating a distribution
+## Installing and creating a distribution or a release
+
+### Locally
 
 You can install the code after compilation by running `meson install -C build` (you can add `--dry-run` option to see where things will get installed). To set the installation destination add `--prefix /path/to/install` option to `meson setup build` command above. 
 
 To create a source distribution you can run `meson dist -C build --no-tests` (the `--no-tests` is needed because GRPC headers won't build properly when distribution is generated). 
+
+### In GitHub
+
+You can use the GitHub actions to create a release in GitHub. Four workflows are defined for this repo, each applicable to several standard Linux distributions:
+- Step 1: Create dependency artifacts: compiles and builds desired versions of BOOST and gRPC
+- Step 2a: Create DEBs and RPMs of the dependencies: creates DEBs and RPMs from artifacts built in Step 1, that contain just the BOOST and gRPC dependency installed into /usr/local. It is useful to install these if you are doing E2SAR development
+- Step 2b: Create E2SAR artifact, DEBs and RPMs: compiles E2SAR using dependency artifacts built in Step 1 and builds DEBs and RPMs that install into /usr/local
+- Step 3: publish a release: using DEBs RPMs of dependencies and E2SAR itself built in steps 2a and 2b publish a release
+
+All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b and Step 3. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
 ## Testing
 
