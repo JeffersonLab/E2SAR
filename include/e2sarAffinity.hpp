@@ -30,6 +30,10 @@ namespace e2sar {
              * Error out if node is invalid or NUMA not supported
              */
             static result<int> setNUMABind(int node) noexcept;
+
+        private:
+            Affinity() = delete;
+            ~Affinity() = delete;
     };
 };
 
