@@ -164,6 +164,7 @@ jobs:
             sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
           elif [ "${{ env.DISTRO }}" = "rocky" ]; then
             sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib64/pkgconfig/e2sar.pc
+          fi
 
       - name: Package project into .deb or .rpm
         run: |
