@@ -1,4 +1,4 @@
-name: Step 2b - e2sar artifact
+name: Step 2b - E2SAR artifact
 
 on:
   workflow_dispatch:
