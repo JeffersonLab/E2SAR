@@ -149,9 +149,9 @@ jobs:
           export IDIR=`pwd`/package/usr/local
           echo "IDIR=${IDIR}" >> $GITHUB_ENV
           cd E2SAR
-          BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
-          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson compile -C build -j 1
-          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib meson install -C build 
+          BOOST_ROOT=${IDIR} PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib:${IDIR}/lib64 meson setup -Dpkg_config_path=${IDIR}/lib/pkgconfig/:${IDIR}/lib64/pkgconfig/ --prefix ${IDIR} build && sed -i 's/-std=c++11//g' build/build.ninja
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib:${IDIR}/lib64 meson compile -C build -j 1
+          PATH=${IDIR}/bin:$PATH LD_LIBRARY_PATH=${IDIR}/lib:${IDIR}/lib64 meson install -C build 
 
       - name: Update pkgconfig prefix files for final installation
         run: |
