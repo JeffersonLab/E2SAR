@@ -101,6 +101,12 @@ jobs:
           fetch-tags: true
           token: ${{ secrets.CLASSIC_REPO_PAT }}
 
+      - name: List checked out code
+        run: |
+          ls -l E2SAR/udplbd/
+          ls -l E2SAR/docs/
+          ls -l E2SAR/wiki/
+
       - name: Create install directories
         run: |
           mkdir -p package/usr/local/include/
