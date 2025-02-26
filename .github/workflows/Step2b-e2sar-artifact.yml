@@ -160,7 +160,10 @@ jobs:
           for file in `ls -1 ${{ env.IDIR }}/lib/pkgconfig`; do sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
           echo Updating E2SAR pkgconfig
           find ${{ env.IDIR }} -name e2sar.pc
-          sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
+          if [ "${{ env.DISTRO }}" = "ubuntu" ]; then
+            sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
+          elif [ "${{ env.DISTRO }}" = "rocky" ]; then
+            sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib64/pkgconfig/e2sar.pc
 
       - name: Package project into .deb or .rpm
         run: |
