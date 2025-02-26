@@ -159,14 +159,15 @@ jobs:
           echo Updating pkgconfig files prefix from ${{ env.IDIR }} to ${{ env.FINAL_INSTALL }}
           for file in `ls -1 ${{ env.IDIR }}/lib/pkgconfig`; do sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${IDIR}/lib/pkgconfig/${file}; done
           echo Updating E2SAR pkgconfig
+          find ${{ env.IDIR }} -name e2sar.pc
           sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
 
       - name: Package project into .deb or .rpm
         run: |
           cd package/ && tar -zcf ../e2sar.tar.gz usr/ && cd ..
-          if [[ ${{ matrix.os }} == *"ubuntu"* ]]; then
+          if [ "${{ env.DISTRO }}" = "ubuntu" ]; then
             fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
-          elif [[ ${{ matrix.os }} == *"rocky"* ]]; then
+          elif [ "${{ env.DISTRO }}" = "rocky" ]; then
             fpm -s tar -t rpm -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           fi
 
