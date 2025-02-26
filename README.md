@@ -198,6 +198,8 @@ You can use the GitHub actions to create a release in GitHub. Four workflows are
 - Step 2b: Create E2SAR artifact, DEBs and RPMs: compiles E2SAR using dependency artifacts built in Step 1 and builds DEBs and RPMs that install into /usr/local
 - Step 3: publish a release: using DEBs RPMs of dependencies and E2SAR itself built in steps 2a and 2b publish a release
 
+Steps 2a, 2b and 3 depend on the tag in the form of `vX.Y.Z` (e.g. `v0.1.5`) to be present on main marking the release. Tagging is done with `git tag -s vX.Y.Z -m "Message" && git push origin vX.Y.Z`
+
 All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b and Step 3. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
 ## Testing
