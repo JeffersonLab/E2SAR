@@ -74,7 +74,9 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     // check the sync stats
     auto recvStats = reas.getStats();
 
-    reas.deregisterWorker();
+    auto dereg_r = reas.deregisterWorker();
+    if (dereg_r.has_error())
+        std::cout << "Error encountered deregistering a worker: " << dereg_r.error().message() << std::endl;
 
     if (recvStats.get<0>() != 0) 
     {
@@ -95,8 +97,9 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
     // stop threads and exit
-    lbman.deregisterWorker();
-    lbman.freeLB();
+    auto free_r = lbman.freeLB();
+    if (free_r.has_error())
+        std::cout << "Error encountered freeing a load balancer: " << free_r.error().message() << std::endl;
 }
 
 BOOST_AUTO_TEST_SUITE_END()
