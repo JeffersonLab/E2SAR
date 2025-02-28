@@ -44,6 +44,9 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     // call reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders);
 
+    if (res.has_error())
+        std::cout << "Encountered error reserving LB: " << res.error().message() << std::endl;
+
     BOOST_CHECK(!res.has_error());
     BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
     BOOST_CHECK(lbman.get_URI().has_syncAddr());
@@ -55,7 +58,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     ip::address loopback = ip::make_address("127.0.0.1");
     u_int16_t listen_port = 10000;
     // create a reassembler and start the threads
-    Reassembler reas(uri, loopback, listen_port, 1, rflags);
+    Reassembler reas(lbman.get_URI(), loopback, listen_port, 1, rflags);
 
     auto reg_r = reas.registerWorker("testworker"s);
     if (reg_r.has_error())
