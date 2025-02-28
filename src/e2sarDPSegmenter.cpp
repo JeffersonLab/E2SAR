@@ -70,13 +70,27 @@ namespace e2sar
         sendThreadState.iface = destintfres.value().get<0>();
 
         if (sflags.mtu == 0)
-            mtu = destintfmtu;
-        else
-            if (sflags.mtu <= destintfmtu)
-                mtu = sflags.mtu;
+        {
+            if (destintfmtu > 0)
+                // if reported MTU size is non-zero we can use it
+                mtu = destintfmtu;
             else
-                throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU of "s + 
-                    destintfres.value().get<0>());
+                throw E2SARException("Outgoing interface MTU is reported as 0, please use manual override of MTU size");
+        }
+        else
+            if (destintfmtu > 0 )
+            {
+                // if destination interface reports proper non 0 MTU (lo doesn't)
+                // then we can check the override against the reported size
+                if (sflags.mtu <= destintfmtu)
+                    mtu = sflags.mtu;
+                else
+                    throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU of "s + 
+                        destintfres.value().get<0>());
+            }
+            else
+                // if destination interface reports 0 MTU we just use the override
+                mtu = sflags.mtu;
 #else
         if (sflags.mtu == 0)
             throw E2SARException("Unable to detect outgoing interface MTU on this platform"s);
