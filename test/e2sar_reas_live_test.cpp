@@ -33,6 +33,22 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
 
     auto uri = uri_r.value();
 
+    // create LBManager
+    auto lbman = LBManager(uri, false);
+
+    // reserve an LB to get sync address
+    auto duration_v = pt::duration_from_string("01");
+    std::string lbname{"mylb"};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
+
+    // call reserve
+    auto res = lbman.reserveLB(lbname, duration_v, senders);
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
+    BOOST_CHECK(lbman.get_URI().has_syncAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
+
     Reassembler::ReassemblerFlags rflags;
     rflags.validateCert = false;
 
@@ -40,6 +56,11 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     u_int16_t listen_port = 10000;
     // create a reassembler and start the threads
     Reassembler reas(uri, loopback, listen_port, 1, rflags);
+
+    auto reg_r = reas.registerWorker("testworker"s);
+    if (reg_r.has_error())
+        std::cout << "Error registering worker with LB: " << reg_r.error().message() << std::endl;
+    BOOST_CHECK(!reg_r.has_error());
 
     auto oas_r = reas.openAndStart();
 
@@ -52,6 +73,8 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
 
     // check the sync stats
     auto recvStats = reas.getStats();
+
+    reas.deregisterWorker();
 
     if (recvStats.get<0>() != 0) 
     {
@@ -72,6 +95,8 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
     // stop threads and exit
+    lbman.deregisterWorker();
+    lbman.freeLB();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
