@@ -41,6 +41,7 @@ void init_e2sarResultTypes(py::module_ &m);
 
 void init_e2sarCP(py::module_ &m);    // in a submodule "ControlPlane"
 void init_e2sarUtil(py::module_ &m);  // in the main module
+void init_e2sarAffinity(py::module_ &m);  // in the main module
 void init_e2sarHeaders(py::module_ &m);  // in the main module
 void init_e2sarDP(pybind11::module_ &m);    // in a submodule "DataPlane"
 
@@ -117,6 +118,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     init_e2sarUtil(m);
     init_e2sarCP(m);
     init_e2sarDP(m);
+    init_e2sarAffinity(m);
 }
 
 
