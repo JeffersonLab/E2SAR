@@ -68,7 +68,7 @@ void init_e2sarDP_segmenter(py::module_ &m)
     py::class_<Segmenter> seg(m, "Segmenter");
 
     // Bind "SegmenterFlags" struct as a nested class of Segmenter
-    py::class_<Segmenter::SegmenterFlags>(m, "SegmenterFlags")
+    py::class_<Segmenter::SegmenterFlags>(seg, "SegmenterFlags")
         .def(py::init<>())  // The default values will be the same in Python after binding.
         .def_readwrite("dpV6", &Segmenter::SegmenterFlags::dpV6)
         .def_readwrite("connectedSocket", &Segmenter::SegmenterFlags::connectedSocket)
@@ -82,13 +82,24 @@ void init_e2sarDP_segmenter(py::module_ &m)
         .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
         .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
-    // Constructor
+    // Constructor-simple
     seg.def(
         py::init<const EjfatURI &, u_int16_t, u_int32_t, const Segmenter::SegmenterFlags &>(),
         "Init the Segmenter object.",
         py::arg("uri"),  // must-have args when init
         py::arg("data_id"),
         py::arg("eventSrc_id"),
+        py::arg("sflags") = Segmenter::SegmenterFlags());
+
+    // Constructor-corelist
+    seg.def(
+        py::init<const EjfatURI &, u_int16_t, u_int32_t,
+                    std::vector<int>, const Segmenter::SegmenterFlags &>(),
+        "Init the Segmenter object with CPU core list (with Python list)",
+        py::arg("uri"),
+        py::arg("data_id"),
+        py::arg("eventSrc_id"),
+        py::arg("cpu_core_list"),
         py::arg("sflags") = Segmenter::SegmenterFlags());
 
     // Return type of result<int>
@@ -162,7 +173,7 @@ void init_e2sarDP_reassembler(py::module_ &m)
     py::class_<Reassembler> reas(m, "Reassembler");
 
     // Bind the ReassemblerFlags struct as a nested class of Reassembler
-    py::class_<Reassembler::ReassemblerFlags>(m, "ReassemblerFlags")
+    py::class_<Reassembler::ReassemblerFlags>(reas, "ReassemblerFlags")
         .def(py::init<>())  // The default values will be the same in Python after binding.
         .def_readwrite("useCP", &Reassembler::ReassemblerFlags::useCP)
         .def_readwrite("useHostAddress", &Reassembler::ReassemblerFlags::useHostAddress)

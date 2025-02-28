@@ -52,7 +52,7 @@ namespace e2sar
             if (data.has_error())
                 throw E2SARException("IPV6 Data address is not present in the URI"s);
             dataaddr = data.value().first;
-        } else  
+        } else
         {
             // use dataplane v4 address for a routing query
             auto data = dpuri.get_dataAddrv4();

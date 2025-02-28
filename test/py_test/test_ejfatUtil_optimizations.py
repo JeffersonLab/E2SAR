@@ -1,13 +1,13 @@
 """
 The pytest for cpp class e2sar::Optimizations.
 
-To make sure it's working, either append the path of "e2say_py.*.so" to sys.path.
+To make sure it's working, either append the path of "e2say_py.*.so" to sys.path. E.g,
 # import sys
 
 # sys.path.append(
 #     '/home/xmei/ejfat_projects/E2SAR/build/src/pybind')
 
-Or, add this path to PYTHONPATH
+Or, add this path to PYTHONPATH, e.g,
 # export PYTHONPATH=/home/xmei/ejfat_projects/E2SAR/build/src/pybind
 """
 
