@@ -182,18 +182,18 @@ void init_e2sarDP_reassembler(py::module_ &m)
         .def_readwrite("Ki", &Reassembler::ReassemblerFlags::Ki)
         .def_readwrite("Kp", &Reassembler::ReassemblerFlags::Kp)
         .def_readwrite("Kd", &Reassembler::ReassemblerFlags::Kd)
-        .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)
-        .def_readwrite("min_factor", &Reassembler::ReassemblerFlags::min_factor)
-        .def_readwrite("max_factor", &Reassembler::ReassemblerFlags::max_factor)
         .def_readwrite("setPoint", &Reassembler::ReassemblerFlags::setPoint)
         .def_readwrite("epoch_ms", &Reassembler::ReassemblerFlags::epoch_ms)
         .def_readwrite("portRange", &Reassembler::ReassemblerFlags::portRange)
         .def_readwrite("withLBHeader", &Reassembler::ReassemblerFlags::withLBHeader)
         .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms)
         .def_readwrite("rcvSocketBufSize", &Reassembler::ReassemblerFlags::rcvSocketBufSize)
+        .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)
+        .def_readwrite("min_factor", &Reassembler::ReassemblerFlags::min_factor)
+        .def_readwrite("max_factor", &Reassembler::ReassemblerFlags::max_factor)
         .def("getFromINI", &Reassembler::ReassemblerFlags::getFromINI);
 
-    // Constructor
+    // Constructor-simple
     reas.def(
         py::init<const EjfatURI &, ip::address, u_int16_t, size_t, const Reassembler::ReassemblerFlags &>(),
         "Init the Reassembler object with number of recv threads.",
@@ -202,6 +202,17 @@ void init_e2sarDP_reassembler(py::module_ &m)
         py::arg("starting_port"),
         py::arg("num_recv_threads") = (size_t)1,
         py::arg("rflags") = Reassembler::ReassemblerFlags());
+
+    // Constructor-simple without data_ip and with v6
+    reas.def(
+        py::init<const EjfatURI &, u_int16_t, size_t,
+                const Reassembler::ReassemblerFlags &, bool>(),
+        "Init the Reassembler object with number of recv threads, and auto-detect the outgoing IP address.",
+        py::arg("uri"),  // must-have args when init
+        py::arg("starting_port"),
+        py::arg("num_recv_threads") = (size_t)1,
+        py::arg("rflags") = Reassembler::ReassemblerFlags(),
+        py::arg("v6") = false);
 
     // Constructor with CPU core list.
     reas.def(
@@ -213,10 +224,20 @@ void init_e2sarDP_reassembler(py::module_ &m)
         py::arg("cpu_core_list"),
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
+    // Constructor with CPU core list, without data_ip and with v6
+    reas.def(
+        py::init<const EjfatURI &, u_int16_t, std::vector<int>,
+                const Reassembler::ReassemblerFlags &, bool>(),
+        "Init the Reassembler object with a list of CPU cores, and auto-detect the outgoing IP address",
+        py::arg("uri"),  // must-have args when init
+        py::arg("starting_port"),
+        py::arg("cpu_core_list"),
+        py::arg("rflags") = Reassembler::ReassemblerFlags(),
+        py::arg("v6") = false);
+
     // Recv events part. Return py::tuple.
     reas.def("getEvent",
-        [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes
-        ) -> py::tuple {
+        [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes) -> py::tuple {
             u_int8_t *eventBuf{nullptr};
             size_t eventLen = 0;
             EventNum_t eventNum = 0;
@@ -241,11 +262,9 @@ void init_e2sarDP_reassembler(py::module_ &m)
             }
 
             return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-
     },
     "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
-    py::arg("recv_bytes_list")
-    );
+    py::arg("recv_bytes_list"));
 
     reas.def("recvEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes,

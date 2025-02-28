@@ -32,7 +32,6 @@ SEG_URI = f"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=
 def test_sflags_getFromINI():
     """
     Test cpp segmenter::segmenterFlags::getFromINI() function.
-    Remember under Python, segmenterFlags is not a submodule of Segmenter.
     """
     res = sflags.getFromINI(SFLAGS_INIT_FILE)
     # print(res.has_error(), res.error() if res.has_error() else None)
