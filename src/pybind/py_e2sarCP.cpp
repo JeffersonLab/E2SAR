@@ -258,6 +258,9 @@ void init_e2sarCP(py::module_ &m) {
     lb_manager.def("remove_senders",  &LBManager::removeSenders);
     lb_manager.def("register_worker", &LBManager::registerWorker);
     lb_manager.def("deregister_worker", &LBManager::deregisterWorker);
+    lb_manager.def("add_sender_self",  &LBManager::addSenderSelf);
+    lb_manager.def("remove_sender_self",  &LBManager::removeSenderSelf);
+    lb_manager.def("register_worker_self", &LBManager::registerWorkerSelf);
 
     /**
      * Return type containing result<std::unique_ptr<LoadBalancerStatusReply>>
