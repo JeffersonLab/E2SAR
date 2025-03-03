@@ -9,7 +9,7 @@ using namespace e2sar;
 
 
 void init_e2sarAffinity(py::module_ &m) {
-    py::class_<Affinity>(m, "Affinity")
+    py::class_<Affinity, std::unique_ptr<Affinity, py::nodelete>>(m, "Affinity")
         .def_static(
             "set_process", &Affinity::setProcess,
             py::arg("cores"),
