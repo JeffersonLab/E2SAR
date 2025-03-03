@@ -1,5 +1,5 @@
 """
-The pytest for cpp class e2sar::Segmenter.
+The pytest for cpp class e2sar::Reassembler.
 
 To make sure it's working, either append the path of "e2say_py.*.so" to sys.path.
 # import sys
@@ -119,6 +119,7 @@ def test_get_data_ip():
 
     ret_ip = reassembler.get_dataIP()
     assert ret_ip == str(ip), "Reassembler::get_dataIP() method failed!"
+
 
 if __name__ == "__main__":
     pytest.main()
