@@ -23,8 +23,7 @@ RFLAGS_INIT_FILE = "/home/xmei/ejfat_projects/E2SAR/reassembler_config.ini"
 
 DATA_ID = 0x0505   # decimal value: 1285
 EVENTSRC_ID = 0x11223344   # decimal value: 287454020
-DP_IPV4_ADDR = "10.250.100.123"  # magic address taken from the e2sar_seg_test.cpp
-# DP_IPV4_ADDR = "127.0.0.1"  # trigger E2SARException
+DP_IPV4_ADDR = "127.0.0.1"
 DP_IPV4_PORT = 19522
 REAS_URI = f"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}"
 
