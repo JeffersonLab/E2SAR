@@ -55,7 +55,6 @@ void init_e2sarDP_reassembler(py::module_ &m);
 void init_e2sarDP_segmenter(py::module_ &m);
 
 void init_e2sarDP(py::module_ &m) {
-
     // Define the submodule "DataPlane"
     py::module_ e2sarDP = m.def_submodule("DataPlane", "E2SAR DataPlane submodule");
 
@@ -63,8 +62,7 @@ void init_e2sarDP(py::module_ &m) {
     init_e2sarDP_reassembler(e2sarDP);
 }
 
-void init_e2sarDP_segmenter(py::module_ &m)
-{
+void init_e2sarDP_segmenter(py::module_ &m) {
     py::class_<Segmenter> seg(m, "Segmenter");
 
     // Bind "SegmenterFlags" struct as a nested class of Segmenter
@@ -111,15 +109,13 @@ void init_e2sarDP_segmenter(py::module_ &m)
         py::arg("buf_len"),
         py::arg("_eventNum") = 0LL,
         py::arg("_dataId") = 0,
-        py::arg("entropy") = 0
-        );
+        py::arg("entropy") = 0);
 
     // Send method related to callback. Have to define corresponding wrapper function.
     seg.def("addToSendQueue",
         [](e2sar::Segmenter& seg, py::buffer py_buf, size_t bytes,
         int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
         py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
-
             // Convert py::bytes to uint8_t*
             py::buffer_info buf_info = py_buf.request();
             uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
@@ -149,8 +145,7 @@ void init_e2sarDP_segmenter(py::module_ &m)
         py::arg("_dataId") = 0,
         py::arg("entropy") = 0,
         py::arg("callback") = py::none(),
-        py::arg("cbArg") = py::none()
-    );
+        py::arg("cbArg") = py::none());
 
     // Return type of boost::tuple<>
     seg.def("getSendStats", [](const Segmenter& segObj) {
@@ -168,9 +163,10 @@ void init_e2sarDP_segmenter(py::module_ &m)
     seg.def("stopThreads", &Segmenter::stopThreads);
 }
 
-void init_e2sarDP_reassembler(py::module_ &m)
-{
+void init_e2sarDP_reassembler(py::module_ &m) {
     py::class_<Reassembler> reas(m, "Reassembler");
+
+    // reas.def(py::init<boost::asio::ip::address>());
 
     // Bind the ReassemblerFlags struct as a nested class of Reassembler
     py::class_<Reassembler::ReassemblerFlags>(reas, "ReassemblerFlags")
@@ -200,7 +196,7 @@ void init_e2sarDP_reassembler(py::module_ &m)
         py::arg("uri"),  // must-have args when init
         py::arg("data_ip"),
         py::arg("starting_port"),
-        py::arg("num_recv_threads") = (size_t)1,
+        py::arg("num_recv_threads") = static_cast<size_t>(1),
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
     // Constructor-simple without data_ip and with v6
@@ -210,7 +206,7 @@ void init_e2sarDP_reassembler(py::module_ &m)
         "Init the Reassembler object with number of recv threads, and auto-detect the outgoing IP address.",
         py::arg("uri"),  // must-have args when init
         py::arg("starting_port"),
-        py::arg("num_recv_threads") = (size_t)1,
+        py::arg("num_recv_threads") = static_cast<size_t>(1),
         py::arg("rflags") = Reassembler::ReassemblerFlags(),
         py::arg("v6") = false);
 
@@ -248,11 +244,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
             if (recvres.has_error()) {
                 std::cout << "Error encountered receiving event frames: "
                     << recvres.error().message() << std::endl;
-                return py::make_tuple((int)-2, eventLen, eventNum, recDataId);
+                return py::make_tuple(static_cast<int>(-2), eventLen, eventNum, recDataId);
             }
-            if (recvres.value() == -1)
+            if (recvres.value() == -1) {
                 std::cout << "No message received, continuing" << std::endl;
-            else {
+            } else {
                 // // Received event
                 // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
                 //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
@@ -261,8 +257,7 @@ void init_e2sarDP_reassembler(py::module_ &m)
                 recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
             }
 
-            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-    },
+            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);},
     "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
     py::arg("recv_bytes_list"));
 
@@ -279,11 +274,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
             if (recvres.has_error()) {
                 std::cout << "Error encountered receiving event frames: "
                     << recvres.error().message() << std::endl;
-                return py::make_tuple((int)-2, eventLen, eventNum, recDataId);
+                return py::make_tuple(static_cast<int>(-2), eventLen, eventNum, recDataId);
             }
-            if (recvres.value() == -1)
+            if (recvres.value() == -1) {
                 std::cout << "No message received, continuing" << std::endl;
-            else {
+            } else {
                 // // Received event
                 // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
                 //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
@@ -292,13 +287,10 @@ void init_e2sarDP_reassembler(py::module_ &m)
                 recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
             }
 
-            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-
-    },
+            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);},
     "Get an event in the blocking mode. Use py::list[None] to accept the data.",
     py::arg("recv_bytes_list"),
-    py::arg("wait_ms") = 0
-    );
+    py::arg("wait_ms") = 0);
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
@@ -314,6 +306,11 @@ void init_e2sarDP_reassembler(py::module_ &m)
             return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
                                     boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats));
         });
+
+    // Return type: ip::address - convert to string for Python
+    reas.def("get_dataIP", [](const Reassembler &reasObj) {
+        return reasObj.get_dataIP().to_string();
+    });
 
     // Simple return types
     reas.def("get_numRecvThreads", &Reassembler::get_numRecvThreads);

@@ -58,7 +58,7 @@ def test_reas_constructor():
 
 
 def test_reas_constructor_core_list():
-    """Test reassembler constructor simple."""
+    """Test reassembler constructor with CPU core list."""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
     assert res.has_error() is False
     flags = res.value()
@@ -76,6 +76,49 @@ def test_reas_constructor_core_list():
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
 
+def test_reas_constructor_core_list_auto_data_ip():
+    """Test reassembler constructor with CPU core list and auto dataIP detection."""
+    res = rflags.getFromINI(RFLAGS_INIT_FILE)
+    assert res.has_error() is False
+    flags = res.value()
+    flags.useCP = False  # turn off CP. Default value is True
+    flags.withLBHeader = True  # LB header will be attached since there is no LB
+
+    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
+
+    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
+    assert isinstance(reas_uri, e2sar_py.EjfatURI)
+
+    core_list=[0]
+    reassembler = reas(reas_uri, DP_IPV4_PORT, core_list, flags, False)
+    assert isinstance(reassembler, reas), "Reassembler object creation failed! "
+
+
+def test_get_data_ip():
+    """Test Reassembler::get_dataIP"""
+    res = rflags.getFromINI(RFLAGS_INIT_FILE)
+    assert res.has_error() is False
+    flags = res.value()
+    flags.useCP = False  # turn off CP. Default value is True
+    flags.withLBHeader = True  # LB header will be attached since there is no LB
+
+    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
+
+    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
+    assert isinstance(reas_uri, e2sar_py.EjfatURI)
+
+    core_list=[0]
+    reassembler = reas(reas_uri, DP_IPV4_PORT, core_list, flags, False)
+    assert isinstance(reassembler, reas), "Reassembler object creation failed! "
+
+    res = reas_uri.get_data_addr_v4()
+    assert res.has_error() is False
+    ip = res.value()[0]
+    assert isinstance(ip, e2sar_py.IPAddress)
+    assert str(ip) == DP_IPV4_ADDR, "EjfatURI get_data_addr_v4() failed!"
+
+    ret_ip = reassembler.get_dataIP()
+    assert ret_ip == str(ip), "Reassembler::get_dataIP() method failed!"
+
 if __name__ == "__main__":
-    # pytest.main()
-    test_reas_constructor_core_list()
+    pytest.main()
