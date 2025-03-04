@@ -76,8 +76,7 @@ glib_dep = dependency('glib-2.0')
 protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 # only needed for older compilers
-cpp = meson.get_compiler('cpp')
-stdcppfs_dep = cpp.find_library('stdc++fs', required: false)
+stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
 # On many platforms, gRPC C++ has to be manually installed and found.
 grpc_dep = dependency('grpc++', version: '>=1.54.1')
