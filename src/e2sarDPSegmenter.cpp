@@ -687,7 +687,9 @@ namespace e2sar
         while (curOffset < eventEnd)
         {
             // fill out LB and RE headers
-            auto hdr = static_cast<LBREHdr*>(malloc(sizeof(LBREHdr)));
+            void *hdrspace = malloc(sizeof(LBREHdr));
+            // placement-new to construct the headers
+            auto hdr = new (hdrspace) LBREHdr();
             // allocate iov (this returns two entries)
             auto iov = static_cast<struct iovec*>(malloc(2*sizeof(struct iovec)));
 
