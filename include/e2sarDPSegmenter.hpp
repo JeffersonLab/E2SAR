@@ -295,6 +295,8 @@ namespace e2sar
             boost::mutex sendThreadMtx;
             // condition variable for send thread
             boost::condition_variable sendThreadCond;
+            // warm up period in MS between sync thread starting and data being allowed to be sent
+            u_int16_t warmUpMs;
             // use control plane (can be disabled for debugging)
             bool useCP;
             // report zero event number change rate in Sync
@@ -340,6 +342,7 @@ namespace e2sar
              * - useCP - enable control plane to send Sync packets {true}
              * - zeroRate - don't provide event number change rate in Sync {false}
              * - usecAsEventNum - use usec clock samples as event numbers in LB and Sync packets {true}
+             * - warmUpMs - a period of sending sync messages before data is allowed {1000}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
@@ -357,6 +360,7 @@ namespace e2sar
                 bool useCP;
                 bool zeroRate;
                 bool usecAsEventNum;
+                u_int16_t warmUpMs;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
@@ -365,7 +369,7 @@ namespace e2sar
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, zeroRate{false}, usecAsEventNum{true}, 
-                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
                 /**
                  * Initialize flags from an INI file
@@ -558,8 +562,6 @@ namespace e2sar
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
                 EventRate_t reportedRate{0};
-                if (not zeroRate)
-                    reportedRate = eventRate;
                 EventNum_t reportedEventNum{lbEventNum};
                 if (usecAsEventNum) 
                 {
@@ -570,6 +572,10 @@ namespace e2sar
                     if (not zeroRate)
                         // 1 MHz in this case
                         reportedRate = 1000000;
+                } else
+                {
+                    if (not zeroRate)
+                        reportedRate = eventRate;
                 }
                 hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }

@@ -36,6 +36,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         cqeThreadState(*this),
 #endif
+        warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
         zeroRate{sflags.zeroRate},
         usecAsEventNum{sflags.usecAsEventNum},
@@ -145,6 +146,8 @@ namespace e2sar
             // start the sync thread from method
             boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
             syncThreadState.threadObj = std::move(syncT);
+            // provide a 1 second warm-up period of sending SYNCs and no data
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(warmUpMs));
         }
 
         // open and connect send sockets
@@ -270,7 +273,10 @@ namespace e2sar
             }
 
             // peek at segmenter metadata circular buffer to calculate event rate
-            evtRate = seg.eventRate(currentTimeNanos);
+            if (seg.usecAsEventNum)
+                evtRate = 0; // will be overwritten by 1MHz
+            else
+                evtRate = seg.eventRate(currentTimeNanos); // calculate actual
 
             // fill the sync header using a mix of current and segmenter data
             // no locking needed - we only look at one field in seg - srcId
@@ -877,6 +883,7 @@ namespace e2sar
 
         // general
         sFlags.useCP = paramTree.get<bool>("general.useCP", sFlags.useCP);
+        sFlags.warmUpMs = paramTree.get<bool>("general.warmUpMS", sFlags.warmUpMs);
 
         // control plane
         sFlags.syncPeriods = paramTree.get<u_int16_t>("control-plane.syncPeriods", 
