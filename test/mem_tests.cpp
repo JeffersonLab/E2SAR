@@ -49,7 +49,9 @@ void useMallocs()
 {
     for(size_t i = 0; i < numBuffers; i++)
     {
-        hdrs[i] = static_cast<LBREHdr*>(malloc(sizeof(LBREHdr)));
+        void *space = malloc(sizeof(LBREHdr));
+
+        hdrs[i] = new (space) LBREHdr();
         iovecs[i] = static_cast<struct iovec*>(calloc(2, sizeof(struct iovec)));
     }
 
