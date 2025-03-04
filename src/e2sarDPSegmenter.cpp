@@ -883,9 +883,9 @@ namespace e2sar
 
         // general
         sFlags.useCP = paramTree.get<bool>("general.useCP", sFlags.useCP);
-        sFlags.warmUpMs = paramTree.get<bool>("general.warmUpMS", sFlags.warmUpMs);
 
         // control plane
+        sFlags.warmUpMs = paramTree.get<bool>("control-plane.warmUpMS", sFlags.warmUpMs);
         sFlags.syncPeriods = paramTree.get<u_int16_t>("control-plane.syncPeriods", 
             sFlags.syncPeriods);
         sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
