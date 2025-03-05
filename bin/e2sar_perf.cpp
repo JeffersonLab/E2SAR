@@ -276,23 +276,25 @@ void recvStatsThread(Reassembler *r)
             lostEvents.push_back(res.value());
         }
         /*
-             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
-             *  - EventNum_t eventSuccess; // events successfully processed
-             *  - int lastErrno; 
-             *  - int grpcErrCnt; 
-             *  - int dataErrCnt; 
-             *  - E2SARErrorc lastE2SARError; 
+             *  - 0 EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - 1 EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
+             *  - 2 EventNum_t eventSuccess; // events successfully processed
+             *  - 3 int lastErrno; 
+             *  - 4 int grpcErrCnt; 
+             *  - 5 int dataErrCnt; 
+             *  - 6 E2SARErrorc lastE2SARError; 
         */
         std::cout << "Stats:" << std::endl;
-        std::cout << "\tEvents Received: " << stats.get<1>() << std::endl;
+        std::cout << "\tEvents Received: " << stats.get<2>() << std::endl;
         std::cout << "\tEvents Mangled: " << mangledEvents << std::endl;
-        std::cout << "\tEvents Lost: " << stats.get<0>() << std::endl;
-        std::cout << "\tData Errors: " << stats.get<4>() << std::endl;
-        if (stats.get<4>() > 0)
-            std::cout << "\tLast Data Error: " << strerror(stats.get<2>()) << std::endl;
-        std::cout << "\tgRPC Errors: " << stats.get<3>() << std::endl;
-        if (stats.get<5>() != E2SARErrorc::NoError)
-            std::cout << "\tLast E2SARError code: " << make_error_code(stats.get<5>()).message() << std::endl;
+        std::cout << "\tEvents Lost in reassembly: " << stats.get<1>() << std::endl;
+        std::cout << "\tEvents Lost in enqueue: " << stats.get<0>() << std::endl;
+        std::cout << "\tData Errors: " << stats.get<5>() << std::endl;
+        if (stats.get<5>() > 0)
+            std::cout << "\tLast Data Error: " << strerror(stats.get<3>()) << std::endl;
+        std::cout << "\tgRPC Errors: " << stats.get<4>() << std::endl;
+        if (stats.get<6>() != E2SARErrorc::NoError)
+            std::cout << "\tLast E2SARError code: " << make_error_code(stats.get<6>()).message() << std::endl;
 
         std::cout << "\tEvents lost so far: ";
         for(auto evt: lostEvents)

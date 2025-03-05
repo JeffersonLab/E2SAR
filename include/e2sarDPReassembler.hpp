@@ -116,6 +116,7 @@ namespace e2sar
             // stats block
             struct AtomicStats {
                 std::atomic<EventNum_t> enqueueLoss{0}; // number of events received and lost on enqueue
+                std::atomic<EventNum_t> reassemblyLoss{0}; // number of events lost in reassembly (missing segments)
                 std::atomic<EventNum_t> eventSuccess{0}; // events successfully processed
                 // last error code
                 std::atomic<int> lastErrno{0};
@@ -240,7 +241,7 @@ namespace e2sar
 
                 // log a lost event via a set of known lost
                 // and add to lost queue for external inspection
-                inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt)
+                inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt, bool enqueLoss)
                 {
                     if (lostEvents.contains(evt))
                         return;
@@ -250,7 +251,10 @@ namespace e2sar
                     std::pair<EventNum_t, u_int16_t> *evtPtr = new std::pair<EventNum_t, u_int16_t>(evt.first, evt.second);
                     reas.recvStats.lostEventsQueue.push(evtPtr);
                     // this is atomic
-                    reas.recvStats.enqueueLoss++;
+                    if (enqueLoss)
+                        reas.recvStats.enqueueLoss++;
+                    else
+                        reas.recvStats.reassemblyLoss++;
                 }
             };
             friend struct RecvThreadState;
@@ -514,16 +518,17 @@ namespace e2sar
             /**
              * Get a tuple representing all the stats:
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
              *  - EventNum_t eventSuccess; // events successfully processed
              *  - int lastErrno; 
              *  - int grpcErrCnt; 
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
              */
-            inline const boost::tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const noexcept
+            inline const boost::tuple<EventNum_t, EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const noexcept
             {
-                return boost::make_tuple<EventNum_t, EventNum_t, int, int, int, E2SARErrorc>(
-                    recvStats.enqueueLoss, recvStats.eventSuccess,
+                return boost::make_tuple<EventNum_t, EventNum_t, EventNum_t, int, int, int, E2SARErrorc>(
+                    recvStats.enqueueLoss, recvStats.reassemblyLoss, recvStats.eventSuccess,
                     recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
                     recvStats.lastE2SARError);
             }

@@ -88,9 +88,9 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     // enqueue loss
     BOOST_CHECK(recvStats.get<0>() == 0);
     // gRPC error count
-    BOOST_CHECK(recvStats.get<3>() == 0);
-    // data error count
     BOOST_CHECK(recvStats.get<4>() == 0);
+    // data error count
+    BOOST_CHECK(recvStats.get<5>() == 0);
 
     auto lostEvent = reas.get_LostEvent();
     if (lostEvent.has_error())
