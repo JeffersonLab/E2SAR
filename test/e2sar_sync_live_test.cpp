@@ -78,8 +78,9 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
     {
         std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
     }
-    // send 10 sync messages and no errors
-    BOOST_CHECK(syncStats.get<0>() == 10);
+    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
+    // send 10+1 (one second sleep before data frame is sent) sync messages and no errors
+    BOOST_CHECK(syncStats.get<0>() == 11);
     BOOST_CHECK(syncStats.get<1>() == 0);
 
     // call free - this will correctly use the admin token (even though instance token
