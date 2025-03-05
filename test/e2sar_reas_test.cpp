@@ -123,18 +123,20 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         auto recvStats = reas.getStats();
         /*
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t reassemblyLoss; // number of events lost in reassembly
              *  - EventNum_t eventSuccess; // events successfully processed
              *  - int lastErrno; 
              *  - int grpcErrCnt; 
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
         */
-        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
-        BOOST_CHECK(recvStats.get<1>() == 5); // all succeeded
-        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
-        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
-        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
-        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+        BOOST_CHECK(recvStats.get<0>() == 0); // no enque losses
+        BOOST_CHECK(recvStats.get<1>() == 0); // no reassembly losses
+        BOOST_CHECK(recvStats.get<2>() == 5); // all succeeded
+        BOOST_CHECK(recvStats.get<3>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<4>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<5>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<6>() == E2SARErrorc::NoError); // no error
 
         auto lostEvent = reas.get_LostEvent();
         if (lostEvent.has_error())
@@ -270,18 +272,20 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         auto recvStats = reas.getStats();
         /*
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t reassemblyLoss; // number of events lost in reassmebly due to missing segments
              *  - EventNum_t eventSuccess; // events successfully processed
              *  - int lastErrno; 
              *  - int grpcErrCnt; 
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
         */
-        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
-        BOOST_CHECK(recvStats.get<1>() == 5); // all succeeded
-        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
-        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
-        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
-        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+        BOOST_CHECK(recvStats.get<0>() == 0); // no enqueue losses
+        BOOST_CHECK(recvStats.get<1>() == 0); // no reassembly losses
+        BOOST_CHECK(recvStats.get<2>() == 5); // all succeeded
+        BOOST_CHECK(recvStats.get<3>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<4>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<5>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<6>() == E2SARErrorc::NoError); // no error
 
         auto lostEvent = reas.get_LostEvent();
         if (lostEvent.has_error())
@@ -614,18 +618,20 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         auto recvStats = reas.getStats();
         /*
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t reassemblyLoss; // number of events lost in reassembly
              *  - EventNum_t eventSuccess; // events successfully processed
              *  - int lastErrno; 
              *  - int grpcErrCnt; 
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
         */
-        BOOST_CHECK(recvStats.get<0>() == 0); // no losses
-        BOOST_CHECK(recvStats.get<1>() == 20); // all succeeded
-        BOOST_CHECK(recvStats.get<2>() == 0); // no errno
-        BOOST_CHECK(recvStats.get<3>() == 0); // no grpc errors
-        BOOST_CHECK(recvStats.get<4>() == 0); // no data errors
-        BOOST_CHECK(recvStats.get<5>() == E2SARErrorc::NoError); // no error
+        BOOST_CHECK(recvStats.get<0>() == 0); // no enque losses
+        BOOST_CHECK(recvStats.get<1>() == 0); // no enque losses
+        BOOST_CHECK(recvStats.get<2>() == 20); // all succeeded
+        BOOST_CHECK(recvStats.get<3>() == 0); // no errno
+        BOOST_CHECK(recvStats.get<4>() == 0); // no grpc errors
+        BOOST_CHECK(recvStats.get<5>() == 0); // no data errors
+        BOOST_CHECK(recvStats.get<6>() == E2SARErrorc::NoError); // no error
 
         auto lostEvent = reas.get_LostEvent();
         if (lostEvent.has_error())

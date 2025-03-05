@@ -304,7 +304,8 @@ void init_e2sarDP_reassembler(py::module_ &m) {
     reas.def("getStats", [](const Reassembler& reasObj) {
             auto stats = reasObj.getStats();
             return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
-                                    boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats));
+                                    boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats), 
+                                    boost::get<6>(stats));
         });
 
     // Return type: ip::address - convert to string for Python
