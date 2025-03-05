@@ -360,7 +360,7 @@ int main(int argc, char **argv)
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate [s,r]");
-    opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip) [s,r]");
+    opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
     opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
@@ -577,9 +577,8 @@ int main(int argc, char **argv)
             }
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
+            std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
             std::cout << "Will run for:                  " << (durationSec ? std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
-            std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
-                "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
 
@@ -602,6 +601,10 @@ int main(int argc, char **argv)
                     else
                         reasPtr = new Reassembler(uri, recvStartPort, numThreads, rflags);
                 }
+
+                std::cout << "Using IP address:              " << reasPtr->get_dataIP() << std::endl;
+                std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
+                    "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
                 boost::thread statT(&recvStatsThread, reasPtr);
                 auto res = prepareToReceive(*reasPtr);
