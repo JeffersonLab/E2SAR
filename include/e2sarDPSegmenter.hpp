@@ -132,9 +132,10 @@ namespace e2sar
             // to get better entropy in usec clock samples (if needed)
             boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
-            //
-            // atomic struct for stat information for sync and send threads
-            //
+            /**
+             * Internal structure of atomic counters to maintain stats on sending
+             * and sync messages
+             */
             struct AtomicStats {
                 // sync messages sent
                 std::atomic<u_int64_t> msgCnt{0}; 
@@ -334,6 +335,22 @@ namespace e2sar
             /** Threads keep running while this is false */
             bool threadsStop{false};
         public:
+            /**
+             * Structure in which statistics are reported back to user, sync
+             * and send stats are identical so same structure is used.
+             */
+            struct ReportedStats {
+                u_int64_t msgCnt;
+                u_int64_t errCnt;
+                int lastErrno;
+                E2SARErrorc lastE2SARError;
+
+                ReportedStats() = delete;
+                ReportedStats(const AtomicStats &as): msgCnt{as.msgCnt}, errCnt{as.errCnt},
+                    lastErrno{as.lastErrno}, lastE2SARError{as.lastE2SARError}
+                    {}
+            };
+            
             /** 
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
@@ -475,23 +492,19 @@ namespace e2sar
                 boost::any cbArg = nullptr) noexcept;
 
             /**
-             * Get a tuple <sync msg cnt, sync err cnt, last errno> of sync statistics.
-             * Stat structures have atomic members, no additional locking needed.
+             * Get a ReportedStats structure of sync statistics.
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int, E2SARErrorc> getSyncStats() const noexcept
+            inline const ReportedStats getSyncStats() const noexcept
             {
-                return getStats(syncStats);
+                return ReportedStats(syncStats);
             }
 
             /**
-             * Get a tuple <event datagrams cnt, event datagrams err cnt, last errno,
-             * last E2SAR error>
-             * of send statistics. Stat structure have atomic members, no additional
-             * locking needed
+             * Get a ReportedStats structure of send statistics. 
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int, E2SARErrorc> getSendStats() const noexcept
+            inline const ReportedStats getSendStats() const noexcept
             {
-                return getStats(sendStats);
+                return ReportedStats(sendStats);
             }
 
             /**
@@ -525,12 +538,6 @@ namespace e2sar
                 threadsStop = true;
             }
         private:
-            inline const boost::tuple<u_int64_t, u_int64_t, int, E2SARErrorc> getStats(const AtomicStats &s) const
-            {
-                return boost::make_tuple<u_int64_t, u_int64_t, int, E2SARErrorc>(s.msgCnt, 
-                    s.errCnt, s.lastErrno, s.lastE2SARError);
-            }
-
             // Calculate the average event rate from circular buffer
             // note that locking lives outside this function, as needed.
             // NOTE: this is only useful to sync messages if sequential

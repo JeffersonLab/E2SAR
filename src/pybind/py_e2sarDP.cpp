@@ -147,15 +147,15 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         py::arg("callback") = py::none(),
         py::arg("cbArg") = py::none());
 
-    // Return type of boost::tuple<>
-    seg.def("getSendStats", [](const Segmenter& segObj) {
-            auto stats = segObj.getSendStats();
-            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
-        });
-    seg.def("getSyncStats", [](const Segmenter& segObj) {
-            auto stats = segObj.getSyncStats();
-            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
-        });
+    // Return type of ReportedStats
+//    seg.def("getSendStats", [](const Segmenter& segObj) {
+//            auto stats = segObj.getSendStats();
+//            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
+//        });
+//    seg.def("getSyncStats", [](const Segmenter& segObj) {
+//            auto stats = segObj.getSyncStats();
+//            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
+//        });
 
     // Simple return types
     seg.def("getMTU", &Segmenter::getMTU);

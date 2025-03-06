@@ -79,17 +79,17 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         // send one event message per 1 seconds that fits into a single frame
         //
         auto sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
         }
         for(auto i=0; i<5;i++) {
             auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
             BOOST_CHECK(!sendres.has_error());
             sendStats = seg.getSendStats();
-            if (sendStats.get<1>() != 0) 
+            if (sendStats.errCnt != 0) 
             {
-                std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
             }
             // sleep for a second
             boost::this_thread::sleep_for(boost::chrono::seconds(1));
@@ -98,10 +98,10 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         // check the send stats
         sendStats = seg.getSendStats();
 
-        std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+        std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
         // send 5 event messages and no errors
-        BOOST_CHECK(sendStats.get<0>() == 5);
-        BOOST_CHECK(sendStats.get<1>() == 0);
+        BOOST_CHECK(sendStats.msgCnt == 5);
+        BOOST_CHECK(sendStats.errCnt == 0);
 
         u_int8_t *eventBuf{nullptr};
         size_t eventLen;
@@ -229,17 +229,17 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         // send one event message per 1 seconds that fits into a single frame
         //
         auto sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
         }
         for(auto i=0; i<5;i++) {
             auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
             BOOST_CHECK(!sendres.has_error());
             sendStats = seg.getSendStats();
-            if (sendStats.get<1>() != 0) 
+            if (sendStats.errCnt != 0) 
             {
-                std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
             }
             // sleep for a second
             boost::this_thread::sleep_for(boost::chrono::seconds(1));
@@ -248,10 +248,10 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         // check the send stats
         sendStats = seg.getSendStats();
 
-        std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+        std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
         // send 5 event messages and no errors
-        BOOST_CHECK(sendStats.get<0>() == 25);
-        BOOST_CHECK(sendStats.get<1>() == 0);
+        BOOST_CHECK(sendStats.msgCnt == 25);
+        BOOST_CHECK(sendStats.errCnt == 0);
 
         u_int8_t *eventBuf{nullptr};
         size_t eventLen;
@@ -511,24 +511,24 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         // send one event message per 1 seconds that fits into a single frame
         //
         auto sendStats = seg1.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered after opening send socket in segmenter1: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered after opening send socket in segmenter1: " << strerror(sendStats.lastErrno) << std::endl;
         }
         sendStats = seg2.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered after opening send socket in segmenter2: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered after opening send socket in segmenter2: " << strerror(sendStats.lastErrno) << std::endl;
         }
         sendStats = seg3.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered after opening send socket in segmenter3: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered after opening send socket in segmenter3: " << strerror(sendStats.lastErrno) << std::endl;
         }
         sendStats = seg4.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered after opening send socket in segmenter4: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered after opening send socket in segmenter4: " << strerror(sendStats.lastErrno) << std::endl;
         }
 
         EventNum_t seg1Base = 1000LL, seg2Base = 2000LL, seg3Base = 3000LL, seg4Base = 4000LL;
@@ -536,30 +536,30 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
             auto sendres = seg1.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString1.data()), eventString1.length(), seg1Base + i);
             BOOST_CHECK(!sendres.has_error());
             sendStats = seg1.getSendStats();
-            if (sendStats.get<1>() != 0) 
+            if (sendStats.errCnt != 0) 
             {
-                std::cout << "Error encountered sending event frames in segmenter1: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered sending event frames in segmenter1: " << strerror(sendStats.lastErrno) << std::endl;
             }
             sendres = seg2.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString2.data()), eventString2.length(), seg2Base + i);
             BOOST_CHECK(!sendres.has_error());
             sendStats = seg1.getSendStats();
-            if (sendStats.get<1>() != 0) 
+            if (sendStats.errCnt != 0) 
             {
-                std::cout << "Error encountered sending event frames in segmenter2: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered sending event frames in segmenter2: " << strerror(sendStats.lastErrno) << std::endl;
             }
             sendres = seg3.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString3.data()), eventString3.length(), seg3Base + i);
             BOOST_CHECK(!sendres.has_error());
             sendStats = seg1.getSendStats();
-            if (sendStats.get<1>() != 0) 
+            if (sendStats.errCnt != 0) 
             {
-                std::cout << "Error encountered sending event frames in segmenter3: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered sending event frames in segmenter3: " << strerror(sendStats.lastErrno) << std::endl;
             }
             sendres = seg4.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString4.data()), eventString4.length(), seg4Base + i);
             BOOST_CHECK(!sendres.has_error());
             sendStats = seg1.getSendStats();
-            if (sendStats.get<1>() != 0) 
+            if (sendStats.errCnt != 0) 
             {
-                std::cout << "Error encountered sending event frames in segmenter4: " << strerror(sendStats.get<2>()) << std::endl;
+                std::cout << "Error encountered sending event frames in segmenter4: " << strerror(sendStats.lastErrno) << std::endl;
             }
             // sleep for a 100ms
             boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
@@ -568,34 +568,34 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         // check the send stats
         sendStats = seg1.getSendStats();
 
-        std::cout << "Segmenter 1 sent " << sendStats.get<0>() << " data frames" << std::endl;
+        std::cout << "Segmenter 1 sent " << sendStats.msgCnt << " data frames" << std::endl;
         // send 5 event messages and no errors
-        BOOST_CHECK(sendStats.get<0>() == 5);
-        BOOST_CHECK(sendStats.get<1>() == 0);
+        BOOST_CHECK(sendStats.msgCnt == 5);
+        BOOST_CHECK(sendStats.errCnt == 0);
 
         // check the send stats
         sendStats = seg2.getSendStats();
 
-        std::cout << "Segmenter 2 sent " << sendStats.get<0>() << " data frames" << std::endl;
+        std::cout << "Segmenter 2 sent " << sendStats.msgCnt << " data frames" << std::endl;
         // send 5 event messages and no errors
-        BOOST_CHECK(sendStats.get<0>() == 5);
-        BOOST_CHECK(sendStats.get<1>() == 0);
+        BOOST_CHECK(sendStats.msgCnt == 5);
+        BOOST_CHECK(sendStats.errCnt == 0);
 
         // check the send stats
         sendStats = seg3.getSendStats();
 
-        std::cout << "Segmenter 3 sent " << sendStats.get<0>() << " data frames" << std::endl;
+        std::cout << "Segmenter 3 sent " << sendStats.msgCnt << " data frames" << std::endl;
         // send 5 event messages and no errors
-        BOOST_CHECK(sendStats.get<0>() == 5);
-        BOOST_CHECK(sendStats.get<1>() == 0);
+        BOOST_CHECK(sendStats.msgCnt == 5);
+        BOOST_CHECK(sendStats.errCnt == 0);
 
         // check the send stats
         sendStats = seg4.getSendStats();
 
-        std::cout << "Segmenter 4 sent " << sendStats.get<0>() << " data frames" << std::endl;
+        std::cout << "Segmenter 4 sent " << sendStats.msgCnt << " data frames" << std::endl;
         // send 5 event messages and no errors
-        BOOST_CHECK(sendStats.get<0>() == 5);
-        BOOST_CHECK(sendStats.get<1>() == 0);
+        BOOST_CHECK(sendStats.msgCnt == 5);
+        BOOST_CHECK(sendStats.errCnt == 0);
 
         u_int8_t *eventBuf{nullptr};
         size_t eventLen;
