@@ -168,20 +168,20 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     // measure this right after we exit the send loop
     auto stats = s.getSendStats();
-    if (expectedFrames > stats.get<0>())
-        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.get<0>() << " of " << 
+    if (expectedFrames > stats.msgCnt)
+        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
             expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
 
     evtBufferPool->purge_memory();
-    std::cout << "Completed, " << stats.get<0>() << " frames sent, " << stats.get<1>() << " errors" << std::endl;
-    if (stats.get<1>() != 0)
+    std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
+    if (stats.errCnt != 0)
     {
-        if (stats.get<3>() != E2SARErrorc::NoError)
+        if (stats.lastE2SARError != E2SARErrorc::NoError)
         {
-            std::cout << "Last E2SARError code: " << make_error_code(stats.get<3>()).message() << std::endl;
+            std::cout << "Last E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
         }
         else
-            std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
+            std::cout << "Last error encountered: " << strerror(stats.lastErrno) << std::endl;
     }
 
     return 0;
