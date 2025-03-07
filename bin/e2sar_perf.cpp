@@ -260,7 +260,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
 
 void recvStatsThread(Reassembler *r)
 {
-    std::vector<std::pair<EventNum_t, u_int16_t>> lostEvents;
+    std::vector<boost::tuple<EventNum_t, u_int16_t, size_t>> lostEvents;
 
     while(threadsRunning)
     {
@@ -285,21 +285,21 @@ void recvStatsThread(Reassembler *r)
              *  - 6 E2SARErrorc lastE2SARError; 
         */
         std::cout << "Stats:" << std::endl;
-        std::cout << "\tEvents Received: " << stats.get<2>() << std::endl;
+        std::cout << "\tEvents Received: " << stats.eventSuccess << std::endl;
         std::cout << "\tEvents Mangled: " << mangledEvents << std::endl;
-        std::cout << "\tEvents Lost in reassembly: " << stats.get<1>() << std::endl;
-        std::cout << "\tEvents Lost in enqueue: " << stats.get<0>() << std::endl;
-        std::cout << "\tData Errors: " << stats.get<5>() << std::endl;
-        if (stats.get<5>() > 0)
-            std::cout << "\tLast Data Error: " << strerror(stats.get<3>()) << std::endl;
-        std::cout << "\tgRPC Errors: " << stats.get<4>() << std::endl;
-        if (stats.get<6>() != E2SARErrorc::NoError)
-            std::cout << "\tLast E2SARError code: " << make_error_code(stats.get<6>()).message() << std::endl;
+        std::cout << "\tEvents Lost in reassembly: " << stats.reassemblyLoss << std::endl;
+        std::cout << "\tEvents Lost in enqueue: " << stats.enqueueLoss << std::endl;
+        std::cout << "\tData Errors: " << stats.dataErrCnt << std::endl;
+        if (stats.dataErrCnt > 0)
+            std::cout << "\tLast Data Error: " << strerror(stats.lastErrno) << std::endl;
+        std::cout << "\tgRPC Errors: " << stats.grpcErrCnt << std::endl;
+        if (stats.lastE2SARError != E2SARErrorc::NoError)
+            std::cout << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
 
         std::cout << "\tEvents lost so far: ";
         for(auto evt: lostEvents)
         {
-            std::cout << "<" << evt.first << ":" << evt.second << "> ";
+            std::cout << "<" << evt.get<0>() << ":" << evt.get<1>() << "/" << evt.get<2>() << "> ";
         }
         std::cout << std::endl;
 

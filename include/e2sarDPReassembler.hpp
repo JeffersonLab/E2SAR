@@ -95,7 +95,7 @@ namespace e2sar
                     bytes = rehdr->get_bufferLength();
                     dataId = rehdr->get_dataId();
                     eventNum = rehdr->get_eventNum();
-                    // use deallocates this, so we don't use a pool
+                    // user deallocates this, so we don't use a pool
                     event = new u_int8_t[rehdr->get_bufferLength()];
                     // set the timestamp
                     firstSegment = boost::chrono::steady_clock::now();
@@ -110,6 +110,12 @@ namespace e2sar
                         rbp.free(i.segment);
                         oodQueue.pop();     
                     }
+                }
+
+                // how many fragments are in out-of-order queue?
+                size_t get_OodSize() 
+                {
+                    return oodQueue.size();
                 }
             };
 
@@ -127,7 +133,8 @@ namespace e2sar
                 // last e2sar error
                 std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
                 // a limited queue to push lost event numbers to
-                boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
+                //boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
+                boost::lockfree::queue<boost::tuple<EventNum_t, u_int16_t, size_t>*> lostEventsQueue{20};
             };
             AtomicStats recvStats;
 
@@ -239,6 +246,7 @@ namespace e2sar
                 // thread loop
                 void _threadBody();
 
+#if 0
                 // log a lost event via a set of known lost
                 // and add to lost queue for external inspection
                 inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt, bool enqueLoss)
@@ -255,6 +263,28 @@ namespace e2sar
                         reas.recvStats.enqueueLoss++;
                     else
                         reas.recvStats.reassemblyLoss++;
+                }
+#endif
+
+                // log a lost event via a set of known lost
+                // ad add to lost queue for external inspection
+                inline void logLostEvent(EventQueueItem* item, bool enqueLoss)
+                {
+                    std::pair<EventNum_t, u_int16_t> evt(item->eventNum, item->dataId);
+
+                    if (lostEvents.contains(evt))
+                        return;
+                    // this is thread-local
+                    lostEvents.insert(evt);
+                    // lockfree queue (only takes trivial types)
+                    boost::tuple<EventNum_t, u_int16_t, size_t> *evtPtr = 
+                        new boost::tuple<EventNum_t, u_int16_t, size_t>(evt.first, evt.second, item->get_OodSize());
+                    reas.recvStats.lostEventsQueue.push(evtPtr);
+                    // this is atomic
+                    if (enqueLoss)
+                        reas.recvStats.enqueueLoss++;
+                    else
+                        reas.recvStats.reassemblyLoss++;                    
                 }
             };
             friend struct RecvThreadState;
@@ -346,6 +376,27 @@ namespace e2sar
                     throw E2SARException("Data address not present in the URI");
             }
         public:
+            /**
+             * Structure in which statistics are reported back to user, sync
+             * and send stats are identical so same structure is used.
+             */
+            struct ReportedStats {
+                EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+                EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
+                EventNum_t eventSuccess; // events successfully processed
+                int lastErrno; 
+                int grpcErrCnt; 
+                int dataErrCnt; 
+                E2SARErrorc lastE2SARError; 
+
+                ReportedStats() = delete;
+                ReportedStats(const AtomicStats &as): enqueueLoss{as.enqueueLoss}, 
+                    reassemblyLoss{as.reassemblyLoss}, eventSuccess{as.eventSuccess},
+                    lastErrno{as.lastErrno}, grpcErrCnt{as.grpcErrCnt}, dataErrCnt{as.dataErrCnt},
+                    lastE2SARError{as.lastE2SARError} 
+                    {}
+            };
+
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
              * - useCP - whether to use the control plane (sendState, registerWorker) {true}
@@ -516,7 +567,7 @@ namespace e2sar
             result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId, u_int64_t wait_ms=0) noexcept;
 
             /**
-             * Get a tuple representing all the stats:
+             * Get a struct representing all the stats:
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
              *  - EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
              *  - EventNum_t eventSuccess; // events successfully processed
@@ -525,21 +576,18 @@ namespace e2sar
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
              */
-            inline const boost::tuple<EventNum_t, EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const noexcept
+            inline const ReportedStats getStats() const noexcept
             {
-                return boost::make_tuple<EventNum_t, EventNum_t, EventNum_t, int, int, int, E2SARErrorc>(
-                    recvStats.enqueueLoss, recvStats.reassemblyLoss, recvStats.eventSuccess,
-                    recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
-                    recvStats.lastE2SARError);
+                return ReportedStats(recvStats);
             }
 
             /**
              * Try to pop an event number of a lost event from the queue that stores them
              * @return result with either (eventNumber,dataId) or E2SARErrorc::NotFound if queue is empty
              */
-            inline result<std::pair<EventNum_t, u_int16_t>> get_LostEvent() noexcept
+            inline result<boost::tuple<EventNum_t, u_int16_t, size_t>> get_LostEvent() noexcept
             {
-                std::pair<EventNum_t, u_int16_t> *res = nullptr;
+                boost::tuple<EventNum_t, u_int16_t, size_t> *res = nullptr;
                 if (recvStats.lostEventsQueue.pop(res))
                 {
                     auto ret{*res};
