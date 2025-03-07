@@ -329,6 +329,9 @@ namespace e2sar
                     freeRecvBuffer = false;
                 }
 
+                // increment the counter of fragments received by this event
+                item->numFragments++;
+
                 // free the recv buffer if possible (not attached into priority queue)
                 if (freeRecvBuffer)
                     recvBufferPool.free(recvBuffer);
