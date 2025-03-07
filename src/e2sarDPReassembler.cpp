@@ -227,7 +227,8 @@ namespace e2sar
                 auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                 if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
                     // check if this event number has been seen as lost
-                    logLostEvent(it->first, false);
+                    //logLostEvent(it->first, false);
+                    logLostEvent(it->second, false);
                     // deallocate event (ood queue and event buffer)
                     it->second->cleanup(recvBufferPool);
                     delete it->second->event;
@@ -376,7 +377,8 @@ namespace e2sar
                     // event lost on enqueuing
                     if (ret == 1) 
                     {
-                        logLostEvent(std::make_pair(item->eventNum, item->dataId), true);
+                        //logLostEvent(std::make_pair(item->eventNum, item->dataId), true);
+                        logLostEvent(item, true);
                         // free up the item
                         delete item;
                     }

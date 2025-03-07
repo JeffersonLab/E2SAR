@@ -4,7 +4,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 ## v0.2.0
 
-Compared to 0.1.X this version introduces a number of enhancements, although it remains backward-compatible with 0.1.X releases. The list of enhancements/changes includes:
+Compared to 0.1.X this version introduces a number of enhancements, although it remains (largely) backward-compatible with 0.1.X releases. The list of enhancements/changes includes:
 
 - Segmenter now has an additional constructor that takes a list of cores to run working threads on. It remains single-threaded so only one core needs to be specified on the list and the sending thread will be bound to this core. 
 - A new class called Affinity is introduced to be the umbrella for a number of static methods that manipulate thread, process and NUMA affinity. See e2sar_perf for examples of how e.g. to turn on NUMA affinity. Thread affinity in Segmenter and Reassembler is automatic if a list of cores is provided to the constructors. Using NUMA affinity requires the installation of `libnuma-dev` package.
@@ -24,6 +24,8 @@ Compared to 0.1.X this version introduces a number of enhancements, although it 
     - int grpcErrCnt; // number of grpcErrors 
     - int dataErrCnt; // number of dataplane socket errors
     - E2SARErrorc lastE2SARError;  // last encountered E2SAR internal error
+    - WARNING! This is the point of incompatibility with 0.1.X as the order of these fields has changed. 
+- Segmenter now has a 'warm-up' period of 1 second by default when it sends SYNC packets without allowing data to be sent. This is to help synchronize schedules with the control plane. The length of this period in milliseconds can be sent using SegmenterFlags.warmUpMs (also reflected in the INI file format)
 - Python bindings have been updated to match these changes; python test framework moved to pytest instead of notebooks
 
 Note that IP auto-detection features work in simple scenarios where the outgoing interface has at most one address of each type (IPv4 or IPv6) associated with it. The code uses the first address it finds if multiple addresses are found. In the case of e.g. aliased interfaces the results of auto-detection may not be as intended and in this case sender and receiver IP addresses will need to be specified explicitly.

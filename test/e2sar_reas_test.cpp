@@ -130,19 +130,20 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
         */
-        BOOST_CHECK(recvStats.get<0>() == 0); // no enque losses
-        BOOST_CHECK(recvStats.get<1>() == 0); // no reassembly losses
-        BOOST_CHECK(recvStats.get<2>() == 5); // all succeeded
-        BOOST_CHECK(recvStats.get<3>() == 0); // no errno
-        BOOST_CHECK(recvStats.get<4>() == 0); // no grpc errors
-        BOOST_CHECK(recvStats.get<5>() == 0); // no data errors
-        BOOST_CHECK(recvStats.get<6>() == E2SARErrorc::NoError); // no error
+        BOOST_CHECK(recvStats.enqueueLoss == 0); // no enque losses
+        BOOST_CHECK(recvStats.reassemblyLoss == 0); // no reass losses
+        BOOST_CHECK(recvStats.eventSuccess == 5); // all succeeded
+        BOOST_CHECK(recvStats.lastErrno == 0); // no errno
+        BOOST_CHECK(recvStats.grpcErrCnt == 0); // no grpc errors
+        BOOST_CHECK(recvStats.dataErrCnt == 0); // no data errors
+        BOOST_CHECK(recvStats.lastE2SARError == E2SARErrorc::NoError); // no error
 
         auto lostEvent = reas.get_LostEvent();
         if (lostEvent.has_error())
             std::cout << "NO EVENT LOSS " << std::endl;
         else
-            std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+            std::cout << "LOST EVENT " << lostEvent.value().get<0>() << ":" << lostEvent.value().get<1>() << 
+                " received " << lostEvent.value().get<2>() << "frames" << std::endl;
         BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
         // stop threads and exit
@@ -279,19 +280,20 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
         */
-        BOOST_CHECK(recvStats.get<0>() == 0); // no enqueue losses
-        BOOST_CHECK(recvStats.get<1>() == 0); // no reassembly losses
-        BOOST_CHECK(recvStats.get<2>() == 5); // all succeeded
-        BOOST_CHECK(recvStats.get<3>() == 0); // no errno
-        BOOST_CHECK(recvStats.get<4>() == 0); // no grpc errors
-        BOOST_CHECK(recvStats.get<5>() == 0); // no data errors
-        BOOST_CHECK(recvStats.get<6>() == E2SARErrorc::NoError); // no error
+        BOOST_CHECK(recvStats.enqueueLoss == 0); // no enque losses
+        BOOST_CHECK(recvStats.reassemblyLoss == 0); // no reass losses
+        BOOST_CHECK(recvStats.eventSuccess == 5); // all succeeded
+        BOOST_CHECK(recvStats.lastErrno == 0); // no errno
+        BOOST_CHECK(recvStats.grpcErrCnt == 0); // no grpc errors
+        BOOST_CHECK(recvStats.dataErrCnt == 0); // no data errors
+        BOOST_CHECK(recvStats.lastE2SARError == E2SARErrorc::NoError); // no error
 
         auto lostEvent = reas.get_LostEvent();
         if (lostEvent.has_error())
             std::cout << "NO EVENT LOSS " << std::endl;
         else
-            std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+            std::cout << "LOST EVENT " << lostEvent.value().get<0>() << ":" << lostEvent.value().get<1>() << 
+                " received " << lostEvent.value().get<2>() << "frames" << std::endl;
         BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
         // stop threads and exit
@@ -625,19 +627,20 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
         */
-        BOOST_CHECK(recvStats.get<0>() == 0); // no enque losses
-        BOOST_CHECK(recvStats.get<1>() == 0); // no enque losses
-        BOOST_CHECK(recvStats.get<2>() == 20); // all succeeded
-        BOOST_CHECK(recvStats.get<3>() == 0); // no errno
-        BOOST_CHECK(recvStats.get<4>() == 0); // no grpc errors
-        BOOST_CHECK(recvStats.get<5>() == 0); // no data errors
-        BOOST_CHECK(recvStats.get<6>() == E2SARErrorc::NoError); // no error
+        BOOST_CHECK(recvStats.enqueueLoss == 0); // no enque losses
+        BOOST_CHECK(recvStats.reassemblyLoss == 0); // no reass losses
+        BOOST_CHECK(recvStats.eventSuccess == 20); // all succeeded
+        BOOST_CHECK(recvStats.lastErrno == 0); // no errno
+        BOOST_CHECK(recvStats.grpcErrCnt == 0); // no grpc errors
+        BOOST_CHECK(recvStats.dataErrCnt == 0); // no data errors
+        BOOST_CHECK(recvStats.lastE2SARError == E2SARErrorc::NoError); // no error
 
         auto lostEvent = reas.get_LostEvent();
         if (lostEvent.has_error())
             std::cout << "NO EVENT LOSS " << std::endl;
         else
-            std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+            std::cout << "LOST EVENT " << lostEvent.value().get<0>() << ":" << lostEvent.value().get<1>() << 
+                " received " << lostEvent.value().get<2>() << "frames" << std::endl;
         BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
         // stop threads and exit

@@ -148,6 +148,7 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         py::arg("cbArg") = py::none());
 
     // Return type of ReportedStats
+    // FIXME: returns a struct instead of a tuple now
 //    seg.def("getSendStats", [](const Segmenter& segObj) {
 //            auto stats = segObj.getSendStats();
 //            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
@@ -298,15 +299,17 @@ void init_e2sarDP_reassembler(py::module_ &m) {
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
 
     // Return type of resultresult<std::pair<EventNum_t, u_int16_t>>
-    reas.def("get_LostEvent", &Reassembler::get_LostEvent);
+    // FIXME: now returns boost::typle<EventNum_t, u_int16_t, size_t>
+//    reas.def("get_LostEvent", &Reassembler::get_LostEvent);
 
     // Return type of boost::tuple<>: convert to std::tuple
-    reas.def("getStats", [](const Reassembler& reasObj) {
-            auto stats = reasObj.getStats();
-            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
-                                    boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats), 
-                                    boost::get<6>(stats));
-        });
+    // FIXME: now returns a struct
+//    reas.def("getStats", [](const Reassembler& reasObj) {
+//            auto stats = reasObj.getStats();
+//            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
+//                                    boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats), 
+//                                    boost::get<6>(stats));
+//        });
 
     // Return type: ip::address - convert to string for Python
     reas.def("get_dataIP", [](const Reassembler &reasObj) {
