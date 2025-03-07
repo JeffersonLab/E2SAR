@@ -296,7 +296,7 @@ void recvStatsThread(Reassembler *r)
         if (stats.lastE2SARError != E2SARErrorc::NoError)
             std::cout << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
 
-        std::cout << "\tEvents lost so far: ";
+        std::cout << "\tEvents lost so far (<Event ID:Data ID/number of fragments received>): ";
         for(auto evt: lostEvents)
         {
             std::cout << "<" << evt.get<0>() << ":" << evt.get<1>() << "/" << evt.get<2>() << "> ";
