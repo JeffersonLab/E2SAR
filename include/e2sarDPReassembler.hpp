@@ -352,8 +352,14 @@ namespace e2sar
             }
         public:
             /**
-             * Structure in which statistics are reported back to user, sync
-             * and send stats are identical so same structure is used.
+             * Structure in which statistics are reported back to user. 
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; // last reported errno (use strerror() to get error message)
+             *  - int grpcErrCnt; // number of gRPC errors
+             *  - int dataErrCnt; // number of dataplae errors
+             *  - E2SARErrorc lastE2SARError; // last recorded E2SAR error (use make_error_code(stats.lastE2SARError).message())
              */
             struct ReportedStats {
                 EventNum_t enqueueLoss;  // number of events received and lost on enqueue

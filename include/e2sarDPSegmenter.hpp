@@ -338,6 +338,10 @@ namespace e2sar
             /**
              * Structure in which statistics are reported back to user, sync
              * and send stats are identical so same structure is used.
+             *  - u_int64_t msgCnt; // fragments sent
+             *  - u_int64_t errCnt; // errors encountered on send
+             *  - int lastErrno; // last errno recorded, use strerror() to get error message
+             *  - E2SARErrorc lastE2SARError; // last recorded E2SAR error (use make_error_code(stats.lastE2SARError).message())
              */
             struct ReportedStats {
                 u_int64_t msgCnt;
@@ -350,7 +354,7 @@ namespace e2sar
                     lastErrno{as.lastErrno}, lastE2SARError{as.lastE2SARError}
                     {}
             };
-            
+
             /** 
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
