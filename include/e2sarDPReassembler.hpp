@@ -79,6 +79,7 @@ namespace e2sar
             // Structure to hold each recv-queue item
             struct EventQueueItem {
                 boost::chrono::steady_clock::time_point firstSegment; // when first segment arrived
+                size_t numFragments; // how many fragments received (in and out of order)
                 size_t bytes;  // total length
                 size_t curEnd; // current end during reassembly
                 EventNum_t eventNum;
@@ -90,7 +91,7 @@ namespace e2sar
                 /**
                  * Initialize from REHdr
                  */
-                EventQueueItem(REHdr *rehdr): curEnd{0}
+                EventQueueItem(REHdr *rehdr): numFragments{0}, curEnd{0}
                 {
                     bytes = rehdr->get_bufferLength();
                     dataId = rehdr->get_dataId();
@@ -110,12 +111,6 @@ namespace e2sar
                         rbp.free(i.segment);
                         oodQueue.pop();     
                     }
-                }
-
-                // how many fragments are in out-of-order queue?
-                size_t get_OodSize() 
-                {
-                    return oodQueue.size();
                 }
             };
 
@@ -246,26 +241,6 @@ namespace e2sar
                 // thread loop
                 void _threadBody();
 
-#if 0
-                // log a lost event via a set of known lost
-                // and add to lost queue for external inspection
-                inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt, bool enqueLoss)
-                {
-                    if (lostEvents.contains(evt))
-                        return;
-                    // this is thread-local
-                    lostEvents.insert(evt);
-                    // lockfree queue (only takes trivial types)
-                    std::pair<EventNum_t, u_int16_t> *evtPtr = new std::pair<EventNum_t, u_int16_t>(evt.first, evt.second);
-                    reas.recvStats.lostEventsQueue.push(evtPtr);
-                    // this is atomic
-                    if (enqueLoss)
-                        reas.recvStats.enqueueLoss++;
-                    else
-                        reas.recvStats.reassemblyLoss++;
-                }
-#endif
-
                 // log a lost event via a set of known lost
                 // ad add to lost queue for external inspection
                 inline void logLostEvent(EventQueueItem* item, bool enqueLoss)
@@ -278,7 +253,7 @@ namespace e2sar
                     lostEvents.insert(evt);
                     // lockfree queue (only takes trivial types)
                     boost::tuple<EventNum_t, u_int16_t, size_t> *evtPtr = 
-                        new boost::tuple<EventNum_t, u_int16_t, size_t>(evt.first, evt.second, item->get_OodSize());
+                        new boost::tuple<EventNum_t, u_int16_t, size_t>(evt.first, evt.second, item->numFragments);
                     reas.recvStats.lostEventsQueue.push(evtPtr);
                     // this is atomic
                     if (enqueLoss)

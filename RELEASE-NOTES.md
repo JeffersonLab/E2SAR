@@ -16,7 +16,7 @@ Compared to 0.1.X this version introduces a number of enhancements, although it 
     - Automatic sender MTU detection - if sFlags.mtu is set to 0 the code will attempt to automatically determine the MTU of the outgoing interface.
     - Automatic sender IP detection - the LBManager object has two new methods: addSenderSelf() and removeSenderSelf() which attempts to determine the IP of the outgoing interface (towards the Load Balancer) and use that IP address to register the sender with the Load Balancer. `lbadm` supports this by allowing user to omit the `-a` option on `--addsenders` and `--removesenders` commands. You can also see e2sar_perf for an example of how it can be done in conjunction with the Segmenter.
     - Automatic receiver IP detection - the LBManager object has a new method registerWorkerSelf() which does not need the receiving IP address and instead attempts to auto-detect it. The Reassembler object has two new constructors that do not require specifying the `<IP address:UDP port>` tuple and instead only need the UDP port. Reassembler object now also has get_dataIP() method to query the outgoing IP address that was auto-detected. You can see e2sar_perf on how it can be used in conjunction with the Reassembler.
-- Reassembler stats tuple has grown by one element (added at index 1) to distinguish enqueue losses from reassembly losses. Now Reassembler.getStats() return a tuple as follows:
+- Reassembler stats tuple has been replaced with a struct. Now Reassembler::getStats() return a struct Reassembler::ReportedStats as follows:
     - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
     - EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
     - EventNum_t eventSuccess; // events successfully processed
@@ -24,8 +24,10 @@ Compared to 0.1.X this version introduces a number of enhancements, although it 
     - int grpcErrCnt; // number of grpcErrors 
     - int dataErrCnt; // number of dataplane socket errors
     - E2SARErrorc lastE2SARError;  // last encountered E2SAR internal error
-    - WARNING! This is the point of incompatibility with 0.1.X as the order of these fields has changed. 
-- Segmenter now has a 'warm-up' period of 1 second by default when it sends SYNC packets without allowing data to be sent. This is to help synchronize schedules with the control plane. The length of this period in milliseconds can be sent using SegmenterFlags.warmUpMs (also reflected in the INI file format)
+    - WARNING! This is the point of incompatibility with 0.1.X 
+- Segmenter sync and send stat return tuple (Segmenter::getSyncStats() and Segmenter::getSendStats()) similarly has been replaced with a Segmenter::ReportedStats struct
+    - WARNING! This is the point of incompatibility with 0.1.X
+- Segmenter now has a 'warm-up' period of 1 second by default when it sends SYNC packets without allowing data to be sent. This is to help synchronize schedules with the control plane. The length of this period in milliseconds can be set using SegmenterFlags.warmUpMs (also reflected in the INI file format)
 - Python bindings have been updated to match these changes; python test framework moved to pytest instead of notebooks
 
 Note that IP auto-detection features work in simple scenarios where the outgoing interface has at most one address of each type (IPv4 or IPv6) associated with it. The code uses the first address it finds if multiple addresses are found. In the case of e.g. aliased interfaces the results of auto-detection may not be as intended and in this case sender and receiver IP addresses will need to be specified explicitly.
