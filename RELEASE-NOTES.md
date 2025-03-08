@@ -25,6 +25,7 @@ Compared to 0.1.X this version introduces a number of enhancements, although it 
     - int dataErrCnt; // number of dataplane socket errors
     - E2SARErrorc lastE2SARError;  // last encountered E2SAR internal error
     - WARNING! This is the point of incompatibility with 0.1.X 
+- Reassembler has additional per-port stats of received fragments which can be obtained by calling Reassembler::get_FDStats() (only after threads have been stopped, otherwise error is returned). Returned is a list of pairs `<port number, number of frames/fragments received>`.
 - Segmenter sync and send stat return tuple (Segmenter::getSyncStats() and Segmenter::getSendStats()) similarly has been replaced with a Segmenter::ReportedStats struct
     - WARNING! This is the point of incompatibility with 0.1.X
 - Segmenter now has a 'warm-up' period of 1 second by default when it sends SYNC packets without allowing data to be sent. This is to help synchronize schedules with the control plane. The length of this period in milliseconds can be set using SegmenterFlags.warmUpMs (also reflected in the INI file format)
