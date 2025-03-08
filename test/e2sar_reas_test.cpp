@@ -644,6 +644,19 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
         // stop threads and exit
+        reas.stopThreads();
+
+        auto fdStats = reas.get_FDStats();
+        if (fdStats.has_error())
+            std::cout << "Unable to get per FD stats: " << fdStats.error().message() << std::endl;
+        BOOST_CHECK(not fdStats.has_error());
+
+        std::cout << "Per FD Stats: ";
+        for (auto fds: fdStats.value())
+        {
+            std::cout << " Port: " << fds.first << " Received: " << fds.second;
+        }
+        std::cout << std::endl;
     }
     catch (E2SARException &ee) {
         std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;

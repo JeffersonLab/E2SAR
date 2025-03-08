@@ -49,7 +49,7 @@ namespace e2sar
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
-        portsToThreads(numRecvThreads),
+        threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
@@ -81,7 +81,7 @@ namespace e2sar
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
-        portsToThreads(numRecvThreads),
+        threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
@@ -110,7 +110,7 @@ namespace e2sar
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
-        portsToThreads(numRecvThreads),
+        threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
@@ -149,7 +149,7 @@ namespace e2sar
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
-        portsToThreads(numRecvThreads),
+        threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
@@ -175,10 +175,12 @@ namespace e2sar
 
     result<int> Reassembler::openAndStart() noexcept
     {
+        int maxFDPlusOne{0};
+        // open all file descriptors in all threads
         for(size_t i=0; i<numRecvThreads; i++)
         {
-            std::vector<int> portVec = std::vector<int>(portsToThreads[i].begin(), 
-                portsToThreads[i].end());
+            std::vector<int> portVec = std::vector<int>(threadsToPorts[i].begin(), 
+                threadsToPorts[i].end());
 
             // this constructor uses move semantics for port vector (not for cpu list tho)
             auto it = recvThreadState.emplace(recvThreadState.end(), *this, 
@@ -191,8 +193,19 @@ namespace e2sar
                return E2SARErrorInfo{E2SARErrorc::SocketError, 
                     "Unable to open receive sockets: " + open_stat.error().message()};
             }
+            // figure out the largest fd + 1 across all threads
+            maxFDPlusOne = (open_stat.value() > maxFDPlusOne ? open_stat.value() : maxFDPlusOne);
+        }
 
+        // create a place for per-fd stats - avoid reallocation
+        recvStats.fragmentsPerFd.resize(maxFDPlusOne);
+        recvStats.fragmentsPerFd.reserve(maxFDPlusOne); 
+
+        // now ready to start threads
+        for(auto it = recvThreadState.begin(); it != recvThreadState.end(); ++it)
+        {
             // start receive thread
+            // it is an iterator and we need a pointer, hence &(*it)
             boost::thread syncT(&Reassembler::RecvThreadState::_threadBody, &(*it));
             it->threadObj = std::move(syncT);
         }
@@ -268,6 +281,10 @@ namespace e2sar
                     reas.recvStats.lastErrno = errno;
                     continue;
                 }
+
+                // count fragment received by socket
+                reas.recvStats.fragmentsPerFd[fd]++;
+
                 // start a new event if offset 0 (check for event number collisions)
                 // or attach to existing event
                 REHdr *rehdr{nullptr};
@@ -308,10 +325,15 @@ namespace e2sar
                         eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                         // add segment into event out-of-order queue
                         item->oodQueue.push(Segment(recvBuffer, nbytes));
+                        // count this fragment of the event received before we continue
+                        item->numFragments++;
                         // done for now
                         continue;
                     }
                 }
+
+                // count this fragment received in main path
+                item->numFragments++;
 
                 // copy segment into event buffer if it is in sequence OR 
                 // attach to out of order priority queue.
@@ -328,9 +350,6 @@ namespace e2sar
                     item->oodQueue.push(Segment(recvBuffer, nbytes));
                     freeRecvBuffer = false;
                 }
-
-                // increment the counter of fragments received by this event
-                item->numFragments++;
 
                 // free the recv buffer if possible (not attached into priority queue)
                 if (freeRecvBuffer)
@@ -465,11 +484,12 @@ namespace e2sar
             sockets.push_back(socketFd);
             FD_SET(socketFd, &fdSet);
             maxFdPlusOne = (maxFdPlusOne > socketFd ? maxFdPlusOne : socketFd);
+            reas.recvStats.portPerFd.resize(socketFd+1);
+            reas.recvStats.portPerFd[socketFd] = port; // which port is for this FD?
         }
 
         // make it plus one
-        maxFdPlusOne++;
-        return 0;
+        return ++maxFdPlusOne;
     }
 
     result<int> Reassembler::RecvThreadState::_close()

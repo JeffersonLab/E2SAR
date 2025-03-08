@@ -130,6 +130,9 @@ namespace e2sar
                 // a limited queue to push lost event numbers to
                 //boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
                 boost::lockfree::queue<boost::tuple<EventNum_t, u_int16_t, size_t>*> lostEventsQueue{20};
+                // this array is accessed by different threads using fd as an index (so no collisions)
+                std::vector<size_t> fragmentsPerFd;
+                std::vector<u_int16_t> portPerFd; // which port assigned to this FD - initialized at the start
             };
             AtomicStats recvStats;
 
@@ -272,7 +275,7 @@ namespace e2sar
             const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
             const size_t numRecvPorts;
-            std::vector<std::list<int>> portsToThreads;
+            std::vector<std::list<int>> threadsToPorts;
             const bool withLBHeader;
             const int eventTimeout_ms; // how long we allow events to linger 'in progress' before we give up
             const int recvWaitTimeout_ms{10}; // how long we wait on condition variable before we come up for air
@@ -296,7 +299,7 @@ namespace e2sar
                 {
                     for(size_t j=0; i<numRecvPorts && j<numRecvThreads; i++, j++)
                     {
-                        portsToThreads[j].push_back(dataPort + i);
+                        threadsToPorts[j].push_back(dataPort + i);
                     } 
                 }
             }
@@ -577,6 +580,27 @@ namespace e2sar
                 }
                 else
                     return E2SARErrorInfo{E2SARErrorc::NotFound, "Lost event queue is empty"};
+            }
+
+            /**
+             * Get per-port/per-fd fragments received stats. Only call this after the threads have been 
+             * stopped, otherwise error is returned. 
+             * @return - list of pairs <port, number of received fragments> or error
+             */
+            inline result<std::list<std::pair<u_int16_t, size_t>>> get_FDStats() noexcept
+            {
+                if (not threadsStop)
+                    return E2SARErrorInfo{E2SARErrorc::LogicError, "This method should only be called after the threads have been stopped."};
+
+                int i{0};
+                std::list<std::pair<u_int16_t, size_t>> ret;
+                for(auto count: recvStats.fragmentsPerFd)
+                {
+                    if (recvStats.portPerFd[i] != 0)
+                        ret.push_back(std::make_pair<>(recvStats.portPerFd[i], count));
+                    ++i;
+                }
+                return ret;
             }
 
             /**
