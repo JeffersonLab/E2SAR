@@ -80,10 +80,13 @@ void ctrlCHandler(int sig)
             std::cout << "Unable to get per FD stats: " << fdStats.error().message() << std::endl;
 
         std::cout << "Port Stats: " << std::endl;
+        size_t totalFragments{0};
         for (auto fds: fdStats.value())
         {
+            totalFragments += fds.second;
             std::cout << "\tPort: " << fds.first << " Received: " << fds.second << std::endl;
         }
+        std::cout << "Total: " << totalFragments << std::endl;
         delete reasPtr;
     }
 
