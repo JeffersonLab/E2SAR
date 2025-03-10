@@ -81,22 +81,23 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     if (dereg_r.has_error())
         std::cout << "Error encountered deregistering a worker: " << dereg_r.error().message() << std::endl;
 
-    if (recvStats.get<0>() != 0) 
+    if (recvStats.enqueueLoss != 0) 
     {
-        std::cout << "Unexpected enqueue loss: " << strerror(recvStats.get<0>()) << std::endl;
+        std::cout << "Unexpected enqueue loss: " << strerror(recvStats.enqueueLoss) << std::endl;
     }
     // enqueue loss
-    BOOST_CHECK(recvStats.get<0>() == 0);
+    BOOST_CHECK(recvStats.enqueueLoss == 0);
     // gRPC error count
-    BOOST_CHECK(recvStats.get<4>() == 0);
+    BOOST_CHECK(recvStats.grpcErrCnt == 0);
     // data error count
-    BOOST_CHECK(recvStats.get<5>() == 0);
+    BOOST_CHECK(recvStats.dataErrCnt == 0);
 
     auto lostEvent = reas.get_LostEvent();
     if (lostEvent.has_error())
         std::cout << "NO EVENT LOSS " << std::endl;
     else
-        std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+        std::cout << "LOST EVENT " << lostEvent.value().get<0>() << ":" << lostEvent.value().get<1>() << 
+            " received " << lostEvent.value().get<2>() << "frames" << std::endl;
     BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
     // stop threads and exit

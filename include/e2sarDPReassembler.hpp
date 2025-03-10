@@ -79,6 +79,7 @@ namespace e2sar
             // Structure to hold each recv-queue item
             struct EventQueueItem {
                 boost::chrono::steady_clock::time_point firstSegment; // when first segment arrived
+                size_t numFragments; // how many fragments received (in and out of order)
                 size_t bytes;  // total length
                 size_t curEnd; // current end during reassembly
                 EventNum_t eventNum;
@@ -90,12 +91,12 @@ namespace e2sar
                 /**
                  * Initialize from REHdr
                  */
-                EventQueueItem(REHdr *rehdr): curEnd{0}
+                EventQueueItem(REHdr *rehdr): numFragments{0}, curEnd{0}
                 {
                     bytes = rehdr->get_bufferLength();
                     dataId = rehdr->get_dataId();
                     eventNum = rehdr->get_eventNum();
-                    // use deallocates this, so we don't use a pool
+                    // user deallocates this, so we don't use a pool
                     event = new u_int8_t[rehdr->get_bufferLength()];
                     // set the timestamp
                     firstSegment = boost::chrono::steady_clock::now();
@@ -127,7 +128,11 @@ namespace e2sar
                 // last e2sar error
                 std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
                 // a limited queue to push lost event numbers to
-                boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
+                //boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
+                boost::lockfree::queue<boost::tuple<EventNum_t, u_int16_t, size_t>*> lostEventsQueue{20};
+                // this array is accessed by different threads using fd as an index (so no collisions)
+                std::vector<size_t> fragmentsPerFd;
+                std::vector<u_int16_t> portPerFd; // which port assigned to this FD - initialized at the start
             };
             AtomicStats recvStats;
 
@@ -240,21 +245,24 @@ namespace e2sar
                 void _threadBody();
 
                 // log a lost event via a set of known lost
-                // and add to lost queue for external inspection
-                inline void logLostEvent(std::pair<EventNum_t, u_int16_t> evt, bool enqueLoss)
+                // ad add to lost queue for external inspection
+                inline void logLostEvent(EventQueueItem* item, bool enqueLoss)
                 {
+                    std::pair<EventNum_t, u_int16_t> evt(item->eventNum, item->dataId);
+
                     if (lostEvents.contains(evt))
                         return;
                     // this is thread-local
                     lostEvents.insert(evt);
                     // lockfree queue (only takes trivial types)
-                    std::pair<EventNum_t, u_int16_t> *evtPtr = new std::pair<EventNum_t, u_int16_t>(evt.first, evt.second);
+                    boost::tuple<EventNum_t, u_int16_t, size_t> *evtPtr = 
+                        new boost::tuple<EventNum_t, u_int16_t, size_t>(evt.first, evt.second, item->numFragments);
                     reas.recvStats.lostEventsQueue.push(evtPtr);
                     // this is atomic
                     if (enqueLoss)
                         reas.recvStats.enqueueLoss++;
                     else
-                        reas.recvStats.reassemblyLoss++;
+                        reas.recvStats.reassemblyLoss++;                    
                 }
             };
             friend struct RecvThreadState;
@@ -267,7 +275,7 @@ namespace e2sar
             const int portRange; // translates into 2^portRange - 1 ports we listen to
             const size_t numRecvThreads;
             const size_t numRecvPorts;
-            std::vector<std::list<int>> portsToThreads;
+            std::vector<std::list<int>> threadsToPorts;
             const bool withLBHeader;
             const int eventTimeout_ms; // how long we allow events to linger 'in progress' before we give up
             const int recvWaitTimeout_ms{10}; // how long we wait on condition variable before we come up for air
@@ -291,7 +299,7 @@ namespace e2sar
                 {
                     for(size_t j=0; i<numRecvPorts && j<numRecvThreads; i++, j++)
                     {
-                        portsToThreads[j].push_back(dataPort + i);
+                        threadsToPorts[j].push_back(dataPort + i);
                     } 
                 }
             }
@@ -346,6 +354,33 @@ namespace e2sar
                     throw E2SARException("Data address not present in the URI");
             }
         public:
+            /**
+             * Structure in which statistics are reported back to user. 
+             *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+             *  - EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
+             *  - EventNum_t eventSuccess; // events successfully processed
+             *  - int lastErrno; // last reported errno (use strerror() to get error message)
+             *  - int grpcErrCnt; // number of gRPC errors
+             *  - int dataErrCnt; // number of dataplae errors
+             *  - E2SARErrorc lastE2SARError; // last recorded E2SAR error (use make_error_code(stats.lastE2SARError).message())
+             */
+            struct ReportedStats {
+                EventNum_t enqueueLoss;  // number of events received and lost on enqueue
+                EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
+                EventNum_t eventSuccess; // events successfully processed
+                int lastErrno; 
+                int grpcErrCnt; 
+                int dataErrCnt; 
+                E2SARErrorc lastE2SARError; 
+
+                ReportedStats() = delete;
+                ReportedStats(const AtomicStats &as): enqueueLoss{as.enqueueLoss}, 
+                    reassemblyLoss{as.reassemblyLoss}, eventSuccess{as.eventSuccess},
+                    lastErrno{as.lastErrno}, grpcErrCnt{as.grpcErrCnt}, dataErrCnt{as.dataErrCnt},
+                    lastE2SARError{as.lastE2SARError} 
+                    {}
+            };
+
             /**
              * Structure for flags governing Reassembler behavior with sane defaults
              * - useCP - whether to use the control plane (sendState, registerWorker) {true}
@@ -516,7 +551,7 @@ namespace e2sar
             result<int> recvEvent(uint8_t **event, size_t *bytes, EventNum_t* eventNum, uint16_t *dataId, u_int64_t wait_ms=0) noexcept;
 
             /**
-             * Get a tuple representing all the stats:
+             * Get a struct representing all the stats:
              *  - EventNum_t enqueueLoss;  // number of events received and lost on enqueue
              *  - EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
              *  - EventNum_t eventSuccess; // events successfully processed
@@ -525,21 +560,18 @@ namespace e2sar
              *  - int dataErrCnt; 
              *  - E2SARErrorc lastE2SARError; 
              */
-            inline const boost::tuple<EventNum_t, EventNum_t, EventNum_t, int, int, int, E2SARErrorc> getStats() const noexcept
+            inline const ReportedStats getStats() const noexcept
             {
-                return boost::make_tuple<EventNum_t, EventNum_t, EventNum_t, int, int, int, E2SARErrorc>(
-                    recvStats.enqueueLoss, recvStats.reassemblyLoss, recvStats.eventSuccess,
-                    recvStats.lastErrno, recvStats.grpcErrCnt, recvStats.dataErrCnt,
-                    recvStats.lastE2SARError);
+                return ReportedStats(recvStats);
             }
 
             /**
              * Try to pop an event number of a lost event from the queue that stores them
              * @return result with either (eventNumber,dataId) or E2SARErrorc::NotFound if queue is empty
              */
-            inline result<std::pair<EventNum_t, u_int16_t>> get_LostEvent() noexcept
+            inline result<boost::tuple<EventNum_t, u_int16_t, size_t>> get_LostEvent() noexcept
             {
-                std::pair<EventNum_t, u_int16_t> *res = nullptr;
+                boost::tuple<EventNum_t, u_int16_t, size_t> *res = nullptr;
                 if (recvStats.lostEventsQueue.pop(res))
                 {
                     auto ret{*res};
@@ -548,6 +580,27 @@ namespace e2sar
                 }
                 else
                     return E2SARErrorInfo{E2SARErrorc::NotFound, "Lost event queue is empty"};
+            }
+
+            /**
+             * Get per-port/per-fd fragments received stats. Only call this after the threads have been 
+             * stopped, otherwise error is returned. 
+             * @return - list of pairs <port, number of received fragments> or error
+             */
+            inline result<std::list<std::pair<u_int16_t, size_t>>> get_FDStats() noexcept
+            {
+                if (not threadsStop)
+                    return E2SARErrorInfo{E2SARErrorc::LogicError, "This method should only be called after the threads have been stopped."};
+
+                int i{0};
+                std::list<std::pair<u_int16_t, size_t>> ret;
+                for(auto count: recvStats.fragmentsPerFd)
+                {
+                    if (recvStats.portPerFd[i] != 0)
+                        ret.push_back(std::make_pair<>(recvStats.portPerFd[i], count));
+                    ++i;
+                }
+                return ret;
             }
 
             /**

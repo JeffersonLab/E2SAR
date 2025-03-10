@@ -63,17 +63,17 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     // send one event message per 2 seconds that fits into a single frame using event queue
     //
     auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
+    if (sendStats.errCnt != 0) 
     {
-        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
     }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
         }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::seconds(2));
@@ -83,20 +83,20 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     auto syncStats = seg.getSyncStats();
     sendStats = seg.getSendStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
     // send 10 sync messages and no errors
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() >= 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    BOOST_CHECK(syncStats.msgCnt >= 10);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // check the send stats
-    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+    std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 5);
-    BOOST_CHECK(sendStats.get<1>() == 0);
+    BOOST_CHECK(sendStats.msgCnt == 5);
+    BOOST_CHECK(sendStats.errCnt == 0);
 
     // stop threads and exit
 }
@@ -139,17 +139,17 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     // send one event message per 2 seconds that fits into two frames using event queue
     //
     auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
+    if (sendStats.errCnt != 0) 
     {
-        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
     }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
         }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::seconds(2));
@@ -159,20 +159,20 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     auto syncStats = seg.getSyncStats();
     sendStats = seg.getSendStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
     // send 10 sync messages and no errors
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() >= 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    BOOST_CHECK(syncStats.msgCnt >= 10);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // check the send stats
-    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+    std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 10);
-    BOOST_CHECK(sendStats.get<1>() == 0);
+    BOOST_CHECK(sendStats.msgCnt == 10);
+    BOOST_CHECK(sendStats.errCnt == 0);
 
     // stop threads and exit
 }
@@ -216,18 +216,18 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     // not the event queue
     //
     auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
+    if (sendStats.errCnt != 0) 
     {
-        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
     }
     for(auto i=0; i<5;i++) {
         // Use direct send instead of the queue
         auto sendres = seg.sendEvent(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
         }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::seconds(2));
@@ -237,20 +237,20 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     auto syncStats = seg.getSyncStats();
     sendStats = seg.getSendStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
     // send 10 sync messages and no errors
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() >= 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    BOOST_CHECK(syncStats.msgCnt >= 10);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // check the send stats
-    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+    std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 10);
-    BOOST_CHECK(sendStats.get<1>() == 0);
+    BOOST_CHECK(sendStats.msgCnt == 10);
+    BOOST_CHECK(sendStats.errCnt == 0);
 
     // stop threads and exit
 }
@@ -298,9 +298,9 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     // send one event message per 2 seconds that fits into two frames using event queue with callback
     //
     auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
+    if (sendStats.errCnt != 0) 
     {
-        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
     }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), 
@@ -308,9 +308,9 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
         parameter++;
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
         }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::seconds(2));
@@ -320,20 +320,20 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     auto syncStats = seg.getSyncStats();
     sendStats = seg.getSendStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
     // send 10 sync messages and no errors
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() >= 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    BOOST_CHECK(syncStats.msgCnt >= 10);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // check the send stats
-    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+    std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 10);
-    BOOST_CHECK(sendStats.get<1>() == 0);
+    BOOST_CHECK(sendStats.msgCnt == 10);
+    BOOST_CHECK(sendStats.errCnt == 0);
 
     // stop threads and exit
 }

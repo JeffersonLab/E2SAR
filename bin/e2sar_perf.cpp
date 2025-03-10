@@ -73,6 +73,20 @@ void ctrlCHandler(int sig)
         if (deregres.has_error()) 
             std::cerr << "Unable to deregister worker on exit: " << deregres.error().message() << std::endl;
         reasPtr->stopThreads();
+
+        // get per-fd stats
+        auto fdStats = reasPtr->get_FDStats();
+        if (fdStats.has_error())
+            std::cout << "Unable to get per FD stats: " << fdStats.error().message() << std::endl;
+
+        std::cout << "Port Stats: " << std::endl;
+        size_t totalFragments{0};
+        for (auto fds: fdStats.value())
+        {
+            totalFragments += fds.second;
+            std::cout << "\tPort: " << fds.first << " Received: " << fds.second << std::endl;
+        }
+        std::cout << "Total: " << totalFragments << std::endl;
         delete reasPtr;
     }
 
@@ -168,20 +182,20 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     // measure this right after we exit the send loop
     auto stats = s.getSendStats();
-    if (expectedFrames > stats.get<0>())
-        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.get<0>() << " of " << 
+    if (expectedFrames > stats.msgCnt)
+        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
             expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
 
     evtBufferPool->purge_memory();
-    std::cout << "Completed, " << stats.get<0>() << " frames sent, " << stats.get<1>() << " errors" << std::endl;
-    if (stats.get<1>() != 0)
+    std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
+    if (stats.errCnt != 0)
     {
-        if (stats.get<3>() != E2SARErrorc::NoError)
+        if (stats.lastE2SARError != E2SARErrorc::NoError)
         {
-            std::cout << "Last E2SARError code: " << make_error_code(stats.get<3>()).message() << std::endl;
+            std::cout << "Last E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
         }
         else
-            std::cout << "Last error encountered: " << strerror(stats.get<2>()) << std::endl;
+            std::cout << "Last error encountered: " << strerror(stats.lastErrno) << std::endl;
     }
 
     return 0;
@@ -260,7 +274,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
 
 void recvStatsThread(Reassembler *r)
 {
-    std::vector<std::pair<EventNum_t, u_int16_t>> lostEvents;
+    std::vector<boost::tuple<EventNum_t, u_int16_t, size_t>> lostEvents;
 
     while(threadsRunning)
     {
@@ -285,21 +299,21 @@ void recvStatsThread(Reassembler *r)
              *  - 6 E2SARErrorc lastE2SARError; 
         */
         std::cout << "Stats:" << std::endl;
-        std::cout << "\tEvents Received: " << stats.get<2>() << std::endl;
+        std::cout << "\tEvents Received: " << stats.eventSuccess << std::endl;
         std::cout << "\tEvents Mangled: " << mangledEvents << std::endl;
-        std::cout << "\tEvents Lost in reassembly: " << stats.get<1>() << std::endl;
-        std::cout << "\tEvents Lost in enqueue: " << stats.get<0>() << std::endl;
-        std::cout << "\tData Errors: " << stats.get<5>() << std::endl;
-        if (stats.get<5>() > 0)
-            std::cout << "\tLast Data Error: " << strerror(stats.get<3>()) << std::endl;
-        std::cout << "\tgRPC Errors: " << stats.get<4>() << std::endl;
-        if (stats.get<6>() != E2SARErrorc::NoError)
-            std::cout << "\tLast E2SARError code: " << make_error_code(stats.get<6>()).message() << std::endl;
+        std::cout << "\tEvents Lost in reassembly: " << stats.reassemblyLoss << std::endl;
+        std::cout << "\tEvents Lost in enqueue: " << stats.enqueueLoss << std::endl;
+        std::cout << "\tData Errors: " << stats.dataErrCnt << std::endl;
+        if (stats.dataErrCnt > 0)
+            std::cout << "\tLast Data Error: " << strerror(stats.lastErrno) << std::endl;
+        std::cout << "\tgRPC Errors: " << stats.grpcErrCnt << std::endl;
+        if (stats.lastE2SARError != E2SARErrorc::NoError)
+            std::cout << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
 
-        std::cout << "\tEvents lost so far: ";
+        std::cout << "\tEvents lost so far (<Evt ID:Data ID/num frags rcvd>): ";
         for(auto evt: lostEvents)
         {
-            std::cout << "<" << evt.first << ":" << evt.second << "> ";
+            std::cout << "<" << evt.get<0>() << ":" << evt.get<1>() << "/" << evt.get<2>() << "> ";
         }
         std::cout << std::endl;
 

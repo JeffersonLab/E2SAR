@@ -74,14 +74,14 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
 
     auto syncStats = seg.getSyncStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
     // send 10+1 (one second sleep before data frame is sent) sync messages and no errors
-    BOOST_CHECK(syncStats.get<0>() == 11);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    BOOST_CHECK(syncStats.msgCnt == 11);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // call free - this will correctly use the admin token (even though instance token
     // is added by reserve call and updated URI inside with LB ID added to it
