@@ -73,6 +73,17 @@ void ctrlCHandler(int sig)
         if (deregres.has_error()) 
             std::cerr << "Unable to deregister worker on exit: " << deregres.error().message() << std::endl;
         reasPtr->stopThreads();
+
+        // get per-fd stats
+        auto fdStats = reasPtr->get_FDStats();
+        if (fdStats.has_error())
+            std::cout << "Unable to get per FD stats: " << fdStats.error().message() << std::endl;
+
+        std::cout << "Port Stats: " << std::endl;
+        for (auto fds: fdStats.value())
+        {
+            std::cout << "\tPort: " << fds.first << " Received: " << fds.second << std::endl;
+        }
         delete reasPtr;
     }
 
