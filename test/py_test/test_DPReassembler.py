@@ -28,6 +28,23 @@ DP_IPV4_PORT = 19522
 REAS_URI = f"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}"
 
 
+def init_reassembler():
+    """Helper function to return a reas object with the top level INI file."""
+    res = rflags.getFromINI(RFLAGS_INIT_FILE)
+    assert res.has_error() is False
+    flags = res.value()
+    flags.useCP = False  # turn off CP. Default value is True
+    flags.withLBHeader = True  # LB header will be attached since there is no LB
+
+    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
+
+    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
+    assert isinstance(reas_uri, e2sar_py.EjfatURI)
+
+    return reas(reas_uri,
+        e2sar_py.IPAddress.from_string(DP_IPV4_ADDR), DP_IPV4_PORT, 1, flags)
+
+
 def test_rflags_getFromINI():
     """
     Test cpp Reassembler::ReassemblerFlags::getFromINI() function.
@@ -41,19 +58,8 @@ def test_rflags_getFromINI():
 
 def test_reas_constructor():
     """Test reassembler constructor simple."""
-    res = rflags.getFromINI(RFLAGS_INIT_FILE)
-    assert res.has_error() is False
-    flags = res.value()
-    flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
 
-    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
-
-    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
-    assert isinstance(reas_uri, e2sar_py.EjfatURI)
-
-    reassembler = reas(reas_uri,
-        e2sar_py.IPAddress.from_string(DP_IPV4_ADDR), DP_IPV4_PORT, 1, flags)
+    reassembler = init_reassembler()
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
 
@@ -97,19 +103,7 @@ def test_reas_constructor_core_list_auto_data_ip():
 
 def test_get_stats():
     """Test Reassembler::getStats"""
-    res = rflags.getFromINI(RFLAGS_INIT_FILE)
-    assert res.has_error() is False
-    flags = res.value()
-    flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
-
-    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
-
-    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
-    assert isinstance(reas_uri, e2sar_py.EjfatURI)
-
-    core_list=[0]
-    reassembler = reas(reas_uri, DP_IPV4_PORT, core_list, flags, False)
+    reassembler = init_reassembler()
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
     res = reassembler.getStats()
@@ -117,6 +111,15 @@ def test_get_stats():
     assert res.enqueueLoss  == 0, "Reassembler getStats wrong enqueueLoss! "
     assert res.lastE2SARError ==  e2sar_py.E2SARErrorc.NoError,\
         "Reassembler getStats wrong error code! "
+
+
+def test_get_fd_stats():
+    """Test Reassembler::get_FDStats"""
+    reassembler = init_reassembler()
+    res = reassembler.get_FDStats()
+    assert isinstance(res, e2sar_py.E2SARResultListOfFDPairs), "Reassembler get_FDStats failed! "
+    assert res.has_error() is True
+    assert res.error().code == e2sar_py.E2SARErrorc.LogicError
 
 
 def test_get_data_ip():

@@ -301,6 +301,9 @@ void init_e2sarDP_reassembler(py::module_ &m) {
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
 
+    // Return type of result<std::list<std::pair<u_int16_t, size_t>>>
+    reas.def("get_FDStats", &Reassembler::get_FDStats);
+
     // Return type of result<boost::tuple<EventNum_t, u_int16_t, size_t>>
     // TODO: check the underlying C++ result<T> convention and pybind
     reas.def("get_LostEvent", [](Reassembler& reasObj) {
