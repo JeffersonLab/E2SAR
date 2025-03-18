@@ -28,6 +28,17 @@ DP_IPV4_PORT = 19522
 SEG_URI = f"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}:{DP_IPV4_PORT}"
 
 
+def init_segmenter():
+    """Helper function to create a segmenter object based on the top level INI file"""
+    res = sflags.getFromINI(SFLAGS_INIT_FILE)
+    flags = res.value()
+    flags.useCP = False  # turn off CP. Default value is True
+
+    seg_uri = e2sar_py.EjfatURI(uri=SEG_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
+
+    return e2sar_py.DataPlane.Segmenter(seg_uri, DATA_ID, EVENTSRC_ID, flags)
+
+
 def test_sflags_getFromINI():
     """
     Test cpp segmenter::segmenterFlags::getFromINI() function.
@@ -78,6 +89,25 @@ def test_seg_constructor_from_cpucorelist():
     segmenter = e2sar_py.DataPlane.Segmenter(seg_uri, DATA_ID, EVENTSRC_ID, cpu_core_list, flags)
     assert isinstance(segmenter, e2sar_py.DataPlane.Segmenter), "Segmenter object creation failed"
 
+
+def test_get_send_stats():
+    """Test Segmenter::getSendStats"""
+    segmenter = init_segmenter()
+    res = segmenter.getSendStats()
+    assert isinstance(res, seg.ReportedStats), "Segmenter getSendStats failed! "
+    assert res.msgCnt == 0, "Segmenter getSendStats wrong msgCnt! "
+    assert res.lastE2SARError ==  e2sar_py.E2SARErrorc.NoError,\
+        "Segmenter getSendStats wrong error code! "
+
+
+def test_get_sync_stats():
+    """Test Segmenter::getSyncStats"""
+    segmenter = init_segmenter()
+    res = segmenter.getSyncStats()
+    assert isinstance(res, seg.ReportedStats), "Segmenter getSyncStats failed! "
+    assert res.msgCnt == 0, "Segmenter getSendStats wrong msgCnt! "
+    assert res.lastE2SARError ==  e2sar_py.E2SARErrorc.NoError,\
+        "Segmenter getSyncStats wrong error code! "
 
 if __name__ == "__main__":
     pytest.main()
