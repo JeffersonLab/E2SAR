@@ -94,6 +94,31 @@ def test_reas_constructor_core_list_auto_data_ip():
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
 
+
+def test_get_stats():
+    """Test Reassembler::getStats"""
+    res = rflags.getFromINI(RFLAGS_INIT_FILE)
+    assert res.has_error() is False
+    flags = res.value()
+    flags.useCP = False  # turn off CP. Default value is True
+    flags.withLBHeader = True  # LB header will be attached since there is no LB
+
+    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
+
+    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
+    assert isinstance(reas_uri, e2sar_py.EjfatURI)
+
+    core_list=[0]
+    reassembler = reas(reas_uri, DP_IPV4_PORT, core_list, flags, False)
+    assert isinstance(reassembler, reas), "Reassembler object creation failed! "
+
+    res = reassembler.getStats()
+    assert isinstance(res, reas.ReportedStats)
+    assert res.enqueueLoss  == 0, "Reassembler getStats wrong enqueueLoss! "
+    assert res.lastE2SARError ==  e2sar_py.E2SARErrorc.NoError,\
+        "Reassembler getStats wrong error code! "
+
+
 def test_get_data_ip():
     """Test Reassembler::get_dataIP"""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -121,5 +146,29 @@ def test_get_data_ip():
     assert ret_ip == str(ip), "Reassembler::get_dataIP() method failed!"
 
 
+'''
+def test_get_lost_event():
+    """Test  Reassembler::get_LostEvent"""
+    res = rflags.getFromINI(RFLAGS_INIT_FILE)
+    assert res.has_error() is False
+    flags = res.value()
+    flags.useCP = False  # turn off CP. Default value is True
+    flags.withLBHeader = True  # LB header will be attached since there is no LB
+
+    assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
+
+    reas_uri = e2sar_py.EjfatURI(uri=REAS_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
+    assert isinstance(reas_uri, e2sar_py.EjfatURI)
+
+    core_list=[0]
+    reassembler = reas(reas_uri, DP_IPV4_PORT, core_list, flags, False)
+    assert isinstance(reassembler, reas), "Reassembler object creation failed! "
+
+    print(reassembler.get_LostEvent())  # Catch an unknown error instead
+'''
+
 if __name__ == "__main__":
     pytest.main()
+
+    # Not working ones, TODO: @xmei
+    # test_get_lost_event()

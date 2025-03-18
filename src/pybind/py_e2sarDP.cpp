@@ -164,6 +164,7 @@ void init_e2sarDP_segmenter(py::module_ &m) {
     seg.def("stopThreads", &Segmenter::stopThreads);
 }
 
+
 void init_e2sarDP_reassembler(py::module_ &m) {
     py::class_<Reassembler> reas(m, "Reassembler");
 
@@ -258,9 +259,10 @@ void init_e2sarDP_reassembler(py::module_ &m) {
                 recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
             }
 
-            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);},
-    "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
-    py::arg("recv_bytes_list"));
+            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
+        },
+        "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
+        py::arg("recv_bytes_list"));
 
     reas.def("recvEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes,
@@ -288,28 +290,47 @@ void init_e2sarDP_reassembler(py::module_ &m) {
                 recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
             }
 
-            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);},
-    "Get an event in the blocking mode. Use py::list[None] to accept the data.",
-    py::arg("recv_bytes_list"),
-    py::arg("wait_ms") = 0);
+            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
+        },
+        "Get an event in the blocking mode. Use py::list[None] to accept the data.",
+        py::arg("recv_bytes_list"),
+        py::arg("wait_ms") = 0);
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
     reas.def("registerWorker", &Reassembler::registerWorker);
     reas.def("deregisterWorker", &Reassembler::deregisterWorker);
 
-    // Return type of resultresult<std::pair<EventNum_t, u_int16_t>>
-    // FIXME: now returns boost::typle<EventNum_t, u_int16_t, size_t>
-//    reas.def("get_LostEvent", &Reassembler::get_LostEvent);
+    // Return type of result<boost::tuple<EventNum_t, u_int16_t, size_t>>
+    // TODO: check the underlying C++ result<T> convention and pybind
+    reas.def("get_LostEvent", [](Reassembler& reasObj) {
+        auto res = reasObj.get_LostEvent();
+        if (res.has_error()) {
+            std::cout << res.error().message();
+        }
 
-    // Return type of boost::tuple<>: convert to std::tuple
-    // FIXME: now returns a struct
-//    reas.def("getStats", [](const Reassembler& reasObj) {
-//            auto stats = reasObj.getStats();
-//            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats),
-//                                    boost::get<3>(stats), boost::get<4>(stats), boost::get<5>(stats), 
-//                                    boost::get<6>(stats));
-//        });
+        auto ret = res.value();  // this may hold E2SARErrorInfo or std::tuple? @Ilya
+        if constexpr (std::is_same_v<decltype(ret), E2SARErrorInfo>) {
+            return ret;  // handle the case where it's an error
+        } else {
+            return std::make_tuple(
+                boost::get<0>(ret),
+                boost::get<1>(ret),
+                boost::get<2>(ret));
+        }
+    });
+
+    // Return type of ReportedStats: bind ReportedStats as a subclass of Reassembler
+    py::class_<Reassembler::ReportedStats,
+                std::unique_ptr<Reassembler::ReportedStats, py::nodelete>>(reas, "ReportedStats")
+        .def_readonly("enqueueLoss", &Reassembler::ReportedStats::enqueueLoss)
+        .def_readonly("reassemblyLoss", &Reassembler::ReportedStats::reassemblyLoss)
+        .def_readonly("eventSuccess", &Reassembler::ReportedStats::eventSuccess)
+        .def_readonly("lastErrno", &Reassembler::ReportedStats::lastErrno)
+        .def_readonly("grpcErrCnt", &Reassembler::ReportedStats::grpcErrCnt)
+        .def_readonly("dataErrCnt", &Reassembler::ReportedStats::dataErrCnt)
+        .def_readonly("lastE2SARError", &Reassembler::ReportedStats::lastE2SARError);
+    reas.def("getStats", &Reassembler::getStats);
 
     // Return type: ip::address - convert to string for Python
     reas.def("get_dataIP", [](const Reassembler &reasObj) {
