@@ -147,16 +147,16 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         py::arg("callback") = py::none(),
         py::arg("cbArg") = py::none());
 
-    // Return type of ReportedStats
-    // FIXME: returns a struct instead of a tuple now
-//    seg.def("getSendStats", [](const Segmenter& segObj) {
-//            auto stats = segObj.getSendStats();
-//            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
-//        });
-//    seg.def("getSyncStats", [](const Segmenter& segObj) {
-//            auto stats = segObj.getSyncStats();
-//            return std::make_tuple(boost::get<0>(stats), boost::get<1>(stats), boost::get<2>(stats));
-//        });
+    // Return type of ReportedStats: bind ReportedStats as a subclass
+    py::class_<Segmenter::ReportedStats,
+        std::unique_ptr<Segmenter::ReportedStats, py::nodelete>>(seg, "ReportedStats")
+            .def_readonly("msgCnt", &Segmenter::ReportedStats::msgCnt)
+            .def_readonly("errCnt", &Segmenter::ReportedStats::errCnt)
+            .def_readonly("lastErrno", &Segmenter::ReportedStats::lastErrno)
+            .def_readonly("lastE2SARError", &Segmenter::ReportedStats::lastE2SARError);
+
+    seg.def("getSendStats", &Segmenter::getSendStats);
+    seg.def("getSyncStats", &Segmenter::getSyncStats);
 
     // Simple return types
     seg.def("getMTU", &Segmenter::getMTU);
