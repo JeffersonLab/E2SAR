@@ -4,12 +4,42 @@
 # all settings are very conservative, with the aim to establish
 # basic functionality, not optimize the performance
 
-# Please modify the parameters below as needed
+show_help () {
+	echo "e2sar-sender.sh requires two arguments: "
+	echo "-a <dataplane IP address of this host> -m <MTU of the dataplane interface>"
+}
 
-myDataPlaneIP='<ip address of the interface for the dataplane>'
+# A POSIX variable
+OPTIND=1       
+
+# Initialize our own variables:
+myDataPlaneIP=''
+dataPlaneMTU='1500'
+
+while getopts ":h?a:m:" opt; do
+  case "$opt" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+    a)  myDataPlaneIP=$OPTARG
+      ;;
+	m)	dataPlaneMTU=$OPTARG
+	  ;;
+	:)
+	  show_help
+	  exit 0
+	  ;;
+  esac
+done
+
+# if no options were passed
+if [ $OPTIND -eq 1 ]; then
+	show_help
+	exit 0
+fi
 
 # these rarely need to be changed
-dataPlaneMTU=1500
 dataRateInGbps=1
 eventLengthInBytes=100000
 numEventsToSend=10000

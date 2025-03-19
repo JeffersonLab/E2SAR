@@ -1,9 +1,40 @@
 #!/bin/bash
 
-# for how long to reserve
-duration='12'
-# what is the name
-name='my-test-lb'
+show_help () {
+	echo "reserve-lb.sh requires two arguments: "
+	echo "-n <lbname> -d <reservation length in hours>"
+}
+
+# A POSIX variable
+OPTIND=1       
+
+# Initialize our own variables:
+duration='2'
+lbname='mylb'
+
+while getopts ":h?n:d:" opt; do
+  case "$opt" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+    n)  lbname=$OPTARG
+      ;;
+    d)  duration=$OPTARG
+      ;;
+	:)
+	  show_help
+	  exit 0
+	  ;;
+  esac
+done
+
+# if no options were passed
+if [ $OPTIND -eq 1 ]; then
+	show_help
+	exit 0
+fi
+
 # this address won't be needed in version 0.2.0
 fake_sender_address='8.8.8.8'
 
@@ -19,6 +50,6 @@ if [ ! -e ${HOME}/e2sar.env ]; then
 fi
 source $HOME/e2sar.env
 echo 'Reserving a new load balancer for $duration hours and generating $HOME/e2sar-instance.env'
-lbadm -v --reserve --lbname ${name} -a ${fake_sender_address} -d ${duration} -e > ${HOME}/e2sar-instance.env
+lbadm -v --reserve --lbname ${lbname} -a ${fake_sender_address} -d ${duration} -e > ${HOME}/e2sar-instance.env
 echo New instance URI is
 cat $HOME/e2sar-instance.env
