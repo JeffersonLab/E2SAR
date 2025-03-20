@@ -13,4 +13,4 @@ BINDIR="${DESTDIR}/${MESON_INSTALL_PREFIX}/bin/"
 
 echo "Installing scripts to ${BINDIR}"
 mkdir -p ${BINDIR}
-cp "${MESON_SOURCE_ROOT}/scripts/bash-helpers/*.sh" ${BINDIR}
+cp ${MESON_SOURCE_ROOT}/scripts/bash-helpers/*.sh ${BINDIR}
