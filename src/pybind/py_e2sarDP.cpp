@@ -283,6 +283,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         py::arg("cpu_core_list"),
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
+
     // Recv events part. Return py::tuple.
     reas.def("getEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes) -> py::tuple {
@@ -310,11 +311,73 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             }
 
             return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-
     },
     "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
-    py::arg("recv_bytes_list")
-    );
+    py::arg("recv_bytes_list"));
+
+    // Receive event as 1D numpy array with the provided numpy data type.
+    reas.def("get1DNumpyArray",
+        [](Reassembler& self, py::dtype data_type) -> py::tuple {
+            u_int8_t *eventBuf{nullptr};
+            size_t eventLen = 0;
+            EventNum_t eventNum = 0;
+            u_int16_t recDataId = 0;
+
+            auto recvres = self.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
+
+            if (recvres.has_error()) {
+                std::cout << "Error encountered receiving event frames: "
+                    << recvres.error().message() << std::endl;
+                return py::make_tuple(static_cast<int>(-2), py::array(), eventNum, recDataId);
+            }
+
+            if (recvres.value() == -1) {
+                std::cout << "No message received, continuing" << std::endl;
+                return py::make_tuple(static_cast<int>(-1), py::array(), eventNum, recDataId);
+            }
+
+            // Create a numpy array from the event buffer with the specified dtype
+            py::ssize_t num_elements = static_cast<py::ssize_t>(eventLen) / data_type.itemsize();
+            py::array numpy_array(data_type, num_elements, eventBuf);
+
+            return py::make_tuple(recvres.value(), numpy_array, eventNum, recDataId);
+        },
+        "Get an event from the Reassembler EventQueue as 1D numpy array.",
+        py::arg("data_type"));
+
+        reas.def("recv1DNumpyArray",
+            [](Reassembler& self, py::dtype data_type, u_int64_t wait_ms) -> py::tuple {
+                u_int8_t *eventBuf{nullptr};
+                size_t eventLen = 0;
+                EventNum_t eventNum = 0;
+                u_int16_t recDataId = 0;
+
+                // Call the underlying recvEvent function
+                auto recvres = self.recvEvent(&eventBuf, &eventLen, &eventNum, &recDataId, wait_ms);
+
+                if (recvres.has_error()) {
+                    std::cout << "Error encountered receiving event frames: "
+                            << recvres.error().message() << std::endl;
+                    return py::make_tuple(static_cast<int>(-2), py::array(), eventNum, recDataId);
+                }
+
+                if (recvres.value() == -1) {
+                    std::cout << "No message received, continuing" << std::endl;
+                    return py::make_tuple(static_cast<int>(-1), py::array(), eventNum, recDataId);
+                }
+
+                // Calculate the number of elements based on the item size of the specified data type
+                py::ssize_t num_elements = static_cast<py::ssize_t>(eventLen) / data_type.itemsize();
+
+                // Create a numpy array from the event buffer with the specified dtype
+                py::array numpy_array(data_type, {num_elements}, eventBuf);
+
+                return py::make_tuple(recvres.value(), numpy_array, eventNum, recDataId);
+            },
+            "Receive an event as a 1D numpy array in blocking mode.",
+            py::arg("data_type"),
+            py::arg("wait_ms") = 0);
+
 
     reas.def("recvEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes,
@@ -343,12 +406,10 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             }
 
             return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-
     },
     "Get an event in the blocking mode. Use py::list[None] to accept the data.",
     py::arg("recv_bytes_list"),
-    py::arg("wait_ms") = 0
-    );
+    py::arg("wait_ms") = 0);
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
