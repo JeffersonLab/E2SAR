@@ -16,8 +16,8 @@ import pytest
 # Make sure the compiled module is added to your path
 import e2sar_py
 reas = e2sar_py.DataPlane.Reassembler
-
 rflags = reas.ReassemblerFlags
+
 # Use absolute path and match the top dir reaseembler_config.ini path
 RFLAGS_INIT_FILE = "/home/xmei/ejfat_projects/E2SAR/reassembler_config.ini"
 

@@ -283,6 +283,16 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         py::arg("cpu_core_list"),
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
+    // Constructor with CPU core list and auto IP detection
+    reas.def(
+        py::init<const EjfatURI &, u_int16_t, std::vector<int>,
+            const Reassembler::ReassemblerFlags &, bool>(),
+        "Init the Reassembler object with a list of CPU cores.",
+        py::arg("uri"),  // must-have args when init
+        py::arg("starting_port"),
+        py::arg("cpu_core_list"),
+        py::arg("rflags") = Reassembler::ReassemblerFlags(),
+        py::arg("v6") = false);
 
     // Recv events part. Return py::tuple.
     reas.def("getEvent",
