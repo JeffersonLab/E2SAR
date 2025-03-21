@@ -5,10 +5,10 @@ To make sure it's working, either append the path of "e2say_py.*.so" to sys.path
 # import sys
 
 # sys.path.append(
-#     '/home/xmei/ejfat_projects/E2SAR/build/src/pybind')
+#     '<my_e2sar_build_path>/build/src/pybind')
 
 Or, add this path to PYTHONPATH, e.g,
-# export PYTHONPATH=/home/xmei/ejfat_projects/E2SAR/build/src/pybind
+# export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
 import pytest
@@ -45,6 +45,7 @@ def init_reassembler():
         e2sar_py.IPAddress.from_string(DP_IPV4_ADDR), DP_IPV4_PORT, 1, flags)
 
 
+@pytest.mark.unit
 def test_rflags_getFromINI():
     """
     Test cpp Reassembler::ReassemblerFlags::getFromINI() function.
@@ -53,9 +54,10 @@ def test_rflags_getFromINI():
     # print(res.has_error(), res.error() if res.has_error() else None)
     assert res.has_error() is False
     flags = res.value()
-    assert flags.useCP is True  # match the ini file 
+    assert flags.useCP is True  # match the ini file
 
 
+@pytest.mark.unit
 def test_reas_constructor():
     """Test reassembler constructor simple."""
 
@@ -63,6 +65,7 @@ def test_reas_constructor():
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
 
+@pytest.mark.unit
 def test_reas_constructor_core_list():
     """Test reassembler constructor with CPU core list."""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -82,6 +85,7 @@ def test_reas_constructor_core_list():
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
 
+@pytest.mark.unit
 def test_reas_constructor_core_list_auto_data_ip():
     """Test reassembler constructor with CPU core list and auto dataIP detection."""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -101,6 +105,7 @@ def test_reas_constructor_core_list_auto_data_ip():
 
 
 
+@pytest.mark.unit
 def test_get_stats():
     """Test Reassembler::getStats"""
     reassembler = init_reassembler()
@@ -113,6 +118,7 @@ def test_get_stats():
         "Reassembler getStats wrong error code! "
 
 
+@pytest.mark.unit
 def test_get_fd_stats():
     """Test Reassembler::get_FDStats"""
     reassembler = init_reassembler()
@@ -122,6 +128,7 @@ def test_get_fd_stats():
     assert res.error().code == e2sar_py.E2SARErrorc.LogicError
 
 
+@pytest.mark.unit
 def test_get_data_ip():
     """Test Reassembler::get_dataIP"""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -169,9 +176,3 @@ def test_get_lost_event():
 
     print(reassembler.get_LostEvent())  # Catch an unknown error instead
 '''
-
-if __name__ == "__main__":
-    pytest.main()
-
-    # Not working ones, TODO: @xmei
-    # test_get_lost_event()

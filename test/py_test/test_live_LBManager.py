@@ -5,10 +5,10 @@ To make sure it's working, either append the path of "e2say_py.*.so" to sys.path
 # import sys
 
 # sys.path.append(
-#     '/home/xmei/ejfat_projects/E2SAR/build/src/pybind')
+#     '<my_e2sar_build_path>/build/src/pybind')
 
 Or, add this path to PYTHONPATH, e.g,
-# export PYTHONPATH=/home/xmei/ejfat_projects/E2SAR/build/src/pybind
+# export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
 import pytest
@@ -20,6 +20,8 @@ ej_uri = e2sar_py.EjfatURI
 
 URI_STR = "ejfats://udplbd@192.168.0.3:18347/lb/1?data=127.0.0.1&sync=192.168.88.199:1234"
 
+
+@pytest.mark.mockLB
 def test_add_sender_self():
     """Test the add_sender_self function."""
 
@@ -34,7 +36,3 @@ def test_add_sender_self():
 
     # TODO: require real LB to test the functionality
 
-
-if __name__ == "__main__":
-    pytest.main()
-    # test_add_sender_self()

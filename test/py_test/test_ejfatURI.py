@@ -5,10 +5,10 @@ To make sure it's working, either append the path of "e2say_py.*.so" to sys.path
 # import sys
 
 # sys.path.append(
-#     '/home/xmei/ejfat_projects/E2SAR/build/src/pybind')
+#     '<my_e2sar_build_path>/build/src/pybind')
 
 Or, add this path to PYTHONPATH, e.g,
-# export PYTHONPATH=/home/xmei/ejfat_projects/E2SAR/build/src/pybind
+# export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
 import pytest
@@ -19,6 +19,8 @@ ej_uri = e2sar_py.EjfatURI
 
 URI_STR = "ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&data=192.188.29.20"
 
+
+@pytest.mark.unit
 def test_get_dp_local_addrs():
     """Test the get_dp_local_addr function."""
 
@@ -30,5 +32,5 @@ def test_get_dp_local_addrs():
     # More strict validation: ips[0] equals to local IP address regardless of URI_STR
 
 
-if __name__ == "__main__":
-    pytest.main()
+# if __name__ == "__main__":
+#     pytest.main()

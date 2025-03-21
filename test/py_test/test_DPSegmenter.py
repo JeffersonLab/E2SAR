@@ -5,10 +5,10 @@ To make sure it's working, either append the path of "e2say_py.*.so" to sys.path
 # import sys
 
 # sys.path.append(
-#     '/home/xmei/ejfat_projects/E2SAR/build/src/pybind')
+#     '<my_e2sar_build_path>/build/src/pybind')
 
 Or, add this path to PYTHONPATH, e.g,
-# export PYTHONPATH=/home/xmei/ejfat_projects/E2SAR/build/src/pybind
+# export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
 import pytest
@@ -39,6 +39,7 @@ def init_segmenter():
     return e2sar_py.DataPlane.Segmenter(seg_uri, DATA_ID, EVENTSRC_ID, flags)
 
 
+@pytest.mark.unit
 def test_sflags_getFromINI():
     """
     Test cpp segmenter::segmenterFlags::getFromINI() function.
@@ -50,6 +51,7 @@ def test_sflags_getFromINI():
     assert flags.mtu == 1500
 
 
+@pytest.mark.unit
 def test_seg_constructor_simple():
     """Test segmenter constructor simple."""
     res = sflags.getFromINI(SFLAGS_INIT_FILE)
@@ -79,6 +81,7 @@ def test_seg_constructor_simple():
         segmenter, e2sar_py.DataPlane.Segmenter), "Segmenter object creation failed"
 
 
+@pytest.mark.unit
 def test_seg_constructor_from_cpucorelist():
     """Test segmenter constructor with CPU core list."""
     flags = sflags.getFromINI(SFLAGS_INIT_FILE).value()
@@ -90,6 +93,7 @@ def test_seg_constructor_from_cpucorelist():
     assert isinstance(segmenter, e2sar_py.DataPlane.Segmenter), "Segmenter object creation failed"
 
 
+@pytest.mark.unit
 def test_get_send_stats():
     """Test Segmenter::getSendStats"""
     segmenter = init_segmenter()
@@ -100,6 +104,7 @@ def test_get_send_stats():
         "Segmenter getSendStats wrong error code! "
 
 
+@pytest.mark.unit
 def test_get_sync_stats():
     """Test Segmenter::getSyncStats"""
     segmenter = init_segmenter()
@@ -108,6 +113,3 @@ def test_get_sync_stats():
     assert res.msgCnt == 0, "Segmenter getSendStats wrong msgCnt! "
     assert res.lastE2SARError ==  e2sar_py.E2SARErrorc.NoError,\
         "Segmenter getSyncStats wrong error code! "
-
-if __name__ == "__main__":
-    pytest.main()
