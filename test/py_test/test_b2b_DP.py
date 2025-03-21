@@ -22,8 +22,9 @@ DP_IPV4_PORT = 10000
 DATA_ID = 0x0505   # decimal value: 1085
 EVENTSRC_ID = 0x11223344   # decimal value: 287454020
 
-SEG_URI = f"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}:{DP_IPV4_PORT}"
-REAS_URI_ = f"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}"
+# Use a different port from DPReassembler
+SEG_URI = f"ejfat://useless@192.168.100.1:9875/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}:{DP_IPV4_PORT}"
+REAS_URI_ = f"ejfat://useless@192.168.100.1:9875/lb/1?sync=192.168.0.1:12345&data={DP_IPV4_ADDR}"
 
 SEND_STR = "THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 1 SECOND."
 
@@ -49,7 +50,7 @@ def get_reassembler():
 
 def verify_result_obj(res_obj):
     """Helper function to check some of the return objects."""
-    assert res_obj.has_error() is False
+    assert res_obj.has_error() is False, f"{res_obj.error()}"
     assert res_obj.value() == 0
 
 
@@ -94,6 +95,7 @@ def test_b2b_send_bytes_recv_list():
     assert recv_str == SEND_STR, "recv_str did not match"
 
 
+# NOTE: Launch in the main suite will fail. Lauch with -m b2b will succeed.
 @pytest.mark.b2b
 def test_b2b_send_numpy_get_numpy():
     """
@@ -113,7 +115,7 @@ def test_b2b_send_numpy_get_numpy():
 
     # Send a 3D numpy array,
     # send_array = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32).reshape((2, 2, 2))
-    send_array = np.random.rand(1000, 1000, 40).astype(np.float32)  # up to 200 MB
+    send_array = np.random.rand(1000, 1000, 50).astype(np.float32)  # up to 200 MB
     send_bytes = send_array.nbytes
 
     res = seg.sendNumpyArray(send_array, send_bytes)
@@ -132,28 +134,30 @@ def test_b2b_send_numpy_get_numpy():
 
 # @pytest.mark.b2b
 # Launch this one with python istead of pytest -m
+
+# NOTE: It's not included in the b2b test because the numpy array size is really big and
+# may fail.
+#
+# A fail run:
+# (e2sar) (e2sar) python test/py_test/test_b2b_DP.py 
+# Send numpy array of 200.0 MB for 5 times
+# Sent msg count: 282863, send MB: 1000.0
+# Rd 1, received 200.0 MB, total 200.0 MB
+# Rd 2, received 200.0 MB, total 400.0 MB
+# No message received, continuing
+# Rd 4, received 200.0 MB, total 600.0 MB
+# No message received, continuing
+# No message received, continuing
+# No message received, continuing
+# No message received, continuing
+# No message received, continuing
+# Receiving error after recv 600000000 bytes
+#
+@pytest.mark.skip(reason="Excluded from main suite")
 def test_b2b_send_numpy_queue_get_numpy():
     """
     A "bonuns" Back-to-back test for Segmenter::addToSendQueue() and Reassembler::getEvent()
     with numpy interfaces.
-
-    NOTE: It's not included in the b2b test because the numpy array size is really big and
-    may fail.
-
-    A fail run:
-        (e2sar) (e2sar) python test/py_test/test_b2b_DP.py 
-        Send numpy array of 200.0 MB for 5 times
-        Sent msg count: 282863, send MB: 1000.0
-        Rd 1, received 200.0 MB, total 200.0 MB
-        Rd 2, received 200.0 MB, total 400.0 MB
-        No message received, continuing
-        Rd 4, received 200.0 MB, total 600.0 MB
-        No message received, continuing
-        No message received, continuing
-        No message received, continuing
-        No message received, continuing
-        No message received, continuing
-        Receiving error after recv 600000000 bytes
     """
 
     seg = get_segmenter()

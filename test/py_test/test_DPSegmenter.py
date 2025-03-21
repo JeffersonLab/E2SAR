@@ -16,8 +16,8 @@ import pytest
 # Make sure the compiled module is added to your path
 import e2sar_py
 seg = e2sar_py.DataPlane.Segmenter
-
 sflags = seg.SegmenterFlags
+
 # Use absolute path and match the top dir segmenter_config.ini path
 SFLAGS_INIT_FILE = "/home/xmei/ejfat_projects/E2SAR/segmenter_config.ini"
 
