@@ -5,6 +5,7 @@
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 
 #include "e2sarDPReassembler.hpp"
 #include "e2sarDPSegmenter.hpp"
@@ -102,14 +103,74 @@ void init_e2sarDP_segmenter(py::module_ &m) {
 
     // Return type of result<int>
     seg.def("OpenAndStart", &Segmenter::openAndStart);
-    seg.def(
-        "sendEvent", &Segmenter::sendEvent,
+
+    // Send event with py::buffer, which accepts python bytes input
+    seg.def("sendEvent",
+        [](Segmenter& self, py::buffer py_buf, size_t buf_len,
+            EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) -> result<int> {
+                // Convert py::bytes to uint8_t*
+                py::buffer_info buf_info = py_buf.request();
+                uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
+
+                return self.sendEvent(data, buf_len, _eventNum, _dataId, entropy);
+        },
         "Send immediately overriding event number",
         py::arg("send_buf"),
         py::arg("buf_len"),
         py::arg("_eventNum") = 0LL,
         py::arg("_dataId") = 0,
         py::arg("entropy") = 0);
+
+    // Send events part with numpy array.
+    seg.def("sendNumpyArray",
+        [](Segmenter& self, py::array numpy_array, size_t nbytes,
+            EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) -> result<int> {
+            // Request buffer info from the numpy array
+            py::buffer_info buf_info = numpy_array.request();
+            uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
+
+            return self.sendEvent(data, nbytes, _eventNum, _dataId, entropy);
+        },
+        "Send an event as a numpy array",
+        py::arg("numpy_array"),
+        py::arg("nbytes"),
+        py::arg("event_num") = 0LL,
+        py::arg("data_id") = 0,
+        py::arg("entropy") = 0);
+
+        // Send method related to callback. Have to define corresponding wrapper function.
+        seg.def("addNumpyArrayToSendQueue",
+            [](e2sar::Segmenter& seg, py::array numpy_array, size_t bytes,
+            int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
+            py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
+                // Convert py::bytes to uint8_t*
+                py::buffer_info buf_info = numpy_array.request();
+                uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
+
+                // Convert Python callback to std::function (if provided)
+                std::function<void(boost::any)> c_callback = nullptr;
+                if (!callback.is_none()) {
+                    c_callback = [callback](boost::any arg) {
+                        // Invoke the Python callback with the provided argument
+                        callback(arg);
+                    };
+                }
+                // Wrap the Python cbArg in boost::any (if provided)
+                boost::any c_cbArg = nullptr;
+                if (!cbArg.is_none()) {
+                    c_cbArg = cbArg;
+                }
+                // Call the wrapper function
+                return addToSendQueueWrapper(seg, data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
+            },
+            "Call Segmenter::addToSendQueue with numpy array interface",
+            py::arg("numpy_array"),
+            py::arg("nbytes"),
+            py::arg("_eventNum") = 0LL,
+            py::arg("_dataId") = 0,
+            py::arg("entropy") = 0,
+            py::arg("callback") = py::none(),
+            py::arg("cbArg") = py::none());
 
     // Send method related to callback. Have to define corresponding wrapper function.
     seg.def("addToSendQueue",
@@ -222,17 +283,6 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         py::arg("cpu_core_list"),
         py::arg("rflags") = Reassembler::ReassemblerFlags());
 
-    // Constructor with CPU core list, without data_ip and with v6
-    reas.def(
-        py::init<const EjfatURI &, u_int16_t, std::vector<int>,
-                const Reassembler::ReassemblerFlags &, bool>(),
-        "Init the Reassembler object with a list of CPU cores, and auto-detect the outgoing IP address",
-        py::arg("uri"),  // must-have args when init
-        py::arg("starting_port"),
-        py::arg("cpu_core_list"),
-        py::arg("rflags") = Reassembler::ReassemblerFlags(),
-        py::arg("v6") = false);
-
     // Recv events part. Return py::tuple.
     reas.def("getEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes) -> py::tuple {
@@ -260,9 +310,11 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             }
 
             return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-        },
-        "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
-        py::arg("recv_bytes_list"));
+
+    },
+    "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
+    py::arg("recv_bytes_list")
+    );
 
     reas.def("recvEvent",
         [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes,
@@ -291,10 +343,12 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             }
 
             return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
-        },
-        "Get an event in the blocking mode. Use py::list[None] to accept the data.",
-        py::arg("recv_bytes_list"),
-        py::arg("wait_ms") = 0);
+
+    },
+    "Get an event in the blocking mode. Use py::list[None] to accept the data.",
+    py::arg("recv_bytes_list"),
+    py::arg("wait_ms") = 0
+    );
 
     // Return type of result<int>
     reas.def("OpenAndStart", &Reassembler::openAndStart);
