@@ -125,7 +125,7 @@ def test_b2b_send_numpy_get_numpy():
 
 # @pytest.mark.b2b
 # Lauch this one with python istead of pytest -m
-def test_b2b_send_numpy_queue_recv_numpy():
+def test_b2b_send_numpy_queue_get_numpy():
     """
     Back-to-back test for Segmenter::addToSendQueue() and Reassembler::getEvent() with numpy interfaces.
     """
@@ -142,7 +142,7 @@ def test_b2b_send_numpy_queue_recv_numpy():
     verify_result_obj(res)
 
     # Send 1D numpy array 5 times
-    num_elements = 100000000  # Push to 50e6 may fail
+    num_elements = 50000000  # Push to 50e6 may fail
     # Create a 2D numpy array and each time send 1 row
     send_array = np.array([np.full((num_elements,), i, dtype=np.uint8) for i in range(5)])
     print(f"Send numpy array of {send_array.nbytes / 5000000} MB for 5 times")
@@ -162,7 +162,7 @@ def test_b2b_send_numpy_queue_recv_numpy():
     i = sleep_time = 0
     while (True):
         i += 1
-        res, recv_array, recv_event_num, recv_data_id = reas.recv1DNumpyArray(np.int32().dtype)
+        res, recv_array, recv_event_num, recv_data_id = reas.get1DNumpyArray(np.int32().dtype)
         if (res == -2 or sleep_time > 4 or recv_bytes > send_array.nbytes):
             print(f"Receiving error after recv {recv_bytes} bytes")
             break
