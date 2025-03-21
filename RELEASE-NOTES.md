@@ -33,6 +33,10 @@ Compared to 0.1.X this version introduces a number of enhancements, although it 
 
 Note that IP auto-detection features work in simple scenarios where the outgoing interface has at most one address of each type (IPv4 or IPv6) associated with it. The code uses the first address it finds if multiple addresses are found. In the case of e.g. aliased interfaces the results of auto-detection may not be as intended and in this case sender and receiver IP addresses will need to be specified explicitly.
 
+## v0.1.8
+
+A fix for sendEvent handling of buffers. Addition of numpy support for sending and receiving numpy arrays. See tests/py_test for examples.
+
 ## v0.1.7
 Added bash-helpers/ scripts that are installed in bin/ - they help test basic functionality by hiding much of the invocation complexity of tools like lbadm and e2sar_perf. The associated README.md explains the usage. 
 
