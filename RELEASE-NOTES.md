@@ -29,16 +29,16 @@ Compared to 0.1.X this version introduces a number of enhancements, although it 
 - Segmenter sync and send stat return tuple (Segmenter::getSyncStats() and Segmenter::getSendStats()) similarly has been replaced with a Segmenter::ReportedStats struct
     - WARNING! This is the point of incompatibility with 0.1.X
 - Segmenter now has a 'warm-up' period of 1 second by default when it sends SYNC packets without allowing data to be sent. This is to help synchronize schedules with the control plane. The length of this period in milliseconds can be set using SegmenterFlags.warmUpMs (also reflected in the INI file format)
-- Python bindings have been updated to match these changes; python test framework moved to pytest instead of notebooks
+- Python bindings have been updated to match these changes; python test framework moved to pytest instead of notebooks. Launch Python test suites with `pytest <path> -m unit|b2b`.
 
 Note that IP auto-detection features work in simple scenarios where the outgoing interface has at most one address of each type (IPv4 or IPv6) associated with it. The code uses the first address it finds if multiple addresses are found. In the case of e.g. aliased interfaces the results of auto-detection may not be as intended and in this case sender and receiver IP addresses will need to be specified explicitly.
 
 ## v0.1.8
 
-A fix for sendEvent handling of buffers. Addition of numpy support for sending and receiving numpy arrays. See tests/py_test for examples.
+A fix for sendEvent handling of buffers. Addition of numpy support for sending and receiving numpy arrays. See tests/py_test/test_b2b_DP.py for examples.
 
 ## v0.1.7
-Added bash-helpers/ scripts that are installed in bin/ - they help test basic functionality by hiding much of the invocation complexity of tools like lbadm and e2sar_perf. The associated README.md explains the usage. 
+Added bash-helpers/ scripts that are installed in bin/ - they help test basic functionality by hiding much of the invocation complexity of tools like lbadm and e2sar_perf. The associated README.md explains the usage.
 
 ## v0.1.5
 
