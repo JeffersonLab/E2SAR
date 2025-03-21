@@ -29,16 +29,18 @@ SEND_STR = "THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 1 SECOND."
 
 
 def get_segmenter():
+    """Create the segmenter instance with CP turned off."""
     seg_uri = e2sar_py.EjfatURI(uri=SEG_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
-    sflags = e2sar_py.DataPlane.SegmenterFlags()
+    sflags = e2sar_py.DataPlane.Segmenter.SegmenterFlags()
     sflags.useCP = False  # turn off CP. Default value is True
     sflags.syncPeriodMs = 1000
     sflags.syncPeriods = 5
     return e2sar_py.DataPlane.Segmenter(seg_uri, DATA_ID, EVENTSRC_ID, sflags)
 
 def get_reassembler():
+    """Create the reassembler instance with CP turned off."""
     reas_uri = e2sar_py.EjfatURI(uri=REAS_URI_, tt=e2sar_py.EjfatURI.TokenType.instance)
-    rflags = e2sar_py.DataPlane.ReassemblerFlags()
+    rflags = e2sar_py.DataPlane.Reassembler.ReassemblerFlags()
     rflags.useCP = False  # turn off CP. Default value is True
     rflags.withLBHeader = True  # LB header will be attached since there is no LB
     return e2sar_py.DataPlane.Reassembler(
@@ -46,13 +48,17 @@ def get_reassembler():
 
 
 def verify_result_obj(res_obj):
+    """Helper function to check some of the return objects."""
     assert res_obj.has_error() is False
     assert res_obj.value() == 0
 
 
 @pytest.mark.b2b
 def test_b2b_send_bytes_recv_list():
-    """Back-to-back test for Segmenter::sendEvent() and Reassembler::getEvent()"""
+    """
+    Back-to-back test for Segmenter::sendEvent() and Reassembler::getEvent()
+    using the py::bytes & List interface.
+    """
     seg = get_segmenter()
     reas = get_reassembler()
 
@@ -65,7 +71,8 @@ def test_b2b_send_bytes_recv_list():
     verify_result_obj(res)
 
     res = seg.getSendStats()
-    assert res[1] == 0, "Error encountered after Segmenter opening send socket: {res[2]}"
+    assert res.msgCnt == 0,\
+        f"Error encountered after Segmenter opening send socket: {res.lastE2SARError}"
 
     # Send the string
     send_context = SEND_STR.encode('utf-8')
@@ -73,7 +80,7 @@ def test_b2b_send_bytes_recv_list():
     verify_result_obj(res)
 
     res = seg.getSendStats()
-    assert res[0] == 1, "segmenter.getSendStats did not get the correct msgCnt"  # sent only 1 message
+    assert res.msgCnt == 1, "Segmenter::getSendStats msgCnt error"
 
     time.sleep(1)  # has to wait for a few cycles for the reassembler to recv the msg
 
@@ -124,10 +131,29 @@ def test_b2b_send_numpy_get_numpy():
 
 
 # @pytest.mark.b2b
-# Lauch this one with python istead of pytest -m
+# Launch this one with python istead of pytest -m
 def test_b2b_send_numpy_queue_get_numpy():
     """
-    Back-to-back test for Segmenter::addToSendQueue() and Reassembler::getEvent() with numpy interfaces.
+    A "bonuns" Back-to-back test for Segmenter::addToSendQueue() and Reassembler::getEvent()
+    with numpy interfaces.
+
+    NOTE: It's not included in the b2b test because the numpy array size is really big and
+    may fail.
+
+    A fail run:
+        (e2sar) (e2sar) python test/py_test/test_b2b_DP.py 
+        Send numpy array of 200.0 MB for 5 times
+        Sent msg count: 282863, send MB: 1000.0
+        Rd 1, received 200.0 MB, total 200.0 MB
+        Rd 2, received 200.0 MB, total 400.0 MB
+        No message received, continuing
+        Rd 4, received 200.0 MB, total 600.0 MB
+        No message received, continuing
+        No message received, continuing
+        No message received, continuing
+        No message received, continuing
+        No message received, continuing
+        Receiving error after recv 600000000 bytes
     """
 
     seg = get_segmenter()
@@ -142,7 +168,7 @@ def test_b2b_send_numpy_queue_get_numpy():
     verify_result_obj(res)
 
     # Send 1D numpy array 5 times
-    num_elements = 50000000  # Push to 50e6 may fail
+    num_elements = 100000000  # push to 50e6 may fail, depends on your platform
     # Create a 2D numpy array and each time send 1 row
     send_array = np.array([np.full((num_elements,), i, dtype=np.uint8) for i in range(5)])
     print(f"Send numpy array of {send_array.nbytes / 5000000} MB for 5 times")
@@ -152,10 +178,11 @@ def test_b2b_send_numpy_queue_get_numpy():
         verify_result_obj(res)
 
     time.sleep(1)
-    # Verify we sent 5 messages
+
+    # Print the msgCnt of SendStats
     res = seg.getSendStats()
-    assert res[1] == 0, f"Send error occured with {res[0]} msg sent"
-    print(f"Sent msg count: {res[0]}, send MB: {send_array.nbytes / 1000000}")
+    assert res.errCnt == 0, f"Send error occured with {res.msgCnt} msg sent"
+    print(f"Sent msg count: {res.msgCnt}, send MB: {send_array.nbytes / 1000000}")
 
     # Recieve via a while loop
     recv_bytes = 0
