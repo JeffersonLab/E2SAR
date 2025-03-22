@@ -295,9 +295,9 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         py::arg("v6") = false);
 
     // Recv events part. Return py::tuple.
-    reas.def("getEvent",
-        [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes) -> py::tuple {
-            u_int8_t *eventBuf{nullptr};
+    reas.def("getEventBytes",
+        [](Reassembler& self) -> py::tuple {
+            u_int8_t *eventBuf = nullptr;
             size_t eventLen = 0;
             EventNum_t eventNum = 0;
             u_int16_t recDataId = 0;
@@ -307,23 +307,24 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             if (recvres.has_error()) {
                 std::cout << "Error encountered receiving event frames: "
                     << recvres.error().message() << std::endl;
-                return py::make_tuple(static_cast<int>(-2), eventLen, eventNum, recDataId);
+                // Return an empty buffer
+                return py::make_tuple(static_cast<int>(-2), py::bytes(), eventNum, recDataId);
             }
-            if (recvres.value() == -1) {
+
+            if (recvres.value() == -1 || eventBuf == nullptr || eventLen == 0) {
                 std::cout << "No message received, continuing" << std::endl;
-            } else {
-                // // Received event
-                // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
-                //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
-
-                // Convert eventBuf to a Python bytes object and update the Python list with it
-                recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
+                return py::make_tuple(static_cast<int>(-1), py::bytes(), eventNum, recDataId);
             }
 
-            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
+            // Received event
+            // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
+            //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
+
+            // Safely convert the buffer to Python bytes
+            py::bytes recv_bytes(reinterpret_cast<const char*>(eventBuf), eventLen);
+            return py::make_tuple(eventLen, recv_bytes, eventNum, recDataId);
     },
-    "Get an event from the Reassembler EventQueue. Use py::list[None] to accept the data.",
-    py::arg("recv_bytes_list"));
+    "Get an event from the Reassembler EventQueue. Use py.bytes to accept the data.");
 
     // Receive event as 1D numpy array with the provided numpy data type.
     reas.def("get1DNumpyArray",
@@ -350,7 +351,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             py::ssize_t num_elements = static_cast<py::ssize_t>(eventLen) / data_type.itemsize();
             py::array numpy_array(data_type, num_elements, eventBuf);
 
-            return py::make_tuple(recvres.value(), numpy_array, eventNum, recDataId);
+            return py::make_tuple(eventLen, numpy_array, eventNum, recDataId);
         },
         "Get an event from the Reassembler EventQueue as 1D numpy array.",
         py::arg("data_type"));
@@ -382,16 +383,15 @@ void init_e2sarDP_reassembler(py::module_ &m) {
                 // Create a numpy array from the event buffer with the specified dtype
                 py::array numpy_array(data_type, {num_elements}, eventBuf);
 
-                return py::make_tuple(recvres.value(), numpy_array, eventNum, recDataId);
+                return py::make_tuple(eventLen, numpy_array, eventNum, recDataId);
             },
             "Receive an event as a 1D numpy array in blocking mode.",
             py::arg("data_type"),
             py::arg("wait_ms") = 0);
 
 
-    reas.def("recvEvent",
-        [](Reassembler& self, /* py::list is mutable */ py::list& recv_bytes,
-        u_int64_t wait_ms) -> py::tuple {
+    reas.def("recvEventBytes",
+        [](Reassembler& self, u_int64_t wait_ms) -> py::tuple {
             u_int8_t *eventBuf{nullptr};
             size_t eventLen = 0;
             EventNum_t eventNum = 0;
@@ -399,26 +399,26 @@ void init_e2sarDP_reassembler(py::module_ &m) {
 
             auto recvres = self.recvEvent(&eventBuf, &eventLen, &eventNum, &recDataId, wait_ms);
 
+            // Return empty bytes object of return code is not 0
             if (recvres.has_error()) {
                 std::cout << "Error encountered receiving event frames: "
                     << recvres.error().message() << std::endl;
-                return py::make_tuple(static_cast<int>(-2), eventLen, eventNum, recDataId);
+                return py::make_tuple(static_cast<int>(-2), py::bytes(), eventNum, recDataId);
             }
+
             if (recvres.value() == -1) {
                 std::cout << "No message received, continuing" << std::endl;
-            } else {
-                // // Received event
-                // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
-                //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
-
-                // Convert eventBuf to a Python bytes object and update the Python list with it
-                recv_bytes[0] = py::bytes(reinterpret_cast<char*>(eventBuf), eventLen);
+                return py::make_tuple(static_cast<int>(-1), py::bytes(), eventNum, recDataId);
             }
 
-            return py::make_tuple(recvres.value(), eventLen, eventNum, recDataId);
+            // Received event
+            // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
+            //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
+            // Safely convert the buffer to Python bytes
+            py::bytes recv_bytes(reinterpret_cast<const char*>(eventBuf), eventLen);
+            return py::make_tuple(eventLen, recv_bytes, eventNum, recDataId);
     },
-    "Get an event in the blocking mode. Use py::list[None] to accept the data.",
-    py::arg("recv_bytes_list"),
+    "Get an event in the blocking mode. Use py.bytes to accept the data.",
     py::arg("wait_ms") = 0);
 
     // Return type of result<int>
