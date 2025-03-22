@@ -1,3 +1,12 @@
+#ifdef NETLINK_CAPABLE
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#endif
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+
 #include "e2sarNetUtil.hpp"
 
 namespace e2sar
@@ -6,9 +15,10 @@ namespace e2sar
      * Get MTU of a given interface. Used in constructors, so doesn't
      * return error.
      */
-    u_int16_t NetUtil::getMTU(const std::string &interfaceName) {
+    size_t NetUtil::getMTU(const std::string &interfaceName) noexcept 
+    {
         // Default MTU
-        u_int16_t mtu = 1500;
+        size_t mtu = 1500;
 
         int sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
         struct ifreq ifr;
@@ -20,7 +30,8 @@ namespace e2sar
         return mtu;
     }
 
-    result<std::string> NetUtil::getHostName() {
+    result<std::string> NetUtil::getHostName() noexcept 
+    {
         char nameBuf[255];
 
         if (!gethostname(nameBuf, 255)) 
@@ -29,6 +40,35 @@ namespace e2sar
             return ret;
         } else 
             return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to retrieve hostname"};
+    }
+
+    result<std::vector<ip::address>> NetUtil::getInterfaceIPs(const std::string &interfaceName, bool v6) noexcept 
+    {
+        struct ifaddrs *ifaddr;
+        std::vector<ip::address> ips;
+
+        if (getifaddrs(&ifaddr) == -1)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, strerror(errno)};
+        
+        // walk the list, multiple answers are possible
+        for (struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
+        {
+            if (ifa->ifa_addr == NULL)
+                continue;
+
+            std::string ifa_name{ifa->ifa_name};
+            if (ifa_name == interfaceName)
+            {
+                if ((not v6 and (ifa->ifa_addr->sa_family == AF_INET)) 
+                    || (v6 and (ifa->ifa_addr->sa_family == AF_INET6)))
+                {
+                    auto ifa_addr = (struct sockaddr_in*) ifa->ifa_addr;
+                    ips.push_back(ip::make_address(inet_ntoa(ifa_addr->sin_addr)));
+                }
+            }
+        }
+        freeifaddrs(ifaddr);
+        return ips;
     }
 #ifdef NETLINK_CAPABLE
     /**
@@ -84,22 +124,16 @@ namespace e2sar
             struct rtattr *rta = RTM_RTA(rtm);
             int rta_len = RTM_PAYLOAD(nlh);
 
+            // walk RTNETLINK attributes
             for (; RTA_OK(rta, rta_len); rta = RTA_NEXT(rta, rta_len)) {
                 if (rta->rta_type == RTA_OIF) {
                     int ifindex = *(int *)RTA_DATA(rta);
                     char ifname[IFNAMSIZ];
                     if_indextoname(ifindex, ifname);
-
-                    struct ifreq ifr;
-                    memset(&ifr, 0, sizeof(ifr));
-                    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
-
-                    if (ioctl(sock, SIOCGIFMTU, &ifr) < 0) 
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-
-                    //printf("MTU of interface %s (index %d) to %s is %d\n", ifname, ifindex, dest_ip, ifr.ifr_mtu);
+                    
+                    auto mtu = getMTU(ifname);
                     close(sock);
-                    return boost::make_tuple<std::string, u_int16_t>(ifname, ifr.ifr_mtu);
+                    return boost::make_tuple<std::string, u_int16_t>(ifname, mtu);
                 }
             }   
         }

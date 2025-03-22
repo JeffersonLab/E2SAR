@@ -136,10 +136,19 @@ namespace e2sar
                                      const boost::posix_time::time_duration &duration,
                                      const std::vector<std::string> &senders) noexcept 
     {
+        google::protobuf::Timestamp ts1;
+        if (duration.is_zero())
+        {
+            // duration of 0 means indefinite reservation
+            ts1.set_seconds(0);
+            ts1.set_nanos(0);
 
-        auto pt = second_clock::universal_time();
-        auto pt1 = pt + duration;
-        auto ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
+        } else 
+        {
+            auto pt = second_clock::universal_time();
+            auto pt1 = pt + duration;
+            ts1 = util::TimeUtil::TimeTToTimestamp(to_time_t(pt1));
+        }
         return reserveLB(lb_name, ts1, senders);
     }
 
@@ -446,6 +455,21 @@ namespace e2sar
         return 0;
     }
 
+    result<int> LBManager::registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, bool v6) noexcept
+    {
+
+        auto ipRes = _cpuri.getDataplaneLocalAddresses(v6);
+
+        if (ipRes.has_error())
+            return ipRes.error();
+
+        if (ipRes.value().size() == 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to determine outgoing dataplane address"};
+
+        return registerWorker(node_name, std::make_pair(ipRes.value()[0], node_port), weight, source_count, min_factor, max_factor);
+    }
+
+
     // deregister worker
     result<int> LBManager::deregisterWorker() noexcept 
     {
@@ -676,6 +700,45 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in RemoveSenders(): "s + status.error_message()};
         }
         return 0;
+    }
+
+    result<int> LBManager::addSenderSelf(bool v6) noexcept
+    {
+        auto ipRes = _cpuri.getDataplaneLocalAddresses(v6);
+
+        if (ipRes.has_error())
+            return ipRes.error();
+
+        if (ipRes.value().size() == 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to determine outgoing dataplane address"};
+
+        std::vector<std::string> strVec;
+        for_each(ipRes.value().begin(), ipRes.value().end(), [&strVec](const ip::address &a)
+            {
+                strVec.push_back(a.to_string());
+            }
+        );
+
+        return addSenders(strVec);
+    }
+
+    result<int> LBManager::removeSenderSelf(bool v6) noexcept
+    {
+        auto ipRes = _cpuri.getDataplaneLocalAddresses(v6);
+
+        if (ipRes.has_error())
+            return ipRes.error();
+
+        if (ipRes.value().size() == 0)
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to determine outgoing dataplane address"};
+
+        std::vector<std::string> strVec;
+        for_each(ipRes.value().begin(), ipRes.value().end(), [&strVec](const ip::address &a)
+            {
+                strVec.push_back(a.to_string());
+            }
+        );
+        return removeSenders(strVec);
     }
 
     /**

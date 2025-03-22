@@ -1,23 +1,30 @@
-project('E2SAR', 'cpp',
-        version: '0.1.8', default_options : ['cpp_std=c++17'])
+project('E2SAR', 'cpp', 
+        version: files('VERSION.txt'), default_options : ['cpp_std=c++17'])
 
 compiler = meson.get_compiler('cpp')
-
 
 if compiler.has_header('linux/netlink.h')
         add_project_arguments('-DNETLINK_CAPABLE', language: ['cpp'])
 endif
 
-zccode = '''
-#include<sys/socket.h>
+# check for both kernel capability and liburing-dev presence
+linker_flags = []
+if compiler.has_header('liburing.h') and compiler.has_header('linux/io_uring.h')
+        add_project_arguments('-DLIBURING_AVAILABLE', language: ['cpp'])
+	linker_flags += ['-luring']
+endif
+
+numacode = '''
+#include <numa.h>
+
 void f() {
-int fd = 0;
-int zerocopy = 1;
-int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));}
+  int res = numa_available();
+}
 '''
 
-if compiler.compiles(zccode, name: 'ZC check')
-        add_project_arguments('-DZEROCOPY_AVAILABLE', language: ['cpp'])
+if compiler.compiles(numacode, name: 'NUMA library check')
+        add_project_arguments('-DNUMA_AVAILABLE', language: ['cpp'])
+        linker_flags += ['-lnuma']
 endif
 
 affcode = '''
@@ -33,6 +40,31 @@ if compiler.compiles(affcode, name: 'CPU Affinity check')
         add_project_arguments('-DAFFINITY_AVAILABLE', language: ['cpp'])
 endif
 
+thaffcode = '''
+#define _GNU_SOURCE
+#include <pthread.h>
+void f() {
+cpu_set_t set;
+pthread_t thread = pthread_self();
+pthread_setaffinity_np(thread, sizeof(set), &set); }
+'''
+
+if compiler.compiles(thaffcode, name: 'Thread Affinity check')
+        add_project_arguments('-DTHRD_AFFINITY_AVAILABLE', language: ['cpp'])
+endif
+
+mmsgcode = '''
+#define _GNU_SOURCE
+#include <sys/socket.h>
+#include <stddef.h>
+void f() {
+  int ret = sendmmsg(0, NULL, 1, 0);
+}
+'''
+
+if compiler.compiles(mmsgcode, name: 'sendmmsg check')
+        add_project_arguments('-DSENDMMSG_AVAILABLE', language: ['cpp'])
+endif
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
@@ -44,8 +76,7 @@ glib_dep = dependency('glib-2.0')
 protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 # only needed for older compilers
-cpp = meson.get_compiler('cpp')
-stdcppfs_dep = cpp.find_library('stdc++fs', required: false)
+stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
 # On many platforms, gRPC C++ has to be manually installed and found.
 grpc_dep = dependency('grpc++', version: '>=1.54.1')

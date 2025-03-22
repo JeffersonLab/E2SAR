@@ -1,10 +1,12 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <set>
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include "e2sarUtil.hpp"
+#include "e2sarNetUtil.hpp"
 
 namespace e2sar
 {
@@ -17,6 +19,138 @@ namespace e2sar
     const std::string& get_Version() 
     {
         return E2SARVersion;
+    }
+
+    // vector of possible options
+    const std::vector<Optimizations::Code> Optimizations::available {
+        Optimizations::Code::none
+#ifdef SENDMMSG_AVAILABLE
+        , Optimizations::Code::sendmmsg
+#endif
+#ifdef LIBURING_AVAILABLE
+        , Optimizations::Code::liburing_send, Optimizations::Code::liburing_recv
+#endif
+    };
+
+    Optimizations* Optimizations::instance{nullptr};
+
+    /**
+     * List of strings of available optimizations that are compiled in
+     */
+    const std::vector<std::string> Optimizations::availableAsStrings() noexcept 
+    {
+        std::vector<std::string> all_strings;
+        for(auto o: available)
+        {
+            all_strings.push_back(toString(o));
+        }
+        return all_strings;
+    }
+
+    /**
+     * A word bit-wise ORing all available optimizationsn
+     */
+    const OptimizationsWord Optimizations::availableAsWord() noexcept 
+    {
+        OptimizationsWord ow{0};
+        for(auto o: available)
+        {
+            ow = ow | toWord(o);
+        }
+        return ow;
+    }
+
+    /**
+     * Select optimizations based on names
+     */
+    result<int> Optimizations::select(std::vector<std::string>& opts) noexcept
+    {
+        std::vector<Optimizations::Code> v;
+        for(auto o: opts) 
+        {
+            v.push_back(fromString(o));
+        }
+        return select(v);
+    }
+
+    /**
+     * Select optimizations based on enum value names
+     */
+    result <int> Optimizations::select(std::vector<Code> &opt) noexcept 
+    {
+        OptimizationsWord ow = availableAsWord();
+        Optimizations *inst = _get();
+
+        for (auto o: opt)
+        {
+            OptimizationsWord ov = toWord(o);
+            if (not (ov & ow))
+            {
+                inst->selected_optimizations = toWord(Code::none);
+                return E2SARErrorInfo{E2SARErrorc::NotFound, "Requested optimization "s + toString(o) + 
+                    " is not available on this platform"s};
+            }
+            inst->selected_optimizations = inst->selected_optimizations | ov;
+        }
+
+        // check for conflict
+        if (isSelected(Code::sendmmsg) and
+            (isSelected(Code::liburing_recv) or 
+            isSelected(Code::liburing_send)))
+        {
+            inst->selected_optimizations = toWord(Code::none);
+            return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
+        }
+
+        // remove 'none' if other optimizations are selected
+        if (inst->selected_optimizations ^ inst->toWord(Code::none))
+            inst->selected_optimizations = inst->selected_optimizations ^ toWord(Code::none);
+        return 0;
+    }
+
+    /**
+     * List of strings of selected optimizations
+     */
+    const std::vector<std::string> Optimizations::selectedAsStrings() noexcept
+    {
+        std::vector<Code> opts = selectedAsList();
+        std::vector<std::string> ret;
+        for(auto o: opts)
+        {
+            ret.push_back(toString(o));
+        }
+        return ret;
+    }
+
+    /**
+     * A word bitwise ORing all selected optimizations
+     */
+    const std::vector<Optimizations::Code> Optimizations::selectedAsList() noexcept 
+    {
+        std::vector<Code> ret;
+        Optimizations *inst = _get();
+        for(auto o: inst->available) 
+        {
+            if (isSelected(o))
+                ret.push_back(o);
+        }
+        return ret;
+    }
+
+    const OptimizationsWord Optimizations::selectedAsWord() noexcept
+    {
+        std::vector<Code> codes = selectedAsList();
+        OptimizationsWord ow{0};
+
+        for(auto c: codes)
+            ow = ow | toWord(c);
+        return ow;
+    }
+
+    const bool Optimizations::isSelected(Code o) noexcept 
+    {
+        Optimizations *inst = _get();
+        return toWord(o) & inst->selected_optimizations;
     }
 
     /**
@@ -259,5 +393,38 @@ namespace e2sar
                (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
                (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
                (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
+    }
+
+    // determine local outgoing address towards the dataplane
+    result<std::vector<ip::address>> EjfatURI::getDataplaneLocalAddresses(bool v6) noexcept
+    {
+#ifdef NETLINK_CAPABLE
+        if (not has_dataAddr())
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have dataplane IP addresses"};
+
+        ip::address dpAddress;
+        if (v6)
+        {
+            if (has_dataAddrv6())
+                dpAddress = get_dataAddrv6().value().first;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv6 dataplane IP address"};
+        } else 
+        {
+            if (has_dataAddrv4())
+                dpAddress = get_dataAddrv4().value().first;
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "URI does not have IPv4 dataplane IP address"};
+        }
+
+        auto intfRes = NetUtil::getInterfaceAndMTU(dpAddress); 
+
+        if (intfRes.has_error())
+            return intfRes.error();
+
+        return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+#else
+        return E2SARErrorInfo{E2SARErrorc::SystemError, "Capability to determine outgoing address not supported on this platform"};
+#endif
     }
 }

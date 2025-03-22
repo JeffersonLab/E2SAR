@@ -41,6 +41,7 @@ void init_e2sarResultTypes(py::module_ &m);
 
 void init_e2sarCP(py::module_ &m);    // in a submodule "ControlPlane"
 void init_e2sarUtil(py::module_ &m);  // in the main module
+void init_e2sarAffinity(py::module_ &m);  // in the main module
 void init_e2sarHeaders(py::module_ &m);  // in the main module
 void init_e2sarDP(pybind11::module_ &m);    // in a submodule "DataPlane"
 
@@ -88,7 +89,7 @@ PYBIND11_MODULE(e2sar_py, m) {
             "__repr__", [](const E2SARErrorInfo &err) {
                 return "<E2SARErrorInfo(code=" + std::to_string(static_cast<int>(err.code())) +
                 ", message='" + err.message() + "')>";
-            });
+        });
 
     /**
      * Bind "IPAddress" class for future usage
@@ -117,6 +118,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     init_e2sarUtil(m);
     init_e2sarCP(m);
     init_e2sarDP(m);
+    init_e2sarAffinity(m);
 }
 
 
@@ -132,6 +134,7 @@ void init_e2sarResultTypes(py::module_ &m)
     bind_result<u_int32_t>(m, "E2SARResultUInt32");
     bind_result<std::pair<boost::asio::ip::address, uint16_t>>(m, "E2SARResultPairIP");
     bind_result<std::pair<std::string, uint16_t>>(m, "E2SARResultPairString");
+    bind_result<std::list<std::pair<u_int16_t, size_t>>>(m, "E2SARResultListOfFDPairs");
     bind_result<std::pair<u_int64_t, uint16_t>>(m, "E2SARResultPairUInt64");
     bind_result<Reassembler::ReassemblerFlags>(m, "E2SARResultReassemblerFlags");
     bind_result<Segmenter::SegmenterFlags>(m, "E2SARResultSegmenterFlags");

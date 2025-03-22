@@ -23,7 +23,7 @@ if [[ ${distro} == 'ubuntu' ]]; then
     # install missing software
     sudo apt-get -yq update
     sudo dpkg -r ufw
-    sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb docker.io firewalld
+    sudo apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb docker.io firewalld tshark
     
     # install meson
     if [[ ${version} == '24.04' ]]; then
@@ -78,5 +78,3 @@ chmod +x .docker/cli-plugins/docker-compose
 curl -SL https://github.com/docker/buildx/releases/download/v0.14.0/buildx-v0.14.0.linux-amd64  -o $DOCKER_CONFIG/cli-plugins/docker-buildx
 chmod +x .docker/cli-plugins/docker-buildx
 
-# put cpnode in etc hosts to enable testing certificate validation
-echo "192.168.0.3 cpnode" | sudo tee -a /etc/hosts

@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <pybind11/operators.h>
 
 #include "e2sarUtil.hpp"
@@ -8,6 +9,7 @@ using namespace e2sar;
 
 void init_e2sarUtil(py::module_ &m) {
 
+    //..............................................................
     // Bind the EjfatURI class in the main module
     py::class_<EjfatURI> ejfat_uri(m, "EjfatURI");
 
@@ -21,8 +23,7 @@ void init_e2sarUtil(py::module_ &m) {
     ejfat_uri.def(
         py::init<const std::string &, EjfatURI::TokenType, bool>(),
         py::arg("uri"), py::arg("tt") = EjfatURI::TokenType::admin, py::arg("preferV6") = false,
-        "Set instance token from string"
-        );
+        "Set instance token from string");
 
     // Private variables and their get/set methods are dealt with class_::def_property()
     // Ref: https://pybind11.readthedocs.io/en/stable/classes.html#instance-and-static-fields
@@ -54,6 +55,25 @@ void init_e2sarUtil(py::module_ &m) {
     ejfat_uri.def("get_data_addr_v6", &EjfatURI::get_dataAddrv6);
     ejfat_uri.def("get_sync_addr", &EjfatURI::get_syncAddr);
 
+    // Return type of result<std::vector<ip::address>> - return a list of IP strings
+    ejfat_uri.def("get_dp_local_addrs",
+        [](EjfatURI &self, bool v6 = false) {
+            auto res = self.getDataplaneLocalAddresses(v6);
+            if (res.has_error() || !res.has_value()) {
+                throw std::runtime_error("Failed to retrieve dataplane local addresses");
+            }
+
+            py::list py_ip_list;
+            auto ip_list = res.value();
+            for (const auto &ip : ip_list) {
+                std::string ip_str = ip.to_string();
+                py_ip_list.append(ip_str);
+            }
+
+            return py_ip_list;
+        },
+        py::arg("v6") = false);
+
     // Return type of result<std::pair<std::string, u_int16_t>>.
     ejfat_uri.def("get_cp_host", &EjfatURI::get_cpHost);
 
@@ -68,8 +88,7 @@ void init_e2sarUtil(py::module_ &m) {
 
     ejfat_uri.def(
         "to_string", &EjfatURI::to_string,
-        py::arg("tt") = EjfatURI::TokenType::admin
-        );
+        py::arg("tt") = EjfatURI::TokenType::admin);
 
     // Return type of result<EjfatURI>.
     ejfat_uri.def_static(
@@ -77,20 +96,48 @@ void init_e2sarUtil(py::module_ &m) {
         py::arg("env_var") = "EJFAT_URI",
         py::arg("tt") = EjfatURI::TokenType::admin,
         py::arg("preferV6") = false,
-        "Create EjfatURI object from environment variable 'EJFAT_URI'."
-    );
+        "Create EjfatURI object from environment variable 'EJFAT_URI'.");
+
     ejfat_uri.def_static(
         "get_from_string", &EjfatURI::getFromString,
         py::arg("_str"),
         py::arg("tt") = EjfatURI::TokenType::admin,
         py::arg("preferV6") = false,
-        "Create EjfatURI object from string."
-    );
+        "Create EjfatURI object from string.");
+
     ejfat_uri.def_static(
         "get_from_file", &EjfatURI::getFromFile,
         py::arg("_filename") = "/tmp/ejfat_uri",
         py::arg("tt") = EjfatURI::TokenType::admin,
         py::arg("preferV6") = false,
-        "Create EjfatURI object from a path indicated by a string."
-    );
+        "Create EjfatURI object from a path indicated by a string.");
+
+    //..............................................................
+    // Bind the Optimizations class in the main module
+    //
+    // pybind11 non-public destructors:
+    // https://pybind11.readthedocs.io/en/stable/advanced/classes.html#non-public-destructors
+    py::class_<Optimizations, std::unique_ptr<Optimizations, py::nodelete>> optimizations(m, "Optimizations");
+
+    optimizations
+        .def_static("toWord", &Optimizations::toWord)
+        .def_static("toString", &Optimizations::toString)
+        .def_static("fromString", &Optimizations::fromString)
+        .def_static("availableAsStrings", &Optimizations::availableAsStrings)
+        .def_static("availableAsWord", &Optimizations::availableAsWord)
+        .def_static("select", py::overload_cast<std::vector<std::string>&>(&Optimizations::select), py::arg("opt"))
+        .def_static("select", py::overload_cast<std::vector<Optimizations::Code>&>(
+                                                                &Optimizations::select), py::arg("opt"))
+        .def_static("selectedAsStrings", &Optimizations::selectedAsStrings)
+        .def_static("selectedAsWord", &Optimizations::selectedAsWord)
+        .def_static("selectedAsList", &Optimizations::selectedAsList)
+        .def_static("isSelected", &Optimizations::isSelected);
+
+    py::enum_<Optimizations::Code>(optimizations, "Code")
+        .value("none", Optimizations::Code::none)
+        .value("sendmmsg", Optimizations::Code::sendmmsg)
+        .value("liburing_send", Optimizations::Code::liburing_send)
+        .value("liburing_recv", Optimizations::Code::liburing_recv)
+        .value("unknown", Optimizations::Code::unknown)
+        .export_values();
 }

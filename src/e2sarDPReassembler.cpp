@@ -6,6 +6,7 @@
 
 #include "portable_endian.h"
 
+#include "e2sarAffinity.hpp"
 #include "e2sarDPReassembler.hpp"
 
 
@@ -48,7 +49,7 @@ namespace e2sar
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
         numRecvThreads{cpuCoreList.size()}, // as many as there are cores
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
-        portsToThreads(numRecvThreads),
+        threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
@@ -56,7 +57,7 @@ namespace e2sar
         useCP{rflags.useCP}
     {
         sanityChecks();
-        auto afres = setAffinity();
+        auto afres = Affinity::setProcess(cpuCoreList);
         if (afres.has_error())
             throw E2SARException(afres.error().message());
         // note if the user chooses to override portRange in rflags, 
@@ -80,7 +81,7 @@ namespace e2sar
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
         numRecvThreads{numRecvThreads},
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
-        portsToThreads(numRecvThreads),
+        threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
@@ -95,12 +96,91 @@ namespace e2sar
         assignPortsToThreads();
     }
 
+    Reassembler::Reassembler(const EjfatURI &uri,  u_int16_t starting_port,
+        std::vector<int> cpuCoreList,
+        const ReassemblerFlags &rflags, bool v6):
+        dpuri(uri),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
+        epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
+        Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
+        pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        cpuCoreList{cpuCoreList}, 
+        dataPort{starting_port},
+        portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
+        numRecvThreads{cpuCoreList.size()}, // as many as there are cores
+        numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
+        threadsToPorts(numRecvThreads),
+        withLBHeader{rflags.withLBHeader},
+        eventTimeout_ms{rflags.eventTimeout_ms},
+        rcvSocketBufSize{rflags.rcvSocketBufSize},
+        sendStateThreadState(*this, rflags.period_ms),
+        useCP{rflags.useCP}
+    {
+        auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
+        if (dpRes.has_error())
+            throw E2SARException(dpRes.error().message());
+
+        if (dpRes.value().size() == 0)
+            throw E2SARException("Unable to determine outgoing dataplane address");
+
+        dataIP = dpRes.value()[0];
+        sanityChecks();
+        auto afres = Affinity::setProcess(cpuCoreList);
+        if (afres.has_error())
+            throw E2SARException(afres.error().message());
+        // note if the user chooses to override portRange in rflags, 
+        // we can end up in a silly situation where the number of receive ports is smaller
+        // than the number of receive threads, but we handle it
+        // Need to break up M ports into at most N bins.
+        assignPortsToThreads();
+    }
+
+    Reassembler::Reassembler(const EjfatURI &uri,  u_int16_t starting_port,
+        size_t numRecvThreads, const ReassemblerFlags &rflags, bool v6):
+        dpuri(uri),
+        lbman(dpuri, rflags.validateCert, rflags.useHostAddress),
+        epochMs{rflags.epoch_ms}, setPoint{rflags.setPoint}, 
+        Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
+        weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
+        pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        cpuCoreList{std::vector<int>()}, // no core list given
+        dataPort{starting_port},
+        portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
+        numRecvThreads{numRecvThreads},
+        numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
+        threadsToPorts(numRecvThreads),
+        withLBHeader{rflags.withLBHeader},
+        eventTimeout_ms{rflags.eventTimeout_ms},
+        rcvSocketBufSize{rflags.rcvSocketBufSize},
+        sendStateThreadState(*this, rflags.period_ms),
+        useCP{rflags.useCP}
+    {
+        auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
+        if (dpRes.has_error())
+            throw E2SARException(dpRes.error().message());
+
+        if (dpRes.value().size() == 0)
+            throw E2SARException("Unable to determine outgoing dataplane address");
+            
+        dataIP = dpRes.value()[0];
+        sanityChecks();
+        // note if the user chooses to override portRange in rflags, 
+        // we can end up in a silly situation where the number of receive ports is smaller
+        // than the number of receive threads, but we handle it
+        // Need to break up M ports into at most N bins.
+        assignPortsToThreads();
+    }
+
+
     result<int> Reassembler::openAndStart() noexcept
     {
+        int maxFDPlusOne{0};
+        // open all file descriptors in all threads
         for(size_t i=0; i<numRecvThreads; i++)
         {
-            std::vector<int> portVec = std::vector<int>(portsToThreads[i].begin(), 
-                portsToThreads[i].end());
+            std::vector<int> portVec = std::vector<int>(threadsToPorts[i].begin(), 
+                threadsToPorts[i].end());
 
             // this constructor uses move semantics for port vector (not for cpu list tho)
             auto it = recvThreadState.emplace(recvThreadState.end(), *this, 
@@ -113,8 +193,19 @@ namespace e2sar
                return E2SARErrorInfo{E2SARErrorc::SocketError, 
                     "Unable to open receive sockets: " + open_stat.error().message()};
             }
+            // figure out the largest fd + 1 across all threads
+            maxFDPlusOne = (open_stat.value() > maxFDPlusOne ? open_stat.value() : maxFDPlusOne);
+        }
 
+        // create a place for per-fd stats - avoid reallocation
+        recvStats.fragmentsPerFd.resize(maxFDPlusOne);
+        recvStats.fragmentsPerFd.reserve(maxFDPlusOne); 
+
+        // now ready to start threads
+        for(auto it = recvThreadState.begin(); it != recvThreadState.end(); ++it)
+        {
             // start receive thread
+            // it is an iterator and we need a pointer, hence &(*it)
             boost::thread syncT(&Reassembler::RecvThreadState::_threadBody, &(*it));
             it->threadObj = std::move(syncT);
         }
@@ -149,7 +240,8 @@ namespace e2sar
                 auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                 if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
                     // check if this event number has been seen as lost
-                    logLostEvent(it->first);
+                    //logLostEvent(it->first, false);
+                    logLostEvent(it->second, false);
                     // deallocate event (ood queue and event buffer)
                     it->second->cleanup(recvBufferPool);
                     delete it->second->event;
@@ -189,6 +281,10 @@ namespace e2sar
                     reas.recvStats.lastErrno = errno;
                     continue;
                 }
+
+                // count fragment received by socket
+                reas.recvStats.fragmentsPerFd[fd]++;
+
                 // start a new event if offset 0 (check for event number collisions)
                 // or attach to existing event
                 REHdr *rehdr{nullptr};
@@ -229,10 +325,15 @@ namespace e2sar
                         eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                         // add segment into event out-of-order queue
                         item->oodQueue.push(Segment(recvBuffer, nbytes));
+                        // count this fragment of the event received before we continue
+                        item->numFragments++;
                         // done for now
                         continue;
                     }
                 }
+
+                // count this fragment received in main path
+                item->numFragments++;
 
                 // copy segment into event buffer if it is in sequence OR 
                 // attach to out of order priority queue.
@@ -298,7 +399,8 @@ namespace e2sar
                     // event lost on enqueuing
                     if (ret == 1) 
                     {
-                        logLostEvent(std::make_pair(item->eventNum, item->dataId));
+                        //logLostEvent(std::make_pair(item->eventNum, item->dataId), true);
+                        logLostEvent(item, true);
                         // free up the item
                         delete item;
                     }
@@ -382,11 +484,12 @@ namespace e2sar
             sockets.push_back(socketFd);
             FD_SET(socketFd, &fdSet);
             maxFdPlusOne = (maxFdPlusOne > socketFd ? maxFdPlusOne : socketFd);
+            reas.recvStats.portPerFd.resize(socketFd+1);
+            reas.recvStats.portPerFd[socketFd] = port; // which port is for this FD?
         }
 
         // make it plus one
-        maxFdPlusOne++;
-        return 0;
+        return ++maxFdPlusOne;
     }
 
     result<int> Reassembler::RecvThreadState::_close()
