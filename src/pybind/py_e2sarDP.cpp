@@ -151,6 +151,8 @@ void init_e2sarDP_segmenter(py::module_ &m) {
                 std::function<void(boost::any)> c_callback = nullptr;
                 if (!callback.is_none()) {
                     c_callback = [callback](boost::any arg) {
+                        // Acquire GIL before calling Python callback
+                        pybind11::gil_scoped_acquire acquire;
                         // Invoke the Python callback with the provided argument
                         callback(arg);
                     };
