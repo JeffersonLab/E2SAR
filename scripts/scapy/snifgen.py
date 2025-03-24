@@ -165,7 +165,7 @@ def validate_lb_packet(packet):
 # validate RE packet
 def validate_re_packet(packet):
     if not (packet.version == 1):
-        return False, "Expected version 1, not {packet.version}"
+        return False, f"Expected version 1, not {packet.version}"
     return True, ""
 
 # generic callback for all headers

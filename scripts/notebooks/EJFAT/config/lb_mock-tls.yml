@@ -12,6 +12,7 @@ lb:
     - "2001:DB8::4"
   mac_unicast: "AB:CD:DE:F1:23:45"
   mac_broadcast: "33:33:ff:00:00:16"
+  allow_private: true
 database:
   file: "/tmp/udplbd.db"
   collection:

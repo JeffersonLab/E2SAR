@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_SUITE(DPSyncTests)
 // as it takes the sync address directly from the EJFAT_URI
 BOOST_AUTO_TEST_CASE(DPSyncTest1)
 {
-    std::cout << "DPSyncTest1: test sync thread sending 10 sync frames (once a second for 10 seconds)" << std::endl;
+    std::cout << "DPSyncTest1: test sync thread sending 11 sync frames (once a second for 10 seconds + 1 sec warm up)" << std::endl;
 
     std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=10.251.100.122:12345&data=10.250.100.123"};
     EjfatURI uri(segUriString);
@@ -38,14 +38,15 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
     // create a segmenter and start the threads
     Segmenter seg(uri, dataId, eventSrcId, sflags);
 
+    // remember this will send one sync packet because of warm up
     auto res = seg.openAndStart();
 
     if (res.has_error())
         std::cout << "ERROR: " << res.error().message() << std::endl;
     BOOST_CHECK(!res.has_error());
 
-    std::cout << "Running sync test for 10 seconds" << 
-        uri.get_syncAddr().value().first << ":" << 
+    std::cout << "Running sync test for 10 seconds " << 
+        uri.get_syncAddr().value().first << ": " << 
         uri.get_syncAddr().value().second << 
         std::endl;
     // run for 10 seconds
@@ -53,13 +54,14 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
 
     auto syncStats = seg.getSyncStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
-    // send 10 sync messages and no errors
-    BOOST_CHECK(syncStats.get<0>() == 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    // send 10+1 (one second sleep before data frame is sent) sync messages and no errors
+    BOOST_CHECK(syncStats.msgCnt == 11);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // stop threads and exit
 }

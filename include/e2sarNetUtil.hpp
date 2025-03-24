@@ -1,11 +1,6 @@
 #ifndef E2SARDPNETUTILHPP
 #define E2SARDPNETUTILHPP
 
-#ifdef NETLINK_CAPABLE
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#endif
-
 #include <boost/asio.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -28,11 +23,16 @@ namespace e2sar
          * @param interfaceName - name of the interface
          * @return MTU or 1500 as the best guess
          */
-        static u_int16_t getMTU(const std::string &interfaceName);
+        static size_t getMTU(const std::string &interfaceName) noexcept;
         /**
          * Get the hostname of the host
          */
-        static result<std::string> getHostName();
+        static result<std::string> getHostName() noexcept;
+
+        /**
+         * get IPs of an interface (by name), either IPv4 or IPv6
+         */
+        static result<std::vector<ip::address>> getInterfaceIPs(const std::string &interfaceName, bool v6=false) noexcept;
 
 #ifdef NETLINK_CAPABLE
         /**

@@ -109,8 +109,14 @@ int main(int argc, char **argv)
     opts("time,t", po::value<uint64_t>(), "specify refresh time in ms (default is 5000ms)");
     
     po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, od), vm);
-    po::notify(vm);
+
+    try {
+        po::store(po::parse_command_line(argc, argv, od), vm);
+        po::notify(vm);
+    } catch (const boost::program_options::unknown_option& e) {
+            std::cout << "Unable to parse command line: " << e.what() << std::endl;
+            return -1;
+    }
 
     std::cout << "E2SAR Version: " << get_Version() << std::endl;
     if (vm.count("help") || vm.empty())
@@ -173,7 +179,7 @@ int main(int argc, char **argv)
 
     uint64_t update_time = 5000;
     if (vm.count("time")){
-        update_time = vm["count"].as<uint64_t>();
+        update_time = vm["time"].as<uint64_t>();
     }
 
     std::string lbid;
