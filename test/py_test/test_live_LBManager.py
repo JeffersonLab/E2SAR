@@ -22,7 +22,7 @@ URI_STR = "ejfats://udplbd@192.168.0.3:18347/lb/1?data=127.0.0.1&sync=192.168.88
 
 
 # Not included yet
-@pytest.mark.mockLB
+@pytest.mark.cp
 def test_add_sender_self():
     """Test the add_sender_self function."""
 
