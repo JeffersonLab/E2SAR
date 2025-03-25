@@ -38,6 +38,8 @@ Note that IP auto-detection features work in simple scenarios where the outgoing
 
 A fix for sendEvent handling of buffers. Addition of numpy support for sending and receiving numpy arrays. See tests/py_test/test_b2b_DP.py for examples.
 
+A fix for grabbing GIL when callbacks are invoked for addToSendQueue. 
+
 ## v0.1.7
 Added bash-helpers/ scripts that are installed in bin/ - they help test basic functionality by hiding much of the invocation complexity of tools like lbadm and e2sar_perf. The associated README.md explains the usage.
 
