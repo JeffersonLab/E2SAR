@@ -155,7 +155,11 @@ When running a Docker Hub version, then:
 ```
 $ docker run --rm ibaldin/e2sar:latest lbadm --version -u "ejfats://udplbd@192.168.0.3:18347/" -v
 ```
-(Notice that default docker network plumbing probably isn't appropriate for listening or sending packets using snifgen.py).
+To run `e2sar_perf` you must use `host` network driver like so (see help for the myriad of command line options):
+```bash
+$ docker run --rm --network host ibaldin/e2sar:latest e2sar_perf -h
+```
+Using `snifgen.py` also requires using `host` network driver if receiving live traffic.
 
 ### Development Docker
 
