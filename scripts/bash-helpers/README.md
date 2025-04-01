@@ -4,7 +4,7 @@
 
 These are bash wrapper scripts to simplify the use of the E2SAR tools like `lbadm` and `e2sar-perf`. They do not exercise all possible options or the best performance, their options are chosen to be conservative to help make things work as easy as possible at first.
 
-They presume E2SAR has been installed into the target system and would typically be found under `/usr/local/bin` if you didn't use a special installation destination prefix. 
+The scripts presume that E2SAR has either been installed into the target system and would typically be found under `/usr/local/bin` if you didn't use a special installation destination prefix; alternatively you can specify that you want to run it from docker as part of the configuration file discussed below. In this latter case local installation is not required - a docker image with necessary tools will be downloaded from Docker Hub.
 
 ## Workflow
 
