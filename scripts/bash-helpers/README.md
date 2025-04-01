@@ -17,11 +17,13 @@ This file follows a simple template shown below. Substitute your own values into
 You should obtain the admin EJFAT URI and add it  into this file as well. 
 
 ```bash
-export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
-export PATH=/usr/local/bin:$PATH
-
-# substitute the value of admin EJFAT URI here
-export EJFAT_URI='ejfats://admintoken@loadbalancerhost:port/'
+# will you run from docker or installed locally
+export E2SAR_IN_DOCKER=yes
+# if running in docker, you can omit setting PATH and LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:<custom e2sar install path>
+export PATH=<e2sar installation path>:$PATH
+# set your admin URI here
+export EJFAT_URI='<admin URI>'
 ```
 
 ### Step 2: Test that you can talk to the load balancer
