@@ -55,7 +55,7 @@ New instance URI is
 export EJFAT_URI='<instance EJFAT URI>'
 ```
 
-Note that this script will save the instance EJFAT URI into a file called $HOME/e2sar-instance.env for future use.
+Note that this script will print and save the instance EJFAT URI into a file called $HOME/e2sar-instance.env for future use.
 
 ### Step 4: Check the status of this instance
 
@@ -79,7 +79,7 @@ LB details: expiresat=2025-03-19T13:19:11Z, currentepoch=0, predictedeventnum=18
 
 At this point you can run sender and receiver in two separate shells to check that traffic passes through the data plane from this node. 
 
-Shell 1 (sender). Successful execution should show something like this. Note the send rate is locked to 1Gbps, event size to 1MB and number of events sent is 10,000: 
+Shell 1 (sender). Successful execution should show something like this. Note the send rate is locked to 1Gbps, event size to 1MB and number of events sent is 10,000. The `-a xxx.xxx.xxx.xxx` should be the address of the interface returned by `ip route get <data= address of printed EJFAT URI in Step 3>`, the `-m 1500` in this case is the conservative setting of the MTU:
 ```bash
 $ ./e2sar-sender.sh -a xxx.xxx.xxx.xxx -m 1500
 Sourcing global configuration in /home/XXXX/e2sar.env
@@ -101,7 +101,7 @@ Stopping threads
 Removing senders: xxx.xxx.xxx.xxx
 ```
 
-Shell 2 (receiver):
+Shell 2 (receiver), the `-a xxx.xxx.xxx.xxx` is the address of the interface returned by `ip route get <data= address from the EJFAT URI printed in Step3>` and `-d 30` is the duration in seconds to run the receiver before exiting:
 ```bash
 $ ./e2sar-receiver.sh -a xxx.xxx.xxx.xxx -d 30
 Sourcing global configuration in /home/XXXX/e2sar.env
