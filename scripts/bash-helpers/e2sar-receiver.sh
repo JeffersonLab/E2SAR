@@ -69,5 +69,5 @@ if [ ${E2SAR_IN_DOCKER} == "yes" ]; then
 else
 	COMMAND_PREFIX=""
 fi
-${COMMAND_PREFIX} e2sar_perf -r -d ${durationInSeconds} --ip ${myDataPlaneIP} --port ${startingUDPPort} --threads ${numReceiveThreads} --withcp -v
+${COMMAND_PREFIX} e2sar_perf -r -u ${EJFAT_URI} -d ${durationInSeconds} --ip ${myDataPlaneIP} --port ${startingUDPPort} --threads ${numReceiveThreads} --withcp -v
 

@@ -49,12 +49,12 @@ if [ ! -e ${HOME}/e2sar.env ]; then
 	exit -1
 fi
 source $HOME/e2sar.env
-echo 'Reserving a new load balancer for $duration hours and generating $HOME/e2sar-instance.env'
+echo "Reserving a new load balancer for $duration hours and generating $HOME/e2sar-instance.env"
 if [ ${E2SAR_IN_DOCKER} == "yes" ]; then
 	COMMAND_PREFIX="docker run --rm --network host ibaldin/e2sar"
 else
 	COMMAND_PREFIX=""
 fi
-${COMMAND_PREFIX} lbadm -v --reserve --lbname ${lbname} -d ${duration} -e > ${HOME}/e2sar-instance.env
+${COMMAND_PREFIX} lbadm -v --reserve --lbname ${lbname} -d ${duration} -u ${EJFAT_URI} -e > ${HOME}/e2sar-instance.env
 echo New instance URI is
 cat $HOME/e2sar-instance.env

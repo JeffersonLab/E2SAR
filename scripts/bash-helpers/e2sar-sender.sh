@@ -75,4 +75,4 @@ if [ ${E2SAR_IN_DOCKER} == "yes" ]; then
 else
 	COMMAND_PREFIX=""
 fi
-${COMMAND_PREFIX} e2sar_perf -s --mtu ${dataPlaneMTU} --rate ${dataRateInGbps} --length ${eventLengthInBytes} -n ${numEventsToSend} --ip ${myDataPlaneIP} --withcp -v
+${COMMAND_PREFIX} e2sar_perf -s -u ${EJFAT_URI} --mtu ${dataPlaneMTU} --rate ${dataRateInGbps} --length ${eventLengthInBytes} -n ${numEventsToSend} --ip ${myDataPlaneIP} --withcp -v

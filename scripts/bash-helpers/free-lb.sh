@@ -26,6 +26,6 @@ if [ ${E2SAR_IN_DOCKER} == "yes" ]; then
 else
 	COMMAND_PREFIX=""
 fi
-${COMMAND_PREFIX} lbadm -v --free
+${COMMAND_PREFIX} lbadm -v --free -u ${EJFAT_URI}
 echo Removing instance configuration in e2sar-instance.env
 rm -f $HOME/e2sar-instance.env

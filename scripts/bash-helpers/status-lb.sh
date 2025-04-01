@@ -26,4 +26,4 @@ if [ ${E2SAR_IN_DOCKER} == "yes" ]; then
 else
 	COMMAND_PREFIX=""
 fi
-${COMMAND_PREFIX} lbadm -v --status
+${COMMAND_PREFIX} lbadm -v --status -u ${EJFAT_URI}
