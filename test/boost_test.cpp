@@ -1,6 +1,8 @@
 #include <iostream>
 #include <system_error>
 #include <ctime>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/select.h>
 #include <boost/asio.hpp>
 #include <boost/outcome.hpp>
@@ -397,5 +399,61 @@ int main()
     std::cout << "Original timestamp " << now1Usec << " with added entropy " << addedEntropy << std::endl;
     std::cout << "Original & 0xFF " << (now1Usec & 0xFF) << " with added entropy & 0xFF " << (addedEntropy & 0xFF) << std::endl; 
     
+    std::string ar[] = 
+    {
+        "string1",
+        "string2"
+    };
+
+    std::string sum;
+
+    for (std::string s: ar)
+    {
+        sum += s + ", ";
+    }
+
+    std::cout << "The sum of strings: " << sum << std::endl;
+
+    // round-up integer divide
+    size_t maxPldLen = 9000;
+
+    for(size_t bytes = 35998; bytes < 36002; bytes++)
+    {
+        auto numFrames = (bytes + maxPldLen -1)/ maxPldLen;
+
+        std::cout << "Number of frames for event of size " << bytes << " and payload length " << maxPldLen << " is " << numFrames << std::endl;
+    }
+
+    std::vector<std::string> strs = {"one", "two", "three"};
+    auto it = strs.begin();
+    std::string rets{};
+    while(it != strs.end())
+    {
+        rets += *it;
+        it++;
+        if (it != strs.end())
+            rets += ", ";
+    }
+    std::cout << "Return string " << rets << std::endl;
+
+    // Duration
+    std::string duration{"00:00:00"};
+    auto duration_v = boost::posix_time::duration_from_string(duration);
+    std::cout << "Duration string " << duration << " converts to " << duration_v << std::endl;
+
+    // converting vector of IP addresses to vector of strings using lambdas
+    std::vector<ip::address> ipVec;
+    ipVec.push_back(ip::make_address("192.168.1.1"));
+    ipVec.push_back(ip::make_address("192.168.100.2"));
+
+    std::vector<std::string> strVec;
+
+    for_each(ipVec.begin(), ipVec.end(), [&strVec](const ip::address &a)
+        {
+            strVec.push_back(a.to_string());
+        }
+    );
+    for(auto a: strVec)
+        std::cout << "ADDRESS IS " << a << std::endl;
 }
 

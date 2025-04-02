@@ -81,17 +81,17 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     // send one event message per 2 seconds that fits into a single frame
     //
     auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
+    if (sendStats.errCnt != 0) 
     {
-        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
     }
     for(auto i=0; i<5;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
         }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::seconds(2));
@@ -101,20 +101,20 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     auto syncStats = seg.getSyncStats();
     sendStats = seg.getSendStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
     // send 10 sync messages and no errors
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() >= 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    BOOST_CHECK(syncStats.msgCnt >= 10);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // check the send stats
-    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+    std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 5);
-    BOOST_CHECK(sendStats.get<1>() == 0);
+    BOOST_CHECK(sendStats.msgCnt == 5);
+    BOOST_CHECK(sendStats.errCnt == 0);
 
     // call free - this will correctly use the admin token (even though instance token
     // is added by reserve call and updated URI inside with LB ID added to it
@@ -191,17 +191,17 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     // send one event message per 2 seconds that fits into a single frame
     //
     auto sendStats = seg.getSendStats();
-    if (sendStats.get<1>() != 0) 
+    if (sendStats.errCnt != 0) 
     {
-        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.get<2>()) << std::endl;
+        std::cout << "Error encountered after opening send socket: " << strerror(sendStats.lastErrno) << std::endl;
     }
     for(auto i=0; i<10;i++) {
         auto sendres = seg.addToSendQueue(reinterpret_cast<u_int8_t*>(eventString.data()), eventString.length());
         BOOST_CHECK(!sendres.has_error());
         sendStats = seg.getSendStats();
-        if (sendStats.get<1>() != 0) 
+        if (sendStats.errCnt != 0) 
         {
-            std::cout << "Error encountered sending event frames: " << strerror(sendStats.get<2>()) << std::endl;
+            std::cout << "Error encountered sending event frames: " << strerror(sendStats.lastErrno) << std::endl;
         }
         // sleep for a second
         boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
@@ -211,20 +211,20 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     auto syncStats = seg.getSyncStats();
     sendStats = seg.getSendStats();
 
-    if (syncStats.get<1>() != 0) 
+    if (syncStats.errCnt != 0) 
     {
-        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.get<2>()) << std::endl;
+        std::cout << "Error encountered sending sync frames: " << strerror(syncStats.lastErrno) << std::endl;
     }
     // send 10 sync messages and no errors
-    std::cout << "Sent " << syncStats.get<0>() << " sync frames" << std::endl;
-    BOOST_CHECK(syncStats.get<0>() >= 10);
-    BOOST_CHECK(syncStats.get<1>() == 0);
+    std::cout << "Sent " << syncStats.msgCnt << " sync frames" << std::endl;
+    BOOST_CHECK(syncStats.msgCnt >= 10);
+    BOOST_CHECK(syncStats.errCnt == 0);
 
     // check the send stats
-    std::cout << "Sent " << sendStats.get<0>() << " data frames" << std::endl;
+    std::cout << "Sent " << sendStats.msgCnt << " data frames" << std::endl;
     // send 5 event messages and no errors
-    BOOST_CHECK(sendStats.get<0>() == 20);
-    BOOST_CHECK(sendStats.get<1>() == 0);
+    BOOST_CHECK(sendStats.msgCnt == 20);
+    BOOST_CHECK(sendStats.errCnt == 0);
     
     // call free - this will correctly use the admin token (even though instance token
     // is added by reserve call and updated URI inside with LB ID added to it

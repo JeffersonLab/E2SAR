@@ -4,7 +4,7 @@
 
 These are bash wrapper scripts to simplify the use of the E2SAR tools like `lbadm` and `e2sar-perf`. They do not exercise all possible options or the best performance, their options are chosen to be conservative to help make things work as easy as possible at first.
 
-They presume E2SAR has been installed into the target system and would typically be found under `/usr/local/bin` if you didn't use a special installation destination prefix. 
+The scripts presume that E2SAR has either been installed into the target system and would typically be found under `/usr/local/bin` if you didn't use a special installation destination prefix; alternatively you can specify that you want to run it from docker as part of the configuration file discussed below. In this latter case local installation is not required - a docker image with necessary tools will be downloaded from Docker Hub.
 
 ## Workflow
 
@@ -17,11 +17,13 @@ This file follows a simple template shown below. Substitute your own values into
 You should obtain the admin EJFAT URI and add it  into this file as well. 
 
 ```bash
-export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
-export PATH=/usr/local/bin:$PATH
-
-# substitute the value of admin EJFAT URI here
-export EJFAT_URI='ejfats://admintoken@loadbalancerhost:port/'
+# will you run from docker or installed locally
+export E2SAR_IN_DOCKER=yes
+# if running in docker, you can omit setting PATH and LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:<custom e2sar install path>
+export PATH=<e2sar installation path>:$PATH
+# set your admin URI here
+export EJFAT_URI='<admin URI>'
 ```
 
 ### Step 2: Test that you can talk to the load balancer
@@ -55,7 +57,7 @@ New instance URI is
 export EJFAT_URI='<instance EJFAT URI>'
 ```
 
-Note that this script will save the instance EJFAT URI into a file called $HOME/e2sar-instance.env for future use.
+Note that this script will print and save the instance EJFAT URI into a file called $HOME/e2sar-instance.env for future use.
 
 ### Step 4: Check the status of this instance
 
@@ -79,7 +81,7 @@ LB details: expiresat=2025-03-19T13:19:11Z, currentepoch=0, predictedeventnum=18
 
 At this point you can run sender and receiver in two separate shells to check that traffic passes through the data plane from this node. 
 
-Shell 1 (sender). Successful execution should show something like this. Note the send rate is locked to 1Gbps, event size to 1MB and number of events sent is 10,000: 
+Shell 1 (sender). Successful execution should show something like this. Note the send rate is locked to 1Gbps, event size to 1MB and number of events sent is 10,000. The `-a xxx.xxx.xxx.xxx` should be the address of the interface returned by `ip route get <data= address of printed EJFAT URI in Step 3>`, the `-m 1500` in this case is the conservative setting of the MTU:
 ```bash
 $ ./e2sar-sender.sh -a xxx.xxx.xxx.xxx -m 1500
 Sourcing global configuration in /home/XXXX/e2sar.env
@@ -101,7 +103,7 @@ Stopping threads
 Removing senders: xxx.xxx.xxx.xxx
 ```
 
-Shell 2 (receiver):
+Shell 2 (receiver), the `-a xxx.xxx.xxx.xxx` is the address of the interface returned by `ip route get <data= address from the EJFAT URI printed in Step3>` and `-d 30` is the duration in seconds to run the receiver before exiting:
 ```bash
 $ ./e2sar-receiver.sh -a xxx.xxx.xxx.xxx -d 30
 Sourcing global configuration in /home/XXXX/e2sar.env

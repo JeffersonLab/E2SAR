@@ -293,6 +293,18 @@ namespace e2sar
          */
         result<int> removeSenders(const std::vector<std::string>& senders) noexcept;
 
+        /**
+         * Determine the caller's outgoing interface towards LB dataplane and register it as a sender
+         * @param - use IPv6 dataplane (default false)
+         */
+        result<int> addSenderSelf(bool v6=false) noexcept;
+
+        /**
+         * Determine the caller's outgoing interface towards LB dataplane and unregister as a sender
+         * @param - use IPv6 dataplane (default false)
+         */
+        result<int> removeSenderSelf(bool v6=false) noexcept;
+
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
          *
@@ -457,6 +469,26 @@ namespace e2sar
          * @return - 0 on success or an error condition
          */
         result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor) noexcept;
+
+        /**
+         * Register the calling worker workernode/backend with an allocated loadbalancer. 
+         * The node tries to determine its outgoing IP address towards LB dataplane.
+         * Note that this call uses instance token. It sets session token and session id on the internal
+         * URI object. Note that a new worker must send state immediately (within 10s)
+         * or be automatically deregistered.
+         *
+         * @param node_name - name of the node (can be FQDN)
+         * @param node_port - a u_int16_t starting UDP port on which it listens
+         * @param weight - weight given to this node in terms of processing power
+         * @param source_count - how many sources we can listen to (gets converted to port range [0,14])
+         * @param min_factor - multiplied with the number of slots that would be assigned evenly to determine min number of slots
+         * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
+         * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
+         * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
+         * @param v6 - use IPv6 dataplane (defaults to false)
+         * @return - 0 on success or an error condition
+         */
+        result<int> registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, bool v6=false) noexcept;
 
         /**
          * Deregister worker using session ID and session token from the register call

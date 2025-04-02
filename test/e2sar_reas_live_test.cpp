@@ -33,13 +33,37 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
 
     auto uri = uri_r.value();
 
+    // create LBManager
+    auto lbman = LBManager(uri, false);
+
+    // reserve an LB to get sync address
+    auto duration_v = pt::duration_from_string("01");
+    std::string lbname{"mylb"};
+    std::vector<std::string> senders{"192.168.100.1"s, "192.168.100.2"s};
+
+    // call reserve
+    auto res = lbman.reserveLB(lbname, duration_v, senders);
+
+    if (res.has_error())
+        std::cout << "Encountered error reserving LB: " << res.error().message() << std::endl;
+
+    BOOST_CHECK(!res.has_error());
+    BOOST_CHECK(!lbman.get_URI().get_InstanceToken().value().empty());
+    BOOST_CHECK(lbman.get_URI().has_syncAddr());
+    BOOST_CHECK(lbman.get_URI().has_dataAddr());
+
     Reassembler::ReassemblerFlags rflags;
     rflags.validateCert = false;
 
     ip::address loopback = ip::make_address("127.0.0.1");
     u_int16_t listen_port = 10000;
     // create a reassembler and start the threads
-    Reassembler reas(uri, loopback, listen_port, 1, rflags);
+    Reassembler reas(lbman.get_URI(), loopback, listen_port, 1, rflags);
+
+    auto reg_r = reas.registerWorker("testworker"s);
+    if (reg_r.has_error())
+        std::cout << "Error registering worker with LB: " << reg_r.error().message() << std::endl;
+    BOOST_CHECK(!reg_r.has_error());
 
     auto oas_r = reas.openAndStart();
 
@@ -53,25 +77,33 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
     // check the sync stats
     auto recvStats = reas.getStats();
 
-    if (recvStats.get<0>() != 0) 
+    auto dereg_r = reas.deregisterWorker();
+    if (dereg_r.has_error())
+        std::cout << "Error encountered deregistering a worker: " << dereg_r.error().message() << std::endl;
+
+    if (recvStats.enqueueLoss != 0) 
     {
-        std::cout << "Unexpected enqueue loss: " << strerror(recvStats.get<0>()) << std::endl;
+        std::cout << "Unexpected enqueue loss: " << strerror(recvStats.enqueueLoss) << std::endl;
     }
     // enqueue loss
-    BOOST_CHECK(recvStats.get<0>() == 0);
+    BOOST_CHECK(recvStats.enqueueLoss == 0);
     // gRPC error count
-    BOOST_CHECK(recvStats.get<3>() == 0);
+    BOOST_CHECK(recvStats.grpcErrCnt == 0);
     // data error count
-    BOOST_CHECK(recvStats.get<4>() == 0);
+    BOOST_CHECK(recvStats.dataErrCnt == 0);
 
     auto lostEvent = reas.get_LostEvent();
     if (lostEvent.has_error())
         std::cout << "NO EVENT LOSS " << std::endl;
     else
-        std::cout << "LOST EVENT " << lostEvent.value().first << ":" << lostEvent.value().second << std::endl;
+        std::cout << "LOST EVENT " << lostEvent.value().get<0>() << ":" << lostEvent.value().get<1>() << 
+            " received " << lostEvent.value().get<2>() << "frames" << std::endl;
     BOOST_CHECK(lostEvent.has_error() && lostEvent.error().code() == E2SARErrorc::NotFound);
 
     // stop threads and exit
+    auto free_r = lbman.freeLB();
+    if (free_r.has_error())
+        std::cout << "Error encountered freeing a load balancer: " << free_r.error().message() << std::endl;
 }
 
 BOOST_AUTO_TEST_SUITE_END()

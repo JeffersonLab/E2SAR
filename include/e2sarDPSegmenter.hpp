@@ -1,8 +1,16 @@
 #ifndef E2SARDSEGMENTERPHPP
 #define E2SARDSEGMENTERPHPP
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#ifdef LIBURING_AVAILABLE
+#include <liburing.h>
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/lockfree/queue.hpp>
+#include <boost/pool/pool.hpp>
 #include <boost/pool/object_pool.hpp>
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -16,6 +24,7 @@
 
 #include <atomic>
 
+#include "e2sar.hpp"
 #include "e2sarUtil.hpp"
 #include "e2sarHeaders.hpp"
 #include "e2sarNetUtil.hpp"
@@ -56,10 +65,13 @@ namespace e2sar
             const int sndSocketBufSize;
 
             // Max size of internal queue holding events to be sent. 
-            static const size_t QSIZE{2047};
+            static constexpr size_t QSIZE{2047};
+
+            // size of CQE batch we peek
+            static constexpr unsigned cqeBatchSize{100};
 
             // how long data send thread spends sleeping
-            static const boost::chrono::milliseconds sleepTime;
+            static constexpr boost::chrono::milliseconds sleepTime{1};
 
             // Structure to hold each send-queue item
             struct EventQueueItem {
@@ -80,6 +92,22 @@ namespace e2sar
             // to avoid locking the item pool send thread puts processed events 
             // on this queue so they can be freed opportunistically by main thread
             boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
+
+#ifdef LIBURING_AVAILABLE
+            struct io_uring ring;
+            // each ring has to have a predefined size - we want to
+            // put at least 2*eventSize/bufferSize entries onto it
+            const size_t uringSize = 1000;
+
+            // we need to be able to call the callback from the CQE thread
+            // instead of send thread when liburing optimization is turned on
+            struct SQEUserData 
+            {
+                struct msghdr* msghdr;
+                void (*callback)(boost::any);
+                boost::any cbArg;
+            };
+#endif
 
             // structure that maintains send stats
             struct SendStats {
@@ -104,9 +132,10 @@ namespace e2sar
             // to get better entropy in usec clock samples (if needed)
             boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
-            //
-            // atomic struct for stat information for sync and send threads
-            //
+            /**
+             * Internal structure of atomic counters to maintain stats on sending
+             * and sync messages
+             */
             struct AtomicStats {
                 // sync messages sent
                 std::atomic<u_int64_t> msgCnt{0}; 
@@ -114,6 +143,8 @@ namespace e2sar
                 std::atomic<u_int64_t> errCnt{0};
                 // last error code
                 std::atomic<int> lastErrno{0};
+                // last e2sar error
+                std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
             };
             // independent stats for each thread
             AtomicStats syncStats;
@@ -156,8 +187,6 @@ namespace e2sar
             friend struct SyncThreadState;
 
             SyncThreadState syncThreadState;
-            // lock with sync thread
-            //boost::mutex syncThreadMtx;
 
             /**
              * This thread sends data to the LB to be distributed to different processing
@@ -167,17 +196,18 @@ namespace e2sar
                 // owner object
                 Segmenter &seg;
                 boost::thread threadObj;
+                // thread index (to help pick core)
+                int threadIndex;
                 // connect socket flag (usually true)
                 const bool connectSocket{true};
 
                 // flags
                 const bool useV6;
-                const bool useZerocopy;
 
                 // transmit parameters
-                const size_t mtu; // must accommodate typical IP, UDP, LB+RE headers and payload
-                const std::string iface; // outgoing interface
-                const size_t maxPldLen;
+                size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
+                std::string iface{""}; // outgoing interface - we may set it if possible
+                size_t maxPldLen; // not a const because mtu is not a const
 
                 // UDP sockets and matching sockaddr structures (local and remote)
                 // <socket fd, local address, remote address>
@@ -189,9 +219,6 @@ namespace e2sar
                 // we RR through these FDs
                 size_t roundRobinIndex{0};
 
-                // pool of LB+RE headers for sending
-                boost::object_pool<LBREHdr> lbreHdrPool{32,0};
-
                 // fast random number generator to create entropy values for events
                 // this entropy value is held the same for all packets of a given
                 // event guaranteeing the same destination UDP port for all of them
@@ -202,19 +229,8 @@ namespace e2sar
                 // to get better entropy in usec clock samples (if needed)
                 boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
-                inline SendThreadState(Segmenter &s, bool v6, bool zc, u_int16_t mtu, bool cnct=true): 
-                    seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, mtu{mtu}, 
-                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
-                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
-                {
-                    // this way every segmenter send thread has a unique PRNG sequence
-                    auto nowT = boost::chrono::system_clock::now();
-                    ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
-                }
-
-                inline SendThreadState(Segmenter &s, bool v6, bool zc, const std::string &iface, bool cnct=true): 
-                    seg{s}, connectSocket{cnct}, useV6{v6}, useZerocopy{zc}, 
-                    mtu{NetUtil::getMTU(iface)}, iface{iface},
+                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool cnct=true): 
+                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
                     maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
@@ -228,17 +244,60 @@ namespace e2sar
                 // close sockets
                 result<int> _close();
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, u_int16_t entropy);
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
+                    u_int16_t entropy, void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
                 // thread loop
                 void _threadBody();
             };
             friend struct SendThreadState;
 
             SendThreadState sendThreadState;
+            const size_t numSendThreads{1};
+            // list of cores we can use to run threads
+            // can be longer than the number of threads
+            // thread at index i uses core cpuCoreList[i]
+            // we don't check cores are unique
+            const std::vector<int> cpuCoreList;
+
+#ifdef LIBURING_AVAILABLE
+            // this thread reaps completions off the uring
+            // and updates stat counters
+            struct CQEThreadState {
+                // owner object
+                Segmenter &seg;
+                boost::thread threadObj;
+
+                inline CQEThreadState(Segmenter &s): seg{s} 
+                {
+                    ;
+                }
+                void _threadBody();
+            };
+            friend struct CQEThreadState;
+
+            CQEThreadState cqeThreadState;
+
+            // between send and CQE reaping thread
+            boost::mutex cqeThreadMtx;
+            // condition variable for CQE thread waiting on new submissions
+            boost::condition_variable cqeThreadCond;
+            // wait time in ms before CQE thread checks if its time to stop
+            // we can't wait for too long - it only takes about 300usec
+            // to exhaust 256 SQEs using 1500 byte MTU at 10Gbps
+            static constexpr boost::chrono::microseconds cqeWaitTime{200};
+            // this is the sleep time for kernel thread in poll mode
+            // it is in milliseconds
+            static constexpr unsigned pollWaitTime{2000};
+            // atomic counter of outstanging sends
+            boost::atomic<u_int32_t> outstandingSends{0};
+#endif
+
             // lock with send thread
             boost::mutex sendThreadMtx;
             // condition variable for send thread
             boost::condition_variable sendThreadCond;
+            // warm up period in MS between sync thread starting and data being allowed to be sent
+            u_int16_t warmUpMs;
             // use control plane (can be disabled for debugging)
             bool useCP;
             // report zero event number change rate in Sync
@@ -246,6 +305,7 @@ namespace e2sar
             // use usec clock samples as event numbers in Sync and LB
             bool usecAsEventNum;
             // use additional entropy in the clock samples
+#define MIN_CLOCK_ENTROPY 6
             bool addEntropy;
 
             /**
@@ -262,29 +322,53 @@ namespace e2sar
                 if (sendThreadState.mtu > 9000)
                     throw E2SARException("MTU set too long, limit 9000");
 
-                if (!dpuri.has_syncAddr())
+                if (useCP and not dpuri.has_syncAddr())
                     throw E2SARException("Sync address not present in the URI");
 
-                if (!dpuri.has_dataAddr())
+                if (not dpuri.has_dataAddr())
                     throw E2SARException("Data address is not present in the URI");
+
+                if (sendThreadState.mtu <= TOTAL_HDR_LEN)
+                    throw E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
             }
 
             /** Threads keep running while this is false */
             bool threadsStop{false};
         public:
+            /**
+             * Structure in which statistics are reported back to user, sync
+             * and send stats are identical so same structure is used.
+             *  - u_int64_t msgCnt; // fragments sent
+             *  - u_int64_t errCnt; // errors encountered on send
+             *  - int lastErrno; // last errno recorded, use strerror() to get error message
+             *  - E2SARErrorc lastE2SARError; // last recorded E2SAR error (use make_error_code(stats.lastE2SARError).message())
+             */
+            struct ReportedStats {
+                u_int64_t msgCnt;
+                u_int64_t errCnt;
+                int lastErrno;
+                E2SARErrorc lastE2SARError;
+
+                ReportedStats() = delete;
+                ReportedStats(const AtomicStats &as): msgCnt{as.msgCnt}, errCnt{as.errCnt},
+                    lastErrno{as.lastErrno}, lastE2SARError{as.lastE2SARError}
+                    {}
+            };
+
             /** 
              * Because of the large number of constructor parameters in Segmenter
              * we make this a structure with sane defaults
              * - dpV6 - prefer V6 dataplane if the URI specifies both data=<ipv4>&data=<ipv6> addresses {false}
-             * - zeroCopy - use zeroCopy send optimization {false}
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
              * - zeroRate - don't provide event number change rate in Sync {false}
-             * - clockAsEventNum - use usec clock samples as event numbers in LB and Sync packets {false}
+             * - usecAsEventNum - use usec clock samples as event numbers in LB and Sync packets {true}
+             * - warmUpMs - a period of sending sync messages before data is allowed {1000}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
-             * IP, UDP and LBRE headers) {1500}
+             * IP, UDP and LBRE headers). Value of 0 means auto-detect based on MTU of outgoing interface
+             * - Linux only {1500}
              * - numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
@@ -293,20 +377,20 @@ namespace e2sar
             struct SegmenterFlags 
             {
                 bool dpV6; 
-                bool zeroCopy;
                 bool connectedSocket;
                 bool useCP;
                 bool zeroRate;
                 bool usecAsEventNum;
+                u_int16_t warmUpMs;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
                 size_t numSendSockets;
                 int sndSocketBufSize;
 
-                SegmenterFlags(): dpV6{false}, zeroCopy{false}, connectedSocket{true},
+                SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, zeroRate{false}, usecAsEventNum{true}, 
-                    syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
                 /**
                  * Initialize flags from an INI file
@@ -321,11 +405,13 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param sfalags - SegmenterFlags 
+             * @param cpuCoreList - list of cores that can be used by sending threads
+             * @param sflags - SegmenterFlags 
              */
             Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId,  
+                std::vector<int> cpuCoreList,
                 const SegmenterFlags &sflags=SegmenterFlags());
-#if 0
+
             /**
              * Initialize segmenter state. Call openAndStart() to begin operation.
              * @param uri - EjfatURI initialized for sender with sync address and data address(es)
@@ -333,14 +419,10 @@ namespace e2sar
              * carried in SAR header
              * @param eventSrcId - unique identifier of an individual LB packet transmitting host/daq, 
              * 32-bit to accommodate IP addresses more easily, carried in Sync header
-             * @param iface - use the following interface for data.
-             * (get MTU from the interface and, if possible, set it as outgoing - available on Linux)
-             * @param sflags - SegmenterFlags
+             * @param sflags - SegmenterFlags 
              */
-            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId, 
-                std::string iface=""s, 
+            Segmenter(const EjfatURI &uri, u_int16_t dataId, u_int32_t eventSrcId,  
                 const SegmenterFlags &sflags=SegmenterFlags());
-#endif
 
             /**
              * Don't want to be able to copy these objects normally
@@ -357,11 +439,24 @@ namespace e2sar
             ~Segmenter()
             {
                 stopThreads();
+#ifdef LIBURING_AVAILABLE
+                // release CQE thread one last time so it can quit in peace
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+                    cqeThreadCond.notify_all();
+#endif
 
                 // wait to exit
                 syncThreadState.threadObj.join();
                 sendThreadState.threadObj.join();
-
+#ifdef LIBURING_AVAILABLE
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+                {
+                    cqeThreadState.threadObj.join();
+                    io_uring_unregister_files(&ring);
+                    // deallocate the ring
+                    io_uring_queue_exit(&ring);
+                }
+#endif
                 // pool memory is implicitly freed when pool goes out of scope
             }
 
@@ -401,22 +496,27 @@ namespace e2sar
                 boost::any cbArg = nullptr) noexcept;
 
             /**
-             * Get a tuple <sync msg cnt, sync err cnt, last errno> of sync statistics.
-             * Stat structures have atomic members, no additional locking needed.
+             * Get a ReportedStats structure of sync statistics.
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getSyncStats() const noexcept
+            inline const ReportedStats getSyncStats() const noexcept
             {
-                return getStats(syncStats);
+                return ReportedStats(syncStats);
             }
 
             /**
-             * Get a tuple <event datagrams cnt, event datagrams err cnt, last errno>
-             * of send statistics. Stat structure have atomic members, no additional
-             * locking needed
+             * Get a ReportedStats structure of send statistics. 
              */
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getSendStats() const noexcept
+            inline const ReportedStats getSendStats() const noexcept
             {
-                return getStats(sendStats);
+                return ReportedStats(sendStats);
+            }
+
+            /**
+             * Get the outgoing interface (if available)
+             */
+            inline const std::string getIntf() const noexcept
+            {
+                return sendThreadState.iface;
             }
 
             /**
@@ -442,12 +542,6 @@ namespace e2sar
                 threadsStop = true;
             }
         private:
-            inline const boost::tuple<u_int64_t, u_int64_t, int> getStats(const AtomicStats &s) const
-            {
-                return boost::make_tuple<u_int64_t, u_int64_t, int>(s.msgCnt, 
-                    s.errCnt, s.lastErrno);
-            }
-
             // Calculate the average event rate from circular buffer
             // note that locking lives outside this function, as needed.
             // NOTE: this is only useful to sync messages if sequential
@@ -479,8 +573,6 @@ namespace e2sar
             inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
             {
                 EventRate_t reportedRate{0};
-                if (not zeroRate)
-                    reportedRate = eventRate;
                 EventNum_t reportedEventNum{lbEventNum};
                 if (usecAsEventNum) 
                 {
@@ -491,11 +583,17 @@ namespace e2sar
                     if (not zeroRate)
                         // 1 MHz in this case
                         reportedRate = 1000000;
+                } else
+                {
+                    if (not zeroRate)
+                        reportedRate = eventRate;
                 }
                 hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }
 
             // process backlog in return queue and free event queue item blocks on it
+            // so long as new events keep coming, backlog will be cleared, for last
+            // event the backlog gets cleared when the pool goes away (as part of object destruction)
             inline void freeEventItemBacklog() 
             {
                 EventQueueItem *item{nullptr};

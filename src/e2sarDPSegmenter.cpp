@@ -8,15 +8,20 @@
 #include "portable_endian.h"
 
 #include "e2sarDPSegmenter.hpp"
+#include "e2sarUtil.hpp"
+#include "e2sarAffinity.hpp"
 
 
 namespace e2sar 
 {
-    // set the sleep timer for the send thread - how long it waits on
-    // a condition for new events
-    const boost::chrono::milliseconds Segmenter::sleepTime(10);
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, 
+        const SegmenterFlags &sflags):
+        Segmenter(uri, did, esid, std::vector<int>(), sflags)
+    {
+    }
 
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid,  
+    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t did, u_int32_t esid, 
+        std::vector<int> cpuCoreList,
         const SegmenterFlags &sflags): 
         dpuri{uri}, 
         dataId{did},
@@ -25,37 +30,107 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
-        useCP{sflags.useCP},
-        zeroRate{sflags.zeroRate},
-        usecAsEventNum{sflags.usecAsEventNum},
-        addEntropy{(clockEntropyTest() > 6 ? false : true)}
-    {
-        sanityChecks();
-    }
-
-#if 0
-    Segmenter::Segmenter(const EjfatURI &uri, u_int16_t sid, 
-        const std::string iface, 
-        const SegmenterFlags &sflags): 
-        dpuri{uri}, 
-        dataId{did},
-        eventSrcId{esid},
-        numSendSockets{sflags.numSendSockets},
-        eventStatsBuffer{sflags.syncPeriods},
-        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        sendThreadState(*this, sflags.dpV6, sflags.zeroCopy, sflags.mtu, sflags.connectedSocket),
-        useCP{sflags.useCP},
-        zeroRate{sflags.zeroRate},
-        usecAsEventNum{sflags.usecAsEventNum},
-        addEntropy{(clockEntropyTest() > 6 ? false : true)}
-    {
-
-        // FIXME: get the MTU from interface and attempt to set as outgoing (on Linux).
-        // set maxPldLen
-        sanityChecks();
-    }
+        // set thread index to 0 for a single send thread
+        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
+        cpuCoreList{cpuCoreList},
+#ifdef LIBURING_AVAILABLE
+        cqeThreadState(*this),
 #endif
+        warmUpMs{sflags.warmUpMs},
+        useCP{sflags.useCP},
+        zeroRate{sflags.zeroRate},
+        usecAsEventNum{sflags.usecAsEventNum},
+        addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
+    {
+        size_t mtu = 0;
+#if NETLINK_CAPABLE
+        // determine the outgoing interface and its MTU based on URI data address 
+        ip::address dataaddr;
+        if (sflags.dpV6) 
+        {
+            // use dataplane v6 address for a routing query
+            auto data = dpuri.get_dataAddrv6();
+            if (data.has_error())
+                throw E2SARException("IPV6 Data address is not present in the URI"s);
+            dataaddr = data.value().first;
+        } else
+        {
+            // use dataplane v4 address for a routing query
+            auto data = dpuri.get_dataAddrv4();
+            if (data.has_error())
+                throw E2SARException("IPV4 Data address is not present in the URI"s);
+            dataaddr = data.value().first;
+        }
+        auto destintfres = NetUtil::getInterfaceAndMTU(dataaddr);
+
+        if (destintfres.has_error())
+            throw E2SARException("Unable to determine outgoing interface for LB destination address "s + 
+                dataaddr.to_string());
+
+        auto destintfmtu = destintfres.value().get<1>();
+        sendThreadState.iface = destintfres.value().get<0>();
+
+        if (sflags.mtu == 0)
+        {
+            if (destintfmtu > 0)
+                // if reported MTU size is non-zero we can use it
+                mtu = destintfmtu;
+            else
+                throw E2SARException("Outgoing interface MTU is reported as 0, please use manual override of MTU size");
+        }
+        else
+            if (destintfmtu > 0 )
+            {
+                // if destination interface reports proper non 0 MTU (lo doesn't)
+                // then we can check the override against the reported size
+                if (sflags.mtu <= destintfmtu)
+                    mtu = sflags.mtu;
+                else
+                    throw E2SARException("Segmenter flags MTU override value exceeds outgoing interface MTU of "s + 
+                        destintfres.value().get<0>());
+            }
+            else
+                // if destination interface reports 0 MTU we just use the override
+                mtu = sflags.mtu;
+#else
+        if (sflags.mtu == 0)
+            throw E2SARException("Unable to detect outgoing interface MTU on this platform"s);
+        else
+            mtu = sflags.mtu;
+#endif
+        // override the values set in constructor
+        sendThreadState.mtu = mtu;
+        sendThreadState.maxPldLen = mtu - TOTAL_HDR_LEN;
+        
+#ifdef LIBURING_AVAILABLE
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+        {
+            // probe for SENDMSG
+            struct io_uring_probe *probe = io_uring_get_probe();
+
+            if (probe == nullptr)
+                throw E2SARException("Unable to allocate io_uring probe, unable to proceed using liburing"s);
+
+            if (not io_uring_opcode_supported(probe, IORING_OP_SENDMSG))
+            {
+                free(probe);
+                throw E2SARException("Your kernel does not support the expected IO_URING operations (IORING_OP_SENDMSG)"s);
+            }
+            free(probe);
+            // init ring
+            struct io_uring_params params;
+            memset(&params, 0, sizeof(params));
+            // setup the kernel polling thread (it goes to sleep and restarts as needed under the covers)
+            // note we will register the file descriptors with the ring a bit later
+            params.flags |= IORING_SETUP_SQPOLL;
+            params.sq_thread_idle = pollWaitTime;
+            int err = io_uring_queue_init_params(uringSize, &ring, &params);
+            if (err)
+                throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
+        }
+#endif
+        sanityChecks();
+    }
 
     result<int> Segmenter::openAndStart() noexcept
     {
@@ -71,6 +146,8 @@ namespace e2sar
             // start the sync thread from method
             boost::thread syncT(&Segmenter::SyncThreadState::_threadBody, &syncThreadState);
             syncThreadState.threadObj = std::move(syncT);
+            // provide a 1 second warm-up period of sending SYNCs and no data
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(warmUpMs));
         }
 
         // open and connect send sockets
@@ -85,8 +162,90 @@ namespace e2sar
         boost::thread sendT(&Segmenter::SendThreadState::_threadBody, &sendThreadState);
         sendThreadState.threadObj = std::move(sendT);
 
+#ifdef LIBURING_AVAILABLE
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+        {
+            boost::thread CQET(&Segmenter::CQEThreadState::_threadBody, &cqeThreadState);
+            cqeThreadState.threadObj = std::move(CQET);
+        }
+#endif
+
         return 0;
     }
+
+#ifdef LIBURING_AVAILABLE
+    void Segmenter::CQEThreadState::_threadBody()
+    {
+        // lock for the mutex (must be thread-local)
+        thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
+        struct io_uring_cqe *cqes[cqeBatchSize];
+
+        // set this thread to run on any core not named in the vector
+        // those cores are reserved for send threads only
+        if (seg.cpuCoreList.size())
+        {
+            auto res = Affinity::setThreadXOR(seg.cpuCoreList);
+            if (res.has_error())
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastE2SARError = res.error().code();
+                return;
+            }
+        }
+
+        while(!seg.threadsStop)
+        {
+            condLock.lock();
+            seg.cqeThreadCond.wait_for(condLock, seg.cqeWaitTime);
+            condLock.unlock();
+
+            // empty cqe queue
+            while(seg.outstandingSends > 0)
+            {
+                // reap CQEs and update the stats
+                // should exit when the ring is deleted
+
+                memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
+                int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, cqeBatchSize);
+                // error or returned nothing
+                if (ret <= 0)
+                {
+                    // don't log error here - it is usually a temporary resource availability
+                    break;
+                }
+                for(int idx = 0; idx < ret; ++idx)
+                {
+                    // we have a CQE now
+                    // check for errors from sendmsg
+                    if (cqes[idx]->res < 0)
+                    {
+                        seg.sendStats.errCnt++;
+                        seg.sendStats.lastErrno = cqes[idx]->res;
+                    }
+                    auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
+                    auto callback = sqeUserData->callback;
+                    auto cbArg = std::move(sqeUserData->cbArg);
+                    // free the memory
+                    auto sqeMsgHdr = sqeUserData->msghdr;
+                    // deallocate the LBRE header
+                    free(sqeMsgHdr->msg_iov[0].iov_base);
+                    // deallocate the iovec itself
+                    free(sqeMsgHdr->msg_iov);
+                    // deallocate struct msghdr
+                    free(sqeMsgHdr);
+                    // deallocate sqeUserData
+                    free(sqeUserData);
+                    // mark CQE as done
+                    io_uring_cqe_seen(&seg.ring, cqes[idx]);
+                    // call the callback if not null (would happen at the end of the event buffer)
+                    if (callback != nullptr)
+                        callback(cbArg);
+                }
+                seg.outstandingSends -= ret;
+            }
+        }
+    }
+#endif
 
     void Segmenter::SyncThreadState::_threadBody()
     {
@@ -114,7 +273,10 @@ namespace e2sar
             }
 
             // peek at segmenter metadata circular buffer to calculate event rate
-            evtRate = seg.eventRate(currentTimeNanos);
+            if (seg.usecAsEventNum)
+                evtRate = 0; // will be overwritten by 1MHz
+            else
+                evtRate = seg.eventRate(currentTimeNanos); // calculate actual
 
             // fill the sync header using a mix of current and segmenter data
             // no locking needed - we only look at one field in seg - srcId
@@ -228,6 +390,17 @@ namespace e2sar
     void Segmenter::SendThreadState::_threadBody()
     {
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
+        // set sending thread affinity if core list is provided
+        if (seg.cpuCoreList.size())
+        {
+            auto res = Affinity::setThread(seg.cpuCoreList[threadIndex]);
+            if (res.has_error())
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastE2SARError = res.error().code();
+                return;
+            }
+        }
         while(!seg.threadsStop)
         {
             // block to get event off the queue and send
@@ -240,14 +413,29 @@ namespace e2sar
                 // call send overriding event number as needed
                 auto res = _send(item->event, item->bytes, 
                     item->eventNum, item->dataId,
-                    item->entropy);
-                // FIXME: do something with result? 
-                // maybe not - it should be taken care by lastErrno in
-                // the stats block
+                    item->entropy, item->callback, item->cbArg);
 
-                // call the callback
-                if (item->callback != nullptr)
-                    item->callback(item->cbArg);
+                // FIXME: do something with result? 
+                // it IS  taken care by lastErrno in the stats block. 
+                // Note that in the case of liburing
+                // result cannot reflect the status of any of the send
+                // operations since it is asynchronous - that is collected 
+                // by a separate thread that looks at completion queue
+                // and reflects into the stats block
+
+                // call the callback 
+#ifdef LIBURING_AVAILABLE
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+                {
+                    // do nothing - it will be called from CQE Reaping Thread
+                    ;
+                }
+                else
+#endif
+                {
+                    if (item->callback != nullptr)
+                        item->callback(item->cbArg);
+                }
 
                 // push the item back to return queue
                 seg.returnQueue.push(item);    
@@ -258,15 +446,12 @@ namespace e2sar
 
     result<int> Segmenter::SendThreadState::_open()
     {
-
-        // Open v4 and v6 sockets for sending data message via DP
-
-#ifdef ZEROCOPY_AVIALABLE
-        int zerocopy = 1;
+#ifdef LIBURING_AVAILABLE
+        // allocate int[] for passing FDs into the ring
+        int ringFds[socketFd4.size()];
+        unsigned int fdCount{0};
 #endif
-        // check that MTU setting was sane
-        if (mtu <= TOTAL_HDR_LEN)
-            return E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
+        // Open v4 and v6 sockets for sending data message via DP
 
         // create numSendSocket bound sockets either v6 or v4. With each socket
         // we save the sockaddr structure in case they are of not connected variety
@@ -322,25 +507,6 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-                
-                // set SO_ZEROCOPY on Linux
-                if (useZerocopy) {
-#ifdef ZEROCOPY_AVAILABLE
-                    int zerocopy = 1;
-                    int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
-                    if (errz < 0) {
-                        close(fd);
-                        seg.sendStats.errCnt++;
-                        seg.sendStats.lastErrno = errno;
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                    }
-#else
-                    close(fd);
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = errno;
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
-#endif
-                }
 
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
@@ -357,6 +523,9 @@ namespace e2sar
                     }
                 }
                 *i = boost::make_tuple<int, sockaddr_in6, sockaddr_in6>(fd, localAddrStruct6, dataAddrStruct6);
+#ifdef LIBURING_AVAILABLE
+                ringFds[fdCount++] = fd;
+#endif
             }
         } else 
         {
@@ -411,25 +580,6 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
 
-                // set SO_ZEROCOPY if needed
-                if (useZerocopy) {
-#ifdef ZEROCOPY_AVAILABLE
-                   int zerocopy = 1;
-                    int errz = setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY, &zerocopy, sizeof(zerocopy));
-                    if (errz < 0) {
-                        close(fd);
-                        seg.sendStats.errCnt++;
-                        seg.sendStats.lastErrno = errno;
-                        return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                    }
-#else
-                    close(fd);
-                    seg.sendStats.errCnt++;
-                    seg.sendStats.lastErrno = errno;
-                    return E2SARErrorInfo{E2SARErrorc::SocketError, "Zerocopy not available on this platform"};
-#endif
-                }
-
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
                 dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
@@ -445,26 +595,49 @@ namespace e2sar
                     }
                 }
                 *i = boost::make_tuple<int, sockaddr_in, sockaddr_in>(fd, localAddrStruct4, dataAddrStruct4);
+#ifdef LIBURING_AVAILABLE
+                ringFds[fdCount++] = fd;
+#endif
             }
         }
+
+#ifdef LIBURING_AVAILABLE
+        // register open file descriptors with the ring
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+        {
+            int ret = io_uring_register_files(&seg.ring, ringFds, fdCount);
+            if (ret < 0)
+            {
+                seg.sendStats.errCnt++;
+                seg.sendStats.lastErrno = ret;
+            }
+        }
+#endif
 
         return 0;
     }
 
     // fragment and send the event
     result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
-        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy)
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy,
+        void (*callback)(boost::any), boost::any cbArg)
     {
         int err;
-        struct iovec iov[2];
         int sendSocket{0};
         // having our own copy on the stack means we can call _send off-thread
         struct msghdr sendhdr{};
-#ifdef ZEROCOPY_AVAILABLE
-        int flags{(useZerocopy ? MSG_ZEROCOPY: 0)};
-#else   
         int flags{0};
+        // number of buffers we will send
+        size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
+#ifdef SENDMMSG_AVAILABLE 
+        // allocate mmsg vector based on event buffer size using fast int ceiling
+        struct mmsghdr *mmsgvec = nullptr;
+        size_t packetIndex = 0;
+        if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
+            // don't need calloc to spend time initializing it
+            mmsgvec = static_cast<struct mmsghdr*>(malloc(numBuffers*sizeof(struct mmsghdr)));
 #endif
+
         // new random entropy generated for each event buffer, unless user specified it
         if (entropy == 0)
             entropy = randDist(ranlux);
@@ -489,6 +662,9 @@ namespace e2sar
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
+#ifdef LIBURING_AVAILABLE
+        int currentFdIndex = roundRobinIndex; // since we registered fds with the ring, we need their indices
+#endif
         roundRobinIndex++;
 
         // fragment event, update/set iov and send in a loop
@@ -517,7 +693,11 @@ namespace e2sar
         while (curOffset < eventEnd)
         {
             // fill out LB and RE headers
-            auto hdr = lbreHdrPool.construct();
+            void *hdrspace = malloc(sizeof(LBREHdr));
+            // placement-new to construct the headers
+            auto hdr = new (hdrspace) LBREHdr();
+            // allocate iov (this returns two entries)
+            auto iov = static_cast<struct iovec*>(malloc(2*sizeof(struct iovec)));
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
@@ -537,37 +717,104 @@ namespace e2sar
             curOffset += curLen;
             curLen = (eventEnd > curOffset + maxPldLen ? maxPldLen : eventEnd - curOffset);
 
-#ifdef ZEROCOPY_AVIALABLE
-            if (useZerocopy)
+#ifdef SENDMMSG_AVAILABLE
+            if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
             {
-                // do recvmsg to get notification of successful transmission so header buffers
-                // can be freed up. Also to signal user via callback this is finished and event buffer
-                // can be reclaimed. Take care of both immediate send and queued send scenarios.
-                // To be continued.
-                err = (int) sendmsg(sendSocket, &sendhdr, flags);
+                // copy the contents of sendhdr into appropriate index of mmsgvec
+                memcpy(&mmsgvec[packetIndex].msg_hdr, &sendhdr, sizeof(sendhdr));
+                packetIndex++;
+            }
+            else 
+#endif
+#ifdef LIBURING_AVAILABLE
+            if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+            {
+                seg.sendStats.msgCnt++;
+                // get an SQE and fill it out
+                struct io_uring_sqe *sqe{nullptr};
+                // busy-wait for a free sqe to become available
+                while(not(sqe = io_uring_get_sqe(&seg.ring)));
+                // allocate struct msghdr - we can't use the stack version here
+                struct msghdr *sqeMsgHdr = static_cast<struct msghdr*>(malloc(sizeof(struct msghdr)));
+                memcpy(sqeMsgHdr, &sendhdr, sizeof(struct msghdr));
+                // allocate SQEUserData
+                SQEUserData *sqeUserData = static_cast<SQEUserData*>(malloc(sizeof(SQEUserData)));
+                sqeUserData->msghdr = sqeMsgHdr;
+                if (curOffset >= eventEnd)
+                {
+                    // this is the last segment, so we give this to CQE
+                    sqeUserData->callback = callback;
+                    sqeUserData->cbArg = std::move(cbArg);
+                } else
+                {
+                    // this is not the last segment
+                    sqeUserData->callback = nullptr;
+                    sqeUserData->cbArg = nullptr;
+                }
+                io_uring_prep_sendmsg(sqe, currentFdIndex, sqeMsgHdr, 0);
+                // so we can free up the memory later
+                io_uring_sqe_set_data(sqe, sqeUserData);
+                // index to previously registered fds, not fds themselves
+                io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
+                // submit for processing
+                io_uring_submit(&seg.ring);
             }
             else
 #endif
-            // Note: we don't need to check useZerocopy here - socket would've been closed
-            // in _open() call
             {
-                // non zerocopy method
+                // just regular sendmsg
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
+                // free the header here for this situation
+                free(hdr);
+                free(iov);
                 if (err == -1)
                 {
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-                // free the header here for this situation
-                lbreHdrPool.free(hdr);
             } 
         }
+#ifdef SENDMMSG_AVAILABLE
+        if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
+        {
+            // send using vector of msg_hdrs via sendmmsg
+            seg.sendStats.msgCnt += numBuffers;
+            // this is a blocking version so send everything or error out
+            err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
+            // free up mmsgvec and included headers and iovecs
+            for(size_t i = 0; i < numBuffers; i++)
+            {
+                free(mmsgvec[i].msg_hdr.msg_iov[0].iov_base);
+                free(mmsgvec[i].msg_hdr.msg_iov);
+            }
+            free(mmsgvec);
+            // sendmmsg returns the number of updated mmsgvec[i].msg_len entries
+            if (err != (int)numBuffers)
+            {
+                seg.sendStats.errCnt += numBuffers - err;
+                // don't override with ESUCCESS
+                if (errno != 0)
+                    seg.sendStats.lastErrno = errno;
+                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+            }
+        }
+#endif
+#ifdef LIBURING_AVAILABLE
+        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+        {
+            // increment atomic counter so CQE reaping thread
+            // knows there's work to do
+            seg.outstandingSends += numBuffers;
+            seg.cqeThreadCond.notify_all();
+        }
+#endif
         // update the event send stats
         seg.eventsInCurrentSync++;
 
-        return 0;
+        // keeps compiler quiet about numBuffers not used
+        return numBuffers * 0;
     }
 
     result<int> Segmenter::SendThreadState::_close()
@@ -591,7 +838,7 @@ namespace e2sar
 
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
-        // continue incrementing
+            // continue incrementing
             userEventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
             entropy);
@@ -612,7 +859,7 @@ namespace e2sar
         item->event = event;
         item->entropy = entropy;
         item->callback = callback;
-        item->cbArg = cbArg;
+        item->cbArg = std::move(cbArg);
         // continue incrementing 
         item->eventNum = userEventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
@@ -638,6 +885,7 @@ namespace e2sar
         sFlags.useCP = paramTree.get<bool>("general.useCP", sFlags.useCP);
 
         // control plane
+        sFlags.warmUpMs = paramTree.get<bool>("control-plane.warmUpMS", sFlags.warmUpMs);
         sFlags.syncPeriods = paramTree.get<u_int16_t>("control-plane.syncPeriods", 
             sFlags.syncPeriods);
         sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
@@ -649,7 +897,6 @@ namespace e2sar
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
-        sFlags.zeroCopy = paramTree.get<bool>("data-plane.zeroCopy", sFlags.zeroCopy);
         sFlags.connectedSocket = paramTree.get<bool>("data-plane.connectedSocket", 
             sFlags.connectedSocket);
         sFlags.mtu = paramTree.get<u_int16_t>("data-plane.mtu", sFlags.mtu);
