@@ -57,11 +57,13 @@ jobs:
                 gem install fpm
             elif [ "${DISTRO}" = "debian" ]; then
                 echo Installing for Debian
-                apt-get -yq update
                 if [ "${DISTRO_VER}" = "11" ]; then
+                  echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/bullseye-backports.list
+                  apt-get -yq update
                   apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler rubygems squashfs-tools git wget
                   apt-get -yq -t bullseye-backports install libre2-dev
                 else
+                  apt-get -yq update
                   apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler libre2-dev rubygems squashfs-tools git wget
                 fi
                 gem install fpm
