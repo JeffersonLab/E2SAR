@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04"]
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04","debian:bullseye", "debian:bookworm"]
     container:
       image: ${{ matrix.container }}
     steps:
@@ -59,6 +59,18 @@ jobs:
                 dnf -yq --enablerepo=devel install python3-pip autoconf cmake libtool pkg-config ninja-build openssl zlib-devel protobuf-compiler glib2-devel re2-devel libquadmath-devel python3-devel python3 git wget
                 dnf -yq install git wget
                 dnf -yq install ruby-devel gcc make rpm-build libffi-devel
+                gem install fpm
+            elif [ "${DISTRO}" = "debian" ]; then
+                echo Installing for Debian
+                if [ "${DISTRO_VER}" = "11" ]; then
+                  echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/bullseye-backports.list
+                  apt-get -yq update
+                  apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler rubygems squashfs-tools git wget
+                  apt-get -yq -t bullseye-backports install libre2-dev
+                else
+                  apt-get -yq update
+                  apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler libre2-dev rubygems squashfs-tools git wget
+                fi
                 gem install fpm
             fi
 
