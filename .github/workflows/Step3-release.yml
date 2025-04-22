@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04"]
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04","debian:bullseye", "debian:bookworm"]
     container:
       image: ${{ matrix.container }}
     steps:
@@ -106,6 +106,8 @@ jobs:
           if [ "${{ env.DISTRO }}" = "rocky" ]; then
             gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.rpm
           elif [ "${{ env.DISTRO }}" = "ubuntu" ]; then
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
+          elif [ "${{ env.DISTRO }}" = "debian" ]; then
             gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
           fi
         env:
