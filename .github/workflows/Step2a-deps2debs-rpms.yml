@@ -127,6 +127,8 @@ jobs:
             fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           elif [ "${{ env.DISTRO }}" = "rocky" ]; then
            fpm -s tar -t rpm -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
+          elif [ "${{ env.DISTRO }}" = "debian" ]; then
+            fpm -s tar -t deb -n e2sar-deps -v ${{ env.E2SAR_VER }} --prefix=/ e2sar-deps.tar.gz
           fi
 
       - name: Upload artifacts
