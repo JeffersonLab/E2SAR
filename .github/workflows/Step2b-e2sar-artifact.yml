@@ -179,7 +179,7 @@ jobs:
             sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
           elif [ "${{ env.DISTRO }}" = "rocky" ]; then
             sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib64/pkgconfig/e2sar.pc
-          if [ "${{ env.DISTRO }}" = "debian" ]; then
+          elif [ "${{ env.DISTRO }}" = "debian" ]; then
             sed -i "s|${{ env.IDIR }}|${{ env.FINAL_INSTALL }}|g" ${{ env.IDIR }}/lib/x86_64-linux-gnu/pkgconfig/e2sar.pc
           fi
 
@@ -190,7 +190,7 @@ jobs:
             fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           elif [ "${{ env.DISTRO }}" = "rocky" ]; then
             fpm -s tar -t rpm -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
-          if [ "${{ env.DISTRO }}" = "debian" ]; then
+          elif [ "${{ env.DISTRO }}" = "debian" ]; then
             fpm -s tar -t deb -n e2sar -v ${{ env.E2SAR_VER }} --prefix=/ e2sar.tar.gz
           fi
 
