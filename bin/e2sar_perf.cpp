@@ -431,6 +431,13 @@ int main(int argc, char **argv)
     if (vm.count("help"))
     {
         std::cout << od << std::endl;
+
+        std::cout << std::endl;
+
+        std::cout << "A trivial loopback invocation sending 10 1MB events at 1Gbps looks like this" << std::endl;
+        std::cout << "(start the receiver first, stop it with Ctrl-C when done): " << std::endl;
+        std::cout << "Receiver: e2sar_perf --ip '127.0.0.1' -r -u 'ejfat://token@127.0.0.1:18020/lb/36?data=127.0.0.1:10000'" << std::endl;
+        std::cout << "Sender:   e2sar_perf --ip '127.0.0.1' -s -u 'ejfat://token@127.0.0.1:18020/lb/36?data=127.0.0.1:10000' --rate 1" << std::endl;
         return 0;
     }
 
