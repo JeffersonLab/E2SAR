@@ -124,17 +124,11 @@ void freeBuffer(boost::any a)
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
     size_t eventBufSize, float rateGbps) {
 
-    // convert bit rate to event rate
-    float eventRate{rateGbps*1000000000/(eventBufSize*8)};
-    u_int64_t interEventSleepUsec{static_cast<u_int64_t>(eventBufSize*8/(rateGbps * 1000))};
-
     // to help print large integers
     std::cout.imbue(std::locale(""));
 
-    std::cout << "Sending bit rate is " << rateGbps << " Gbps" << std::endl;
+    std::cout << "Sending average bit rate is " << rateGbps << " Gbps" << std::endl;
     std::cout << "Event size is " << eventBufSize << " bytes or " << eventBufSize*8 << " bits" << std::endl;
-    std::cout << "Event rate is " << eventRate << " Hz" << std::endl;
-    std::cout << "Inter-event sleep time is " << interEventSleepUsec << " microseconds" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
     std::cout << "Using MTU " << s.getMTU() << std::endl;
@@ -153,9 +147,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     for(size_t evt = 0; evt < numEvents; evt++)
     {
-        // Get the current time point
-        auto nowT = boost::chrono::high_resolution_clock::now();
-
         // send the event
         auto eventBuffer = static_cast<u_int8_t*>(evtBufferPool->malloc());
         // fill in the first part of the buffer with something meaningful and also the end
@@ -163,21 +154,27 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
 
         // put on queue with a callback to free this buffer
-        auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
-            &freeBuffer, eventBuffer);
-
-        // sleep
-        auto until = nowT + boost::chrono::microseconds(interEventSleepUsec);
-        if (nowT > until)
+        while(true)
         {
-            return E2SARErrorInfo{E2SARErrorc::LogicError, 
-                "Clock overrun, either event buffer length too short or requested sending rate too high"};
+            auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
+                &freeBuffer, eventBuffer);
+            if (sendRes.has_error()) 
+            {
+                if (sendRes.error().code() == E2SARErrorc::MemoryError)
+                {
+                    // unable to send, queue full, try again
+                    ;
+                } else 
+                {
+                    std::cout << "Unexpected error submitting event into the queue: " << sendRes.error().message() << std::endl;
+                }
+            } else
+                break;
         }
         // free the backlog of empty buffers
         u_int8_t *item{nullptr};
         while (returnBufferQueue.pop(item))
             evtBufferPool->free(item);
-        boost::this_thread::sleep_until(until);
     }
 
     // measure this right after we exit the send loop
@@ -555,6 +552,7 @@ int main(int argc, char **argv)
                 sflags.numSendSockets = numSockets;
                 sflags.zeroRate = zeroRate;
                 sflags.usecAsEventNum = usecAsEventNum;
+                sflags.rateGbps = rateGbps;
             }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;

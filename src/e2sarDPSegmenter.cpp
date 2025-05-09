@@ -28,6 +28,7 @@ namespace e2sar
         eventSrcId{esid},
         numSendSockets{sflags.numSendSockets},
         sndSocketBufSize{sflags.sndSocketBufSize},
+        rateGbps{sflags.rateGbps},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
@@ -629,6 +630,12 @@ namespace e2sar
         int flags{0};
         // number of buffers we will send
         size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
+        // convert send rate into either inter-event or inter-frame sleep times
+        // inter-event is used with sendMmsg, inter-frame - with no optimizations and io_uring
+#ifdef SENDMMSG_AVAILABLE
+        u_int64_t interEventSleepUsec{static_cast<u_int64_t>(bytes*8/(seg.rateGbps * 1000))};
+#endif
+        u_int64_t interFrameSleepUsec{static_cast<u_int64_t>(mtu*8/(seg.rateGbps * 1000))};
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
         struct mmsghdr *mmsgvec = nullptr;
@@ -672,15 +679,17 @@ namespace e2sar
         u_int8_t *eventEnd = event + bytes;
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
+        // Get the current time point of event start
+        auto nowTE = boost::chrono::system_clock::now();
+
         // update the event number being reported in Sync and LB packets
         if (seg.usecAsEventNum)
         {
             // use microseconds since the UNIX Epoch, but make sure the entropy
             // of the 8lsb is sufficient (for LB)
-            // Get the current time point
-            auto nowT = boost::chrono::system_clock::now();
+
             // Convert the time point to microseconds since the epoch
-            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowTE.time_since_epoch()).count();
             if (seg.addEntropy) 
                 seg.lbEventNum = seg.addClockEntropy(now);
             else
@@ -729,6 +738,8 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
+                // get current clock in case we sleep
+                auto nowTF = boost::chrono::system_clock::now();
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
@@ -758,11 +769,19 @@ namespace e2sar
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
                 io_uring_submit(&seg.ring);
+                // if send rate set, sleep for inter-frame period
+                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
+                {
+                    auto until = nowTF + boost::chrono::microseconds(interFrameSleepUsec);
+                    boost::this_thread::sleep_until(until);
+                }
             }
             else
 #endif
             {
                 // just regular sendmsg
+                // get current clock in case we sleep
+                auto nowTF = boost::chrono::system_clock::now();
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 // free the header here for this situation
@@ -773,6 +792,12 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // if send rate set, sleep for inter-frame period
+                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
+                {
+                    auto until = nowTF + boost::chrono::microseconds(interFrameSleepUsec);
+                    boost::this_thread::sleep_until(until);
                 }
             } 
         }
@@ -798,6 +823,12 @@ namespace e2sar
                 if (errno != 0)
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+            }
+            // if send rate set, sleep for inter-event period
+            if (seg.rateGbps > 0. && interEventSleepUsec > 0)
+            {
+                auto until = nowTE + boost::chrono::microseconds(interEventSleepUsec);
+                boost::this_thread::sleep_until(until);
             }
         }
 #endif
@@ -863,10 +894,13 @@ namespace e2sar
         // continue incrementing 
         item->eventNum = userEventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
-        eventQueue.push(item);
+        auto res = eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
         sendThreadCond.notify_one();
-        return 0;
+        if (res)
+            return 0;
+        else
+            return E2SARErrorInfo{E2SARErrorc::MemoryError, "Send queue is temporarily full, try again later"};
     }
 
     result<Segmenter::SegmenterFlags> Segmenter::SegmenterFlags::getFromINI(const std::string &iniFile) noexcept
@@ -904,6 +938,8 @@ namespace e2sar
             sFlags.numSendSockets);
         sFlags.sndSocketBufSize = paramTree.get<int>("data-plane.sndSocketBufSize", 
             sFlags.sndSocketBufSize);
+        sFlags.rateGbps = paramTree.get<float>("data-plane.rateGbps",
+            sFlags.rateGbps);
 
         return sFlags;
     }
