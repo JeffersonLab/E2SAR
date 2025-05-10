@@ -178,6 +178,23 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     }
 
     // measure this right after we exit the send loop
+    while(true)
+    {
+        auto stats = s.getSendStats();
+        auto nowT = boost::chrono::high_resolution_clock::now();
+
+        // check if we can exit - either all events left the queue or
+        // there are errors
+        if ((expectedFrames == stats.msgCnt) ||
+            (stats.errCnt > 0) ||
+            (stats.lastE2SARError != E2SARErrorc::NoError))
+            break;
+
+        // sleep 10 ms and try again
+        auto until = nowT + boost::chrono::milliseconds(10);
+        boost::this_thread::sleep_until(until);
+    }
+
     auto stats = s.getSendStats();
     if (expectedFrames > stats.msgCnt)
         std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
