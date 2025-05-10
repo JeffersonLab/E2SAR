@@ -145,6 +145,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // initialize a pool of memory buffers  we will be sending (mostly filled with random data)
     evtBufferPool = new boost::pool<>{eventBufSize};
 
+    auto sendStartTime = boost::chrono::high_resolution_clock::now();
     for(size_t evt = 0; evt < numEvents; evt++)
     {
         // send the event
@@ -186,14 +187,14 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         // check if we can exit - either all events left the queue or
         // there are errors
         if ((expectedFrames == stats.msgCnt) ||
-            (stats.errCnt > 0) ||
-            (stats.lastE2SARError != E2SARErrorc::NoError))
+            (stats.errCnt > 0))
             break;
 
-        // sleep 10 ms and try again
-        auto until = nowT + boost::chrono::milliseconds(10);
+        // sleep 1 ms and try again
+        auto until = nowT + boost::chrono::milliseconds(1);
         boost::this_thread::sleep_until(until);
     }
+    auto sendEndTime = boost::chrono::high_resolution_clock::now();
 
     auto stats = s.getSendStats();
     if (expectedFrames > stats.msgCnt)
@@ -210,7 +211,13 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         }
         else
             std::cout << "Last error encountered: " << strerror(stats.lastErrno) << std::endl;
-    }
+    } 
+
+    // estimate the goodput
+    auto elapsedUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(sendEndTime - sendStartTime);
+    std::cout << "Elapsed usecs: " << elapsedUsec;
+    // *8 for bits, * 1000000 to convert time to seconds
+    std::cout << "Estimated goodput (bps): " << (stats.msgCnt * eventBufSize * 8000000.) / elapsedUsec.count();
 
     return 0;
 }
