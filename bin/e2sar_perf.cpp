@@ -217,7 +217,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     auto elapsedUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(sendEndTime - sendStartTime);
     std::cout << "Elapsed usecs: " << elapsedUsec << std::endl;
     // *8 for bits, * 1000000 to convert time to seconds
-    std::cout << "Estimated goodput (Gbps): " << (stats.msgCnt * eventBufSize * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
+    std::cout << "Estimated throughput (Gbps): " << (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
     return 0;
 }
