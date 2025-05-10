@@ -215,9 +215,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     // estimate the goodput
     auto elapsedUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(sendEndTime - sendStartTime);
-    std::cout << "Elapsed usecs: " << elapsedUsec;
+    std::cout << "Elapsed usecs: " << elapsedUsec << std::endl;
     // *8 for bits, * 1000000 to convert time to seconds
-    std::cout << "Estimated goodput (bps): " << (stats.msgCnt * eventBufSize * 8000000.) / elapsedUsec.count();
+    std::cout << "Estimated goodput (Gbps): " << (stats.msgCnt * eventBufSize * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
     return 0;
 }
