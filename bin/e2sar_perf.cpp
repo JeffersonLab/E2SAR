@@ -408,13 +408,10 @@ int main(int argc, char **argv)
     try {
         po::store(po::parse_command_line(argc, argv, od), vm);
         po::notify(vm);
-    } catch (const boost::program_options::unknown_option& e) {
-            std::cout << "Unable to parse command line: " << e.what() << std::endl;
-            return -1;
+    } catch (const boost::program_options::error &e) {
+        std::cout << "Unable to parse command line: " << e.what() << std::endl;
+        return -1;
     }
-
-    // for ctrl-C
-    signal(SIGINT, ctrlCHandler);
 
     try
     {
@@ -444,6 +441,9 @@ int main(int argc, char **argv)
         std::cerr << "Error processing command-line options: " << le.what() << std::endl;
         return -1;
     }
+
+    // for ctrl-C
+    signal(SIGINT, ctrlCHandler);
 
     std::cout << "E2SAR Version:                 " << get_Version() << std::endl;
     std::cout << "E2SAR Available Optimizations: " << 
