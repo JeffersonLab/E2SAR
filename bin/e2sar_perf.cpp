@@ -191,8 +191,8 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             break;
 
         // sleep 1 ms and try again
-        auto until = nowT + boost::chrono::milliseconds(1);
-        boost::this_thread::sleep_until(until);
+        //auto until = nowT + boost::chrono::milliseconds(1);
+        //boost::this_thread::sleep_until(until);
     }
     auto sendEndTime = boost::chrono::high_resolution_clock::now();
 
