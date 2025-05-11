@@ -839,8 +839,8 @@ namespace e2sar
         // update the event send stats
         seg.eventsInCurrentSync++;
 
-        // keeps compiler quiet about numBuffers not used
-        return numBuffers * 0;
+        // keeps compiler quiet about unused variables in default optimizations
+        return interEventSleepUsec * numBuffers * 0;
     }
 
     result<int> Segmenter::SendThreadState::_close()
