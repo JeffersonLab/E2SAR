@@ -182,7 +182,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     while(true)
     {
         auto stats = s.getSendStats();
-        auto nowT = boost::chrono::high_resolution_clock::now();
+//        auto nowT = boost::chrono::high_resolution_clock::now();
 
         // check if we can exit - either all events left the queue or
         // there are errors
@@ -217,7 +217,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     auto elapsedUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(sendEndTime - sendStartTime);
     std::cout << "Elapsed usecs: " << elapsedUsec << std::endl;
     // *8 for bits, * 1000000 to convert time to seconds
-    std::cout << "Estimated throughput (Gbps): " << (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
+    std::cout << "Estimated effective throughput (Gbps): " << (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
     return 0;
 }

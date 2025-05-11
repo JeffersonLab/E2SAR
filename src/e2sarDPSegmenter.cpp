@@ -678,7 +678,7 @@ namespace e2sar
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
         // Get the current time point of event start
-        auto nowTE = boost::chrono::system_clock::now();
+        auto nowTE = boost::chrono::high_resolution_clock::now();
 
         // update the event number being reported in Sync and LB packets
         if (seg.usecAsEventNum)
@@ -839,8 +839,14 @@ namespace e2sar
         // if send rate set, sleep for inter-event period
         if (seg.rateGbps > 0. && interEventSleepUsec > 0)
         {
-            auto until = nowTE + boost::chrono::microseconds(interEventSleepUsec);
-            boost::this_thread::sleep_until(until);
+//            auto until = nowTE + boost::chrono::microseconds(interEventSleepUsec);
+//            boost::this_thread::sleep_until(until);
+            while(true)
+            {
+                // busy wait checking the clock
+                if (boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::high_resolution_clock::now() - nowTE).count() > interEventSleepUsec)
+                    break;
+            }            
         }
 
         // keeps compiler quiet about numBuffers not used
