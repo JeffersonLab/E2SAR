@@ -632,7 +632,7 @@ namespace e2sar
         size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
         // convert send rate into either inter-event or inter-frame sleep times
         // inter-event is used with sendMmsg, inter-frame - with no optimizations and io_uring
-        u_int64_t interEventSleepUsec{static_cast<u_int64_t>(bytes*8/(seg.rateGbps * 1000))};
+        int64_t interEventSleepUsec{static_cast<int64_t>(bytes*8/(seg.rateGbps * 1000))};
 //        u_int64_t interFrameSleepUsec{static_cast<u_int64_t>(mtu*8/(seg.rateGbps * 1000))};
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
