@@ -182,24 +182,19 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     while(true)
     {
         auto stats = s.getSendStats();
-//        auto nowT = boost::chrono::high_resolution_clock::now();
 
         // check if we can exit - either all events left the queue or
         // there are errors
         if ((expectedFrames == stats.msgCnt) ||
             (stats.errCnt > 0))
             break;
-
-        // sleep 1 ms and try again
-        //auto until = nowT + boost::chrono::milliseconds(1);
-        //boost::this_thread::sleep_until(until);
     }
     auto sendEndTime = boost::chrono::high_resolution_clock::now();
 
     auto stats = s.getSendStats();
     if (expectedFrames > stats.msgCnt)
         std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
-            expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
+            expectedFrames << ")." << std::endl;
 
     evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
@@ -216,8 +211,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // estimate the goodput
     auto elapsedUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(sendEndTime - sendStartTime);
     std::cout << "Elapsed usecs: " << elapsedUsec << std::endl;
-    // *8 for bits, * 1000000 to convert time to seconds
-    std::cout << "Estimated effective throughput (Gbps): " << (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
+    // *8 for bits, *1000 to convert to Gbps
+    std::cout << "Estimated effective throughput (Gbps): " << 
+        (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
     return 0;
 }

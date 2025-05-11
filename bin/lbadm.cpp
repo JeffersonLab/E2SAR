@@ -430,7 +430,7 @@ int main(int argc, char **argv)
     try {
         po::store(po::parse_command_line(argc, argv, od), vm);
         po::notify(vm);
-    } catch (const boost::program_options::unknown_option& e) {
+    } catch (const boost::program_options::error& e) {
             std::cout << "Unable to parse command line: " << e.what() << std::endl;
             return -1;
     }
