@@ -124,17 +124,11 @@ void freeBuffer(boost::any a)
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
     size_t eventBufSize, float rateGbps) {
 
-    // convert bit rate to event rate
-    float eventRate{rateGbps*1000000000/(eventBufSize*8)};
-    u_int64_t interEventSleepUsec{static_cast<u_int64_t>(eventBufSize*8/(rateGbps * 1000))};
-
     // to help print large integers
     std::cout.imbue(std::locale(""));
 
-    std::cout << "Sending bit rate is " << rateGbps << " Gbps" << std::endl;
+    std::cout << "Sending average bit rate is " << rateGbps << " Gbps" << std::endl;
     std::cout << "Event size is " << eventBufSize << " bytes or " << eventBufSize*8 << " bits" << std::endl;
-    std::cout << "Event rate is " << eventRate << " Hz" << std::endl;
-    std::cout << "Inter-event sleep time is " << interEventSleepUsec << " microseconds" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
     std::cout << "Using MTU " << s.getMTU() << std::endl;
@@ -151,11 +145,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // initialize a pool of memory buffers  we will be sending (mostly filled with random data)
     evtBufferPool = new boost::pool<>{eventBufSize};
 
+    auto sendStartTime = boost::chrono::high_resolution_clock::now();
     for(size_t evt = 0; evt < numEvents; evt++)
     {
-        // Get the current time point
-        auto nowT = boost::chrono::high_resolution_clock::now();
-
         // send the event
         auto eventBuffer = static_cast<u_int8_t*>(evtBufferPool->malloc());
         // fill in the first part of the buffer with something meaningful and also the end
@@ -163,28 +155,46 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
 
         // put on queue with a callback to free this buffer
-        auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
-            &freeBuffer, eventBuffer);
-
-        // sleep
-        auto until = nowT + boost::chrono::microseconds(interEventSleepUsec);
-        if (nowT > until)
+        while(true)
         {
-            return E2SARErrorInfo{E2SARErrorc::LogicError, 
-                "Clock overrun, either event buffer length too short or requested sending rate too high"};
+            auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
+                &freeBuffer, eventBuffer);
+            if (sendRes.has_error()) 
+            {
+                if (sendRes.error().code() == E2SARErrorc::MemoryError)
+                {
+                    // unable to send, queue full, try again
+                    ;
+                } else 
+                {
+                    std::cout << "Unexpected error submitting event into the queue: " << sendRes.error().message() << std::endl;
+                }
+            } else
+                break;
         }
         // free the backlog of empty buffers
         u_int8_t *item{nullptr};
         while (returnBufferQueue.pop(item))
             evtBufferPool->free(item);
-        boost::this_thread::sleep_until(until);
     }
 
     // measure this right after we exit the send loop
+    while(true)
+    {
+        auto stats = s.getSendStats();
+
+        // check if we can exit - either all events left the queue or
+        // there are errors
+        if ((expectedFrames == stats.msgCnt) ||
+            (stats.errCnt > 0))
+            break;
+    }
+    auto sendEndTime = boost::chrono::high_resolution_clock::now();
+
     auto stats = s.getSendStats();
     if (expectedFrames > stats.msgCnt)
         std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
-            expectedFrames << "), sender is not keeping up with the requested send rate." << std::endl;
+            expectedFrames << ")." << std::endl;
 
     evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
@@ -196,7 +206,14 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         }
         else
             std::cout << "Last error encountered: " << strerror(stats.lastErrno) << std::endl;
-    }
+    } 
+
+    // estimate the goodput
+    auto elapsedUsec = boost::chrono::duration_cast<boost::chrono::microseconds>(sendEndTime - sendStartTime);
+    std::cout << "Elapsed usecs: " << elapsedUsec << std::endl;
+    // *8 for bits, *1000 to convert to Gbps
+    std::cout << "Estimated effective throughput (Gbps): " << 
+        (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
     return 0;
 }
@@ -387,13 +404,10 @@ int main(int argc, char **argv)
     try {
         po::store(po::parse_command_line(argc, argv, od), vm);
         po::notify(vm);
-    } catch (const boost::program_options::unknown_option& e) {
-            std::cout << "Unable to parse command line: " << e.what() << std::endl;
-            return -1;
+    } catch (const boost::program_options::error &e) {
+        std::cout << "Unable to parse command line: " << e.what() << std::endl;
+        return -1;
     }
-
-    // for ctrl-C
-    signal(SIGINT, ctrlCHandler);
 
     try
     {
@@ -423,6 +437,9 @@ int main(int argc, char **argv)
         std::cerr << "Error processing command-line options: " << le.what() << std::endl;
         return -1;
     }
+
+    // for ctrl-C
+    signal(SIGINT, ctrlCHandler);
 
     std::cout << "E2SAR Version:                 " << get_Version() << std::endl;
     std::cout << "E2SAR Available Optimizations: " << 
@@ -555,6 +572,7 @@ int main(int argc, char **argv)
                 sflags.numSendSockets = numSockets;
                 sflags.zeroRate = zeroRate;
                 sflags.usecAsEventNum = usecAsEventNum;
+                sflags.rateGbps = rateGbps;
             }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;

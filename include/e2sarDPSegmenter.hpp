@@ -64,6 +64,9 @@ namespace e2sar
             // send socket buffer size for setsockop
             const int sndSocketBufSize;
 
+            // send rate (ignore if negative)
+            const float rateGbps;
+
             // Max size of internal queue holding events to be sent. 
             static constexpr size_t QSIZE{2047};
 
@@ -304,7 +307,6 @@ namespace e2sar
             bool zeroRate;
             // use usec clock samples as event numbers in Sync and LB
             bool usecAsEventNum;
-            // use additional entropy in the clock samples
 #define MIN_CLOCK_ENTROPY 6
             bool addEntropy;
 
@@ -387,11 +389,12 @@ namespace e2sar
                 u_int16_t mtu;
                 size_t numSendSockets;
                 int sndSocketBufSize;
+                float rateGbps; 
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, zeroRate{false}, usecAsEventNum{true}, 
                     warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3} {}
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

@@ -526,6 +526,17 @@ namespace e2sar
         return rets;
     }
 
+    // busy wait for a given number of microseconds using high_resolution_clock timepoints
+    inline void busyWaitUsecs(const boost::chrono::steady_clock::time_point &tp, int64_t usecs)
+    {
+        while(true)
+        {
+            // busy wait checking the clock
+            if (boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::high_resolution_clock::now() 
+                - tp).count() > usecs)
+                break;
+        }   
+    }
 
     using OptimizationsWord = u_int16_t;
     /**

@@ -79,6 +79,7 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         .def_readwrite("mtu", &Segmenter::SegmenterFlags::mtu)
         .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets)
         .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
+        .def_readwrite("rageGbps", &Segmenter::SegmenterFlags::rateGbps)
         .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
     // Constructor-simple
