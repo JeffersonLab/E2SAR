@@ -633,7 +633,7 @@ namespace e2sar
         // convert send rate into either inter-event or inter-frame sleep times
         // inter-event is used with sendMmsg, inter-frame - with no optimizations and io_uring
         int64_t interEventSleepUsec{static_cast<int64_t>(bytes*8/(seg.rateGbps * 1000))};
-//        u_int64_t interFrameSleepUsec{static_cast<u_int64_t>(mtu*8/(seg.rateGbps * 1000))};
+        int64_t interFrameSleepUsec{static_cast<int64_t>(mtu*8/(seg.rateGbps * 1000))};
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
         struct mmsghdr *mmsgvec = nullptr;
@@ -737,7 +737,7 @@ namespace e2sar
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
                 // get current clock in case we sleep
-//                auto nowTF = boost::chrono::system_clock::now();
+                auto nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
@@ -768,18 +768,17 @@ namespace e2sar
                 // submit for processing
                 io_uring_submit(&seg.ring);
                 // if send rate set, sleep for inter-frame period
-//                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
-//                {
-//                    auto until = nowTF + boost::chrono::microseconds(interFrameSleepUsec);
-//                    boost::this_thread::sleep_until(until);
-//                }
+                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
+                {
+                    busyWaitUsecs(nowTF, interFrameSleepUsec);       
+                }
             }
             else
 #endif
             {
                 // just regular sendmsg
                 // get current clock in case we sleep
-//                auto nowTF = boost::chrono::system_clock::now();
+                auto nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 // free the header here for this situation
@@ -792,11 +791,10 @@ namespace e2sar
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
                 // if send rate set, sleep for inter-frame period
-//                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
-//                {
-//                    auto until = nowTF + boost::chrono::microseconds(interFrameSleepUsec);
-//                    boost::this_thread::sleep_until(until);
-//                }
+                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
+                {
+                    busyWaitUsecs(nowTF, interFrameSleepUsec);       
+                }
             } 
         }
 #ifdef SENDMMSG_AVAILABLE
@@ -822,6 +820,11 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
+            // busy wait if needed for inter-event period
+            if (seg.rateGbps > 0. && interEventSleepUsec > 0)
+            {
+                busyWaitUsecs(nowTE, interEventSleepUsec);       
+            }
         }
 #endif
 #ifdef LIBURING_AVAILABLE
@@ -835,19 +838,6 @@ namespace e2sar
 #endif
         // update the event send stats
         seg.eventsInCurrentSync++;
-
-        // if send rate set, sleep for inter-event period
-        if (seg.rateGbps > 0. && interEventSleepUsec > 0)
-        {
-//            auto until = nowTE + boost::chrono::microseconds(interEventSleepUsec);
-//            boost::this_thread::sleep_until(until);
-            while(true)
-            {
-                // busy wait checking the clock
-                if (boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::high_resolution_clock::now() - nowTE).count() > interEventSleepUsec)
-                    break;
-            }            
-        }
 
         // keeps compiler quiet about numBuffers not used
         return numBuffers * 0;
