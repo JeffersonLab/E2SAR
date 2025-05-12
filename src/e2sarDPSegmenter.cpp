@@ -746,8 +746,8 @@ namespace e2sar
                 // allocate struct msghdr - we can't use the stack version here
                 struct msghdr *sqeMsgHdr = static_cast<struct msghdr*>(malloc(sizeof(struct msghdr)));
                 memcpy(sqeMsgHdr, &sendhdr, sizeof(struct msghdr));
-                // allocate SQEUserData
-                SQEUserData *sqeUserData = static_cast<SQEUserData*>(malloc(sizeof(SQEUserData)));
+                // allocate SQEUserData, make sure allocated memory is zeroed out
+                SQEUserData *sqeUserData = static_cast<SQEUserData*>(calloc(1, sizeof(SQEUserData)));
                 sqeUserData->msghdr = sqeMsgHdr;
                 if (curOffset >= eventEnd)
                 {
