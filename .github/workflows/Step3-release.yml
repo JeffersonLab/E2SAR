@@ -104,11 +104,11 @@ jobs:
         run: |
           cd E2SAR
           if [ "${{ env.DISTRO }}" = "rocky" ]; then
-            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} --notes-from-tag v${{env.E2SAR_VER}} ./*.rpm
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.rpm
           elif [ "${{ env.DISTRO }}" = "ubuntu" ]; then
-            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} --notes-from-tag v${{env.E2SAR_VER}} ./*.deb
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
           elif [ "${{ env.DISTRO }}" = "debian" ]; then
-            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} --notes-from-tag v${{env.E2SAR_VER}} ./*.deb
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
           fi
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
