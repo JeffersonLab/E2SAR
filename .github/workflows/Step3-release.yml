@@ -78,7 +78,15 @@ jobs:
           # The option to enable + in sed regexps differs by OS so we avoid it
           name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
           echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
-          mkdir E2SAR
+
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: false
+          ref: v${{ env.E2SAR_VER }}
+          fetch-tags: true
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
 
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
