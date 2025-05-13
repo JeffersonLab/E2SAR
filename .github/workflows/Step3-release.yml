@@ -18,6 +18,11 @@ on:
         default: '0.1.5'
         type: string
         required: true
+      e2sar_branch:
+        description: 'E2SAR Branch'
+        default: 'main'
+        type: string
+        required: true
 
 jobs:
   build:
@@ -39,6 +44,7 @@ jobs:
             echo "BOOST_VER=${{ inputs.boost_ver }}" >> $GITHUB_ENV
             echo "GRPC_VER=${{ inputs.grpc_ver }}" >> $GITHUB_ENV
             echo "E2SAR_VER=${{ inputs.e2sar_ver }}" >> $GITHUB_ENV
+            echo "E2SAR_BRANCH=${{ inputs.e2sar_branch }}" >> $GITHUB_ENV
             
       - name: Install GH CLI tools
         run: |
@@ -72,15 +78,7 @@ jobs:
           # The option to enable + in sed regexps differs by OS so we avoid it
           name=$(echo -n "$name" | sed -e 's/[ \t:\/\\"<>|*?]/-/g' -e 's/--*/-/g')
           echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
-
-      - name: Checkout E2SAR code
-        uses: actions/checkout@v4
-        with:
-          path: E2SAR
-          submodules: false
-          ref: v${{ env.E2SAR_VER }}
-          fetch-tags: true
-          token: ${{ secrets.CLASSIC_REPO_PAT }}
+          mkdir E2SAR
 
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
@@ -104,11 +102,11 @@ jobs:
         run: |
           cd E2SAR
           if [ "${{ env.DISTRO }}" = "rocky" ]; then
-            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.rpm
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} --target ${{ env.E2SAR_BRANCH }} --notes-from-tag v${{ env.E2SAR_VER }} ./*.rpm
           elif [ "${{ env.DISTRO }}" = "ubuntu" ]; then
-            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} --target ${{ env.E2SAR_BRANCH }} --notes-from-tag v${{ env.E2SAR_VER }} ./*.deb
           elif [ "${{ env.DISTRO }}" = "debian" ]; then
-            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} ./*.deb
+            gh release create E2SAR-${{ env.E2SAR_VER }}-${{ github.ref_name }}-${{ env.ARTIFACT_NAME }} --target ${{ env.E2SAR_BRANCH }} --notes-from-tag v${{ env.E2SAR_VER }} ./*.deb
           fi
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
