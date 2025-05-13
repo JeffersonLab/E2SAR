@@ -2,6 +2,15 @@
 
 API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
 
+## v0.2.1
+
+Added rate pacing for the Segmenter. An additional field has been added: SegmenterFlags.rateGbps which specifies a floating point value of rate in Gbps. A negative value means ignore the setting and send as fast as possible. When a positive value is specified the sending code busy waits for the desired number of usecs either between frames (for sendmsg and io_uring) or between events (for sendmmsg). Note that when using Segmenter.addToSendQueue() the user must be careful to check that it doesn't return a E2SARErrorc::MemoryError which indicates that the queue is full (in this case the event should be resubmitted at a later time, the method by which the event submission code waits is left to the user).
+
+e2sar_perf now estimates the send rate based on the time elapsed, it is generally slightly smaller than the requested limit, up to the level where maximum rate is achieved.
+
+Bug Fixes:
+- When using io_uring on send the SQE structure was malloc'ed resulting in garbage contained in it, which led the move semantics for cbArg to fail since it tries to call a d-tor if the object is not null. Replaced with calloc. 
+
 ## v0.2.0
 
 Compared to 0.1.X this version introduces a number of enhancements, although it remains (largely) backward-compatible with 0.1.X releases. The list of enhancements/changes includes:
