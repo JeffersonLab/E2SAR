@@ -678,7 +678,11 @@ namespace e2sar
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
         // Get the current time point of event start
+        // we need both a high-res timer and system timer (different epochs)
+        auto nowT = boost::chrono::system_clock::now();
+#ifdef SENDMMSG_AVAILABLE
         auto nowTE = boost::chrono::high_resolution_clock::now();
+#endif
 
         // update the event number being reported in Sync and LB packets
         if (seg.usecAsEventNum)
@@ -687,7 +691,7 @@ namespace e2sar
             // of the 8lsb is sufficient (for LB)
 
             // Convert the time point to microseconds since the epoch
-            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowTE.time_since_epoch()).count();
+            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
             if (seg.addEntropy) 
                 seg.lbEventNum = seg.addClockEntropy(now);
             else

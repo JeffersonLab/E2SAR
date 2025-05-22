@@ -146,7 +146,8 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     evtBufferPool = new boost::pool<>{eventBufSize};
 
     auto sendStartTime = boost::chrono::high_resolution_clock::now();
-    for(size_t evt = 0; evt < numEvents; evt++)
+    size_t evt = 0;
+    for(; evt < numEvents; evt++)
     {
         // send the event
         auto eventBuffer = static_cast<u_int8_t*>(evtBufferPool->malloc());
@@ -214,6 +215,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // *8 for bits, *1000 to convert to Gbps
     std::cout << "Estimated effective throughput (Gbps): " << 
         (stats.msgCnt * s.getMTU() * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
+
+    std::cout << "Estimated goodput (Gbps): " <<
+        (evt * eventBufSize * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
     return 0;
 }
