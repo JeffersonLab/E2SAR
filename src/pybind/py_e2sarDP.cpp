@@ -327,6 +327,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
 
             // Safely convert the buffer to Python bytes
             py::bytes recv_bytes(reinterpret_cast<const char*>(eventBuf), eventLen);
+            delete eventBuf;
             return py::make_tuple(eventLen, recv_bytes, eventNum, recDataId);
     },
     "Get an event from the Reassembler EventQueue. Use py.bytes to accept the data.");
@@ -421,6 +422,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
             // Safely convert the buffer to Python bytes
             py::bytes recv_bytes(reinterpret_cast<const char*>(eventBuf), eventLen);
+            delete eventBuf;
             return py::make_tuple(eventLen, recv_bytes, eventNum, recDataId);
     },
     "Get an event in the blocking mode. Use py.bytes to accept the data.",
