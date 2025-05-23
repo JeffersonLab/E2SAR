@@ -216,7 +216,14 @@ There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which 
 
 ### Python
 
-The C++ unit tests `e2sar_uri_test` and `e2sar_reas_test` have been reproduced in Python Jupyter notebooks, which can be found at [scripts/notebooks/pybind11_examples/](scripts/notebooks/pybind11_examples/). The Python `e2sar_lbcp_live_test` is currently under development.
+The code can be tested using pytest
+
+- Make sure to pip install pytest and numpy
+- Set `PYTHONPATH` to point to build/src/pybind directory (so .so of the python bindings can be located)
+- Set `E2SARCONFIGDIR` to point to (absolute path) the location of E2SAR directory (e.g. ``cd E2SAR; export E2SARCONFIGDIR=`pwd` ``)
+- Run `cd src/pytest; pytest -m unit` to run unit tests (substitute `b2b` or other labels found in src/pytest/pytest.ini for other test suites)
+
+There are some example tests in have been reproduced in Python Jupyter notebooks, which can be found at [scripts/notebooks/pybind11_examples/](scripts/notebooks/pybind11_examples/). 
 
 ### Scapy
 

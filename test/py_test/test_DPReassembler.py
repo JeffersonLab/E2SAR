@@ -10,7 +10,8 @@ To make sure it's working, either append the path of "e2say_py.*.so" to sys.path
 Or, add this path to PYTHONPATH, e.g,
 # export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
-
+import os
+import sys
 import pytest
 
 # Make sure the compiled module is added to your path
@@ -19,7 +20,11 @@ reas = e2sar_py.DataPlane.Reassembler
 rflags = reas.ReassemblerFlags
 
 # Use absolute path and match the top dir reaseembler_config.ini path
-RFLAGS_INIT_FILE = "/home/xmei/ejfat_projects/E2SAR/reassembler_config.ini"
+if os.environ.get('E2SARCONFIGDIR') is None:
+    print('Please set environment variable E2SARCONFIGDIR to the absolute path of the root of E2SAR tree')
+    sys.exit(0)
+
+RFLAGS_INIT_FILE = os.environ['E2SARCONFIGDIR'] + '/reassembler_config.ini'
 
 DATA_ID = 0x0505   # decimal value: 1285
 EVENTSRC_ID = 0x11223344   # decimal value: 287454020
