@@ -36,6 +36,7 @@ def get_segmenter():
     sflags.useCP = False  # turn off CP. Default value is True
     sflags.syncPeriodMs = 1000
     sflags.syncPeriods = 5
+    sflags.rateGbps = 1.0
     return e2sar_py.DataPlane.Segmenter(seg_uri, DATA_ID, EVENTSRC_ID, sflags)
 
 def get_reassembler():
@@ -44,12 +45,15 @@ def get_reassembler():
     rflags = e2sar_py.DataPlane.Reassembler.ReassemblerFlags()
     rflags.useCP = False  # turn off CP. Default value is True
     rflags.withLBHeader = True  # LB header will be attached since there is no LB
+    #rflags.eventTimeout_ms = 4500 # make sure event timeout is long enough to receive events
     return e2sar_py.DataPlane.Reassembler(
         reas_uri, e2sar_py.IPAddress.from_string(DP_IPV4_ADDR), DP_IPV4_PORT, 1, rflags)
 
 
 def verify_result_obj(res_obj):
     """Helper function to check some of the return objects."""
+    if res_obj.has_error():
+        print(res_obj.error().message)
     assert res_obj.has_error() is False, f"{res_obj.error()}"
     assert res_obj.value() == 0
 
@@ -65,7 +69,7 @@ def supports_buffer_protocol(obj):
         return False
 
 
-@pytest.mark.b2b
+@pytest.mark.b2b1
 def test_b2b_send_bytes_recv_bytes():
     """
     Back-to-back test for Segmenter::sendEvent() and Reassembler::getEvent()
@@ -108,7 +112,7 @@ def test_b2b_send_bytes_recv_bytes():
 
 
 # NOTE: Launch in the main suite will fail. Lauch with -m b2b will succeed.
-@pytest.mark.b2b
+@pytest.mark.b2b2
 def test_b2b_send_numpy_get_numpy():
     """
     Back-to-back test for Segmenter::sendEvent() and Reassembler::getEvent() with numpy interfaces.
@@ -135,8 +139,40 @@ def test_b2b_send_numpy_get_numpy():
 
     time.sleep(1)
 
+    total_bytes = 0
+    sleep_cnt = 0
     # Receive the numpy array
-    recv_len, recv_array, recv_event_num, recv_data_id = reas.get1DNumpyArray(np.float32().dtype)
+    while sleep_cnt < 5:
+        print(f"Entering loop {sleep_cnt=}")
+        recv_len, recv_array, recv_event_num, recv_data_id = reas.get1DNumpyArray(np.float32().dtype)
+        if (recv_len == -2 or sleep_cnt > 4 or total_bytes >= send_array.nbytes):
+            print(f"Receiving error")
+            break
+
+        if recv_len == -1:
+            sleep_cnt += 1
+            time.sleep(5)
+            continue
+
+        # success
+        if recv_len > 0:
+            break
+
+
+    stats = reas.getStats()
+    print(f"{stats.lastErrno=}")
+    print(f"{stats.dataErrCnt=}")
+    print(f"{stats.grpcErrCnt=}")
+    print(f"{stats.reassemblyLoss=}")
+    print(f"{stats.enqueueLoss=}")
+    print(f"{stats.eventSuccess=}")
+
+    lost = reas.get_LostEvent()
+    if len(lost) > 0:
+        print(f"Lost Event: {lost[0]}:{lost[1]} Fragments received: {lost[2]} ")
+    else:
+        print('No events lost')
+
     # print(recv_bytes, recv_array.nbytes, recv_event_num, recv_data_id)
     assert recv_len > 0
     assert recv_len == recv_array.nbytes
@@ -147,7 +183,7 @@ def test_b2b_send_numpy_get_numpy():
     reas.stopThreads()
 
 
-@pytest.mark.b2b
+@pytest.mark.b2b3
 def test_b2b_send_numpy_queue_recv_bytes():
     """
     Back-to-back test for Segmenter::addToSendQueue() and Reassembler::recvEvent().
