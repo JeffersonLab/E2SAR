@@ -79,6 +79,7 @@ namespace e2sar
             // Structure to hold each recv-queue item
             struct EventQueueItem {
                 boost::chrono::steady_clock::time_point firstSegment; // when first segment arrived
+                boost::chrono::steady_clock::time_point latestSegment; // when latest segment arrived
                 size_t numFragments; // how many fragments received (in and out of order)
                 size_t bytes;  // total length
                 size_t curEnd; // current end during reassembly
@@ -100,6 +101,12 @@ namespace e2sar
                     event = new u_int8_t[rehdr->get_bufferLength()];
                     // set the timestamp
                     firstSegment = boost::chrono::steady_clock::now();
+                    latestSegment = firstSegment;
+                }
+
+                void updateLatestSegment()
+                {
+                    latestSegment = boost::chrono::steady_clock::now();
                 }
                 // not a proper destructor on purpose
                 void cleanup(boost::pool<> &rbp)

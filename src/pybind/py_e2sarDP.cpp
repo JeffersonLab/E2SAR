@@ -79,7 +79,7 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         .def_readwrite("mtu", &Segmenter::SegmenterFlags::mtu)
         .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets)
         .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
-        .def_readwrite("rageGbps", &Segmenter::SegmenterFlags::rateGbps)
+        .def_readwrite("rateGbps", &Segmenter::SegmenterFlags::rateGbps)
         .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
     // Constructor-simple
@@ -356,6 +356,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             // Create a numpy array from the event buffer with the specified dtype
             py::ssize_t num_elements = static_cast<py::ssize_t>(eventLen) / data_type.itemsize();
             py::array numpy_array(data_type, num_elements, eventBuf);
+            delete eventBuf;
 
             return py::make_tuple(eventLen, numpy_array, eventNum, recDataId);
         },
@@ -388,6 +389,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
 
                 // Create a numpy array from the event buffer with the specified dtype
                 py::array numpy_array(data_type, {num_elements}, eventBuf);
+                delete eventBuf;
 
                 return py::make_tuple(eventLen, numpy_array, eventNum, recDataId);
             },
@@ -438,20 +440,14 @@ void init_e2sarDP_reassembler(py::module_ &m) {
 
     // Return type of result<boost::tuple<EventNum_t, u_int16_t, size_t>>
     // TODO: check the underlying C++ result<T> convention and pybind
-    reas.def("get_LostEvent", [](Reassembler& reasObj) {
+    reas.def("get_LostEvent", [](Reassembler& reasObj) -> py::tuple {
+        
         auto res = reasObj.get_LostEvent();
         if (res.has_error()) {
-            std::cout << res.error().message();
-        }
-
-        auto ret = res.value();  // this may hold E2SARErrorInfo or std::tuple? @Ilya
-        if constexpr (std::is_same_v<decltype(ret), E2SARErrorInfo>) {
-            return ret;  // handle the case where it's an error
+            return py::make_tuple();
         } else {
-            return std::make_tuple(
-                boost::get<0>(ret),
-                boost::get<1>(ret),
-                boost::get<2>(ret));
+            auto ret = res.value();
+            return py::make_tuple(boost::get<0>(ret), boost::get<1>(ret), boost::get<2>(ret));
         }
     });
 

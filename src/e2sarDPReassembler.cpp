@@ -236,7 +236,8 @@ namespace e2sar
             // because we waited too long
             auto nowT = boost::chrono::steady_clock::now();
             for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
-                auto inWaiting = nowT - it->second->firstSegment;
+                //auto inWaiting = nowT - it->second->firstSegment;
+                auto inWaiting = nowT - it->second->latestSegment;
                 auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                 if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
                     // check if this event number has been seen as lost
@@ -334,6 +335,7 @@ namespace e2sar
 
                 // count this fragment received in main path
                 item->numFragments++;
+                item->updateLatestSegment();
 
                 // copy segment into event buffer if it is in sequence OR 
                 // attach to out of order priority queue.
