@@ -682,7 +682,12 @@ namespace e2sar
         // Get the current time point of event start
         // we need both a high-res timer and system timer (different epochs)
         auto nowT = boost::chrono::system_clock::now();
-        auto nowTE = boost::chrono::high_resolution_clock::now();
+        boost::chrono::high_resolution_clock::time_point nowTE, nowTF;
+        if (seg.rateLimit)
+        {
+            // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
+            nowTE = boost::chrono::high_resolution_clock::now();
+        }
 
         // update the event number being reported in Sync and LB packets
         if (seg.usecAsEventNum)
@@ -741,7 +746,8 @@ namespace e2sar
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
                 // get current clock in case we sleep
-                auto nowTF = boost::chrono::high_resolution_clock::now();
+                if (seg.rateLimit)
+                    nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
@@ -783,7 +789,8 @@ namespace e2sar
             {
                 // just regular sendmsg
                 // get current clock in case we sleep
-                auto nowTF = boost::chrono::high_resolution_clock::now();
+                if (seg.rateLimit)
+                    nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 // free the header here for this situation
@@ -843,7 +850,7 @@ namespace e2sar
             seg.cqeThreadCond.notify_all();
             // busy wait if needed for inter-event period if inter-frame is too short
             // for the case of liburing optimization
-            if (seg.rateLimit && interFrameSleepUsec == 0 && interEventSleepUsec > 0)
+            if (seg.rateLimit && interFrameSleepUsec <= 0 && interEventSleepUsec > 0)
             {
                 busyWaitUsecs(nowTE, interEventSleepUsec);       
             }
@@ -853,7 +860,7 @@ namespace e2sar
         {
             // busy wait if needed for inter-event period if inter-frame is too short
             // this is when there are no optimizations
-            if (seg.rateLimit && interFrameSleepUsec == 0 && interEventSleepUsec > 0)
+            if (seg.rateLimit && interFrameSleepUsec <= 0 && interEventSleepUsec > 0)
             {
                 busyWaitUsecs(nowTE, interEventSleepUsec);       
             }  
