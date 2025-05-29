@@ -324,8 +324,6 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             // Received event
             // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
             //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
-
-            // Create bytes object without copying, and tie its lifetime to the capsule
             py::bytes recv_bytes(reinterpret_cast<const char*>(eventBuf), eventLen);
             delete[] eventBuf;  // Clean up the buffer
             return py::make_tuple(eventLen, recv_bytes, eventNum, recDataId);
@@ -355,6 +353,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
 
             // Create a numpy array from the event buffer with the specified dtype
             py::ssize_t num_elements = static_cast<py::ssize_t>(eventLen) / data_type.itemsize();
+            // Use capsule to manage the lifetime of eventBuf
             py::capsule cleanup(eventBuf, [](void *p) { delete[] static_cast<uint8_t*>(p); });
             py::array numpy_array(data_type, {num_elements}, eventBuf, cleanup);
 
@@ -423,7 +422,6 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             // Received event
             // std::cout << "Received message: " << reinterpret_cast<char*>(eventBuf) << " of length " << eventLen
             //     << " with event number " << eventNum << " and data id " << recDataId << std::endl;
-            // Create bytes object without copying, and tie its lifetime to the capsule 
             py::bytes recv_bytes(reinterpret_cast<const char*>(eventBuf), eventLen);
             delete [] eventBuf;  // Clean up the buffer
             return py::make_tuple(eventLen, recv_bytes, eventNum, recDataId);
