@@ -51,7 +51,7 @@ def test_sflags_getFromINI():
     """
     res = sflags.getFromINI(SFLAGS_INIT_FILE)
     # print(res.has_error(), res.error() if res.has_error() else None)
-    assert res.has_error() is False
+    assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
     assert flags.mtu == 1500
 
@@ -60,7 +60,7 @@ def test_sflags_getFromINI():
 def test_seg_constructor_simple():
     """Test segmenter constructor simple."""
     res = sflags.getFromINI(SFLAGS_INIT_FILE)
-    assert res.has_error() is False
+    assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
     flags.useCP = False  # turn off CP. Default value is True
 

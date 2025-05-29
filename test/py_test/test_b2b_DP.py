@@ -69,7 +69,7 @@ def supports_buffer_protocol(obj):
         return False
 
 
-@pytest.mark.b2b1
+@pytest.mark.b2b
 def test_b2b_send_bytes_recv_bytes():
     """
     Back-to-back test for Segmenter::sendEvent() and Reassembler::getEvent()
@@ -112,7 +112,7 @@ def test_b2b_send_bytes_recv_bytes():
 
 
 # NOTE: Launch in the main suite will fail. Lauch with -m b2b will succeed.
-@pytest.mark.b2b2
+@pytest.mark.b2b
 def test_b2b_send_numpy_get_numpy():
     """
     Back-to-back test for Segmenter::sendEvent() and Reassembler::getEvent() with numpy interfaces.
@@ -183,7 +183,7 @@ def test_b2b_send_numpy_get_numpy():
     reas.stopThreads()
 
 
-@pytest.mark.b2b3
+@pytest.mark.b2b
 def test_b2b_send_numpy_queue_recv_bytes():
     """
     Back-to-back test for Segmenter::addToSendQueue() and Reassembler::recvEvent().

@@ -78,7 +78,7 @@ def test_select_by_string():
     """Test the select function with string inputs."""
     opt_names = ["sendmmsg"]
     result = opt.select(opt_names)
-    assert result.has_error() is False
+    assert result.has_error() is False, f"Error: {result.error().message}"
     assert isinstance(result.value(), int)
 
 
@@ -89,7 +89,7 @@ def test_select_by_enum():
     # used together with "liburing_send"/"liburing_recv".
     opt_enums = [opt.Code.sendmmsg]
     result = opt.select(opt_enums)
-    assert result.has_error() is False
+    assert result.has_error() is False, f"Error: {result.error().message}"
     assert isinstance(result.value(), int)
 
 
