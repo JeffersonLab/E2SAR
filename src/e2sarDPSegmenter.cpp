@@ -29,6 +29,7 @@ namespace e2sar
         numSendSockets{sflags.numSendSockets},
         sndSocketBufSize{sflags.sndSocketBufSize},
         rateGbps{sflags.rateGbps},
+        rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
@@ -634,6 +635,7 @@ namespace e2sar
         // inter-event is used with sendMmsg, inter-frame - with no optimizations and io_uring
         int64_t interEventSleepUsec{static_cast<int64_t>(bytes*8/(seg.rateGbps * 1000))};
         int64_t interFrameSleepUsec{static_cast<int64_t>(mtu*8/(seg.rateGbps * 1000))};
+
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
         struct mmsghdr *mmsgvec = nullptr;
@@ -680,9 +682,7 @@ namespace e2sar
         // Get the current time point of event start
         // we need both a high-res timer and system timer (different epochs)
         auto nowT = boost::chrono::system_clock::now();
-#ifdef SENDMMSG_AVAILABLE
         auto nowTE = boost::chrono::high_resolution_clock::now();
-#endif
 
         // update the event number being reported in Sync and LB packets
         if (seg.usecAsEventNum)
@@ -771,8 +771,9 @@ namespace e2sar
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
                 io_uring_submit(&seg.ring);
-                // if send rate set, sleep for inter-frame period
-                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
+                // if send rate set, sleep for inter-frame period if it is large enough
+                // otherwise we will wait for inter-event period below
+                if (seg.rateLimit && interFrameSleepUsec > 0)
                 {
                     busyWaitUsecs(nowTF, interFrameSleepUsec);       
                 }
@@ -794,8 +795,9 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
-                // if send rate set, sleep for inter-frame period
-                if (seg.rateGbps > 0. && interFrameSleepUsec > 0)
+                // if send rate set, sleep for inter-frame period if it is large enough
+                // otherwise we will wait for inter-event period below
+                if (seg.rateLimit && interFrameSleepUsec > 0)
                 {
                     busyWaitUsecs(nowTF, interFrameSleepUsec);       
                 }
@@ -824,12 +826,13 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
-            // busy wait if needed for inter-event period
-            if (seg.rateGbps > 0. && interEventSleepUsec > 0)
+            // busy wait if needed for inter-event period (the only option available to sendmmsg)
+            if (seg.rateLimit && interEventSleepUsec > 0)
             {
                 busyWaitUsecs(nowTE, interEventSleepUsec);       
             }
         }
+        else
 #endif
 #ifdef LIBURING_AVAILABLE
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
@@ -838,8 +841,23 @@ namespace e2sar
             // knows there's work to do
             seg.outstandingSends += numBuffers;
             seg.cqeThreadCond.notify_all();
+            // busy wait if needed for inter-event period if inter-frame is too short
+            // for the case of liburing optimization
+            if (seg.rateLimit && interFrameSleepUsec == 0 && interEventSleepUsec > 0)
+            {
+                busyWaitUsecs(nowTE, interEventSleepUsec);       
+            }
         }
+        else
 #endif
+        {
+            // busy wait if needed for inter-event period if inter-frame is too short
+            // this is when there are no optimizations
+            if (seg.rateLimit && interFrameSleepUsec == 0 && interEventSleepUsec > 0)
+            {
+                busyWaitUsecs(nowTE, interEventSleepUsec);       
+            }  
+        }
         // update the event send stats
         seg.eventsInCurrentSync++;
 

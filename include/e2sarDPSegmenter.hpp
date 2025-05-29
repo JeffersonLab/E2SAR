@@ -66,6 +66,8 @@ namespace e2sar
 
             // send rate (ignore if negative)
             const float rateGbps;
+            // used to avoid floating point comparisons, set to false if rateGbps <= 0
+            const bool rateLimit;
 
             // Max size of internal queue holding events to be sent. 
             static constexpr size_t QSIZE{2047};
