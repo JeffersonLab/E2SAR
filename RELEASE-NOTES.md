@@ -10,6 +10,9 @@ e2sar_perf now estimates the send rate based on the time elapsed, it is generall
 
 Bug Fixes:
 - When using io_uring on send the SQE structure was malloc'ed resulting in garbage contained in it, which led the move semantics for cbArg to fail since it tries to call a d-tor if the object is not null. Replaced with calloc. 
+- Python bindings for send calls had a memory leak - use of py::bytes or py::array constructors results in a copy by default. For py::bytes added delete [] statements, for py::array (using with NumPy arrays) instead used py::capsule to avoid copying and making send more efficient.
+- Improved exception handling in Python by registering E2SARException with pybind11 framework
+- Made Python pytest tests more robust to platform errors
 
 ## v0.2.0
 
