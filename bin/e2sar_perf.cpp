@@ -127,7 +127,11 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     // to help print large integers
     std::cout.imbue(std::locale(""));
 
-    std::cout << "Sending average bit rate is " << rateGbps << " Gbps" << std::endl;
+    std::cout << "Sending average bit rate is ";
+    if (rateGbps > 0.) 
+        std::cout << rateGbps << " Gbps" << std::endl;
+    else
+        std::cout << "unlimited" << std::endl;
     std::cout << "Event size is " << eventBufSize << " bytes or " << eventBufSize*8 << " bits" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
