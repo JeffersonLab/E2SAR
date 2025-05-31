@@ -79,7 +79,7 @@ thread_dep = dependency('threads')
 stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
 # On many platforms, gRPC C++ has to be manually installed and found.
-grpc_dep = dependency('grpc++', version: '>=1.54.1')
+grpc_dep = dependency('grpc++', version: '>=1.51.1')
 
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible

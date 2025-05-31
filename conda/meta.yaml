@@ -1,0 +1,39 @@
+{% set version = load_file_regex(load_file='../VERSION.txt', regex_pattern="^(.*)$", from_recipe_dir=True)[0] %}
+
+package:
+  name: e2sar
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  script: 
+    - export BOOST_ROOT=$PREFIX
+    - meson setup --prefix $PREFIX build --wipe
+    - meson compile -C build
+    - meson install -C build
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - meson
+    - ninja
+    - boost-cpp ==1.85.0, <1.87.0
+    - grpc-cpp >=1.51.1
+    - protobuf
+    - pybind11
+  host:
+    - boost-cpp ==1.85.0, <1.87.0
+    - grpc-cpp >=1.51.1
+    - protobuf
+  run:
+    - boost-cpp ==1.85.0, <1.87.0
+    - grpc-cpp >=1.51.1
+    - protobuf
+
+about:
+  home: https://github.com/JeffersonLab/E2SAR
+  license: MIT
+  summary: E2SAR Event Segmentation And Reassembly library

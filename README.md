@@ -206,6 +206,29 @@ Steps 2a, 2b and 3 depend on the tag in the form of `vX.Y.Z` (e.g. `v0.1.5`) to 
 
 All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b and Step 3. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
+### Conda packaging
+
+E2SAR provides an `e2sar` Conda package (primarily for use with Python bindings). 
+
+0. Install and initialize Conda
+```bash
+$ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+$ chmod +x Miniconda3-latest-Linux-x86_64.sh
+$ ./Miniconda3-latest-Linux-x86_64.sh
+$ source ~/.bashrc
+$ conda config --add channels conda-forge && conda config --set channel_priority strict
+```
+1. Create and initialize a Conda environment:
+```bash
+$ conda create -n e2sar-dev
+$ conda activate e2sar-dev
+$ conda install conda-build conda-verify
+```
+2. Build a Conda package:
+```bash
+$ ./conda/build-conda.sh
+```
+
 ## Testing
 
 ### C++
