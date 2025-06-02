@@ -222,11 +222,27 @@ $ conda config --add channels conda-forge && conda config --set channel_priority
 ```bash
 $ conda create -n e2sar-dev
 $ conda activate e2sar-dev
-$ conda install conda-build conda-verify
+$ conda install conda-build conda-verify anaconda-client
+$ conda config --add channels defaults
+$ conda config --add channels conda-forge
+$ conda config --set channel_priority strict
 ```
 2. Build a Conda package:
 ```bash
 $ ./conda/build-conda.sh
+```
+3. Login
+```bash
+$ anaconda login --username <username> --password <password>
+```
+4. Publish
+```bash
+$ anaconda upload  ~/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a4-h2bc3f7f_0.conda
+```
+5. Verify and install
+```bash
+$ conda search -c ibaldin -c conda-forge -i e2sar
+$ conda install -c ibaldin -c conda-forge e2sar
 ```
 
 ## Testing

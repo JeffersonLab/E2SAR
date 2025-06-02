@@ -8,32 +8,34 @@ source:
   path: ..
 
 build:
-  number: 0
-  script: 
-    - export BOOST_ROOT=$PREFIX
+  number: 1
+  script:
+    - export BOOST_ROOT=$BUILD_PREFIX
+    - export CXXFLAGS="-std=c++17 -Wno-c++26-extensions"
     - meson setup --prefix $PREFIX build --wipe
-    - meson compile -C build
+    - meson compile -C build -j 2
     - meson install -C build
 
 requirements:
   build:
     - {{ compiler('cxx') }}
+    - python
     - meson
     - ninja
     - boost-cpp ==1.85.0, <1.87.0
     - grpc-cpp >=1.51.1
     - protobuf
     - pybind11
-  host:
-    - boost-cpp ==1.85.0, <1.87.0
-    - grpc-cpp >=1.51.1
-    - protobuf
+    - libstdcxx-ng
   run:
-    - boost-cpp ==1.85.0, <1.87.0
-    - grpc-cpp >=1.51.1
-    - protobuf
+    - {{ pin_compatible('python', max_pin='x.x') }}
+    - {{ pin_compatible('grpc-cpp', max_pin='x.x') }}
+    - {{ pin_compatible('protobuf', max_pin='x.x') }}
+    - {{ pin_compatible('libstdcxx-ng', max_pin='x') }}
+    - numpy
 
 about:
   home: https://github.com/JeffersonLab/E2SAR
-  license: MIT
+  license_file:
+    - LICENSE
   summary: E2SAR Event Segmentation And Reassembly library
