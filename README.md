@@ -239,10 +239,10 @@ $ anaconda login --username <username> --password <password>
 ```bash
 $ anaconda upload  ~/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a4-h2bc3f7f_0.conda
 ```
-5. Verify and install
+5. Verify and install (shown for python 3.9, also supported 3.10 and 3.11)
 ```bash
-$ conda search -c ibaldin -c conda-forge -i e2sar
-$ conda install -c ibaldin -c conda-forge e2sar
+$ conda search -c ibaldin -i e2sar
+$ conda install -c ibaldin e2sar python=3.9
 ```
 
 ## Testing
