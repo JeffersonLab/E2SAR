@@ -8,7 +8,7 @@ source:
   path: ..
 
 build:
-  number: 4
+  number: 5
   string: "h{{ PKG_HASH }}_py{{ python }}_{{ PKG_BUILDNUM }}"
   script:
     - export BOOST_ROOT=$BUILD_PREFIX
@@ -33,6 +33,7 @@ requirements:
     - {{ pin_compatible('grpc-cpp', max_pin='x.x') }}
     - {{ pin_compatible('protobuf', max_pin='x.x') }}
     - {{ pin_compatible('libstdcxx-ng', max_pin='x') }}
+    - {{ pin_compatible('boost-cpp', max_pin='x.x') }}
     - numpy
 
 about:
