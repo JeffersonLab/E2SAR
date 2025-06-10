@@ -364,8 +364,6 @@ int main(int argc, char **argv)
     int sockBufSize;
     int durationSec;
     bool withCP;
-    bool zeroRate;
-    bool usecAsEventNum;
     bool autoIP;
     std::string sndrcvIP;
     std::string iniFile;
@@ -393,15 +391,13 @@ int main(int argc, char **argv)
     opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)[s]");
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s] or ReassemblerFlags [r]."
-        " Values found in the file override --withcp, --mtu, --sockets, --zerorate, --seq, --novalidate, --ip[46] and --bufsize");
+        " Values found in the file override --withcp, --mtu, --sockets, --novalidate, --ip[46] and --bufsize");
     opts("ip", po::value<std::string>(&sndrcvIP)->default_value(""), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens (conflicts with --autoip) [s,r]");
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
-    opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
-    opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
@@ -437,7 +433,6 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
         conflicting_options(vm, "deq", "send");
-        conflicting_options(vm, "seq", "recv");
         conflicting_options(vm, "cores", "threads");
     }
     catch (const std::logic_error &le)
@@ -487,8 +482,6 @@ int main(int argc, char **argv)
     }
 
     withCP = vm["withcp"].as<bool>();
-    zeroRate = vm["zerorate"].as<bool>();
-    usecAsEventNum = not vm["seq"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
@@ -578,15 +571,11 @@ int main(int argc, char **argv)
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
-                sflags.zeroRate = zeroRate;
-                sflags.usecAsEventNum = usecAsEventNum;
                 sflags.rateGbps = rateGbps;
             }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
-            std::cout << "Event rate reporting in Sync:  " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
-            std::cout << "Using usecs as event numbers:  " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 

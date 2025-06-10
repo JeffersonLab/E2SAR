@@ -40,8 +40,6 @@ namespace e2sar
 #endif
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
-        zeroRate{sflags.zeroRate},
-        usecAsEventNum{sflags.usecAsEventNum},
         addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
     {
         size_t mtu = 0;
@@ -260,7 +258,6 @@ namespace e2sar
             UnixTimeNano_t currentTimeNanos = static_cast<UnixTimeNano_t>(now);
             // get sync header buffer
             SyncHdr hdr{};
-            e2sar::EventRate_t evtRate;
 
             // push the stats onto ring buffer (except the first time) and reset
             // locking is not needed as sync thread is the  
@@ -274,15 +271,9 @@ namespace e2sar
                 seg.currentSyncStartNano = currentTimeNanos;
             }
 
-            // peek at segmenter metadata circular buffer to calculate event rate
-            if (seg.usecAsEventNum)
-                evtRate = 0; // will be overwritten by 1MHz
-            else
-                evtRate = seg.eventRate(currentTimeNanos); // calculate actual
-
             // fill the sync header using a mix of current and segmenter data
             // no locking needed - we only look at one field in seg - srcId
-            seg.fillSyncHdr(&hdr, evtRate, currentTimeNanos);
+            seg.fillSyncHdr(&hdr, currentTimeNanos);
 
             // send it off
             auto sendRes = _send(&hdr);
@@ -393,16 +384,20 @@ namespace e2sar
     {
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
         // set sending thread affinity if core list is provided
-        if (seg.cpuCoreList.size())
-        {
-            auto res = Affinity::setThread(seg.cpuCoreList[threadIndex]);
-            if (res.has_error())
-            {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastE2SARError = res.error().code();
-                return;
-            }
-        }
+        // if (seg.cpuCoreList.size())
+        // {
+        //     auto res = Affinity::setThread(seg.cpuCoreList[threadIndex]);
+        //     if (res.has_error())
+        //     {
+        //         seg.sendStats.errCnt++;
+        //         seg.sendStats.lastE2SARError = res.error().code();
+        //         return;
+        //     }
+        // }
+
+        // create a thread pool for sending events
+        static boost::asio::thread_pool threadPool(seg.numSendSockets);
+
         while(!seg.threadsStop)
         {
             // block to get event off the queue and send
@@ -412,10 +407,23 @@ namespace e2sar
             EventQueueItem *item{nullptr};
             while(seg.eventQueue.pop(item))
             {
+                // round robin through sending sockets
+                seg.roundRobinIndex = (seg.roundRobinIndex + 1) % seg.numSendSockets;
+
+                boost::asio::post(threadPool,
+                    [&]() {
+                        // TODO: add affinity here
+                        _send(item->event, item->bytes, 
+                        item->eventNum, item->dataId,
+                        item->entropy, seg.roundRobinIndex, 
+                        item->callback, item->cbArg);
+                });
+
                 // call send overriding event number as needed
-                auto res = _send(item->event, item->bytes, 
-                    item->eventNum, item->dataId,
-                    item->entropy, item->callback, item->cbArg);
+                // auto res = _send(item->event, item->bytes, 
+                //     item->eventNum, item->dataId,
+                //     item->entropy, seg.roundRobinIndex, 
+                //     item->callback, item->cbArg);
 
                 // FIXME: do something with result? 
                 // it IS  taken care by lastErrno in the stats block. 
@@ -621,7 +629,7 @@ namespace e2sar
 
     // fragment and send the event
     result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
-        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy,
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy, size_t roundRobinIndex,
         void (*callback)(boost::any), boost::any cbArg)
     {
         int err;
@@ -649,9 +657,6 @@ namespace e2sar
         if (entropy == 0)
             entropy = randDist(ranlux);
 
-        if (roundRobinIndex == socketFd4.size())
-            roundRobinIndex = 0;
-
         // randomize source port using round robin
         sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
         // prepare msghdr
@@ -669,10 +674,6 @@ namespace e2sar
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
-#ifdef LIBURING_AVAILABLE
-        int currentFdIndex = roundRobinIndex; // since we registered fds with the ring, we need their indices
-#endif
-        roundRobinIndex++;
 
         // fragment event, update/set iov and send in a loop
         u_int8_t *curOffset = event;
@@ -690,20 +691,16 @@ namespace e2sar
         }
 
         // update the event number being reported in Sync and LB packets
-        if (seg.usecAsEventNum)
-        {
-            // use microseconds since the UNIX Epoch, but make sure the entropy
-            // of the 8lsb is sufficient (for LB)
+        // use microseconds since the UNIX Epoch, but make sure the entropy
+        // of the 8lsb is sufficient (for LB)
 
-            // Convert the time point to microseconds since the epoch
-            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
-            if (seg.addEntropy) 
-                seg.lbEventNum = seg.addClockEntropy(now);
-            else
-                seg.lbEventNum = now;
-        } else
-            // use current user-specified or sequential event number
-            seg.lbEventNum = eventNum;
+        // Convert the time point to microseconds since the epoch
+        auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+        EventNum_t lbEventNum{0};
+        if (seg.addEntropy) 
+            lbEventNum = seg.addClockEntropy(now);
+        else
+            lbEventNum = now;
 
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
@@ -717,7 +714,7 @@ namespace e2sar
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
-            hdr->lb.set(entropy, seg.lbEventNum);
+            hdr->lb.set(entropy, lbEventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -770,7 +767,7 @@ namespace e2sar
                     sqeUserData->callback = nullptr;
                     sqeUserData->cbArg = nullptr;
                 }
-                io_uring_prep_sendmsg(sqe, currentFdIndex, sqeMsgHdr, 0);
+                io_uring_prep_sendmsg(sqe, roundRobinIndex, sqeMsgHdr, 0);
                 // so we can free up the memory later
                 io_uring_sqe_set_data(sqe, sqeUserData);
                 // index to previously registered fds, not fds themselves
@@ -891,12 +888,15 @@ namespace e2sar
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
 
+        roundRobinIndex = (roundRobinIndex + 1) % numSendSockets;
+
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
             // continue incrementing
             userEventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
-            entropy);
+            entropy, roundRobinIndex
+        );
     }
 
     // Non-blocking call specifying explicit event number.
@@ -948,10 +948,6 @@ namespace e2sar
             sFlags.syncPeriods);
         sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
             sFlags.syncPeriodMs);
-        sFlags.zeroRate = paramTree.get<bool>("control-plane.zeroRate",
-            sFlags.zeroRate);
-        sFlags.usecAsEventNum = paramTree.get<bool>("control-plane.usecAsEventNum",
-            sFlags.usecAsEventNum);
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);

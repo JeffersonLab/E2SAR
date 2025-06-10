@@ -72,8 +72,6 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         .def_readwrite("dpV6", &Segmenter::SegmenterFlags::dpV6)
         .def_readwrite("connectedSocket", &Segmenter::SegmenterFlags::connectedSocket)
         .def_readwrite("useCP", &Segmenter::SegmenterFlags::useCP)
-        .def_readwrite("zeroRate", &Segmenter::SegmenterFlags::zeroRate)
-        .def_readwrite("usecAsEventNum", &Segmenter::SegmenterFlags::usecAsEventNum)
         .def_readwrite("syncPeriodMs", &Segmenter::SegmenterFlags::syncPeriodMs)
         .def_readwrite("syncPeriods", &Segmenter::SegmenterFlags::syncPeriods)
         .def_readwrite("mtu", &Segmenter::SegmenterFlags::mtu)
