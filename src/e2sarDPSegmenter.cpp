@@ -397,6 +397,7 @@ namespace e2sar
 
         // create a thread pool for sending events
         static boost::asio::thread_pool threadPool(seg.numSendSockets);
+        boost::chrono::high_resolution_clock::time_point nowTE;
 
         while(!seg.threadsStop)
         {
@@ -407,23 +408,16 @@ namespace e2sar
             EventQueueItem *item{nullptr};
             while(seg.eventQueue.pop(item))
             {
+                // convert send rate into inter-event sleep time 
+                int64_t interEventSleepUsec{static_cast<int64_t>(item->bytes*8/(seg.rateGbps * 1000))};
+
+                if (seg.rateLimit)
+                {
+                    // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
+                    nowTE = boost::chrono::high_resolution_clock::now();
+                }
                 // round robin through sending sockets
                 seg.roundRobinIndex = (seg.roundRobinIndex + 1) % seg.numSendSockets;
-
-                boost::asio::post(threadPool,
-                    [&]() {
-                        // TODO: add affinity here
-                        _send(item->event, item->bytes, 
-                        item->eventNum, item->dataId,
-                        item->entropy, seg.roundRobinIndex, 
-                        item->callback, item->cbArg);
-                });
-
-                // call send overriding event number as needed
-                // auto res = _send(item->event, item->bytes, 
-                //     item->eventNum, item->dataId,
-                //     item->entropy, seg.roundRobinIndex, 
-                //     item->callback, item->cbArg);
 
                 // FIXME: do something with result? 
                 // it IS  taken care by lastErrno in the stats block. 
@@ -433,22 +427,36 @@ namespace e2sar
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
 
-                // call the callback 
-#ifdef LIBURING_AVAILABLE
-                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
-                {
-                    // do nothing - it will be called from CQE Reaping Thread
-                    ;
-                }
-                else
-#endif
-                {
-                    if (item->callback != nullptr)
-                        item->callback(item->cbArg);
-                }
+                boost::asio::post(threadPool,
+                    [this, item]() {
+                        // TODO: add affinity here
+                        auto res = _send(item->event, item->bytes, 
+                        item->eventNum, item->dataId,
+                        item->entropy, seg.roundRobinIndex, 
+                        item->callback, item->cbArg);
 
-                // push the item back to return queue
-                seg.returnQueue.push(item);    
+                        // call the callback on the worker thread (except with liburing)
+#ifdef LIBURING_AVAILABLE
+                        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+                        {
+                            // do nothing - it will be called from CQE Reaping Thread
+                            ;
+                        }
+                        else
+#endif
+                        {
+                            if (item->callback != nullptr)
+                                item->callback(item->cbArg);
+                        }
+                        
+                        // free malloc-ed item here
+                        free(item);
+                });
+                // busy wait if needed for inter-event period 
+                if (seg.rateLimit && interEventSleepUsec > 0)
+                {
+                    busyWaitUsecs(nowTE, interEventSleepUsec);       
+                }
             }
         }
         auto res = _close();
@@ -639,10 +647,6 @@ namespace e2sar
         int flags{0};
         // number of buffers we will send
         size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
-        // convert send rate into either inter-event or inter-frame sleep times
-        // inter-event is used with sendMmsg, inter-frame - with no optimizations and io_uring
-        int64_t interEventSleepUsec{static_cast<int64_t>(bytes*8/(seg.rateGbps * 1000))};
-        int64_t interFrameSleepUsec{static_cast<int64_t>(mtu*8/(seg.rateGbps * 1000))};
 
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
@@ -681,14 +685,7 @@ namespace e2sar
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
         // Get the current time point of event start
-        // we need both a high-res timer and system timer (different epochs)
         auto nowT = boost::chrono::system_clock::now();
-        boost::chrono::high_resolution_clock::time_point nowTE, nowTF;
-        if (seg.rateLimit)
-        {
-            // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
-            nowTE = boost::chrono::high_resolution_clock::now();
-        }
 
         // update the event number being reported in Sync and LB packets
         // use microseconds since the UNIX Epoch, but make sure the entropy
@@ -742,9 +739,6 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
-                // get current clock in case we sleep
-                if (seg.rateLimit)
-                    nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
@@ -774,20 +768,11 @@ namespace e2sar
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
                 io_uring_submit(&seg.ring);
-                // if send rate set, sleep for inter-frame period if it is large enough
-                // otherwise we will wait for inter-event period below
-                if (seg.rateLimit && interFrameSleepUsec > 0)
-                {
-                    busyWaitUsecs(nowTF, interFrameSleepUsec);       
-                }
             }
             else
 #endif
             {
                 // just regular sendmsg
-                // get current clock in case we sleep
-                if (seg.rateLimit)
-                    nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 // free the header here for this situation
@@ -798,12 +783,6 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                }
-                // if send rate set, sleep for inter-frame period if it is large enough
-                // otherwise we will wait for inter-event period below
-                if (seg.rateLimit && interFrameSleepUsec > 0)
-                {
-                    busyWaitUsecs(nowTF, interFrameSleepUsec);       
                 }
             } 
         }
@@ -830,11 +809,6 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
-            // busy wait if needed for inter-event period (the only option available to sendmmsg)
-            if (seg.rateLimit && interEventSleepUsec > 0)
-            {
-                busyWaitUsecs(nowTE, interEventSleepUsec);       
-            }
         }
         else
 #endif
@@ -845,28 +819,13 @@ namespace e2sar
             // knows there's work to do
             seg.outstandingSends += numBuffers;
             seg.cqeThreadCond.notify_all();
-            // busy wait if needed for inter-event period if inter-frame is too short
-            // for the case of liburing optimization
-            if (seg.rateLimit && interFrameSleepUsec <= 0 && interEventSleepUsec > 0)
-            {
-                busyWaitUsecs(nowTE, interEventSleepUsec);       
-            }
         }
-        else
 #endif
-        {
-            // busy wait if needed for inter-event period if inter-frame is too short
-            // this is when there are no optimizations
-            if (seg.rateLimit && interFrameSleepUsec <= 0 && interEventSleepUsec > 0)
-            {
-                busyWaitUsecs(nowTE, interEventSleepUsec);       
-            }  
-        }
         // update the event send stats
         seg.eventsInCurrentSync++;
 
         // keeps compiler quiet about unused variables in default optimizations
-        return interEventSleepUsec * numBuffers * 0;
+        return numBuffers * 0;
     }
 
     result<int> Segmenter::SendThreadState::_close()
@@ -883,7 +842,6 @@ namespace e2sar
     result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, 
         EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) noexcept
     {
-        freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
@@ -905,11 +863,10 @@ namespace e2sar
         void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
-        freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
-        EventQueueItem *item = queueItemPool.construct();
+        EventQueueItem *item = static_cast<EventQueueItem*>(malloc(sizeof(EventQueueItem)));
         item->bytes = bytes;
         item->event = event;
         item->entropy = entropy;

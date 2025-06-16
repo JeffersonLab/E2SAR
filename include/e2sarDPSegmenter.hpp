@@ -89,14 +89,8 @@ namespace e2sar
                 boost::any cbArg;
             };
 
-            // pool from which queue items are allocated as needed 
-            boost::object_pool<EventQueueItem> queueItemPool{32, QSIZE + 1};
-
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
-            // to avoid locking the item pool send thread puts processed events 
-            // on this queue so they can be freed opportunistically by main thread
-            boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
 
 #ifdef LIBURING_AVAILABLE
             struct io_uring ring;
@@ -574,15 +568,6 @@ namespace e2sar
                 hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }
 
-            // process backlog in return queue and free event queue item blocks on it
-            // so long as new events keep coming, backlog will be cleared, for last
-            // event the backlog gets cleared when the pool goes away (as part of object destruction)
-            inline void freeEventItemBacklog() 
-            {
-                EventQueueItem *item{nullptr};
-                while (returnQueue.pop(item))
-                    queueItemPool.free(item);
-            }
             /**
              * Add entropy to a clock sample by randomizing the least 8 bits. Runs in the 
              * context of send thread.
