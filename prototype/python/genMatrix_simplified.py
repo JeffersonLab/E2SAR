@@ -1,6 +1,7 @@
 import galois
 import numpy as np
 import random
+import itertools
 
 np.set_printoptions(formatter={'int':lambda x: f'{x:2}'},linewidth = 1000)
 
@@ -52,7 +53,6 @@ def gf_sum(a,b):
    return a^b
 
 
-
 #--------------------------------------------------------------------------------------
 # Polynomial Functions
 #--------------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ def poly_div(poly_a,poly_b):
 
 
 #--------------------------------------------------------------------------------------
-# Reed Solomon Functinos
+# Reed Solomon Functions
 #--------------------------------------------------------------------------------------
 
 # Create the RS generator polynomial
@@ -115,9 +115,8 @@ def rs_gen_G(k,t,gen_poly):
       f"""
         The parity check words are the remainder of the identity matrix
         divided by the generator polynomial.  This gives us a G matrix
-        in the form of an identity matrix + parity words for directly passing
-        the data (n) bits into the m = (n+2*t) messsage matrix
-      
+        in the form of an identity matrix + parity generation words for
+        directly passing the data (n) bits into the m = (n+2*t) matrix
        """
    )
    print(f"n = {n} k = {k} 2t = {2*t}")
@@ -129,8 +128,9 @@ def rs_gen_G(k,t,gen_poly):
       print(f"G[-1] = {G[-1]} div={div} rem={rem}")
       G[-1] = G[-1][0:k]+rem
       row = [0] + row[0:n-1]
-   print(f"G = {np.array(G)}")
-   return np.array(G)
+   G = np.array(G)
+   print(f"G=\n{G}")
+   return G
 
 def rs_gen_H(G):
    k,n = G.shape
@@ -294,35 +294,6 @@ def rs_decode(H,m):
    return poly_matrix_vector_mul(H,m)
 
 
-def rs_forney(c,e_pos):
-   def rs_find_errata_locator(e_pos):
-      '''Compute the erasures/errors/errata locator polynomial from the erasures/errors/errata positions
-       (the positions must be relative to the x coefficient, eg: "hello worldxxxxxxxxx" is tampered to "h_ll_ worldxxxxxxxxx"
-       with xxxxxxxxx being the ecc of length n-k=9, here the string positions are [1, 4], but the coefficients are reversed
-       since the ecc characters are placed as the first coefficients of the polynomial, thus the coefficients of the
-       erased characters are n-1 - [1, 4] = [18, 15] = erasures_loc to be specified as an argument.'''
-
-      e_loc = [1] # just to init because we will multiply, so it must be 1 so that the multiplication starts correctly without nulling any term
-      # erasures_loc = product(1 - x*alpha**i) for i in erasures_pos and where alpha is the alpha chosen to evaluate polynomials.
-      for i in e_pos:
-         e_loc = poly_mul(e_loc,[gf_log_seq[i],1])
-
-      print(f"e_loc polynomial is {e_loc}")
-      return e_loc
-
-   def rs_find_error_evaluator(synd, err_loc, nsym):
-      '''Compute the error (or erasures if you supply sigma=erasures locator polynomial, or errata) evaluator polynomial Omega
-       from the syndrome and the error/erasures/errata locator Sigma.'''
-
-      # Faster way that is equivalent
-      remainder = gf_poly_mul(synd, err_loc)          # first multiply the syndromes with the errata locator polynomial
-      remainder = remainder[len(remainder)-(nsym+1):] # then slice the list to truncate it (which represents the polynomial), which
-                                                    # is equivalent to dividing by a polynomial of the length we want
-      return remainder
-
-   
-   e_loc = rs_find_errata_locator(e_pos)
-
 # ---------------------------- Main --------------------------------------
 
 if (True) :
@@ -417,20 +388,14 @@ if (True) :
       print("-----  Generator Matrix Construction -----\n")
 
 #   d = [1,2,3,4,5]    # use this to define a specific message else a random one will be generated
-   t = 2               # 2*t parity words for 2*t erasure correction
+   t = 4               # 2*t parity words for 2*t erasure correction
 
    try : d
    except :
-     n = 16   # number of data symbols. n SHOULD be >= 3 for fast determinant calculation
+     n = 8   # number of data symbols. n SHOULD be >= 3 for fast determinant calculation
      d = [random.randrange(0, 16, 1) for i in range(n)]
    else :
      n = len(d)
-   
-#   if (len(m)-2*t) < 3 :
-#      print(f"WARNING: fast determinant will fail due to inadequate number of m bits {(len(m)-2*t)}")
-#      quit()
-#   else :
-#      print(f"INFO: fast determinant will work for number of m bits {(len(m)-2*t)}")
       
    print(f"t = {t} , Data = {d}")
    Gpoly = rs_gen_poly(t)
@@ -451,13 +416,33 @@ if (True) :
 
    print("-----  RS Decoder  -----")
 
-#   e_bits = random.sample(range(0, len(m)+2*t), 2*t)  # errors in m,p bits
-   e_bits = random.sample(range(0,len(c_matrix)),2*t)  # errors in m bits
+   print("#-- Test to see if all possible G* -> H matrices are invertable --")
+   
+   print("testing for matrix invertability")
+   for errors in itertools.combinations(list(range(0,len(c_matrix)-1)),2*t) :
+      e_bits = list(errors)
+
+      c_rx = c_matrix.copy()
+      for error in e_bits:
+         c_rx[error] = 0
+   
+      G_error = np.delete(G.transpose(),e_bits,0)
+      m_rx = np.delete(c_matrix,e_bits)
+   
+      try :
+         H = gf_poly_matrix_invert(G_error)
+      except :
+         print(f" ----  UNABLE TO INVERT G* ------ ")
+         print(f"m_rx = {m_rx}")      
+         print(f" Error locations .. {e_bits}")
+   
+#   e_bits = random.sample(range(0, len(m)+2*t), 2*t)    # errors in m,p bits
+   e_bits = random.sample(range(0,len(c_matrix)-1),2*t)  # errors in m bits
 
    print()
    print("#-- build the G* matrix by deleting errored rows ------- ")
    print()
-   
+
    c_rx = c_matrix.copy()
    for error in e_bits:
       c_rx[error] = 0
@@ -469,11 +454,16 @@ if (True) :
    print("G* = ")
    print(G_error)
    
-   H = gf_poly_matrix_invert(G_error)
+   try :
+      H = gf_poly_matrix_invert(G_error)
+   except :
+      print(f" ----  UNABLE TO INVERT G* ------ ")
+      print(f" Error locations .. {e_bits}")
+      exit()
+   
    print("H = ")
    print(H)
    d_corrected = poly_matrix_vector_mul(np.array(H),m_rx)
-
 
    print(f" -- message with d and parity, and corrupted message received !")
    print(f"    upto {2*t} erasures can be corrected\n")
@@ -511,12 +501,7 @@ if (True) :
    print(f"c_tx   = {np.array(c_matrix)}")
    print(f"c_rx   = {np.array(c_rx)}")
 
-#   print()
-#   print("#-- erasure correction using the Forney algorithm ------------------ ")
-#   print()
-   
-#   rs_forney(c_matrix,e_bits)
-   
+
    
 
 
