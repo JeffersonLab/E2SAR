@@ -434,6 +434,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "port");
         conflicting_options(vm, "deq", "send");
         conflicting_options(vm, "cores", "threads");
+        conflicting_options(vm, "cores", "sockets");
     }
     catch (const std::logic_error &le)
     {
@@ -580,7 +581,11 @@ int main(int argc, char **argv)
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
+                if (vm.count("cores"))
+                    segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
+                else
+                    segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
+                    
                 auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {

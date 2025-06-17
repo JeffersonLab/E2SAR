@@ -130,6 +130,13 @@ namespace e2sar
         }
 #endif
         sanityChecks();
+
+        // set process affinity to the set of threads provided
+        auto res = Affinity::setProcess(cpuCoreList);
+        if (res.has_error())
+        {
+            throw E2SARException("Unable to set process affinity to indicated threads: "s + res.error().message());
+        }
     }
 
     result<int> Segmenter::openAndStart() noexcept
@@ -179,19 +186,6 @@ namespace e2sar
         // lock for the mutex (must be thread-local)
         thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
         struct io_uring_cqe *cqes[cqeBatchSize];
-
-        // set this thread to run on any core not named in the vector
-        // those cores are reserved for send threads only
-        if (seg.cpuCoreList.size())
-        {
-            auto res = Affinity::setThreadXOR(seg.cpuCoreList);
-            if (res.has_error())
-            {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastE2SARError = res.error().code();
-                return;
-            }
-        }
 
         while(!seg.threadsStop)
         {
@@ -383,19 +377,8 @@ namespace e2sar
     void Segmenter::SendThreadState::_threadBody()
     {
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
-        // set sending thread affinity if core list is provided
-        // if (seg.cpuCoreList.size())
-        // {
-        //     auto res = Affinity::setThread(seg.cpuCoreList[threadIndex]);
-        //     if (res.has_error())
-        //     {
-        //         seg.sendStats.errCnt++;
-        //         seg.sendStats.lastE2SARError = res.error().code();
-        //         return;
-        //     }
-        // }
 
-        // create a thread pool for sending events
+        // create a thread pool for sending events 
         static boost::asio::thread_pool threadPool(seg.numSendSockets);
         boost::chrono::high_resolution_clock::time_point nowTE;
 
@@ -429,7 +412,6 @@ namespace e2sar
 
                 boost::asio::post(threadPool,
                     [this, item]() {
-                        // TODO: add affinity here
                         auto res = _send(item->event, item->bytes, 
                         item->eventNum, item->dataId,
                         item->entropy, seg.roundRobinIndex, 
