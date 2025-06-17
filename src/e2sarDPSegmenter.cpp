@@ -221,7 +221,7 @@ namespace e2sar
                     }
                     auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
                     auto callback = sqeUserData->callback;
-                    auto cbArg = sqeUserData->cbArg;
+                    auto cbArg = std::move(sqeUserData->cbArg);
                     // free the memory
                     auto sqeMsgHdr = sqeUserData->msghdr;
                     // deallocate the LBRE header
@@ -434,7 +434,7 @@ namespace e2sar
                                 item->callback(item->cbArg);
                         }
                         
-                        // free malloc-ed item here
+                        // free item here
                         free(item);
                 });
                 // busy wait if needed for inter-event period 
@@ -739,7 +739,7 @@ namespace e2sar
                 {
                     // this is the last segment, so we give this to CQE
                     sqeUserData->callback = callback;
-                    sqeUserData->cbArg = cbArg;
+                    sqeUserData->cbArg = std::move(cbArg);
                 } else
                 {
                     // this is not the last segment
@@ -851,12 +851,13 @@ namespace e2sar
         // reset local event number to override
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
-        EventQueueItem *item = static_cast<EventQueueItem*>(malloc(sizeof(EventQueueItem)));
+
+        EventQueueItem *item = reinterpret_cast<EventQueueItem*>(calloc(1, sizeof(EventQueueItem)));
         item->bytes = bytes;
         item->event = event;
         item->entropy = entropy;
         item->callback = callback;
-        item->cbArg = cbArg;
+        item->cbArg = std::move(cbArg);
         // continue incrementing 
         item->eventNum = userEventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
