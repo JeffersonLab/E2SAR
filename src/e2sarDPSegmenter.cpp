@@ -132,10 +132,13 @@ namespace e2sar
         sanityChecks();
 
         // set process affinity to the set of threads provided
-        auto res = Affinity::setProcess(cpuCoreList);
-        if (res.has_error())
+        if (cpuCoreList.size() > 0)
         {
-            throw E2SARException("Unable to set process affinity to indicated threads: "s + res.error().message());
+            auto res = Affinity::setProcess(cpuCoreList);
+            if (res.has_error())
+            {
+                throw E2SARException("Unable to set process affinity to indicated threads: "s + res.error().message());
+            }
         }
     }
 
