@@ -585,7 +585,7 @@ int main(int argc, char **argv)
                     segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
                 else
                     segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
-                    
+
                 auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {

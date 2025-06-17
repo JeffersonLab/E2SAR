@@ -221,7 +221,7 @@ namespace e2sar
                     }
                     auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
                     auto callback = sqeUserData->callback;
-                    auto cbArg = std::move(sqeUserData->cbArg);
+                    auto cbArg = sqeUserData->cbArg;
                     // free the memory
                     auto sqeMsgHdr = sqeUserData->msghdr;
                     // deallocate the LBRE header
@@ -739,7 +739,7 @@ namespace e2sar
                 {
                     // this is the last segment, so we give this to CQE
                     sqeUserData->callback = callback;
-                    sqeUserData->cbArg = std::move(cbArg);
+                    sqeUserData->cbArg = cbArg;
                 } else
                 {
                     // this is not the last segment
@@ -856,7 +856,7 @@ namespace e2sar
         item->event = event;
         item->entropy = entropy;
         item->callback = callback;
-        item->cbArg = std::move(cbArg);
+        item->cbArg = cbArg;
         // continue incrementing 
         item->eventNum = userEventNum++;
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
