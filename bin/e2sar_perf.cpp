@@ -371,6 +371,7 @@ int main(int argc, char **argv)
     std::vector<int> coreList;
     std::vector<std::string> optimizations;
     int numaNode;
+    bool multiPort;
 
     // parameters
     opts("send,s", "send traffic");
@@ -402,6 +403,7 @@ int main(int argc, char **argv)
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
+    opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
 
     po::variables_map vm;
 
@@ -429,6 +431,8 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
+        conflicting_options(vm, "withcp", "multiport");
+        conflicting_options(vm, "recv", "multiport");
         // these are optional
         conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
@@ -484,6 +488,7 @@ int main(int argc, char **argv)
 
     withCP = vm["withcp"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
+    multiPort = vm["multiport"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -573,8 +578,10 @@ int main(int argc, char **argv)
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
                 sflags.rateGbps = rateGbps;
+                sflags.multiPort = multiPort;
             }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :

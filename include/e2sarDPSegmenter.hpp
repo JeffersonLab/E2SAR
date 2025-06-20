@@ -68,6 +68,8 @@ namespace e2sar
             const float rateGbps;
             // used to avoid floating point comparisons, set to false if rateGbps <= 0
             const bool rateLimit;
+            // use multiple destination ports (for back-to-back testing only)
+            const bool multiPort;
 
             // Max size of internal queue holding events to be sent. 
             static constexpr size_t QSIZE{2047};
@@ -363,6 +365,9 @@ namespace e2sar
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.wmem_max) to be higher. {3MB}
+             * - rateGbps - send rate as floating point expression in Gbps. Negative value means unlimited. {-1.0}
+             * - multiPort - use numSendSockets consecutive destination ports, rather than a single port from the EjfatURI 
+             * (incompatible with a load balancer, only useful in back-to-back testing) {false}
              */
             struct SegmenterFlags 
             {
@@ -376,10 +381,11 @@ namespace e2sar
                 size_t numSendSockets;
                 int sndSocketBufSize;
                 float rateGbps; 
+                bool multiPort; 
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0} {}
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, multiPort{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

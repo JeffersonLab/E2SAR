@@ -30,6 +30,7 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         rateGbps{sflags.rateGbps},
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
+        multiPort{sflags.multiPort},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
@@ -452,8 +453,9 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         // allocate int[] for passing FDs into the ring
         int ringFds[socketFd4.size()];
-        unsigned int fdCount{0};
 #endif
+        unsigned int fdCount{0};
+
         // Open v4 and v6 sockets for sending data message via DP
 
         // create numSendSocket bound sockets either v6 or v4. With each socket
@@ -513,7 +515,11 @@ namespace e2sar
 
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
-                dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
+                // use consecutive destination ports of requested
+                if (seg.multiPort)
+                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second + fdCount);
+                else
+                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
                 inet_pton(AF_INET6, dataAddr6.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
 
                 if (connectSocket) {
@@ -527,8 +533,9 @@ namespace e2sar
                 }
                 *i = boost::make_tuple<int, sockaddr_in6, sockaddr_in6>(fd, localAddrStruct6, dataAddrStruct6);
 #ifdef LIBURING_AVAILABLE
-                ringFds[fdCount++] = fd;
+                ringFds[fdCount] = fd;
 #endif
+                fdCount++;
             }
         } else 
         {
@@ -585,7 +592,12 @@ namespace e2sar
 
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
-                dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+                // use consecutive destination ports of requested
+                if (seg.multiPort)
+                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second + fdCount);
+                else
+                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+
                 inet_pton(AF_INET, dataAddr4.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
 
                 if (connectSocket) {
@@ -599,8 +611,9 @@ namespace e2sar
                 }
                 *i = boost::make_tuple<int, sockaddr_in, sockaddr_in>(fd, localAddrStruct4, dataAddrStruct4);
 #ifdef LIBURING_AVAILABLE
-                ringFds[fdCount++] = fd;
+                ringFds[fdCount] = fd;
 #endif
+                fdCount++;
             }
         }
 
@@ -852,6 +865,7 @@ namespace e2sar
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
 
+        // have to zero out or else destructor is called in the assignment of cbArg below
         EventQueueItem *item = reinterpret_cast<EventQueueItem*>(calloc(1, sizeof(EventQueueItem)));
         item->bytes = bytes;
         item->event = event;
@@ -903,6 +917,8 @@ namespace e2sar
             sFlags.sndSocketBufSize);
         sFlags.rateGbps = paramTree.get<float>("data-plane.rateGbps",
             sFlags.rateGbps);
+        sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
+            sFlags.multiPort);
 
         return sFlags;
     }
