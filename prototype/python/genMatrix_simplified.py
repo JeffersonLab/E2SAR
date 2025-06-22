@@ -11,19 +11,18 @@ GF = galois.GF(16,irreducible_poly=[1,0,0,1,1])
 print(GF.properties)
 print(GF.repr_table())
 
-
 #--------------------------------------------------------------------------------------
 # Galois Field Functions from scratch
 #--------------------------------------------------------------------------------------
 
-gf_mul_seq =  [1,2,4,8,3,6,12,11,5,10,7,14,15,13,9]
+gf_mul_seq =  [1,2,4,8,3,6,12,11,5,10,7,14,15,13,9,0]
 gf_log_seq = {}
 gf_exp_seq = {}
 
 for i,val in enumerate(gf_mul_seq) :
    gf_log_seq[i] = val     # alpha -> x 
    gf_exp_seq[val] = i     # x -> alpha
-
+   
 print("------   GF Log Table from scratch  -------")
 print("gf log seq",gf_log_seq)
 print("gf exp seq",gf_exp_seq)
@@ -387,8 +386,8 @@ if (True) :
 
       print("-----  Generator Matrix Construction -----\n")
 
-#   d = [1,2,3,4,5]    # use this to define a specific message else a random one will be generated
-   t = 4               # 2*t parity words for 2*t erasure correction
+   d = [1,2,3,4,5,6,7,8]    # use this to define a specific message else a random one will be generated
+   t = 3                    # 2*t parity words for 2*t erasure correction
 
    try : d
    except :
@@ -425,8 +424,9 @@ if (True) :
       c_rx = c_matrix.copy()
       for error in e_bits:
          c_rx[error] = 0
-   
-      G_error = np.delete(G.transpose(),e_bits,0)
+
+      G_error = G.copy()
+      G_error = np.delete(G_error.transpose(),e_bits,0)
       m_rx = np.delete(c_matrix,e_bits)
    
       try :
@@ -446,8 +446,9 @@ if (True) :
    c_rx = c_matrix.copy()
    for error in e_bits:
       c_rx[error] = 0
-   
-   G_error = np.delete(G.transpose(),e_bits,0)
+
+   G_error = G.copy()
+   G_error = np.delete(G_error.transpose(),e_bits,0)
    m_rx = np.delete(c_matrix,e_bits)
    print(f"m_rx = {m_rx}")
 
@@ -480,7 +481,8 @@ if (True) :
    print()
    
    c_rx = c_matrix.copy()
-   G_error = G.transpose()
+   G_error = G.copy()
+   G_error = G_error.transpose()
    for i,error in enumerate(e_bits) :
       c_rx[error] = c_rx[len(d)+i]
       G_error[error] = G_error[len(d)+i]
@@ -502,8 +504,31 @@ if (True) :
    print(f"c_rx   = {np.array(c_rx)}")
 
 
-   
+   # ---------------------  Write the C Model for the RS encoder and decoder -----------
 
+if (True) :
+   C_Model_File = open("rs_model.h","w")
+
+   print(f''' static const char _ejfat_rs_gf_log_seq[{len(gf_log_seq)}] = {{ {",".join(map(str,list(gf_log_seq.values())))} }}; ''',file = C_Model_File)
+
+   gf_exp_seq_sorted = dict(sorted(gf_exp_seq.items()))
+   print(f''' static const char _ejfat_rs_gf_exp_seq[{len(gf_exp_seq_sorted)}] = {{ {",".join(map(str,list(gf_exp_seq_sorted.values())))} }}; ''', file = C_Model_File)
+
+   print('\n', file = C_Model_File);
+   print(f''' static const int _ejfat_rs_n = {n}; // data words ''' , file = C_Model_File);
+   print(f''' static const int _ejfat_rs_p = {2*t}; // parity words  ''' , file = C_Model_File);
+   print(f''' static const int _ejfat_rs_k = {n+2*t}; // message words = data+parity ''' , file = C_Model_File);   
+   
+   print(
+f'''
+ static const char _ejfat_rs_G[{G.shape[0]}][{G.shape[1]}] = {{
+{
+(","+ chr(10)).join([ "    {" + ",".join(map(str,list(G[i]))) + "}" for i in range(len(G)) ])
+} 
+ }};
+''',
+   file = C_Model_File)
+   
 
 
 

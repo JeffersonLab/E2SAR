@@ -1,2 +1,2 @@
-encode : encode.c ejfat_rs.h
-	gcc -o encode encode.c
+test : test.c ejfat_rs.h ../prototype/python/rs_model.h
+	gcc -o test test.c -O3 
