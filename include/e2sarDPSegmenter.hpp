@@ -366,8 +366,9 @@ namespace e2sar
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.wmem_max) to be higher. {3MB}
              * - rateGbps - send rate as floating point expression in Gbps. Negative value means unlimited. {-1.0}
-             * - multiPort - use numSendSockets consecutive destination ports, rather than a single port from the EjfatURI 
-             * (incompatible with a load balancer, only useful in back-to-back testing) {false}
+             * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
+             * rather than a single port; source ports are still randomized (incompatible with a load balancer, 
+             * only useful in back-to-back testing) {false}
              */
             struct SegmenterFlags 
             {

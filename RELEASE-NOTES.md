@@ -10,6 +10,8 @@ e2sar_perf now estimates the send rate based on the time elapsed, it is generall
 
 Added Conda packages (linux-64) for e2sar, can be installed using `conda install -c ibaldin -c conda-forge e2sar`. Package includes the E2SAR libraries, executables and the Python bindings (as a `.so`).
 
+Added `multiPort` boolean option to SegmenterFlags to allow sending to multiple destination ports. This is only useful in back-to-back performance testing without a Load Balancer. Defaults to false.
+
 Bug Fixes:
 - When using io_uring on send the SQE structure was malloc'ed resulting in garbage contained in it, which led the move semantics for cbArg to fail since it tries to call a d-tor if the object is not null. Replaced with calloc. 
 - Python bindings for send calls had a memory leak - use of py::bytes or py::array constructors results in a copy by default. For py::bytes added delete [] statements, for py::array (using with NumPy arrays) instead used py::capsule to avoid copying and making send more efficient.
