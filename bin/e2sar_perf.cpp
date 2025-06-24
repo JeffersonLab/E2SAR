@@ -132,6 +132,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         std::cout << rateGbps << " Gbps" << std::endl;
     else
         std::cout << "unlimited" << std::endl;
+    if (rateGbps > 0.)
+        // same computation Segmenter does
+        std::cout << "Inter-event sleep (usec) is " << static_cast<int64_t>(eventBufSize*8/(rateGbps * 1000)) << std::endl;
     std::cout << "Event size is " << eventBufSize << " bytes or " << eventBufSize*8 << " bits" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
