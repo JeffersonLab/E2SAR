@@ -385,23 +385,23 @@ namespace e2sar
         // create a thread pool for sending events 
         static boost::asio::thread_pool threadPool(seg.numSendSockets);
         boost::chrono::high_resolution_clock::time_point nowTE;
+        int64_t interEventSleepUsec{0};
 
         while(!seg.threadsStop)
         {
             // block to get event off the queue and send
-            seg.sendThreadCond.wait_for(condLock, sleepTime);
+            //seg.sendThreadCond.wait_for(condLock, sleepTime);
 
             // try to pop off eventQueue
             EventQueueItem *item{nullptr};
             while(seg.eventQueue.pop(item))
             {
-                // convert send rate into inter-event sleep time 
-                int64_t interEventSleepUsec{static_cast<int64_t>(item->bytes*8/(seg.rateGbps * 1000))};
-
                 if (seg.rateLimit)
                 {
                     // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
                     nowTE = boost::chrono::high_resolution_clock::now();
+                    // convert send rate into inter-event sleep time 
+                    interEventSleepUsec = static_cast<int64_t>(item->bytes*8/(seg.rateGbps * 1000));
                 }
                 // round robin through sending sockets
                 seg.roundRobinIndex = (seg.roundRobinIndex + 1) % seg.numSendSockets;
@@ -877,7 +877,7 @@ namespace e2sar
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
         auto res = eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
-        sendThreadCond.notify_one();
+        //sendThreadCond.notify_one();
         if (res)
             return 0;
         else

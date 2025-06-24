@@ -294,7 +294,7 @@ namespace e2sar
             // lock with send thread
             boost::mutex sendThreadMtx;
             // condition variable for send thread
-            boost::condition_variable sendThreadCond;
+            //boost::condition_variable sendThreadCond;
             // warm up period in MS between sync thread starting and data being allowed to be sent
             u_int16_t warmUpMs;
             // use control plane (can be disabled for debugging)
