@@ -243,6 +243,7 @@ namespace e2sar
             auto sinceLastGC_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(sinceLastGC);
             if (sinceLastGC_ms > eventTimeout_ms)
             {
+                lastGC = nowT;
                 for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
                     // we save time by looking at the first segment time of arrival
                     // this way we avoid querying time on every segment arrival
