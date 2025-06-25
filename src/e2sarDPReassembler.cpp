@@ -224,6 +224,10 @@ namespace e2sar
     void Reassembler::RecvThreadState::_threadBody()
     {
 
+        // last time we ran garbage collection on events in progress
+        auto lastGC = boost::chrono::steady_clock::now();
+        auto eventTimeout_ms = boost::chrono::milliseconds(reas.eventTimeout_ms);
+
         while(!reas.threadsStop)
         {
             fd_set curSet{fdSet};
@@ -231,24 +235,30 @@ namespace e2sar
             // do select/wait on open sockets
             auto select_retval = select(maxFdPlusOne, &curSet, NULL, NULL, &sleep_tv);
 
-            // this is garbage collection
+            // this is garbage collection that only runs once in eventTimeout_ms (for efficiency)
             // sweep the map of in progress events and see if any should be given up on
             // because we waited too long
             auto nowT = boost::chrono::steady_clock::now();
-            for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
-                //auto inWaiting = nowT - it->second->firstSegment;
-                auto inWaiting = nowT - it->second->latestSegment;
-                auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
-                if (inWaiting_ms > boost::chrono::milliseconds(reas.eventTimeout_ms)) {
-                    // check if this event number has been seen as lost
-                    //logLostEvent(it->first, false);
-                    logLostEvent(it->second, false);
-                    delete it->second->event;
-                    // deallocate queue item
-                    delete it->second;
-                    it = eventsInProgress.erase(it);  // erase returns the next element (or end())
-                } else {
-                    ++it;  // Just advance the iterator if no deletion
+            auto sinceLastGC = nowT - lastGC;
+            auto sinceLastGC_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(sinceLastGC);
+            if (sinceLastGC_ms > eventTimeout_ms)
+            {
+                for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
+                    // we save time by looking at the first segment time of arrival
+                    // this way we avoid querying time on every segment arrival
+                    auto inWaiting = nowT - it->second->firstSegment;
+                    auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
+                    if (inWaiting_ms > eventTimeout_ms) {
+                        // check if this event number has been seen as lost
+                        //logLostEvent(it->first, false);
+                        logLostEvent(it->second, false);
+                        delete[] it->second->event;
+                        // deallocate queue item
+                        delete it->second;
+                        it = eventsInProgress.erase(it);  // erase returns the next element (or end())
+                    } else {
+                        ++it;  // Just advance the iterator if no deletion
+                    }
                 }
             }
 
@@ -326,7 +336,6 @@ namespace e2sar
 
                 // count this fragment received (it could be anywhere in the event)
                 item->numFragments++;
-                item->updateLatestSegment();
 
                 // copy segment into event buffer into its proper place 
                 // note that with or without LB header, our REhdr should be set now
@@ -339,7 +348,6 @@ namespace e2sar
                 recvBufferPool.free(recvBuffer);
 
                 // check if this event is completed, if so put on queue
-                // make sure oodQueue of the event is empty
                 if (item->curBytes == item->bytes)
                 {
                     // remove this item from in progress map
@@ -350,8 +358,10 @@ namespace e2sar
                     // event lost on enqueuing
                     if (ret == 1) 
                     {
-                        //logLostEvent(std::make_pair(item->eventNum, item->dataId), true);
+                        // log this lost event
                         logLostEvent(item, true);
+                        // event buffer is lost
+                        delete[] item->event;
                         // free up the item
                         delete item;
                     }
