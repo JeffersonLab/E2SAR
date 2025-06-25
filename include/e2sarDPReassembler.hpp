@@ -57,42 +57,21 @@ namespace e2sar
             // and an associated atomic variable that reflects
             // how many event entries are in it.
 
-            // hold one receive buffer
-            struct Segment {
-                u_int8_t *segment; // start of the received buffer including headers
-                size_t length; // length of useful payloads minus REHdr (and LBHdr if appropriate)
-                Segment(): segment{nullptr}, length{0} {}
-                Segment(u_int8_t *s, size_t l): segment{s}, length{l} {}
-            };
-
-            // custom comparator of REHdr buffers/segments - placing outside the event queue 
-            // item class just not to confuse things - needed for priority queue
-            // orders segments in the increasing order of offset
-            struct SegmentComparator {
-                bool operator() (const Segment &l, const Segment &r) const {
-                    REHdr *lhdr = reinterpret_cast<REHdr*>(l.segment);
-                    REHdr *rhdr = reinterpret_cast<REHdr*>(r.segment);
-                    return lhdr->bufferOffset > rhdr->bufferOffset;
-                }   
-            };
-
             // Structure to hold each recv-queue item
             struct EventQueueItem {
                 boost::chrono::steady_clock::time_point firstSegment; // when first segment arrived
                 boost::chrono::steady_clock::time_point latestSegment; // when latest segment arrived
                 size_t numFragments; // how many fragments received (in and out of order)
                 size_t bytes;  // total length
-                size_t curEnd; // current end during reassembly
+                size_t curBytes; // current bytes accumulated (could be scattered across fragments)
                 EventNum_t eventNum;
                 u_int8_t *event;
                 u_int16_t dataId;
-                boost::heap::priority_queue<Segment, 
-                    boost::heap::compare<SegmentComparator>> oodQueue; // out-of-order segments in a priority queue
-                EventQueueItem(): bytes{0}, curEnd{0}, eventNum{0}, event{nullptr}, dataId{0} {}
+                EventQueueItem(): bytes{0}, curBytes{0}, eventNum{0}, event{nullptr}, dataId{0} {}
                 /**
                  * Initialize from REHdr
                  */
-                EventQueueItem(REHdr *rehdr): numFragments{0}, curEnd{0}
+                EventQueueItem(REHdr *rehdr): numFragments{0}, curBytes{0}
                 {
                     bytes = rehdr->get_bufferLength();
                     dataId = rehdr->get_dataId();
@@ -107,17 +86,6 @@ namespace e2sar
                 void updateLatestSegment()
                 {
                     latestSegment = boost::chrono::steady_clock::now();
-                }
-                // not a proper destructor on purpose
-                void cleanup(boost::pool<> &rbp)
-                {
-                    // clean up memory
-                    while(!oodQueue.empty()) 
-                    {
-                        auto i = oodQueue.top();
-                        rbp.free(i.segment);
-                        oodQueue.pop();     
-                    }
                 }
             };
 

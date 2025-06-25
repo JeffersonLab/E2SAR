@@ -243,8 +243,6 @@ namespace e2sar
                     // check if this event number has been seen as lost
                     //logLostEvent(it->first, false);
                     logLostEvent(it->second, false);
-                    // deallocate event (ood queue and event buffer)
-                    it->second->cleanup(recvBufferPool);
                     delete it->second->event;
                     // deallocate queue item
                     delete it->second;
@@ -268,7 +266,6 @@ namespace e2sar
                     continue;
 
                 // allocate receive buffer from the pool
-                bool freeRecvBuffer = true;
                 auto recvBuffer = static_cast<u_int8_t*>(recvBufferPool.malloc());
 
                 struct sockaddr_in client_addr{};
@@ -324,75 +321,27 @@ namespace e2sar
                         item = new EventQueueItem(rehdr);
                         // add to in progress map
                         eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
-                        // add segment into event out-of-order queue
-                        item->oodQueue.push(Segment(recvBuffer, nbytes));
-                        // count this fragment of the event received before we continue
-                        item->numFragments++;
-                        // done for now
-                        continue;
                     }
                 }
 
-                // count this fragment received in main path
+                // count this fragment received (it could be anywhere in the event)
                 item->numFragments++;
                 item->updateLatestSegment();
 
-                // copy segment into event buffer if it is in sequence OR 
-                // attach to out of order priority queue.
+                // copy segment into event buffer into its proper place 
                 // note that with or without LB header, our REhdr should be set now
-                if (item->curEnd == rehdr->get_bufferOffset())
-                {
-                    memcpy(item->event + item->curEnd, 
-                        reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
-                    // nbytes by now is less REHdr and LBHdr (as needed)
-                    item->curEnd += nbytes;
-                } else
-                {
-                    // add to out-of-order queue
-                    item->oodQueue.push(Segment(recvBuffer, nbytes));
-                    freeRecvBuffer = false;
-                }
+                memcpy(item->event + rehdr->get_bufferOffset(), 
+                    reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
+                // nbytes by now is less REHdr and LBHdr (as needed)
+                item->curBytes += nbytes;
 
-                // free the recv buffer if possible (not attached into priority queue)
-                if (freeRecvBuffer)
-                    recvBufferPool.free(recvBuffer);
-
-                // check the priority queue if it can be emptied by copying segments into
-                // event buffer and freeing them
-                while(!item->oodQueue.empty())
-                {
-                    auto e = item->oodQueue.top();
-                    if (reas.withLBHeader)
-                        rehdr = reinterpret_cast<REHdr*>(e.segment + sizeof(LBHdr));
-                    else
-                        rehdr = reinterpret_cast<REHdr*>(e.segment);
-                    if (item->curEnd == rehdr->get_bufferOffset())
-                    {
-                        memcpy(item->event + item->curEnd,
-                            reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
-                        item->curEnd += nbytes;
-                        recvBufferPool.free(e.segment);
-                        // pop the item off and try to continue
-                        item->oodQueue.pop();
-                    } else 
-                    {
-                        // there are still missing segments, so stop
-                        break;
-                    }
-                }
+                // free the recv buffer
+                recvBufferPool.free(recvBuffer);
 
                 // check if this event is completed, if so put on queue
                 // make sure oodQueue of the event is empty
-                if (item->curEnd == item->bytes)
+                if (item->curBytes == item->bytes)
                 {
-                    // check ood queue is empty
-                    if (!item->oodQueue.empty())
-                    {
-                        reas.recvStats.lastE2SARError = E2SARErrorc::MemoryError;
-                        // clean up ood queue
-                        item->cleanup(recvBufferPool);
-                    }
-
                     // remove this item from in progress map
                     eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
 
