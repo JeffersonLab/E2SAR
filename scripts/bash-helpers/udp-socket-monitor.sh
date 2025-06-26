@@ -139,7 +139,7 @@ sample_data() {
     local ss_filter="$1"
     
     # Run ss command with filter
-    ss -u -n -p -e -m -O "$ss_filter" 2>/dev/null | while read -r line; do
+    ss -u -n -p -e -m -O -a "$ss_filter" 2>/dev/null | while read -r line; do
         # Skip empty lines
         [ -z "$line" ] && continue
         
@@ -151,6 +151,11 @@ sample_data() {
         local send_q="${fields[2]}"
         local local_addr="${fields[3]}"
         local peer_addr="${fields[4]}"
+
+        # skip the first line every time
+        if [ ${state} = "State" ]; then
+            continue
+        fi
         
         # Extract port from local address
         local port=$(echo "$local_addr" | sed 's/.*://')
