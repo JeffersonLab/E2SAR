@@ -157,6 +157,24 @@ namespace e2sar
 
             // have we registered a worker
             bool registeredWorker{false};
+
+
+            /**
+             * This thread does GC for all of the recv threads disposing of partially
+             * assembled events that have been there too long.
+             */
+            struct GCThreadState {
+                Reassembler &reas;
+                boost::thread threadObj;
+
+                GCThreadState(Reassembler &r): reas{r} {}
+
+                // Go through the list of threads on the recv thread list and
+                // do garbage collection on their partially assembled events
+                void _threadBody(); 
+            };
+            GCThreadState gcThreadState;
+
             /**
              * This thread receives data, reassembles into events and puts them onto the 
              * event queue for getEvent()
@@ -185,6 +203,8 @@ namespace e2sar
                 // segments are transmitted, they are guarangeed to go
                 // to the same port
                 boost::unordered_map<std::pair<EventNum_t, u_int16_t>, EventQueueItem*, pair_hash, pair_equal> eventsInProgress;
+                // mutex for guarding access to events in progress (recv thread, gc thread)
+                boost::mutex evtsInProgressMutex;
                 // thread local instance of events we lost
                 boost::container::flat_set<std::pair<EventNum_t, u_int16_t>> lostEvents;
 
@@ -471,6 +491,8 @@ namespace e2sar
 
                 for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
                     i->threadObj.join();
+
+                gcThreadState.threadObj.join();
 
                 // pool memory is implicitly freed when pool goes out of scope
             }

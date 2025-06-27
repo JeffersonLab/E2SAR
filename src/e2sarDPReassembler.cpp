@@ -43,6 +43,7 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        gcThreadState(*this),
         cpuCoreList{cpuCoreList}, 
         dataIP{data_ip},
         dataPort{starting_port},
@@ -75,6 +76,7 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        gcThreadState(*this),
         cpuCoreList{std::vector<int>()}, // no core list given
         dataIP{data_ip},
         dataPort{starting_port},
@@ -105,6 +107,7 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        gcThreadState(*this),
         cpuCoreList{cpuCoreList}, 
         dataPort{starting_port},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(cpuCoreList.size())}, 
@@ -144,6 +147,7 @@ namespace e2sar
         Kp{rflags.Kp}, Ki{rflags.Ki}, Kd{rflags.Kd},
         weight{rflags.weight}, min_factor{rflags.min_factor}, max_factor{rflags.max_factor},
         pidSampleBuffer(rflags.epoch_ms/rflags.period_ms), // ring buffer size (usually 10 = 1sec/100ms)
+        gcThreadState(*this),
         cpuCoreList{std::vector<int>()}, // no core list given
         dataPort{starting_port},
         portRange{rflags.portRange != -1 ? rflags.portRange : get_PortRange(numRecvThreads)}, 
@@ -206,9 +210,13 @@ namespace e2sar
         {
             // start receive thread
             // it is an iterator and we need a pointer, hence &(*it)
-            boost::thread syncT(&Reassembler::RecvThreadState::_threadBody, &(*it));
-            it->threadObj = std::move(syncT);
+            boost::thread recvT(&Reassembler::RecvThreadState::_threadBody, &(*it));
+            it->threadObj = std::move(recvT);
         }
+
+        // start the GC thread
+        boost::thread gcT(&Reassembler::GCThreadState::_threadBody, &gcThreadState);
+        gcThreadState.threadObj = std::move(gcT);
 
         // open is not needed for this thread because gRPC
         if (useCP)
@@ -221,47 +229,49 @@ namespace e2sar
         return 0;
     }
 
-    void Reassembler::RecvThreadState::_threadBody()
+    void Reassembler::GCThreadState::_threadBody()
     {
-
-        // last time we ran garbage collection on events in progress
-        auto lastGC = boost::chrono::steady_clock::now();
         auto eventTimeout_ms = boost::chrono::milliseconds(reas.eventTimeout_ms);
 
+        while (!reas.threadsStop)
+        {
+            auto nowT = boost::chrono::steady_clock::now();
+
+            // iterate over threads
+            for(auto i = reas.recvThreadState.begin(); i != reas.recvThreadState.end(); ++i)
+            {
+                i->evtsInProgressMutex.lock();
+                for (auto it = i->eventsInProgress.begin(); it != i->eventsInProgress.end(); ) {
+                    // we save time by looking at the first segment time of arrival
+                    // this way we avoid querying time on every segment arrival
+                    auto inWaiting = nowT - it->second->firstSegment;
+                    auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
+                    if (inWaiting_ms > eventTimeout_ms) {
+                        i->logLostEvent(it->second, false);
+                        delete[] it->second->event;
+                        // deallocate queue item
+                        delete it->second;
+                        it = i->eventsInProgress.erase(it);  // erase returns the next element (or end())
+                    } else {
+                        ++it;  // Just advance the iterator if no deletion
+                    }
+                }
+                i->evtsInProgressMutex.unlock();
+            }
+            // sleep approximately for eventTimeout msecs
+            auto until = nowT + boost::chrono::milliseconds(eventTimeout_ms);
+            boost::this_thread::sleep_until(until);
+        }
+    }
+
+    void Reassembler::RecvThreadState::_threadBody()
+    {
         while(!reas.threadsStop)
         {
             fd_set curSet{fdSet};
 
             // do select/wait on open sockets
             auto select_retval = select(maxFdPlusOne, &curSet, NULL, NULL, &sleep_tv);
-
-            // this is garbage collection that only runs once in eventTimeout_ms (for efficiency)
-            // sweep the map of in progress events and see if any should be given up on
-            // because we waited too long
-            auto nowT = boost::chrono::steady_clock::now();
-            auto sinceLastGC = nowT - lastGC;
-            auto sinceLastGC_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(sinceLastGC);
-            if (sinceLastGC_ms > eventTimeout_ms)
-            {
-                lastGC = nowT;
-                for (auto it = eventsInProgress.begin(); it != eventsInProgress.end(); ) {
-                    // we save time by looking at the first segment time of arrival
-                    // this way we avoid querying time on every segment arrival
-                    auto inWaiting = nowT - it->second->firstSegment;
-                    auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
-                    if (inWaiting_ms > eventTimeout_ms) {
-                        // check if this event number has been seen as lost
-                        //logLostEvent(it->first, false);
-                        logLostEvent(it->second, false);
-                        delete[] it->second->event;
-                        // deallocate queue item
-                        delete it->second;
-                        it = eventsInProgress.erase(it);  // erase returns the next element (or end())
-                    } else {
-                        ++it;  // Just advance the iterator if no deletion
-                    }
-                }
-            }
 
             if (select_retval == -1)
             {
@@ -317,22 +327,25 @@ namespace e2sar
                     // since this is done by many threads, can't use object_pool easily
                     item = new EventQueueItem(rehdr);
                     // add to in progress map based on <event number, data id> tuple
+                    evtsInProgressMutex.lock();
                     eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+                    evtsInProgressMutex.unlock();
                 } else 
                 {
                     // try to locate the event in the in progress map
+                    evtsInProgressMutex.lock();
                     auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
                     if (it != eventsInProgress.end()) 
                         item = it->second;
                     else
                     {
                         // out of order delivery and we haven't seen this event
-                        // start a new event item and new event buffer and put segment
-                        // on out-of-order queue
+                        // start a new event item and new event buffer 
                         item = new EventQueueItem(rehdr);
                         // add to in progress map
                         eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                     }
+                    evtsInProgressMutex.unlock();
                 }
 
                 // count this fragment received (it could be anywhere in the event)
@@ -352,7 +365,9 @@ namespace e2sar
                 if (item->curBytes == item->bytes)
                 {
                     // remove this item from in progress map
+                    evtsInProgressMutex.lock();
                     eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
+                    evtsInProgressMutex.unlock();
 
                     // queue it up for the user to receive
                     auto ret = reas.enqueue(item);
