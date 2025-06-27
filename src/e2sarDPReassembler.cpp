@@ -277,6 +277,9 @@ namespace e2sar
 
     void Reassembler::RecvThreadState::_threadBody()
     {
+        // thread pool for receiving
+        thread_local boost::asio::thread_pool threadPool(udpPorts.size() + 1);
+
         while(!reas.threadsStop)
         {
             fd_set curSet{fdSet};
@@ -297,8 +300,8 @@ namespace e2sar
                 if (!FD_ISSET(fd, &curSet))
                     continue;
 
-                // allocate receive buffer from the pool
-                auto recvBuffer = static_cast<u_int8_t*>(recvBufferPool.malloc());
+                // allocate receive buffer 
+                auto recvBuffer = static_cast<u_int8_t*>(malloc(RECV_BUFFER_SIZE));
 
                 struct sockaddr_in client_addr{};
                 socklen_t client_addr_len = sizeof(client_addr);
@@ -309,95 +312,103 @@ namespace e2sar
                 if (nbytes == -1) {
                     reas.recvStats.dataErrCnt++;
                     reas.recvStats.lastErrno = errno;
-                    continue;
+                    return;
                 }
-
                 // count fragment received by socket
                 reas.recvStats.fragmentsPerFd[fd]++;
 
-                // start a new event if offset 0 (check for event number collisions)
-                // or attach to existing event
-                REHdr *rehdr{nullptr};
-                // for testing we may leave LB header attached, so it needs to be
-                // subtracted
-                if (reas.withLBHeader)
-                {
-                    rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdr));
-                    nbytes -= sizeof(LBHdr) + sizeof(REHdr);
-                }
-                else
-                {
-                    rehdr = reinterpret_cast<REHdr*>(recvBuffer);
-                    nbytes -= sizeof(REHdr);
-                }
+                // receive and deal with everything on a thread
+                boost::asio::post(threadPool,
+                    [this, recvBuffer, nbytes]() {
 
-                EventQueueItem *item{nullptr};
-                if (rehdr->get_bufferOffset() == 0)
-                {
-                    // new event - start a new event item and new event buffer 
-                    // since this is done by many threads, can't use object_pool easily
-                    item = new EventQueueItem(rehdr);
-                    // add to in progress map based on <event number, data id> tuple
-                    evtsInProgressMutex.lock();
-                    eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
-                    evtsInProgressMutex.unlock();
-                } else 
-                {
-                    // try to locate the event in the in progress map
-                    evtsInProgressMutex.lock();
-                    auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
-                    if (it != eventsInProgress.end()) 
-                        item = it->second;
+                    auto localNbytes = nbytes;
+
+                    // start a new event if offset 0 (check for event number collisions)
+                    // or attach to existing event
+                    REHdr *rehdr{nullptr};
+                    // for testing we may leave LB header attached, so it needs to be
+                    // subtracted
+                    if (reas.withLBHeader)
+                    {
+                        rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdr));
+                        localNbytes -= sizeof(LBHdr) + sizeof(REHdr);
+                    }
                     else
                     {
-                        // out of order delivery and we haven't seen this event
-                        // start a new event item and new event buffer 
-                        item = new EventQueueItem(rehdr);
-                        // add to in progress map
-                        eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+                        rehdr = reinterpret_cast<REHdr*>(recvBuffer);
+                        localNbytes -= sizeof(REHdr);
                     }
-                    evtsInProgressMutex.unlock();
-                }
 
-                // count this fragment received (it could be anywhere in the event)
-                item->numFragments++;
-
-                // copy segment into event buffer into its proper place 
-                // note that with or without LB header, our REhdr should be set now
-                memcpy(item->event + rehdr->get_bufferOffset(), 
-                    reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
-                // nbytes by now is less REHdr and LBHdr (as needed)
-                item->curBytes += nbytes;
-
-                // free the recv buffer
-                recvBufferPool.free(recvBuffer);
-
-                // check if this event is completed, if so put on queue
-                if (item->curBytes == item->bytes)
-                {
-                    // remove this item from in progress map
-                    evtsInProgressMutex.lock();
-                    eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
-                    evtsInProgressMutex.unlock();
-
-                    // queue it up for the user to receive
-                    auto ret = reas.enqueue(item);
-                    // event lost on enqueuing
-                    if (ret == 1) 
+                    EventQueueItem *item{nullptr};
+                    if (rehdr->get_bufferOffset() == 0)
                     {
-                        // log this lost event
-                        logLostEvent(item, true);
-                        // event buffer is lost
-                        delete[] item->event;
-                        // free up the item
-                        delete item;
+                        // new event - start a new event item and new event buffer 
+                        // since this is done by many threads, can't use object_pool easily
+                        item = new EventQueueItem(rehdr);
+                        // add to in progress map based on <event number, data id> tuple
+                        evtsInProgressMutex.lock();
+                        eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+                        evtsInProgressMutex.unlock();
+                    } else 
+                    {
+                        // try to locate the event in the in progress map
+                        evtsInProgressMutex.lock();
+                        auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
+                        if (it != eventsInProgress.end()) 
+                            item = it->second;
+                        else
+                        {
+                            // out of order delivery and we haven't seen this event
+                            // start a new event item and new event buffer 
+                            item = new EventQueueItem(rehdr);
+                            // add to in progress map
+                            eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+                        }
+                        evtsInProgressMutex.unlock();
                     }
 
-                    // update statistics
-                    reas.recvStats.eventSuccess++;
-                }
+                    // count this fragment received (it could be anywhere in the event)
+                    item->numFragments++;
+
+                    // copy segment into event buffer into its proper place 
+                    // note that with or without LB header, our REhdr should be set now
+                    memcpy(item->event + rehdr->get_bufferOffset(), 
+                        reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), localNbytes);
+                    // localNbytes by now is less REHdr and LBHdr (as needed)
+                    item->curBytes += localNbytes;
+
+                    // free the recv buffer
+                    free(recvBuffer);
+
+                    // check if this event is completed, if so put on queue
+                    if (item->curBytes == item->bytes)
+                    {
+                        // remove this item from in progress map
+                        evtsInProgressMutex.lock();
+                        eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
+                        evtsInProgressMutex.unlock();
+
+                        // queue it up for the user to receive
+                        auto ret = reas.enqueue(item);
+                        // event lost on enqueuing
+                        if (ret == 1) 
+                        {
+                            // log this lost event
+                            logLostEvent(item, true);
+                            // event buffer is lost
+                            delete[] item->event;
+                            // free up the item
+                            delete item;
+                        }
+
+                        // update statistics
+                        reas.recvStats.eventSuccess++;
+                    }
+                });
             }
         }
+        // let all threads finish
+        threadPool.join();
 
         // close on exit
         auto res = _close();

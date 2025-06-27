@@ -195,7 +195,7 @@ namespace e2sar
 
                 // object pool from which receive frames come from
                 // template parameter is allocator
-                boost::pool<> recvBufferPool{RECV_BUFFER_SIZE};
+                //boost::pool<> recvBufferPool{RECV_BUFFER_SIZE};
                 // map from <event number, data id> to event queue item
                 // for those items that are in assembly. Note that event
                 // is uniquely identified by <event number, data id> and
@@ -222,7 +222,7 @@ namespace e2sar
 
                 inline ~RecvThreadState()
                 {
-                    recvBufferPool.purge_memory();
+                    //recvBufferPool.purge_memory();
                 }
 
                 // open v4/v6 sockets
