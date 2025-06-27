@@ -312,12 +312,13 @@ namespace e2sar
                 if (nbytes == -1) {
                     reas.recvStats.dataErrCnt++;
                     reas.recvStats.lastErrno = errno;
-                    return;
+                    free(recvBuffer);
+                    continue;
                 }
                 // count fragment received by socket
                 reas.recvStats.fragmentsPerFd[fd]++;
 
-                // receive and deal with everything on a thread
+                // deal with everything on a thread
                 boost::asio::post(threadPool,
                     [this, recvBuffer, nbytes]() {
 
