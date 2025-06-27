@@ -180,7 +180,6 @@ namespace e2sar
             cqeThreadState.threadObj = std::move(CQET);
         }
 #endif
-
         return 0;
     }
 
@@ -190,6 +189,16 @@ namespace e2sar
         // lock for the mutex (must be thread-local)
         thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
         struct io_uring_cqe *cqes[cqeBatchSize];
+
+        // TODO: need to set main threads' affinity in a more granular
+        // fashion so we can then do this. Currently the entire process
+        // affinity is set to cpu core list (suboptimal)
+        //if (seg.cpuCoreList.size() > 0)
+        //{
+        //    auto res = Affinity::setThreadXOR(seg.cpuCoreList);
+        //    if (res.has_error())
+        //        seg.sendStats.lastE2SARError = res.error().code();
+        //}
 
         while(!seg.threadsStop)
         {
@@ -446,6 +455,8 @@ namespace e2sar
             }
         }
         auto res = _close();
+        // wait for all threads to complete
+        threadPool.join();
     }
 
     result<int> Segmenter::SendThreadState::_open()

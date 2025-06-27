@@ -232,8 +232,9 @@ namespace e2sar
                 // thread loop
                 void _threadBody();
 
-                // log a lost event via a set of known lost
-                // ad add to lost queue for external inspection
+                // log a lost event and add to lost queue for external inspection
+                // boolean flag discriminates between enqueue losses (true)
+                // and reassembly losses (false)
                 inline void logLostEvent(EventQueueItem* item, bool enqueLoss)
                 {
                     std::pair<EventNum_t, u_int16_t> evt(item->eventNum, item->dataId);

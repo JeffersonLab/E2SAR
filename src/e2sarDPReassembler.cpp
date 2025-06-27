@@ -233,6 +233,17 @@ namespace e2sar
     {
         auto eventTimeout_ms = boost::chrono::milliseconds(reas.eventTimeout_ms);
 
+        // TODO: move to a more granular affinity setting for main
+        // threads and then set this thread to anything other than
+        // the cores specified by user
+        // set affinity to anything other than cores we are using
+        // if (reas.cpuCoreList.size() > 0)
+        // {
+        //     auto res = Affinity::setThreadXOR(reas.cpuCoreList);
+        //     if (res.has_error())
+        //     reas.recvStats.lastE2SARError = res.error().code();
+        // }
+
         while (!reas.threadsStop)
         {
             auto nowT = boost::chrono::steady_clock::now();
