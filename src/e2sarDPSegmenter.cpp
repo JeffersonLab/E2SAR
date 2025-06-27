@@ -392,7 +392,7 @@ namespace e2sar
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
 
         // create a thread pool for sending events 
-        static boost::asio::thread_pool threadPool(seg.numSendSockets);
+        thread_local boost::asio::thread_pool threadPool(seg.numSendSockets);
         boost::chrono::high_resolution_clock::time_point nowTE;
         int64_t interEventSleepUsec{0};
 
