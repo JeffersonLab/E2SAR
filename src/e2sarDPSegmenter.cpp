@@ -454,9 +454,10 @@ namespace e2sar
                 }
             }
         }
-        auto res = _close();
         // wait for all threads to complete
         threadPool.join();
+        
+        auto res = _close();
     }
 
     result<int> Segmenter::SendThreadState::_open()
