@@ -261,7 +261,7 @@ namespace e2sar
                         i->logLostEvent(it->second, false);
                         delete[] it->second->event;
                         // deallocate queue item
-                        delete it->second;
+                        it->second.reset();
                         it = i->eventsInProgress.erase(it);  // erase returns the next element (or end())
                     } else {
                         ++it;  // Just advance the iterator if no deletion
@@ -340,20 +340,19 @@ namespace e2sar
                         localNbytes -= sizeof(REHdr);
                     }
 
-                    EventQueueItem *item{nullptr};
+                    std::shared_ptr<EventQueueItem> item;
+                    evtsInProgressMutex.lock();
+
                     if (rehdr->get_bufferOffset() == 0)
                     {
                         // new event - start a new event item and new event buffer 
                         // since this is done by many threads, can't use object_pool easily
-                        item = new EventQueueItem(rehdr);
+                        item = std::make_shared<EventQueueItem>(rehdr);
                         // add to in progress map based on <event number, data id> tuple
-                        evtsInProgressMutex.lock();
                         eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
-                        evtsInProgressMutex.unlock();
                     } else 
                     {
                         // try to locate the event in the in progress map
-                        evtsInProgressMutex.lock();
                         auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
                         if (it != eventsInProgress.end()) 
                             item = it->second;
@@ -361,31 +360,32 @@ namespace e2sar
                         {
                             // out of order delivery and we haven't seen this event
                             // start a new event item and new event buffer 
-                            item = new EventQueueItem(rehdr);
+                            item = std::make_shared<EventQueueItem>(rehdr);
                             // add to in progress map
                             eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                         }
-                        evtsInProgressMutex.unlock();
                     }
-
-                    // count this fragment received (it could be anywhere in the event)
-                    item->numFragments++;
+                    evtsInProgressMutex.unlock();
 
                     // copy segment into event buffer into its proper place 
                     // note that with or without LB header, our REhdr should be set now
                     memcpy(item->event + rehdr->get_bufferOffset(), 
                         reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), localNbytes);
-                    // localNbytes by now is less REHdr and LBHdr (as needed)
-                    item->curBytes += localNbytes;
 
                     // free the recv buffer
                     free(recvBuffer);
 
+                    // count this fragment received (it could be anywhere in the event)
+                    item->numFragments++;
+
                     // check if this event is completed, if so put on queue
-                    if (item->curBytes == item->bytes)
+                    // threads in the pool can have a race here, so we use fetch_add
+                    if (item->curBytes.fetch_add(localNbytes) == item->bytes - localNbytes)
                     {
                         // remove this item from in progress map
                         evtsInProgressMutex.lock();
+                        // TODO: a bit inefficient as this searches for all keys equal to this.
+                        // If we can get ahold of an iterator in advance we can precisely erase the element
                         eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
                         evtsInProgressMutex.unlock();
 
@@ -396,12 +396,12 @@ namespace e2sar
                         {
                             // log this lost event
                             logLostEvent(item, true);
-                            // event buffer is lost
+                            // delete event buffer
                             delete[] item->event;
-                            // free up the item
-                            delete item;
                         }
-
+                        // deallocate queue item - either we put a copy of the item
+                        // on the queue or we couldn't, either way we release
+                        item.reset();
                         // update statistics
                         reas.recvStats.eventSuccess++;
                     }
@@ -608,7 +608,6 @@ namespace e2sar
         *eventNum = eventItem->eventNum;
         *dataId = eventItem->dataId;
 
-        // just rely on its locking
         delete eventItem;
 
         return 0;
@@ -645,7 +644,6 @@ namespace e2sar
         *eventNum = eventItem->eventNum;
         *dataId = eventItem->dataId;
 
-        // just rely on its locking
         delete eventItem;
         return 0;
     }
