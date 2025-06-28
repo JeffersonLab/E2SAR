@@ -293,7 +293,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
             memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
             mangledEvents++;
 
-        delete evtBuf;
+        delete[] evtBuf;
         evtBuf = nullptr;
     }
     std::cout << "Completed" << std::endl;
