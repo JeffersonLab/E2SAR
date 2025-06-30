@@ -60,9 +60,9 @@ namespace e2sar
             // Structure to hold each recv-queue item
             struct EventQueueItem {
                 boost::chrono::steady_clock::time_point firstSegment; // when first segment arrived
-                std::atomic<size_t> numFragments; // how many fragments received (in and out of order)
+                size_t numFragments; // how many fragments received (in and out of order)
                 size_t bytes;  // total length
-                std::atomic<size_t> curBytes; // current bytes accumulated (could be scattered across fragments)
+                size_t curBytes; // current bytes accumulated (could be scattered across fragments)
                 EventNum_t eventNum;
                 u_int8_t *event;
                 u_int16_t dataId;
@@ -75,8 +75,8 @@ namespace e2sar
                 EventQueueItem& operator=(const EventQueueItem &i) = delete;
 
                 EventQueueItem(const EventQueueItem &i): firstSegment{i.firstSegment}, 
-                    numFragments{i.numFragments.load()},               
-                    bytes{i.bytes}, curBytes{i.curBytes.load()}, 
+                    numFragments{i.numFragments},               
+                    bytes{i.bytes}, curBytes{i.curBytes}, 
                     eventNum{i.eventNum},   event{i.event},  dataId{i.dataId} {}
                 /**
                  * Initialize from REHdr
