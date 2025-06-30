@@ -1,3 +1,5 @@
+#include <sys/ioctl.h>
+
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -456,7 +458,7 @@ namespace e2sar
         }
         // wait for all threads to complete
         threadPool.join();
-        
+
         auto res = _close();
     }
 
@@ -825,7 +827,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            // increment atomic counter so CQE reaping thread
+            // increment atomic counter so CQE reaping socket
             // knows there's work to do
             seg.outstandingSends += numBuffers;
             seg.cqeThreadCond.notify_all();
@@ -838,13 +840,32 @@ namespace e2sar
         return numBuffers * 0;
     }
 
+    // in Linux use an ioctl to read socket send buffer state
+    // otherwise just close
+    result<int> Segmenter::SendThreadState::_waitAndCloseFd(int fd)
+    {
+        int outq = 0;
+        bool stop{false};
+        // busy wait while the socket has outstanding data
+        while(!stop)
+        {
+            if (ioctl(fd, TIOCOUTQ, &outq) == 0)
+                stop = (outq == 0);
+            else
+                stop = true;
+        }
+        close(fd);
+        return 0;
+    }
+
     result<int> Segmenter::SendThreadState::_close()
     {
-        for(auto f: socketFd4)
-            close(f.get<0>());
         if (useV6)
             for (auto f: socketFd6)
-                close(f.get<0>());
+                auto res = _waitAndCloseFd(f.get<0>());
+        else
+            for(auto f: socketFd4)
+                auto res = _waitAndCloseFd(f.get<0>());
         return 0;
     }
 

@@ -241,6 +241,8 @@ namespace e2sar
                 result<int> _open();
                 // close sockets
                 result<int> _close();
+                // close a given socket, wait that it has sent all the data (in Linux)
+                result<int> _waitAndCloseFd(int fd);
                 // fragment and send the event
                 result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
                     u_int16_t entropy, size_t roundRobinIndex, 
