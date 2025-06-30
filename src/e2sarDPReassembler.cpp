@@ -280,6 +280,10 @@ namespace e2sar
         // thread pool for receiving
         thread_local boost::asio::thread_pool threadPool(udpPorts.size() + 1);
 
+        // synchronizing the posted threads
+        std::mutex barrierMutex;
+        std::condition_variable barrierCV;
+
         while(!reas.threadsStop)
         {
             fd_set curSet{fdSet};
@@ -293,6 +297,18 @@ namespace e2sar
                 reas.recvStats.lastErrno = errno;
                 continue;
             }
+
+            // how many fd's fired, how many threads we will wait for
+            int taskCount = 0;
+            for(auto fd: sockets)
+                if (FD_ISSET(fd, &curSet))
+                    ++taskCount;
+
+            if (taskCount == 0)
+                continue;
+
+            // Shared counter for this batch
+            auto counter = std::make_shared<std::atomic<int>>(taskCount);
 
             // receive a event fragment on one or more of them
             for(auto fd: sockets) 
@@ -320,7 +336,7 @@ namespace e2sar
 
                 // deal with everything on a thread
                 boost::asio::post(threadPool,
-                    [this, recvBuffer, nbytes]() {
+                    [this, recvBuffer, nbytes, counter, &barrierMutex, &barrierCV]() {
 
                     auto localNbytes = nbytes;
 
@@ -405,7 +421,19 @@ namespace e2sar
                         // update statistics
                         reas.recvStats.eventSuccess++;
                     }
+
+                    // Barrier
+                    if (counter->fetch_sub(1) == 1) {
+                        std::lock_guard<std::mutex> lock(barrierMutex);
+                        barrierCV.notify_one();
+                    }
                 });
+            }
+
+            // Wait for all tasks in this batch to finish
+            {
+                std::unique_lock<std::mutex> lock(barrierMutex);
+                barrierCV.wait(lock, [&counter]{ return counter->load() == 0; });
             }
         }
         // let all threads finish

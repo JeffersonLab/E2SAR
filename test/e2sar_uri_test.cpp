@@ -35,6 +35,9 @@ std::string uri_string10{"ejfats://ejfat-lb.es.net:18020/lb/36?sync=192.188.29.6
 // with custom data port
 std::string uri_string11{"ejfat://192.188.29.6:18020/lb/36?data=192.188.29.6:19020"};
 
+// IPv6 and custom data port
+std::string uri_string12{"ejfats://89f9afdb6972597@ejfat-lb.es.net:18008/lb/17?sync=192.188.29.6:19010&data=192.188.29.10&data=[2001:400:a300::10]:10000"};
+
 BOOST_AUTO_TEST_SUITE(URITestSuite)
 
 BOOST_AUTO_TEST_CASE(URITest1)
@@ -298,5 +301,17 @@ BOOST_AUTO_TEST_CASE(URITest13)
     BOOST_CHECK(euri.get_dataAddrv4().value().second == 19020);
 }
 
+BOOST_AUTO_TEST_CASE(URITest14)
+{
+    EjfatURI euri(uri_string12);
 
+    std::cout << static_cast<std::string>(euri) << "Dataplane address with custom port v6: " << euri.get_dataAddrv6().value().first <<
+        ":" << euri.get_dataAddrv6().value().second << " v4: " << euri.get_dataAddrv4().value().first <<
+        ":" << euri.get_dataAddrv4().value().second << std::endl;
+
+    BOOST_CHECK(euri.get_dataAddrv6().value().first == ip::make_address("2001:400:a300::10"));
+    BOOST_CHECK(euri.get_dataAddrv6().value().second == 10000);
+    BOOST_CHECK(euri.get_dataAddrv4().value().first == ip::make_address("192.188.29.10"));
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == 10000);
+}
 BOOST_AUTO_TEST_SUITE_END()
