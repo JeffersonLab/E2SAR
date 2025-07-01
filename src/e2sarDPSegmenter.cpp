@@ -644,7 +644,7 @@ namespace e2sar
         // register open file descriptors with the rings
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            int i{0}
+            int i{0};
             for (auto ring: seg.rings)
             {
                 // one fd per ring, the call expects an array so we do &ringFds[i]
