@@ -19,10 +19,6 @@ namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 using namespace e2sar;
 
-// prepare a pool
-boost::pool<> *evtBufferPool;
-// to avoid locking the pool we use the return queue
-boost::lockfree::queue<u_int8_t*> returnBufferQueue{10000};
 // app-level stats
 std::atomic<u_int64_t> mangledEvents{0};
 std::atomic<u_int64_t> receivedWithError{0};
@@ -118,7 +114,7 @@ void option_dependency(const po::variables_map &vm,
 void freeBuffer(boost::any a) 
 {
     auto p = boost::any_cast<u_int8_t*>(a);
-    returnBufferQueue.push(p);
+    free(p);
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
@@ -149,15 +145,12 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     if (openRes.has_error())
         return openRes;
 
-    // initialize a pool of memory buffers  we will be sending (mostly filled with random data)
-    evtBufferPool = new boost::pool<>{eventBufSize};
-
     auto sendStartTime = boost::chrono::high_resolution_clock::now();
     size_t evt = 0;
     for(; evt < numEvents; evt++)
     {
         // send the event
-        auto eventBuffer = static_cast<u_int8_t*>(evtBufferPool->malloc());
+        auto eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
         // fill in the first part of the buffer with something meaningful and also the end
         memcpy(eventBuffer, eventPldStart.c_str(), eventPldStart.size());
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
@@ -180,10 +173,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             } else
                 break;
         }
-        // free the backlog of empty buffers
-        u_int8_t *item{nullptr};
-        while (returnBufferQueue.pop(item))
-            evtBufferPool->free(item);
     }
 
     // measure this right after we exit the send loop
@@ -204,7 +193,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
             expectedFrames << ")." << std::endl;
 
-    evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
     if (stats.errCnt != 0)
     {
