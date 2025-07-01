@@ -95,7 +95,7 @@ namespace e2sar
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
 
 #ifdef LIBURING_AVAILABLE
-            struct io_uring ring;
+            std::vector<struct io_uring> rings;
             // each ring has to have a predefined size - we want to
             // put at least 2*eventSize/bufferSize entries onto it
             const size_t uringSize = 1000;
@@ -449,9 +449,12 @@ namespace e2sar
                 if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
                     cqeThreadState.threadObj.join();
-                    io_uring_unregister_files(&ring);
-                    // deallocate the ring
-                    io_uring_queue_exit(&ring);
+                    for (auto ring: rings)
+                    {
+                        io_uring_unregister_files(&ring);
+                        // deallocate the ring
+                        io_uring_queue_exit(&ring);
+                    }
                 }
 #endif
                 // pool memory is implicitly freed when pool goes out of scope

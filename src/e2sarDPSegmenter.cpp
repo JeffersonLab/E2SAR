@@ -127,9 +127,15 @@ namespace e2sar
             // note we will register the file descriptors with the ring a bit later
             params.flags |= IORING_SETUP_SQPOLL;
             params.sq_thread_idle = pollWaitTime;
-            int err = io_uring_queue_init_params(uringSize, &ring, &params);
-            if (err)
-                throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
+
+            // set the ring vector to the number of sockets (there will be one thread per)
+            rings.resize(numSendSockets);
+            for(auto ring: rings)
+            {
+                int err = io_uring_queue_init_params(uringSize, &ring, &params);
+                if (err)
+                    throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
+            }
         }
 #endif
         sanityChecks();
@@ -214,43 +220,46 @@ namespace e2sar
                 // reap CQEs and update the stats
                 // should exit when the ring is deleted
 
-                memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
-                int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, cqeBatchSize);
-                // error or returned nothing
-                if (ret <= 0)
+                for(auto ring: seg.rings)
                 {
-                    // don't log error here - it is usually a temporary resource availability
-                    break;
-                }
-                for(int idx = 0; idx < ret; ++idx)
-                {
-                    // we have a CQE now
-                    // check for errors from sendmsg
-                    if (cqes[idx]->res < 0)
+                    memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
+                    int ret = io_uring_peek_batch_cqe(&ring, cqes, cqeBatchSize);
+                    // error or returned nothing
+                    if (ret <= 0)
                     {
-                        seg.sendStats.errCnt++;
-                        seg.sendStats.lastErrno = cqes[idx]->res;
+                        // don't log error here - it is usually a temporary resource availability
+                        break;
                     }
-                    auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
-                    auto callback = sqeUserData->callback;
-                    auto cbArg = std::move(sqeUserData->cbArg);
-                    // free the memory
-                    auto sqeMsgHdr = sqeUserData->msghdr;
-                    // deallocate the LBRE header
-                    free(sqeMsgHdr->msg_iov[0].iov_base);
-                    // deallocate the iovec itself
-                    free(sqeMsgHdr->msg_iov);
-                    // deallocate struct msghdr
-                    free(sqeMsgHdr);
-                    // deallocate sqeUserData
-                    free(sqeUserData);
-                    // mark CQE as done
-                    io_uring_cqe_seen(&seg.ring, cqes[idx]);
-                    // call the callback if not null (would happen at the end of the event buffer)
-                    if (callback != nullptr)
-                        callback(cbArg);
+                    for(int idx = 0; idx < ret; ++idx)
+                    {
+                        // we have a CQE now
+                        // check for errors from sendmsg
+                        if (cqes[idx]->res < 0)
+                        {
+                            seg.sendStats.errCnt++;
+                            seg.sendStats.lastErrno = cqes[idx]->res;
+                        }
+                        auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
+                        auto callback = sqeUserData->callback;
+                        auto cbArg = std::move(sqeUserData->cbArg);
+                        // free the memory
+                        auto sqeMsgHdr = sqeUserData->msghdr;
+                        // deallocate the LBRE header
+                        free(sqeMsgHdr->msg_iov[0].iov_base);
+                        // deallocate the iovec itself
+                        free(sqeMsgHdr->msg_iov);
+                        // deallocate struct msghdr
+                        free(sqeMsgHdr);
+                        // deallocate sqeUserData
+                        free(sqeUserData);
+                        // mark CQE as done
+                        io_uring_cqe_seen(&ring, cqes[idx]);
+                        // call the callback if not null (would happen at the end of the event buffer)
+                        if (callback != nullptr)
+                            callback(cbArg);
+                    }
+                    seg.outstandingSends -= ret;
                 }
-                seg.outstandingSends -= ret;
             }
         }
     }
@@ -424,39 +433,31 @@ namespace e2sar
                 // operations since it is asynchronous - that is collected 
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
+                boost::asio::post(threadPool,
+                    [this, item]() {
+                        auto res = _send(item->event, item->bytes, 
+                            item->eventNum, item->dataId,
+                            item->entropy, seg.roundRobinIndex, 
+                            item->callback, item->cbArg);
+
 #ifdef LIBURING_AVAILABLE
-                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
-                {
-                    // invoke _send directly, since io_uring is not mt-safe and
-                    // creating and managing  an io_uring per thread in the pool 
-                    // becomes a fair bit of work for an uncertain outcome
-                    auto res = _send(item->event, item->bytes, 
-                        item->eventNum, item->dataId,
-                        item->entropy, seg.roundRobinIndex, 
-                        item->callback, item->cbArg);
-                    // we don't call the callback as it's done on the CQE reaper thread
-
-                    // free item here
-                    free(item);
-                }
-                else
+                        if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
+                        {
+                            // no callback here, see cqe reaper thread
+                            ;
+                        }
+                        else
 #endif
-                {
-                    boost::asio::post(threadPool,
-                        [this, item]() {
-                            auto res = _send(item->event, item->bytes, 
-                                item->eventNum, item->dataId,
-                                item->entropy, seg.roundRobinIndex, 
-                                item->callback, item->cbArg);
-
+                        {
                             // call the callback on the worker thread (except with liburing)
                             if (item->callback != nullptr)
                                 item->callback(item->cbArg);
-                            
-                            // free item here
-                            free(item);
-                    });
-                }
+                        }
+                        
+                        // free item here
+                        free(item);
+                });
+
                 // busy wait if needed for inter-event period 
                 if (seg.rateLimit && interEventSleepUsec > 0)
                 {
@@ -473,7 +474,7 @@ namespace e2sar
     result<int> Segmenter::SendThreadState::_open()
     {
 #ifdef LIBURING_AVAILABLE
-        // allocate int[] for passing FDs into the ring
+        // allocate int[] for passing FDs into the rings
         int ringFds[socketFd4.size()];
 #endif
         unsigned int fdCount{0};
@@ -640,14 +641,20 @@ namespace e2sar
         }
 
 #ifdef LIBURING_AVAILABLE
-        // register open file descriptors with the ring
+        // register open file descriptors with the rings
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            int ret = io_uring_register_files(&seg.ring, ringFds, fdCount);
-            if (ret < 0)
+            int i{0}
+            for (auto ring: seg.rings)
             {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = ret;
+                // one fd per ring, the call expects an array so we do &ringFds[i]
+                int ret = io_uring_register_files(&ring, &ringFds[i], 1);
+                if (ret < 0)
+                {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = ret;
+                }
+                ++i;
             }
         }
 #endif
@@ -763,7 +770,7 @@ namespace e2sar
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
                 // busy-wait for a free sqe to become available
-                while(not(sqe = io_uring_get_sqe(&seg.ring)));
+                while(not(sqe = io_uring_get_sqe(&seg.rings[roundRobinIndex])));
                 // allocate struct msghdr - we can't use the stack version here
                 struct msghdr *sqeMsgHdr = static_cast<struct msghdr*>(malloc(sizeof(struct msghdr)));
                 memcpy(sqeMsgHdr, &sendhdr, sizeof(struct msghdr));
@@ -787,7 +794,7 @@ namespace e2sar
                 // index to previously registered fds, not fds themselves
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
-                io_uring_submit(&seg.ring);
+                io_uring_submit(&seg.rings[roundRobinIndex]);
             }
             else
 #endif
