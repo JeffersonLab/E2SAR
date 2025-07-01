@@ -424,31 +424,39 @@ namespace e2sar
                 // operations since it is asynchronous - that is collected 
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
-
-                boost::asio::post(threadPool,
-                    [this, item]() {
-                        auto res = _send(item->event, item->bytes, 
+#ifdef LIBURING_AVAILABLE
+                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
+                {
+                    // invoke _send directly, since io_uring is not mt-safe and
+                    // creating and managing  an io_uring per thread in the pool 
+                    // becomes a fair bit of work for an uncertain outcome
+                    auto res = _send(item->event, item->bytes, 
                         item->eventNum, item->dataId,
                         item->entropy, seg.roundRobinIndex, 
                         item->callback, item->cbArg);
+                    // we don't call the callback as it's done on the CQE reaper thread
 
-                        // call the callback on the worker thread (except with liburing)
-#ifdef LIBURING_AVAILABLE
-                        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
-                        {
-                            // do nothing - it will be called from CQE Reaping Thread
-                            ;
-                        }
-                        else
+                    // free item here
+                    free(item);
+                }
+                else
 #endif
-                        {
+                {
+                    boost::asio::post(threadPool,
+                        [this, item]() {
+                            auto res = _send(item->event, item->bytes, 
+                                item->eventNum, item->dataId,
+                                item->entropy, seg.roundRobinIndex, 
+                                item->callback, item->cbArg);
+
+                            // call the callback on the worker thread (except with liburing)
                             if (item->callback != nullptr)
                                 item->callback(item->cbArg);
-                        }
-                        
-                        // free item here
-                        free(item);
-                });
+                            
+                            // free item here
+                            free(item);
+                    });
+                }
                 // busy wait if needed for inter-event period 
                 if (seg.rateLimit && interEventSleepUsec > 0)
                 {
