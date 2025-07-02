@@ -212,7 +212,6 @@ namespace e2sar
         {
             condLock.lock();
             seg.cqeThreadCond.wait_for(condLock, seg.cqeWaitTime);
-            condLock.unlock();
 
             // empty cqe queue
             while(seg.outstandingSends > 0)
@@ -261,6 +260,7 @@ namespace e2sar
                     seg.outstandingSends -= ret;
                 }
             }
+            condLock.unlock();
         }
     }
 #endif
@@ -644,7 +644,6 @@ namespace e2sar
         // register open file descriptors with the rings
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            int i{0};
             for (size_t i = 0; i < seg.rings.size(); ++i)
             {
                 // register all fds with each ring
@@ -766,6 +765,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
+                boost::lockguard<boost::mutex> cqeLock(cqeThreadMtx);
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};

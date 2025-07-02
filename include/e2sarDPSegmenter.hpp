@@ -96,6 +96,7 @@ namespace e2sar
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
+            
             // each ring has to have a predefined size - we want to
             // put at least 2*eventSize/bufferSize entries onto it
             const size_t uringSize = 1000;
@@ -449,11 +450,11 @@ namespace e2sar
                 if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
                     cqeThreadState.threadObj.join();
-                    for (auto ring: rings)
+                    for (size_t i = 0; i < rings.size(); ++i)
                     {
-                        io_uring_unregister_files(&ring);
+                        io_uring_unregister_files(&rings[i]);
                         // deallocate the ring
-                        io_uring_queue_exit(&ring);
+                        io_uring_queue_exit(&rings[i]);
                     }
                 }
 #endif
