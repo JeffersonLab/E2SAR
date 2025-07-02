@@ -657,7 +657,6 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = ret;
                 }
-                ++i;
             }
         }
 #endif
