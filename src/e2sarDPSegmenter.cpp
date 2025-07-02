@@ -223,13 +223,14 @@ namespace e2sar
 
                 for(size_t i = 0; i < seg.rings.size(); ++i)
                 {
-                    boost::lock_guard<boost::mutex> cqeGuard(seg.ringMtxs[i]);
+                    seg.ringMtxs[i].lock();
                     memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
                     int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
                     // error or returned nothing
                     if (ret <= 0)
                     {
                         // don't log error here - it is usually a temporary resource availability
+                        seg.ringMtxs[i].unlock();
                         continue;
                     }
                     for(int idx = 0; idx < ret; ++idx)
@@ -260,6 +261,7 @@ namespace e2sar
                         if (callback != nullptr)
                             callback(cbArg);
                     }
+                    seg.ringMtxs[i].unlock();
                     seg.outstandingSends -= ret;
                 }
             }
@@ -768,8 +770,8 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
-                boost::lock_guard<boost::mutex> cqeGuard(seg.ringMtxs[roundRobinIndex]);
                 seg.sendStats.msgCnt++;
+                seg.ringMtxs[roundRobinIndex].lock();
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
                 // busy-wait for a free sqe to become available
@@ -798,6 +800,7 @@ namespace e2sar
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
                 io_uring_submit(&seg.rings[roundRobinIndex]);
+                seg.ringMtxs[roundRobinIndex].unlock();
             }
             else
 #endif
