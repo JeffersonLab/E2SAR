@@ -96,7 +96,8 @@ namespace e2sar
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
-            
+            std::vector<boost::mutex> ringMtxs;
+
             // each ring has to have a predefined size - we want to
             // put at least 2*eventSize/bufferSize entries onto it
             const size_t uringSize = 1000;

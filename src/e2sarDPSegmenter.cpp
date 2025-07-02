@@ -39,6 +39,8 @@ namespace e2sar
         sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
         cpuCoreList{cpuCoreList},
 #ifdef LIBURING_AVAILABLE
+        rings(sflags.numSendSockets),
+        ringMtxs(sflags.numSendSockets),
         cqeThreadState(*this),
 #endif
         warmUpMs{sflags.warmUpMs},
@@ -129,7 +131,6 @@ namespace e2sar
             params.sq_thread_idle = pollWaitTime;
 
             // set the ring vector to the number of sockets (there will be one thread per)
-            rings.resize(numSendSockets);
             for(size_t i = 0; i < rings.size(); ++i)
             {
                 int err = io_uring_queue_init_params(uringSize, &rings[i], &params);
@@ -212,6 +213,7 @@ namespace e2sar
         {
             condLock.lock();
             seg.cqeThreadCond.wait_for(condLock, seg.cqeWaitTime);
+            condLock.unlock();
 
             // empty cqe queue
             while(seg.outstandingSends > 0)
@@ -221,13 +223,14 @@ namespace e2sar
 
                 for(size_t i = 0; i < seg.rings.size(); ++i)
                 {
+                    boost::lock_guard<boost::mutex> cqeGuard(ringMtxs[i]);
                     memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
                     int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
                     // error or returned nothing
                     if (ret <= 0)
                     {
                         // don't log error here - it is usually a temporary resource availability
-                        break;
+                        continue;
                     }
                     for(int idx = 0; idx < ret; ++idx)
                     {
@@ -260,7 +263,6 @@ namespace e2sar
                     seg.outstandingSends -= ret;
                 }
             }
-            condLock.unlock();
         }
     }
 #endif
@@ -426,6 +428,8 @@ namespace e2sar
                 // round robin through sending sockets
                 seg.roundRobinIndex = (seg.roundRobinIndex + 1) % seg.numSendSockets;
 
+                auto rri = seg.roundRobinIndex;
+
                 // FIXME: do something with result? 
                 // it IS  taken care by lastErrno in the stats block. 
                 // Note that in the case of liburing
@@ -434,10 +438,10 @@ namespace e2sar
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
                 boost::asio::post(threadPool,
-                    [this, item]() {
+                    [this, rri, item]() {
                         auto res = _send(item->event, item->bytes, 
                             item->eventNum, item->dataId,
-                            item->entropy, seg.roundRobinIndex, 
+                            item->entropy, rri, 
                             item->callback, item->cbArg);
 
 #ifdef LIBURING_AVAILABLE
@@ -765,7 +769,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
-                boost::lock_guard<boost::mutex> cqeLock(seg.cqeThreadMtx);
+                boost::lock_guard<boost::mutex> cqeGuard(ringMtxs[roundRobinIndex]);
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
