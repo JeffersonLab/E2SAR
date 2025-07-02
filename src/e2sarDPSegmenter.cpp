@@ -130,9 +130,9 @@ namespace e2sar
 
             // set the ring vector to the number of sockets (there will be one thread per)
             rings.resize(numSendSockets);
-            for(auto ring: rings)
+            for(int i = 0; i < rings.size(); ++i)
             {
-                int err = io_uring_queue_init_params(uringSize, &ring, &params);
+                int err = io_uring_queue_init_params(uringSize, &rings[i], &params);
                 if (err)
                     throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
             }
@@ -220,10 +220,10 @@ namespace e2sar
                 // reap CQEs and update the stats
                 // should exit when the ring is deleted
 
-                for(auto ring: seg.rings)
+                for(int i = 0; i < seg.rings.size(); ++i)
                 {
                     memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
-                    int ret = io_uring_peek_batch_cqe(&ring, cqes, cqeBatchSize);
+                    int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
                     // error or returned nothing
                     if (ret <= 0)
                     {
@@ -253,7 +253,7 @@ namespace e2sar
                         // deallocate sqeUserData
                         free(sqeUserData);
                         // mark CQE as done
-                        io_uring_cqe_seen(&ring, cqes[idx]);
+                        io_uring_cqe_seen(&seg.rings[i], cqes[idx]);
                         // call the callback if not null (would happen at the end of the event buffer)
                         if (callback != nullptr)
                             callback(cbArg);
@@ -645,10 +645,10 @@ namespace e2sar
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
             int i{0};
-            for (auto ring: seg.rings)
+            for (int i = 0; i < seg.rings.size(); ++i)
             {
-                // one fd per ring, the call expects an array so we do &ringFds[i]
-                int ret = io_uring_register_files(&ring, &ringFds[i], 1);
+                // register all fds with each ring
+                int ret = io_uring_register_files(&seg.rings[i], ringFds, fdCount);
                 if (ret < 0)
                 {
                     seg.sendStats.errCnt++;
