@@ -765,7 +765,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
-                boost::lockguard<boost::mutex> cqeLock(cqeThreadMtx);
+                boost::lock_guard<boost::mutex> cqeLock(seg.cqeThreadMtx);
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
