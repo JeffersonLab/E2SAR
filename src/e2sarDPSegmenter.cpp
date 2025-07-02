@@ -223,7 +223,7 @@ namespace e2sar
 
                 for(size_t i = 0; i < seg.rings.size(); ++i)
                 {
-                    boost::lock_guard<boost::mutex> cqeGuard(ringMtxs[i]);
+                    boost::lock_guard<boost::mutex> cqeGuard(seg.ringMtxs[i]);
                     memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
                     int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
                     // error or returned nothing
@@ -769,7 +769,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
-                boost::lock_guard<boost::mutex> cqeGuard(ringMtxs[roundRobinIndex]);
+                boost::lock_guard<boost::mutex> cqeGuard(seg.ringMtxs[roundRobinIndex]);
                 seg.sendStats.msgCnt++;
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
