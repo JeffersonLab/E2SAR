@@ -130,7 +130,7 @@ namespace e2sar
 
             // set the ring vector to the number of sockets (there will be one thread per)
             rings.resize(numSendSockets);
-            for(int i = 0; i < rings.size(); ++i)
+            for(size_t i = 0; i < rings.size(); ++i)
             {
                 int err = io_uring_queue_init_params(uringSize, &rings[i], &params);
                 if (err)
@@ -220,7 +220,7 @@ namespace e2sar
                 // reap CQEs and update the stats
                 // should exit when the ring is deleted
 
-                for(int i = 0; i < seg.rings.size(); ++i)
+                for(size_t i = 0; i < seg.rings.size(); ++i)
                 {
                     memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
                     int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
@@ -645,7 +645,7 @@ namespace e2sar
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
             int i{0};
-            for (int i = 0; i < seg.rings.size(); ++i)
+            for (size_t i = 0; i < seg.rings.size(); ++i)
             {
                 // register all fds with each ring
                 int ret = io_uring_register_files(&seg.rings[i], ringFds, fdCount);
