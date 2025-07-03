@@ -5,7 +5,7 @@ compiler = meson.get_compiler('cpp')
 
 # adding -fsanitize if needed:
 # you can add -fsanitize=address for address sanitizer or 
-# -fsanitize=threads to look for race conditions. Need to be
+# -fsanitize=thread to look for race conditions. Need to be
 # added to both compile and link arguments
 #add_project_arguments('-fsanitize=address', language : 'cpp')
 #add_project_link_arguments('-fsanitize=address', language : 'cpp')
