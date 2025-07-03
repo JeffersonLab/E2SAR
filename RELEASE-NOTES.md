@@ -6,11 +6,13 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 Added rate pacing for the Segmenter. An additional field has been added: SegmenterFlags.rateGbps which specifies a floating point value of rate in Gbps. A negative value means ignore the setting and send as fast as possible. When a positive value is specified the sending code busy waits for the desired number of usecs either between frames (for sendmsg and io_uring) or between events (for sendmmsg). Note that when using Segmenter.addToSendQueue() the user must be careful to check that it doesn't return a E2SARErrorc::MemoryError which indicates that the queue is full (in this case the event should be resubmitted at a later time, the method by which the event submission code waits is left to the user).
 
-e2sar_perf now estimates the send rate based on the time elapsed, it is generally slightly smaller than the requested limit, up to the level where maximum rate is achieved.
+e2sar_perf now estimates the send rate based on the time elapsed, so the reported rate is generally slightly smaller than the requested limit, up to the level where maximum rate is achieved.
+
+Segmenter is now multi-threaded using a static thread pool, the degree of threading determined by the numSendSockets field of the INI file or in e2sar_perf there is a `--sockets` option. In addition and ONLY TO SUPPORT TESTING e2sar_perf offers a `--multiport` option, which forces segmenter to send on numSendSockets consecutive ports starting with the port specified in the data portion of the EjfatURI. This option is INCOMPATIBLE with using a real load balancer (so cannot be used with `--withcp`). When `--withcp` is in effect all packets are sent to a single LB port indicated in the Ejfat URI data portion.
+
+The Reassembler receive path has been significantly streamlined to offer better performance - all garbage collection of timed out event queue items has been moved onto a separate thread. 
 
 Added Conda packages (linux-64) for e2sar, can be installed using `conda install -c ibaldin -c conda-forge e2sar`. Package includes the E2SAR libraries, executables and the Python bindings (as a `.so`).
-
-Added `multiPort` boolean option to SegmenterFlags to allow sending to multiple destination ports. This is only useful in back-to-back performance testing without a Load Balancer. Defaults to false.
 
 Bug Fixes:
 - When using io_uring on send the SQE structure was malloc'ed resulting in garbage contained in it, which led the move semantics for cbArg to fail since it tries to call a d-tor if the object is not null. Replaced with calloc. 
