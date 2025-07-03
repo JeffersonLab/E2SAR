@@ -308,14 +308,14 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             auto recvres = self.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
 
             if (recvres.has_error()) {
-                std::cout << "Error encountered receiving event frames: "
-                    << recvres.error().message() << std::endl;
+                //std::cout << "Error encountered receiving event frames: "
+                //    << recvres.error().message() << std::endl;
                 // Return an empty buffer
                 return py::make_tuple(static_cast<int>(-2), py::bytes(), eventNum, recDataId);
             }
 
             if (recvres.value() == -1 || eventBuf == nullptr || eventLen == 0) {
-                std::cout << "No message received, continuing" << std::endl;
+                //std::cout << "No message received, continuing" << std::endl;
                 return py::make_tuple(static_cast<int>(-1), py::bytes(), eventNum, recDataId);
             }
 
@@ -339,13 +339,13 @@ void init_e2sarDP_reassembler(py::module_ &m) {
             auto recvres = self.getEvent(&eventBuf, &eventLen, &eventNum, &recDataId);
 
             if (recvres.has_error()) {
-                std::cout << "Error encountered receiving event frames: "
-                    << recvres.error().message() << std::endl;
+                //std::cout << "Error encountered receiving event frames: "
+                //    << recvres.error().message() << std::endl;
                 return py::make_tuple(static_cast<int>(-2), py::array(), eventNum, recDataId);
             }
 
             if (recvres.value() == -1) {
-                std::cout << "No message received, continuing" << std::endl;
+                //std::cout << "No message received, continuing" << std::endl;
                 return py::make_tuple(static_cast<int>(-1), py::array(), eventNum, recDataId);
             }
 
@@ -371,13 +371,13 @@ void init_e2sarDP_reassembler(py::module_ &m) {
                 auto recvres = self.recvEvent(&eventBuf, &eventLen, &eventNum, &recDataId, wait_ms);
 
                 if (recvres.has_error()) {
-                    std::cout << "Error encountered receiving event frames: "
-                            << recvres.error().message() << std::endl;
+                    //std::cout << "Error encountered receiving event frames: "
+                    //        << recvres.error().message() << std::endl;
                     return py::make_tuple(static_cast<int>(-2), py::array(), eventNum, recDataId);
                 }
 
                 if (recvres.value() == -1) {
-                    std::cout << "No message received, continuing" << std::endl;
+                    //std::cout << "No message received, continuing" << std::endl;
                     return py::make_tuple(static_cast<int>(-1), py::array(), eventNum, recDataId);
                 }
 
@@ -407,13 +407,13 @@ void init_e2sarDP_reassembler(py::module_ &m) {
 
             // Return empty bytes object of return code is not 0
             if (recvres.has_error()) {
-                std::cout << "Error encountered receiving event frames: "
-                    << recvres.error().message() << std::endl;
+                //std::cout << "Error encountered receiving event frames: "
+                //    << recvres.error().message() << std::endl;
                 return py::make_tuple(static_cast<int>(-2), py::bytes(), eventNum, recDataId);
             }
 
             if (recvres.value() == -1) {
-                std::cout << "No message received, continuing" << std::endl;
+                //std::cout << "No message received, continuing" << std::endl;
                 return py::make_tuple(static_cast<int>(-1), py::bytes(), eventNum, recDataId);
             }
 
