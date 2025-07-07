@@ -183,6 +183,12 @@ def test_b2b_send_numpy_get_numpy():
     reas.stopThreads()
 
 
+# Callback function that will be executed when the event is sent
+def send_completion_callback(cb_arg):
+    """Called when the event transmission completes"""
+    print(f"Event sent successfully! Callback argument: {cb_arg}")
+
+
 @pytest.mark.b2b
 def test_b2b_send_numpy_queue_recv_bytes():
     """
@@ -206,8 +212,14 @@ def test_b2b_send_numpy_queue_recv_bytes():
     # Create a 2D numpy array and each time send 1 row
     send_array = np.array([np.full((num_elements,), i, dtype=np.uint8) for i in range(5)])
     for i in range(5):
+        # print(f'Sending {send_array[i]=}')
         send_bytes = send_array[i].nbytes
-        res = seg.addToSendQueue(send_array[i], send_bytes)
+        callback_arg = {
+            'event_id': i,
+            'user_data': 'Important event marker'
+        }
+        res = seg.addNumpyArrayToSendQueue(numpy_array=send_array[i], nbytes=send_bytes, 
+                                 callback=send_completion_callback, cbArg=callback_arg)
         verify_result_obj(res)
 
     time.sleep(1)
@@ -236,7 +248,13 @@ def test_b2b_send_numpy_queue_recv_bytes():
         # Validate the recv buffer
         # Decode the buffer as numpy 1D array
         recv_array = np.frombuffer(recv_data, dtype=np.uint8)
-        assert np.array_equal(send_array[i - 1], recv_array)
+        # search for input data - may not arrive in-order
+        found = False
+        for j in range(5):
+            if np.array_equal(recv_array, send_array[j]):
+                found = True
+        assert found == True
+        #assert np.array_equal(send_array[i - 1], recv_array)
         assert recv_data_id == DATA_ID
 
         if total_bytes >= send_array.nbytes:
@@ -265,6 +283,7 @@ def test_b2b_send_numpy_queue_recv_bytes():
 # No message received, continuing
 # Receiving error after recv 600000000 bytes
 #
+#@pytest.mark.skip(reason="Excluded from main suite")
 @pytest.mark.skip(reason="Excluded from main suite")
 def test_b2b_send_numpy_queue_get_numpy():
     """
