@@ -1,3 +1,5 @@
+#include <sys/ioctl.h>
+
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -30,18 +32,19 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         rateGbps{sflags.rateGbps},
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
+        multiPort{sflags.multiPort},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
         sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
         cpuCoreList{cpuCoreList},
 #ifdef LIBURING_AVAILABLE
+        rings(sflags.numSendSockets),
+        ringMtxs(sflags.numSendSockets),
         cqeThreadState(*this),
 #endif
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
-        zeroRate{sflags.zeroRate},
-        usecAsEventNum{sflags.usecAsEventNum},
         addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
     {
         size_t mtu = 0;
@@ -126,12 +129,27 @@ namespace e2sar
             // note we will register the file descriptors with the ring a bit later
             params.flags |= IORING_SETUP_SQPOLL;
             params.sq_thread_idle = pollWaitTime;
-            int err = io_uring_queue_init_params(uringSize, &ring, &params);
-            if (err)
-                throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
+
+            // set the ring vector to the number of sockets (there will be one thread per)
+            for(size_t i = 0; i < rings.size(); ++i)
+            {
+                int err = io_uring_queue_init_params(uringSize, &rings[i], &params);
+                if (err)
+                    throw E2SARException("Unable to allocate uring due to "s + strerror(errno));
+            }
         }
 #endif
         sanityChecks();
+
+        // set process affinity to the set of threads provided
+        if (cpuCoreList.size() > 0)
+        {
+            auto res = Affinity::setProcess(cpuCoreList);
+            if (res.has_error())
+            {
+                throw E2SARException("Unable to set process affinity to indicated threads: "s + res.error().message());
+            }
+        }
     }
 
     result<int> Segmenter::openAndStart() noexcept
@@ -171,7 +189,6 @@ namespace e2sar
             cqeThreadState.threadObj = std::move(CQET);
         }
 #endif
-
         return 0;
     }
 
@@ -182,18 +199,15 @@ namespace e2sar
         thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
         struct io_uring_cqe *cqes[cqeBatchSize];
 
-        // set this thread to run on any core not named in the vector
-        // those cores are reserved for send threads only
-        if (seg.cpuCoreList.size())
-        {
-            auto res = Affinity::setThreadXOR(seg.cpuCoreList);
-            if (res.has_error())
-            {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastE2SARError = res.error().code();
-                return;
-            }
-        }
+        // TODO: need to set main threads' affinity in a more granular
+        // fashion so we can then do this. Currently the entire process
+        // affinity is set to cpu core list (suboptimal)
+        //if (seg.cpuCoreList.size() > 0)
+        //{
+        //    auto res = Affinity::setThreadXOR(seg.cpuCoreList);
+        //    if (res.has_error())
+        //        seg.sendStats.lastE2SARError = res.error().code();
+        //}
 
         while(!seg.threadsStop)
         {
@@ -207,43 +221,49 @@ namespace e2sar
                 // reap CQEs and update the stats
                 // should exit when the ring is deleted
 
-                memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
-                int ret = io_uring_peek_batch_cqe(&seg.ring, cqes, cqeBatchSize);
-                // error or returned nothing
-                if (ret <= 0)
+                for(size_t i = 0; i < seg.rings.size(); ++i)
                 {
-                    // don't log error here - it is usually a temporary resource availability
-                    break;
-                }
-                for(int idx = 0; idx < ret; ++idx)
-                {
-                    // we have a CQE now
-                    // check for errors from sendmsg
-                    if (cqes[idx]->res < 0)
+                    seg.ringMtxs[i].lock();
+                    memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
+                    int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
+                    // error or returned nothing
+                    if (ret <= 0)
                     {
-                        seg.sendStats.errCnt++;
-                        seg.sendStats.lastErrno = cqes[idx]->res;
+                        // don't log error here - it is usually a temporary resource availability
+                        seg.ringMtxs[i].unlock();
+                        continue;
                     }
-                    auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
-                    auto callback = sqeUserData->callback;
-                    auto cbArg = std::move(sqeUserData->cbArg);
-                    // free the memory
-                    auto sqeMsgHdr = sqeUserData->msghdr;
-                    // deallocate the LBRE header
-                    free(sqeMsgHdr->msg_iov[0].iov_base);
-                    // deallocate the iovec itself
-                    free(sqeMsgHdr->msg_iov);
-                    // deallocate struct msghdr
-                    free(sqeMsgHdr);
-                    // deallocate sqeUserData
-                    free(sqeUserData);
-                    // mark CQE as done
-                    io_uring_cqe_seen(&seg.ring, cqes[idx]);
-                    // call the callback if not null (would happen at the end of the event buffer)
-                    if (callback != nullptr)
-                        callback(cbArg);
+                    for(int idx = 0; idx < ret; ++idx)
+                    {
+                        // we have a CQE now
+                        // check for errors from sendmsg
+                        if (cqes[idx]->res < 0)
+                        {
+                            seg.sendStats.errCnt++;
+                            seg.sendStats.lastErrno = cqes[idx]->res;
+                        }
+                        auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
+                        auto callback = sqeUserData->callback;
+                        auto cbArg = std::move(sqeUserData->cbArg);
+                        // free the memory
+                        auto sqeMsgHdr = sqeUserData->msghdr;
+                        // deallocate the LBRE header
+                        free(sqeMsgHdr->msg_iov[0].iov_base);
+                        // deallocate the iovec itself
+                        free(sqeMsgHdr->msg_iov);
+                        // deallocate struct msghdr
+                        free(sqeMsgHdr);
+                        // deallocate sqeUserData
+                        free(sqeUserData);
+                        // mark CQE as done
+                        io_uring_cqe_seen(&seg.rings[i], cqes[idx]);
+                        // call the callback if not null (would happen at the end of the event buffer)
+                        if (callback != nullptr)
+                            callback(cbArg);
+                    }
+                    seg.ringMtxs[i].unlock();
+                    seg.outstandingSends -= ret;
                 }
-                seg.outstandingSends -= ret;
             }
         }
     }
@@ -260,7 +280,6 @@ namespace e2sar
             UnixTimeNano_t currentTimeNanos = static_cast<UnixTimeNano_t>(now);
             // get sync header buffer
             SyncHdr hdr{};
-            e2sar::EventRate_t evtRate;
 
             // push the stats onto ring buffer (except the first time) and reset
             // locking is not needed as sync thread is the  
@@ -274,15 +293,9 @@ namespace e2sar
                 seg.currentSyncStartNano = currentTimeNanos;
             }
 
-            // peek at segmenter metadata circular buffer to calculate event rate
-            if (seg.usecAsEventNum)
-                evtRate = 0; // will be overwritten by 1MHz
-            else
-                evtRate = seg.eventRate(currentTimeNanos); // calculate actual
-
             // fill the sync header using a mix of current and segmenter data
             // no locking needed - we only look at one field in seg - srcId
-            seg.fillSyncHdr(&hdr, evtRate, currentTimeNanos);
+            seg.fillSyncHdr(&hdr, currentTimeNanos);
 
             // send it off
             auto sendRes = _send(&hdr);
@@ -392,30 +405,32 @@ namespace e2sar
     void Segmenter::SendThreadState::_threadBody()
     {
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
-        // set sending thread affinity if core list is provided
-        if (seg.cpuCoreList.size())
-        {
-            auto res = Affinity::setThread(seg.cpuCoreList[threadIndex]);
-            if (res.has_error())
-            {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastE2SARError = res.error().code();
-                return;
-            }
-        }
+
+        // create a thread pool for sending events 
+        thread_local boost::asio::thread_pool threadPool(seg.numSendSockets);
+        boost::chrono::high_resolution_clock::time_point nowTE;
+        int64_t interEventSleepUsec{0};
+
         while(!seg.threadsStop)
         {
             // block to get event off the queue and send
-            seg.sendThreadCond.wait_for(condLock, sleepTime);
+            //seg.sendThreadCond.wait_for(condLock, sleepTime);
 
             // try to pop off eventQueue
             EventQueueItem *item{nullptr};
             while(seg.eventQueue.pop(item))
             {
-                // call send overriding event number as needed
-                auto res = _send(item->event, item->bytes, 
-                    item->eventNum, item->dataId,
-                    item->entropy, item->callback, item->cbArg);
+                if (seg.rateLimit)
+                {
+                    // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
+                    nowTE = boost::chrono::high_resolution_clock::now();
+                    // convert send rate into inter-event sleep time 
+                    interEventSleepUsec = static_cast<int64_t>(item->bytes*8/(seg.rateGbps * 1000));
+                }
+                // round robin through sending sockets
+                seg.roundRobinIndex = (seg.roundRobinIndex + 1) % seg.numSendSockets;
+
+                auto rri = seg.roundRobinIndex;
 
                 // FIXME: do something with result? 
                 // it IS  taken care by lastErrno in the stats block. 
@@ -424,35 +439,52 @@ namespace e2sar
                 // operations since it is asynchronous - that is collected 
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
+                boost::asio::post(threadPool,
+                    [this, rri, item]() {
+                        auto res = _send(item->event, item->bytes, 
+                            item->eventNum, item->dataId,
+                            item->entropy, rri, 
+                            item->callback, item->cbArg);
 
-                // call the callback 
 #ifdef LIBURING_AVAILABLE
-                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
-                {
-                    // do nothing - it will be called from CQE Reaping Thread
-                    ;
-                }
-                else
+                        if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
+                        {
+                            // no callback here, see cqe reaper thread
+                            ;
+                        }
+                        else
 #endif
-                {
-                    if (item->callback != nullptr)
-                        item->callback(item->cbArg);
-                }
+                        {
+                            // call the callback on the worker thread (except with liburing)
+                            if (item->callback != nullptr)
+                                item->callback(item->cbArg);
+                        }
+                        
+                        // free item here
+                        free(item);
+                });
 
-                // push the item back to return queue
-                seg.returnQueue.push(item);    
+                // busy wait if needed for inter-event period 
+                if (seg.rateLimit && interEventSleepUsec > 0)
+                {
+                    busyWaitUsecs(nowTE, interEventSleepUsec);       
+                }
             }
         }
+        // wait for all threads to complete
+        threadPool.join();
+
         auto res = _close();
     }
 
     result<int> Segmenter::SendThreadState::_open()
     {
 #ifdef LIBURING_AVAILABLE
-        // allocate int[] for passing FDs into the ring
+        // allocate int[] for passing FDs into the rings
         int ringFds[socketFd4.size()];
-        unsigned int fdCount{0};
 #endif
+        unsigned int fdCount{0};
+
         // Open v4 and v6 sockets for sending data message via DP
 
         // create numSendSocket bound sockets either v6 or v4. With each socket
@@ -512,7 +544,11 @@ namespace e2sar
 
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
-                dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
+                // use consecutive destination ports of requested
+                if (seg.multiPort)
+                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second + fdCount);
+                else
+                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
                 inet_pton(AF_INET6, dataAddr6.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
 
                 if (connectSocket) {
@@ -526,8 +562,9 @@ namespace e2sar
                 }
                 *i = boost::make_tuple<int, sockaddr_in6, sockaddr_in6>(fd, localAddrStruct6, dataAddrStruct6);
 #ifdef LIBURING_AVAILABLE
-                ringFds[fdCount++] = fd;
+                ringFds[fdCount] = fd;
 #endif
+                fdCount++;
             }
         } else 
         {
@@ -584,7 +621,12 @@ namespace e2sar
 
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
-                dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+                // use consecutive destination ports of requested
+                if (seg.multiPort)
+                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second + fdCount);
+                else
+                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+
                 inet_pton(AF_INET, dataAddr4.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
 
                 if (connectSocket) {
@@ -598,20 +640,25 @@ namespace e2sar
                 }
                 *i = boost::make_tuple<int, sockaddr_in, sockaddr_in>(fd, localAddrStruct4, dataAddrStruct4);
 #ifdef LIBURING_AVAILABLE
-                ringFds[fdCount++] = fd;
+                ringFds[fdCount] = fd;
 #endif
+                fdCount++;
             }
         }
 
 #ifdef LIBURING_AVAILABLE
-        // register open file descriptors with the ring
+        // register open file descriptors with the rings
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            int ret = io_uring_register_files(&seg.ring, ringFds, fdCount);
-            if (ret < 0)
+            for (size_t i = 0; i < seg.rings.size(); ++i)
             {
-                seg.sendStats.errCnt++;
-                seg.sendStats.lastErrno = ret;
+                // register all fds with each ring
+                int ret = io_uring_register_files(&seg.rings[i], ringFds, fdCount);
+                if (ret < 0)
+                {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = ret;
+                }
             }
         }
 #endif
@@ -621,7 +668,7 @@ namespace e2sar
 
     // fragment and send the event
     result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
-        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy,
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy, size_t roundRobinIndex,
         void (*callback)(boost::any), boost::any cbArg)
     {
         int err;
@@ -631,10 +678,6 @@ namespace e2sar
         int flags{0};
         // number of buffers we will send
         size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
-        // convert send rate into either inter-event or inter-frame sleep times
-        // inter-event is used with sendMmsg, inter-frame - with no optimizations and io_uring
-        int64_t interEventSleepUsec{static_cast<int64_t>(bytes*8/(seg.rateGbps * 1000))};
-        int64_t interFrameSleepUsec{static_cast<int64_t>(mtu*8/(seg.rateGbps * 1000))};
 
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
@@ -648,9 +691,6 @@ namespace e2sar
         // new random entropy generated for each event buffer, unless user specified it
         if (entropy == 0)
             entropy = randDist(ranlux);
-
-        if (roundRobinIndex == socketFd4.size())
-            roundRobinIndex = 0;
 
         // randomize source port using round robin
         sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
@@ -669,10 +709,6 @@ namespace e2sar
             // prefill - always the same
             sendhdr.msg_namelen = sizeof(sockaddr_in);
         }
-#ifdef LIBURING_AVAILABLE
-        int currentFdIndex = roundRobinIndex; // since we registered fds with the ring, we need their indices
-#endif
-        roundRobinIndex++;
 
         // fragment event, update/set iov and send in a loop
         u_int8_t *curOffset = event;
@@ -680,30 +716,19 @@ namespace e2sar
         size_t curLen = (bytes <= maxPldLen ? bytes : maxPldLen);
 
         // Get the current time point of event start
-        // we need both a high-res timer and system timer (different epochs)
         auto nowT = boost::chrono::system_clock::now();
-        boost::chrono::high_resolution_clock::time_point nowTE, nowTF;
-        if (seg.rateLimit)
-        {
-            // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
-            nowTE = boost::chrono::high_resolution_clock::now();
-        }
 
         // update the event number being reported in Sync and LB packets
-        if (seg.usecAsEventNum)
-        {
-            // use microseconds since the UNIX Epoch, but make sure the entropy
-            // of the 8lsb is sufficient (for LB)
+        // use microseconds since the UNIX Epoch, but make sure the entropy
+        // of the 8lsb is sufficient (for LB)
 
-            // Convert the time point to microseconds since the epoch
-            auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
-            if (seg.addEntropy) 
-                seg.lbEventNum = seg.addClockEntropy(now);
-            else
-                seg.lbEventNum = now;
-        } else
-            // use current user-specified or sequential event number
-            seg.lbEventNum = eventNum;
+        // Convert the time point to microseconds since the epoch
+        auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+        EventNum_t lbEventNum{0};
+        if (seg.addEntropy) 
+            lbEventNum = seg.addClockEntropy(now);
+        else
+            lbEventNum = now;
 
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
@@ -717,7 +742,7 @@ namespace e2sar
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
-            hdr->lb.set(entropy, seg.lbEventNum);
+            hdr->lb.set(entropy, lbEventNum);
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -745,14 +770,12 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
-                // get current clock in case we sleep
-                if (seg.rateLimit)
-                    nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
+                seg.ringMtxs[roundRobinIndex].lock();
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
                 // busy-wait for a free sqe to become available
-                while(not(sqe = io_uring_get_sqe(&seg.ring)));
+                while(not(sqe = io_uring_get_sqe(&seg.rings[roundRobinIndex])));
                 // allocate struct msghdr - we can't use the stack version here
                 struct msghdr *sqeMsgHdr = static_cast<struct msghdr*>(malloc(sizeof(struct msghdr)));
                 memcpy(sqeMsgHdr, &sendhdr, sizeof(struct msghdr));
@@ -770,27 +793,19 @@ namespace e2sar
                     sqeUserData->callback = nullptr;
                     sqeUserData->cbArg = nullptr;
                 }
-                io_uring_prep_sendmsg(sqe, currentFdIndex, sqeMsgHdr, 0);
+                io_uring_prep_sendmsg(sqe, roundRobinIndex, sqeMsgHdr, 0);
                 // so we can free up the memory later
                 io_uring_sqe_set_data(sqe, sqeUserData);
                 // index to previously registered fds, not fds themselves
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
-                io_uring_submit(&seg.ring);
-                // if send rate set, sleep for inter-frame period if it is large enough
-                // otherwise we will wait for inter-event period below
-                if (seg.rateLimit && interFrameSleepUsec > 0)
-                {
-                    busyWaitUsecs(nowTF, interFrameSleepUsec);       
-                }
+                io_uring_submit(&seg.rings[roundRobinIndex]);
+                seg.ringMtxs[roundRobinIndex].unlock();
             }
             else
 #endif
             {
                 // just regular sendmsg
-                // get current clock in case we sleep
-                if (seg.rateLimit)
-                    nowTF = boost::chrono::high_resolution_clock::now();
                 seg.sendStats.msgCnt++;
                 err = (int) sendmsg(sendSocket, &sendhdr, flags);
                 // free the header here for this situation
@@ -801,12 +816,6 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
-                }
-                // if send rate set, sleep for inter-frame period if it is large enough
-                // otherwise we will wait for inter-event period below
-                if (seg.rateLimit && interFrameSleepUsec > 0)
-                {
-                    busyWaitUsecs(nowTF, interFrameSleepUsec);       
                 }
             } 
         }
@@ -833,52 +842,51 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
             }
-            // busy wait if needed for inter-event period (the only option available to sendmmsg)
-            if (seg.rateLimit && interEventSleepUsec > 0)
-            {
-                busyWaitUsecs(nowTE, interEventSleepUsec);       
-            }
         }
         else
 #endif
 #ifdef LIBURING_AVAILABLE
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            // increment atomic counter so CQE reaping thread
+            // increment atomic counter so CQE reaping socket
             // knows there's work to do
             seg.outstandingSends += numBuffers;
             seg.cqeThreadCond.notify_all();
-            // busy wait if needed for inter-event period if inter-frame is too short
-            // for the case of liburing optimization
-            if (seg.rateLimit && interFrameSleepUsec <= 0 && interEventSleepUsec > 0)
-            {
-                busyWaitUsecs(nowTE, interEventSleepUsec);       
-            }
         }
-        else
 #endif
-        {
-            // busy wait if needed for inter-event period if inter-frame is too short
-            // this is when there are no optimizations
-            if (seg.rateLimit && interFrameSleepUsec <= 0 && interEventSleepUsec > 0)
-            {
-                busyWaitUsecs(nowTE, interEventSleepUsec);       
-            }  
-        }
         // update the event send stats
         seg.eventsInCurrentSync++;
 
         // keeps compiler quiet about unused variables in default optimizations
-        return interEventSleepUsec * numBuffers * 0;
+        return numBuffers * 0;
+    }
+
+    // in Linux use an ioctl to read socket send buffer state
+    // otherwise just close
+    result<int> Segmenter::SendThreadState::_waitAndCloseFd(int fd)
+    {
+        int outq = 0;
+        bool stop{false};
+        // busy wait while the socket has outstanding data
+        while(!stop)
+        {
+            if (ioctl(fd, TIOCOUTQ, &outq) == 0)
+                stop = (outq == 0);
+            else
+                stop = true;
+        }
+        close(fd);
+        return 0;
     }
 
     result<int> Segmenter::SendThreadState::_close()
     {
-        for(auto f: socketFd4)
-            close(f.get<0>());
         if (useV6)
             for (auto f: socketFd6)
-                close(f.get<0>());
+                auto res = _waitAndCloseFd(f.get<0>());
+        else
+            for(auto f: socketFd4)
+                auto res = _waitAndCloseFd(f.get<0>());
         return 0;
     }
 
@@ -886,17 +894,19 @@ namespace e2sar
     result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, 
         EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) noexcept
     {
-        freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
+
+        roundRobinIndex = (roundRobinIndex + 1) % numSendSockets;
 
         // use specified event number and dataId
         return sendThreadState._send(event, bytes, 
             // continue incrementing
             userEventNum++, 
             (_dataId  == 0 ? dataId : _dataId), 
-            entropy);
+            entropy, roundRobinIndex
+        );
     }
 
     // Non-blocking call specifying explicit event number.
@@ -905,11 +915,12 @@ namespace e2sar
         void (*callback)(boost::any), 
         boost::any cbArg) noexcept
     {
-        freeEventItemBacklog();
         // reset local event number to override
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
-        EventQueueItem *item = queueItemPool.construct();
+
+        // have to zero out or else destructor is called in the assignment of cbArg below
+        EventQueueItem *item = reinterpret_cast<EventQueueItem*>(calloc(1, sizeof(EventQueueItem)));
         item->bytes = bytes;
         item->event = event;
         item->entropy = entropy;
@@ -920,7 +931,7 @@ namespace e2sar
         item->dataId = (_dataId  == 0 ? dataId : _dataId);
         auto res = eventQueue.push(item);
         // wake up send thread (no need to hold the lock as queue is lock_free)
-        sendThreadCond.notify_one();
+        //sendThreadCond.notify_one();
         if (res)
             return 0;
         else
@@ -948,10 +959,6 @@ namespace e2sar
             sFlags.syncPeriods);
         sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
             sFlags.syncPeriodMs);
-        sFlags.zeroRate = paramTree.get<bool>("control-plane.zeroRate",
-            sFlags.zeroRate);
-        sFlags.usecAsEventNum = paramTree.get<bool>("control-plane.usecAsEventNum",
-            sFlags.usecAsEventNum);
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
@@ -964,6 +971,8 @@ namespace e2sar
             sFlags.sndSocketBufSize);
         sFlags.rateGbps = paramTree.get<float>("data-plane.rateGbps",
             sFlags.rateGbps);
+        sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
+            sFlags.multiPort);
 
         return sFlags;
     }

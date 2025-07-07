@@ -68,6 +68,8 @@ namespace e2sar
             const float rateGbps;
             // used to avoid floating point comparisons, set to false if rateGbps <= 0
             const bool rateLimit;
+            // use multiple destination ports (for back-to-back testing only)
+            const bool multiPort;
 
             // Max size of internal queue holding events to be sent. 
             static constexpr size_t QSIZE{2047};
@@ -89,17 +91,13 @@ namespace e2sar
                 boost::any cbArg;
             };
 
-            // pool from which queue items are allocated as needed 
-            boost::object_pool<EventQueueItem> queueItemPool{32, QSIZE + 1};
-
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
             boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
-            // to avoid locking the item pool send thread puts processed events 
-            // on this queue so they can be freed opportunistically by main thread
-            boost::lockfree::queue<EventQueueItem*> returnQueue{QSIZE};
 
 #ifdef LIBURING_AVAILABLE
-            struct io_uring ring;
+            std::vector<struct io_uring> rings;
+            std::vector<boost::mutex> ringMtxs;
+
             // each ring has to have a predefined size - we want to
             // put at least 2*eventSize/bufferSize entries onto it
             const size_t uringSize = 1000;
@@ -129,13 +127,14 @@ namespace e2sar
 
             // currently user-assigned or sequential event number at enqueuing and reported in RE header
             boost::atomic<EventNum_t> userEventNum{0};
-            // current event number being sent and reported in LB header
-            boost::atomic<EventNum_t> lbEventNum{0};
 
             // fast random number generator 
             boost::random::ranlux24_base ranlux;
             // to get better entropy in usec clock samples (if needed)
             boost::random::uniform_int_distribution<> lsbDist{0, 255};
+
+            // we RR through these FDs for send thread _send
+            size_t roundRobinIndex{0};
 
             /**
              * Internal structure of atomic counters to maintain stats on sending
@@ -221,8 +220,6 @@ namespace e2sar
 #define GET_REMOTE_SEND_STRUCT(sas, i) boost::get<2>(sas[i])
                 std::vector<boost::tuple<int, sockaddr_in, sockaddr_in>> socketFd4;
                 std::vector<boost::tuple<int, sockaddr_in6, sockaddr_in6>> socketFd6;
-                // we RR through these FDs
-                size_t roundRobinIndex{0};
 
                 // fast random number generator to create entropy values for events
                 // this entropy value is held the same for all packets of a given
@@ -231,8 +228,6 @@ namespace e2sar
                 boost::random::uniform_int_distribution<> randDist{0, std::numeric_limits<u_int16_t>::max()};
                 // to get random port numbers we skip low numbered privileged ports
                 boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
-                // to get better entropy in usec clock samples (if needed)
-                boost::random::uniform_int_distribution<> lsbDist{0, 255};
 
                 inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool cnct=true): 
                     seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
@@ -248,9 +243,12 @@ namespace e2sar
                 result<int> _open();
                 // close sockets
                 result<int> _close();
+                // close a given socket, wait that it has sent all the data (in Linux)
+                result<int> _waitAndCloseFd(int fd);
                 // fragment and send the event
                 result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
-                    u_int16_t entropy, void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
+                    u_int16_t entropy, size_t roundRobinIndex, 
+                    void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
                 // thread loop
                 void _threadBody();
             };
@@ -300,15 +298,11 @@ namespace e2sar
             // lock with send thread
             boost::mutex sendThreadMtx;
             // condition variable for send thread
-            boost::condition_variable sendThreadCond;
+            //boost::condition_variable sendThreadCond;
             // warm up period in MS between sync thread starting and data being allowed to be sent
             u_int16_t warmUpMs;
             // use control plane (can be disabled for debugging)
             bool useCP;
-            // report zero event number change rate in Sync
-            bool zeroRate;
-            // use usec clock samples as event numbers in Sync and LB
-            bool usecAsEventNum;
 #define MIN_CLOCK_ENTROPY 6
             bool addEntropy;
 
@@ -365,8 +359,6 @@ namespace e2sar
              * - dpV6 - prefer V6 dataplane if the URI specifies both data=<ipv4>&data=<ipv6> addresses {false}
              * - connectedSocket - use connected sockets {true}
              * - useCP - enable control plane to send Sync packets {true}
-             * - zeroRate - don't provide event number change rate in Sync {false}
-             * - usecAsEventNum - use usec clock samples as event numbers in LB and Sync packets {true}
              * - warmUpMs - a period of sending sync messages before data is allowed {1000}
              * - syncPeriodMs - sync thread period in milliseconds {1000}
              * - syncPerods - number of sync periods to use for averaging reported send rate {2}
@@ -377,14 +369,16 @@ namespace e2sar
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.wmem_max) to be higher. {3MB}
+             * - rateGbps - send rate as floating point expression in Gbps. Negative value means unlimited. {-1.0}
+             * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
+             * rather than a single port; source ports are still randomized (incompatible with a load balancer, 
+             * only useful in back-to-back testing) {false}
              */
             struct SegmenterFlags 
             {
                 bool dpV6; 
                 bool connectedSocket;
                 bool useCP;
-                bool zeroRate;
-                bool usecAsEventNum;
                 u_int16_t warmUpMs;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
@@ -392,11 +386,11 @@ namespace e2sar
                 size_t numSendSockets;
                 int sndSocketBufSize;
                 float rateGbps; 
+                bool multiPort; 
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
-                    useCP{true}, zeroRate{false}, usecAsEventNum{true}, 
-                    warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0} {}
+                    useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, multiPort{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
@@ -457,9 +451,12 @@ namespace e2sar
                 if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
                     cqeThreadState.threadObj.join();
-                    io_uring_unregister_files(&ring);
-                    // deallocate the ring
-                    io_uring_queue_exit(&ring);
+                    for (size_t i = 0; i < rings.size(); ++i)
+                    {
+                        io_uring_unregister_files(&rings[i]);
+                        // deallocate the ring
+                        io_uring_queue_exit(&rings[i]);
+                    }
                 }
 #endif
                 // pool memory is implicitly freed when pool goes out of scope
@@ -575,36 +572,16 @@ namespace e2sar
 
             // doesn't require locking as it looks at only srcId in segmenter, which
             // never changes past initialization
-            inline void fillSyncHdr(SyncHdr *hdr, EventRate_t eventRate, UnixTimeNano_t tnano) 
+            inline void fillSyncHdr(SyncHdr *hdr, UnixTimeNano_t tnano) 
             {
-                EventRate_t reportedRate{0};
-                EventNum_t reportedEventNum{lbEventNum};
-                if (usecAsEventNum) 
-                {
-                    // figure out what event number would be at this moment, don't worry about its entropy
-                    auto nowT = boost::chrono::system_clock::now();
-                    // Convert the time point to microseconds since the epoch
-                    reportedEventNum = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
-                    if (not zeroRate)
-                        // 1 MHz in this case
-                        reportedRate = 1000000;
-                } else
-                {
-                    if (not zeroRate)
-                        reportedRate = eventRate;
-                }
+                EventRate_t reportedRate{1000000};
+                // figure out what event number would be at this moment, don't worry about its entropy
+                auto nowT = boost::chrono::system_clock::now();
+                // Convert the time point to microseconds since the epoch
+                EventNum_t reportedEventNum = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
                 hdr->set(eventSrcId, reportedEventNum, reportedRate, tnano);
             }
 
-            // process backlog in return queue and free event queue item blocks on it
-            // so long as new events keep coming, backlog will be cleared, for last
-            // event the backlog gets cleared when the pool goes away (as part of object destruction)
-            inline void freeEventItemBacklog() 
-            {
-                EventQueueItem *item{nullptr};
-                while (returnQueue.pop(item))
-                    queueItemPool.free(item);
-            }
             /**
              * Add entropy to a clock sample by randomizing the least 8 bits. Runs in the 
              * context of send thread.

@@ -19,10 +19,6 @@ namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 using namespace e2sar;
 
-// prepare a pool
-boost::pool<> *evtBufferPool;
-// to avoid locking the pool we use the return queue
-boost::lockfree::queue<u_int8_t*> returnBufferQueue{10000};
 // app-level stats
 std::atomic<u_int64_t> mangledEvents{0};
 std::atomic<u_int64_t> receivedWithError{0};
@@ -118,7 +114,7 @@ void option_dependency(const po::variables_map &vm,
 void freeBuffer(boost::any a) 
 {
     auto p = boost::any_cast<u_int8_t*>(a);
-    returnBufferQueue.push(p);
+    free(p);
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
@@ -132,6 +128,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         std::cout << rateGbps << " Gbps" << std::endl;
     else
         std::cout << "unlimited" << std::endl;
+    if (rateGbps > 0.)
+        // same computation Segmenter does
+        std::cout << "Inter-event sleep (usec) is " << static_cast<int64_t>(eventBufSize*8/(rateGbps * 1000)) << std::endl;
     std::cout << "Event size is " << eventBufSize << " bytes or " << eventBufSize*8 << " bits" << std::endl;
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
@@ -146,15 +145,12 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     if (openRes.has_error())
         return openRes;
 
-    // initialize a pool of memory buffers  we will be sending (mostly filled with random data)
-    evtBufferPool = new boost::pool<>{eventBufSize};
-
     auto sendStartTime = boost::chrono::high_resolution_clock::now();
     size_t evt = 0;
     for(; evt < numEvents; evt++)
     {
         // send the event
-        auto eventBuffer = static_cast<u_int8_t*>(evtBufferPool->malloc());
+        auto eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
         // fill in the first part of the buffer with something meaningful and also the end
         memcpy(eventBuffer, eventPldStart.c_str(), eventPldStart.size());
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
@@ -177,10 +173,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
             } else
                 break;
         }
-        // free the backlog of empty buffers
-        u_int8_t *item{nullptr};
-        while (returnBufferQueue.pop(item))
-            evtBufferPool->free(item);
     }
 
     // measure this right after we exit the send loop
@@ -201,7 +193,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
             expectedFrames << ")." << std::endl;
 
-    evtBufferPool->purge_memory();
     std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
     if (stats.errCnt != 0)
     {
@@ -290,7 +281,7 @@ int recvEvents(Reassembler *r, int *durationSec) {
             memcmp(evtBuf + evtSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size() - 1))
             mangledEvents++;
 
-        delete evtBuf;
+        delete[] evtBuf;
         evtBuf = nullptr;
     }
     std::cout << "Completed" << std::endl;
@@ -364,8 +355,6 @@ int main(int argc, char **argv)
     int sockBufSize;
     int durationSec;
     bool withCP;
-    bool zeroRate;
-    bool usecAsEventNum;
     bool autoIP;
     std::string sndrcvIP;
     std::string iniFile;
@@ -373,6 +362,7 @@ int main(int argc, char **argv)
     std::vector<int> coreList;
     std::vector<std::string> optimizations;
     int numaNode;
+    bool multiPort;
 
     // parameters
     opts("send,s", "send traffic");
@@ -387,25 +377,24 @@ int main(int argc, char **argv)
     opts("dataid", po::value<u_int16_t>(&dataId)->default_value(4321), "Data id (default 4321) [s]");
     opts("threads", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
     opts("sockets", po::value<size_t>(&numSockets)->default_value(4), "number of send sockets (defaults to 4) [r]");
-    opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0)");
+    opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0, negative value means no limit)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
     opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)[s]");
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
     opts("ini,i", po::value<std::string>(&iniFile)->default_value(""), "INI file to initialize SegmenterFlags [s] or ReassemblerFlags [r]."
-        " Values found in the file override --withcp, --mtu, --sockets, --zerorate, --seq, --novalidate, --ip[46] and --bufsize");
+        " Values found in the file override --withcp, --mtu, --sockets, --novalidate, --ip[46] and --bufsize");
     opts("ip", po::value<std::string>(&sndrcvIP)->default_value(""), "IP address (IPv4 or IPv6) from which sender sends from or on which receiver listens (conflicts with --autoip) [s,r]");
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("novalidate,v", "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
-    opts("zerorate,z", po::bool_switch()->default_value(false),"report zero event number change rate in Sync messages [s]");
-    opts("seq", po::bool_switch()->default_value(false),"use sequential numbers as event numbers in Sync and LB messages instead of usec [s]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
+    opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
 
     po::variables_map vm;
 
@@ -433,12 +422,14 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
+        conflicting_options(vm, "withcp", "multiport");
+        conflicting_options(vm, "recv", "multiport");
         // these are optional
         conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
         conflicting_options(vm, "deq", "send");
-        conflicting_options(vm, "seq", "recv");
         conflicting_options(vm, "cores", "threads");
+        conflicting_options(vm, "cores", "sockets");
     }
     catch (const std::logic_error &le)
     {
@@ -487,9 +478,8 @@ int main(int argc, char **argv)
     }
 
     withCP = vm["withcp"].as<bool>();
-    zeroRate = vm["zerorate"].as<bool>();
-    usecAsEventNum = not vm["seq"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
+    multiPort = vm["multiport"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -578,20 +568,22 @@ int main(int argc, char **argv)
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
-                sflags.zeroRate = zeroRate;
-                sflags.usecAsEventNum = usecAsEventNum;
                 sflags.rateGbps = rateGbps;
+                sflags.multiPort = multiPort;
             }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
-            std::cout << "Event rate reporting in Sync:  " << (sflags.zeroRate ? "OFF" : "ON") << std::endl;
-            std::cout << "Using usecs as event numbers:  " << (sflags.usecAsEventNum ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
             try {
-                segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
+                if (vm.count("cores"))
+                    segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
+                else
+                    segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
+
                 auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, rateGbps);
 
                 if (res.has_error()) {

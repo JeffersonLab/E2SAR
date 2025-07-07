@@ -8,12 +8,12 @@ source:
   path: ..
 
 build:
-  number: 5
+  number: 1
   string: "h{{ PKG_HASH }}_py{{ python }}_{{ PKG_BUILDNUM }}"
   script:
     - export BOOST_ROOT=$BUILD_PREFIX
     - export CXXFLAGS="-std=c++17 -Wno-c++26-extensions"
-    - meson setup --prefix $PREFIX build --wipe
+    - meson setup --prefix $PREFIX -Dpkg_config_path=$BUILD_PREFIX/lib/pkgconfig build --wipe
     - meson compile -C build -j 2
     - meson install -C build
 

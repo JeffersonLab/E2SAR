@@ -229,7 +229,7 @@ $ conda config --set channel_priority strict
 ```
 2. Build a Conda package:
 ```bash
-$ ./conda/build-conda.sh
+$ ./conda/conda-build.sh
 ```
 3. Login
 ```bash
@@ -244,7 +244,12 @@ $ anaconda upload  ~/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a4-
 $ conda search -c ibaldin -i e2sar
 $ conda install -c ibaldin e2sar python=3.9
 ```
-
+A quick test script may look like this:
+```python
+>>> import e2sar_py
+>>> e2sar_py.get_version()
+'0.2.1a5'
+```
 ## Testing
 
 ### C++
