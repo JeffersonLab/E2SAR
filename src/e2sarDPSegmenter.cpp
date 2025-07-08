@@ -437,6 +437,15 @@ namespace e2sar
         // wait for all threads to complete
         threadPool.join();
 
+#ifdef LIBURING_AVAILABLE
+        // reap the remaining CQEs
+        while(seg.outstandingSends > 0) 
+        {
+            for(size_t rri{0}; rri < seg.numSendSockets; ++rri)
+                _reap(rri);
+        }
+#endif
+
         auto res = _close();
     }
 

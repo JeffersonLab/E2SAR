@@ -423,12 +423,6 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
                 if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
-                    // wait for everything to get reaped 
-                    while(outstandingSends > 0) 
-                    {
-                        // don't just busy wait
-                        boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-                    }
                     for (size_t i = 0; i < rings.size(); ++i)
                     {
                         io_uring_unregister_files(&rings[i]);
