@@ -40,6 +40,7 @@ namespace e2sar
         cpuCoreList{cpuCoreList},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
+        ringMtxs(sflags.numSendSockets),
 #endif
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
@@ -186,7 +187,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
     void Segmenter::SendThreadState::_reap(size_t roundRobinIndex)
     {
-        struct io_uring_cqe *cqes[cqeBatchSize];
+        static thread_local struct io_uring_cqe *cqes[cqeBatchSize];
 
         // loop while CQEs are available
         while(true)
@@ -404,6 +405,10 @@ namespace e2sar
                 // and reflects into the stats block
                 boost::asio::post(threadPool,
                     [this, rri, item]() {
+#ifdef LIBURING_AVAILABLE
+                        if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
+                            seg.ringMtxs[rri].lock();
+#endif 
                         auto res = _send(item->event, item->bytes, 
                             item->eventNum, item->dataId,
                             item->entropy, rri, 
@@ -414,6 +419,7 @@ namespace e2sar
                         {
                             // reap the CQEs and will call the callback if needed
                             _reap(rri);
+                            seg.ringMtxs[rri].unlock();
                         }
                         else
 #endif
