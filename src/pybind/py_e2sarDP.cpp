@@ -32,25 +32,51 @@ void print_type(const T& param) {
 namespace py = pybind11;
 using namespace e2sar;
 
-// Must have a wrapper because of the callback function.
-result<int> addToSendQueueWrapper(Segmenter& seg, uint8_t *event, size_t bytes,
-                                  int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
-                                  std::function<void(boost::any)> callback,
-                                  boost::any cbArg) noexcept {
-    // If callback is provided, wrap it in a lambda
-    void (*c_callback)(boost::any) = nullptr;
-    if (callback) {
-        // Use a static function to store the lambda
-        static std::function<void(boost::any)> static_callback;
-        static_callback = callback;
-        c_callback = [](boost::any arg) {
-            static_callback(arg);
-        };
+// Thread-safe callback wrapper that avoids storing Python objects
+struct PythonCallbackWrapper {
+    PyObject* callback_ptr;
+    PyObject* cbArg_ptr;
+    
+    PythonCallbackWrapper(py::object cb, py::object arg) {
+        // Must hold GIL when manipulating Python objects
+        pybind11::gil_scoped_acquire acquire;
+        // Increment reference count and store raw pointers
+        callback_ptr = cb.is_none() ? nullptr : cb.inc_ref().ptr();
+        cbArg_ptr = arg.is_none() ? nullptr : arg.inc_ref().ptr();
     }
-
-    // Call the actual addToSendQueue method
-    return seg.addToSendQueue(event, bytes, _eventNum, _dataId, entropy, c_callback, cbArg);
-}
+    
+    ~PythonCallbackWrapper() {
+        // Must acquire GIL before decrementing reference counts
+        if (callback_ptr || cbArg_ptr) {
+            pybind11::gil_scoped_acquire acquire;
+            if (callback_ptr) {
+                Py_DECREF(callback_ptr);
+            }
+            if (cbArg_ptr) {
+                Py_DECREF(cbArg_ptr);
+            }
+        }
+    }
+    
+    static void execute(boost::any wrapper_any) {
+        PythonCallbackWrapper* wrapper = nullptr;
+        try {
+            wrapper = boost::any_cast<PythonCallbackWrapper*>(wrapper_any);
+            if (wrapper && wrapper->callback_ptr) {
+                pybind11::gil_scoped_acquire acquire;
+                py::object callback = py::reinterpret_borrow<py::object>(wrapper->callback_ptr);
+                py::object cbArg = wrapper->cbArg_ptr ? 
+                    py::reinterpret_borrow<py::object>(wrapper->cbArg_ptr) : py::none();
+                callback(cbArg);
+            }
+        } catch (...) {
+            // Ignore callback execution errors
+        }
+        
+        // Always clean up wrapper
+        delete wrapper;
+    }
+};
 
 void init_e2sarDP_reassembler(py::module_ &m);
 void init_e2sarDP_segmenter(py::module_ &m);
@@ -137,72 +163,60 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         py::arg("data_id") = 0,
         py::arg("entropy") = 0);
 
-        // Send method related to callback. Have to define corresponding wrapper function.
-        seg.def("addNumpyArrayToSendQueue",
-            [](e2sar::Segmenter& seg, py::array numpy_array, size_t bytes,
-            int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
-            py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
-                // Convert py::bytes to uint8_t*
-                py::buffer_info buf_info = numpy_array.request();
-                uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
+    // Send method related to callback with thread-safe implementation
+    seg.def("addNumpyArrayToSendQueue",
+        [](e2sar::Segmenter& seg, py::array numpy_array, size_t bytes,
+        int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
+        py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
+            
+            py::buffer_info buf_info = numpy_array.request();
+            uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
 
-                // Convert Python callback to std::function (if provided)
-                std::function<void(boost::any)> c_callback = nullptr;
-                if (!callback.is_none()) {
-                    c_callback = [callback](boost::any arg) {
-                        // Acquire GIL before calling Python callback
-                        pybind11::gil_scoped_acquire acquire;
-                        // Invoke the Python callback with the provided argument
-                        callback(arg);
-                    };
-                }
-                // Wrap the Python cbArg in boost::any (if provided)
-                boost::any c_cbArg = nullptr;
-                if (!cbArg.is_none()) {
-                    c_cbArg = cbArg;
-                }
-                // Call the wrapper function
-                return addToSendQueueWrapper(seg, data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
-            },
-            "Call Segmenter::addToSendQueue with numpy array interface",
-            py::arg("numpy_array"),
-            py::arg("nbytes"),
-            py::arg("_eventNum") = 0LL,
-            py::arg("_dataId") = 0,
-            py::arg("entropy") = 0,
-            py::arg("callback") = py::none(),
-            py::arg("cbArg") = py::none());
+            void (*c_callback)(boost::any) = nullptr;
+            boost::any c_cbArg = boost::any();
+            
+            if (!callback.is_none()) {
+                // Create heap-allocated wrapper for thread-safe callback
+                auto* wrapper = new PythonCallbackWrapper(callback, cbArg);
+                c_callback = PythonCallbackWrapper::execute;
+                c_cbArg = wrapper;
+            }
 
-    // Send method related to callback. Have to define corresponding wrapper function.
+            // Call the C++ method directly - no wrapper needed
+            return seg.addToSendQueue(data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
+        },
+        "Call Segmenter::addToSendQueue with numpy array interface",
+        py::arg("numpy_array"),
+        py::arg("nbytes"),
+        py::arg("_eventNum") = 0LL,
+        py::arg("_dataId") = 0,
+        py::arg("entropy") = 0,
+        py::arg("callback") = py::none(),
+        py::arg("cbArg") = py::none());
+
+    // Send method related to callback with thread-safe implementation
     seg.def("addToSendQueue",
         [](e2sar::Segmenter& seg, py::buffer py_buf, size_t bytes,
         int64_t _eventNum, uint16_t _dataId, uint16_t entropy,
         py::object callback = py::none(), py::object cbArg = py::none()) -> result<int> {
-            // Convert py::bytes to uint8_t*
+            
             py::buffer_info buf_info = py_buf.request();
             uint8_t* data = static_cast<uint8_t*>(buf_info.ptr);
 
-            // Convert Python callback to std::function (if provided)
-            std::function<void(boost::any)> c_callback = nullptr;
+            void (*c_callback)(boost::any) = nullptr;
+            boost::any c_cbArg = boost::any();
+            
             if (!callback.is_none()) {
-                c_callback = [callback](boost::any arg) {
-                    // Acquire GIL before calling Python callback
-                    pybind11::gil_scoped_acquire acquire;
-                    // Invoke the Python callback with the provided argument
-                    callback(arg);
-                };
+                // Create heap-allocated wrapper for thread-safe callback
+                auto* wrapper = new PythonCallbackWrapper(callback, cbArg);
+                c_callback = PythonCallbackWrapper::execute;
+                c_cbArg = wrapper;
             }
 
-            // Wrap the Python cbArg in boost::any (if provided)
-            boost::any c_cbArg = nullptr;
-            if (!cbArg.is_none()) {
-                c_cbArg = cbArg;
-            }
-
-            // Call the wrapper function
-            return addToSendQueueWrapper(seg, data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
+            // Call the C++ method directly - no wrapper needed
+            return seg.addToSendQueue(data, bytes, _eventNum, _dataId, entropy, c_callback, c_cbArg);
         },
-        "Call Segmenter::addToSendQueue.",
+        "Call Segmenter::addToSendQueue with buffer interface",
         py::arg("send_buf"),
         py::arg("buf_len"),
         py::arg("_eventNum") = 0LL,
