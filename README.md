@@ -208,7 +208,7 @@ All workflows are manually triggered and take input parameters including the gRP
 
 ### Conda packaging
 
-E2SAR provides an `e2sar` Conda package (primarily for use with Python bindings). 
+E2SAR provides an `e2sar` Conda package (primarily for use with Python bindings). The Conda configuration allows building `linux-64` as well as `osx-arm64` packages for multiple Python versions (generally 3.9, 3.10 and 3.11). 
 
 0. Install and initialize Conda
 ```bash
@@ -227,7 +227,7 @@ $ conda config --add channels defaults
 $ conda config --add channels conda-forge
 $ conda config --set channel_priority strict
 ```
-2. Build a Conda package:
+2. Build the Conda packages for multiple Python versions:
 ```bash
 $ ./conda/conda-build.sh
 ```
@@ -237,7 +237,10 @@ $ anaconda login --username <username> --password <password>
 ```
 4. Publish
 ```bash
-$ anaconda upload  ~/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a4-h2bc3f7f_0.conda
+$ anaconda upload \
+    /home/ubuntu/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a6-h2bc3f7f_py3.11_1.conda \
+    /home/ubuntu/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a6-h2bc3f7f_py3.9_1.conda \
+    /home/ubuntu/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a6-h2bc3f7f_py3.10_1.conda
 ```
 5. Verify and install (shown for python 3.9, also supported 3.10 and 3.11)
 ```bash
@@ -250,6 +253,7 @@ A quick test script may look like this:
 >>> e2sar_py.get_version()
 '0.2.1a5'
 ```
+
 ## Testing
 
 ### C++

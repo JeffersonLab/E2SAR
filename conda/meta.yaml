@@ -27,12 +27,12 @@ requirements:
     - grpc-cpp >=1.51.1
     - protobuf
     - pybind11
-    - libstdcxx-ng
+    - libstdcxx-ng [linux64]
   run:
     - {{ pin_compatible('python', max_pin='x.x') }}
     - {{ pin_compatible('grpc-cpp', max_pin='x.x') }}
     - {{ pin_compatible('protobuf', max_pin='x.x') }}
-    - {{ pin_compatible('libstdcxx-ng', max_pin='x') }}
+    - {{ pin_compatible('libstdcxx-ng', max_pin='x') }} [linux64]
     - {{ pin_compatible('boost-cpp', max_pin='x.x') }}
     - numpy
 
