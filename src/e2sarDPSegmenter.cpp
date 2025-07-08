@@ -40,8 +40,6 @@ namespace e2sar
         cpuCoreList{cpuCoreList},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
-        ringMtxs(sflags.numSendSockets),
-        cqeThreadState(*this),
 #endif
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
@@ -182,89 +180,54 @@ namespace e2sar
         boost::thread sendT(&Segmenter::SendThreadState::_threadBody, &sendThreadState);
         sendThreadState.threadObj = std::move(sendT);
 
-#ifdef LIBURING_AVAILABLE
-        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
-        {
-            boost::thread CQET(&Segmenter::CQEThreadState::_threadBody, &cqeThreadState);
-            cqeThreadState.threadObj = std::move(CQET);
-        }
-#endif
         return 0;
     }
 
 #ifdef LIBURING_AVAILABLE
-    void Segmenter::CQEThreadState::_threadBody()
+    void Segmenter::SendThreadState::_reap(size_t roundRobinIndex)
     {
-        // lock for the mutex (must be thread-local)
-        thread_local boost::unique_lock<boost::mutex> condLock(seg.cqeThreadMtx, boost::defer_lock);
         struct io_uring_cqe *cqes[cqeBatchSize];
 
-        // TODO: need to set main threads' affinity in a more granular
-        // fashion so we can then do this. Currently the entire process
-        // affinity is set to cpu core list (suboptimal)
-        //if (seg.cpuCoreList.size() > 0)
-        //{
-        //    auto res = Affinity::setThreadXOR(seg.cpuCoreList);
-        //    if (res.has_error())
-        //        seg.sendStats.lastE2SARError = res.error().code();
-        //}
-
-        while(!seg.threadsStop)
+        // loop while CQEs are available
+        while(true)
         {
-            condLock.lock();
-            seg.cqeThreadCond.wait_for(condLock, seg.cqeWaitTime);
-            condLock.unlock();
-
-            // empty cqe queue
-            while(seg.outstandingSends > 0)
+            memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
+            int ret = io_uring_peek_batch_cqe(&seg.rings[roundRobinIndex], cqes, cqeBatchSize);
+            // error or returned nothing
+            if (ret <= 0)
             {
-                // reap CQEs and update the stats
-                // should exit when the ring is deleted
-
-                for(size_t i = 0; i < seg.rings.size(); ++i)
-                {
-                    seg.ringMtxs[i].lock();
-                    memset(static_cast<void*>(cqes), 0, sizeof(struct io_uring_cqe *) * cqeBatchSize);
-                    int ret = io_uring_peek_batch_cqe(&seg.rings[i], cqes, cqeBatchSize);
-                    // error or returned nothing
-                    if (ret <= 0)
-                    {
-                        // don't log error here - it is usually a temporary resource availability
-                        seg.ringMtxs[i].unlock();
-                        continue;
-                    }
-                    for(int idx = 0; idx < ret; ++idx)
-                    {
-                        // we have a CQE now
-                        // check for errors from sendmsg
-                        if (cqes[idx]->res < 0)
-                        {
-                            seg.sendStats.errCnt++;
-                            seg.sendStats.lastErrno = cqes[idx]->res;
-                        }
-                        auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
-                        auto callback = sqeUserData->callback;
-                        auto cbArg = std::move(sqeUserData->cbArg);
-                        // free the memory
-                        auto sqeMsgHdr = sqeUserData->msghdr;
-                        // deallocate the LBRE header
-                        free(sqeMsgHdr->msg_iov[0].iov_base);
-                        // deallocate the iovec itself
-                        free(sqeMsgHdr->msg_iov);
-                        // deallocate struct msghdr
-                        free(sqeMsgHdr);
-                        // deallocate sqeUserData
-                        free(sqeUserData);
-                        // mark CQE as done
-                        io_uring_cqe_seen(&seg.rings[i], cqes[idx]);
-                        // call the callback if not null (would happen at the end of the event buffer)
-                        if (callback != nullptr)
-                            callback(cbArg);
-                    }
-                    seg.ringMtxs[i].unlock();
-                    seg.outstandingSends -= ret;
-                }
+                // don't log error here - it is usually a temporary resource availability
+                return;
             }
+            for(int idx = 0; idx < ret; ++idx)
+            {
+                // we have a CQE now
+                // check for errors from sendmsg
+                if (cqes[idx]->res < 0)
+                {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = cqes[idx]->res;
+                }
+                auto sqeUserData = reinterpret_cast<SQEUserData*>(cqes[idx]->user_data);
+                auto callback = sqeUserData->callback;
+                auto cbArg = std::move(sqeUserData->cbArg);
+                // free the memory
+                auto sqeMsgHdr = sqeUserData->msghdr;
+                // deallocate the LBRE header
+                free(sqeMsgHdr->msg_iov[0].iov_base);
+                // deallocate the iovec itself
+                free(sqeMsgHdr->msg_iov);
+                // deallocate struct msghdr
+                free(sqeMsgHdr);
+                // deallocate sqeUserData
+                free(sqeUserData);
+                // mark CQE as done
+                io_uring_cqe_seen(&seg.rings[roundRobinIndex], cqes[idx]);
+                // call the callback if not null (would happen at the end of the event buffer)
+                if (callback != nullptr)
+                    callback(cbArg);
+            }
+            seg.outstandingSends -= ret;
         }
     }
 #endif
@@ -449,8 +412,8 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
                         if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
                         {
-                            // no callback here, see cqe reaper thread
-                            ;
+                            // reap the CQEs and will call the callback if needed
+                            _reap(rri);
                         }
                         else
 #endif
@@ -771,7 +734,6 @@ namespace e2sar
             if (Optimizations::isSelected(Optimizations::Code::liburing_send))
             {
                 seg.sendStats.msgCnt++;
-                seg.ringMtxs[roundRobinIndex].lock();
                 // get an SQE and fill it out
                 struct io_uring_sqe *sqe{nullptr};
                 // busy-wait for a free sqe to become available
@@ -800,7 +762,6 @@ namespace e2sar
                 io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
                 // submit for processing
                 io_uring_submit(&seg.rings[roundRobinIndex]);
-                seg.ringMtxs[roundRobinIndex].unlock();
             }
             else
 #endif
@@ -848,10 +809,7 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
         {
-            // increment atomic counter so CQE reaping socket
-            // knows there's work to do
             seg.outstandingSends += numBuffers;
-            seg.cqeThreadCond.notify_all();
         }
 #endif
         // update the event send stats

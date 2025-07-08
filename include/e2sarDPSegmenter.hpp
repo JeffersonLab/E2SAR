@@ -96,7 +96,6 @@ namespace e2sar
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
-            std::vector<boost::mutex> ringMtxs;
 
             // each ring has to have a predefined size - we want to
             // put at least 2*eventSize/bufferSize entries onto it
@@ -251,6 +250,10 @@ namespace e2sar
                     void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
                 // thread loop
                 void _threadBody();
+#ifdef LIBURING_AVAILABLE
+                // reap CQEs if LIBURING is used
+                void _reap(size_t roundRobinIndex);
+#endif
             };
             friend struct SendThreadState;
 
@@ -263,31 +266,6 @@ namespace e2sar
             const std::vector<int> cpuCoreList;
 
 #ifdef LIBURING_AVAILABLE
-            // this thread reaps completions off the uring
-            // and updates stat counters
-            struct CQEThreadState {
-                // owner object
-                Segmenter &seg;
-                boost::thread threadObj;
-
-                inline CQEThreadState(Segmenter &s): seg{s} 
-                {
-                    ;
-                }
-                void _threadBody();
-            };
-            friend struct CQEThreadState;
-
-            CQEThreadState cqeThreadState;
-
-            // between send and CQE reaping thread
-            boost::mutex cqeThreadMtx;
-            // condition variable for CQE thread waiting on new submissions
-            boost::condition_variable cqeThreadCond;
-            // wait time in ms before CQE thread checks if its time to stop
-            // we can't wait for too long - it only takes about 300usec
-            // to exhaust 256 SQEs using 1500 byte MTU at 10Gbps
-            static constexpr boost::chrono::microseconds cqeWaitTime{200};
             // this is the sleep time for kernel thread in poll mode
             // it is in milliseconds
             static constexpr unsigned pollWaitTime{2000};
@@ -438,11 +416,6 @@ namespace e2sar
             ~Segmenter()
             {
                 stopThreads();
-#ifdef LIBURING_AVAILABLE
-                // release CQE thread one last time so it can quit in peace
-                if (Optimizations::isSelected(Optimizations::Code::liburing_send))
-                    cqeThreadCond.notify_all();
-#endif
 
                 // wait to exit
                 syncThreadState.threadObj.join();
@@ -450,7 +423,12 @@ namespace e2sar
 #ifdef LIBURING_AVAILABLE
                 if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
-                    cqeThreadState.threadObj.join();
+                    // wait for everything to get reaped 
+                    while(outstandingSends > 0) 
+                    {
+                        // don't just busy wait
+                        boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+                    }
                     for (size_t i = 0; i < rings.size(); ++i)
                     {
                         io_uring_unregister_files(&rings[i]);
