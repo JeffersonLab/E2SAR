@@ -12,13 +12,13 @@ Segmenter is now multi-threaded using a static thread pool, the degree of thread
 
 The Reassembler receive path has been significantly streamlined to offer better performance - all garbage collection of timed out event queue items has been moved onto a separate thread. 
 
-Added Conda packages (linux-64) for e2sar, can be installed using `conda install -c ibaldin -c conda-forge e2sar`. Package includes the E2SAR libraries, executables and the Python bindings (as a `.so`).
+Added Conda packages (linux-64 and osx-arm64) for e2sar, can be installed using `conda install -c ibaldin -c conda-forge e2sar`. Package includes the E2SAR libraries, executables and the Python bindings (as a `.so` or `.dso`).
 
 Bug Fixes:
 - When using io_uring on send the SQE structure was malloc'ed resulting in garbage contained in it, which led the move semantics for cbArg to fail since it tries to call a d-tor if the object is not null. Replaced with calloc. 
 - Python bindings for send calls had a memory leak - use of py::bytes or py::array constructors results in a copy by default. For py::bytes added delete [] statements, for py::array (using with NumPy arrays) instead used py::capsule to avoid copying and making send more efficient.
 - Improved exception handling in Python by registering E2SARException with pybind11 framework
-- Fixed GIL issues with the callback on addToSendQueue method variants 
+- Fixed GIL issues with the callback on addToSendQueue method variants and added tests for it 
 - Made Python pytest tests more robust to platform errors
 
 ## v0.2.0
