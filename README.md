@@ -206,6 +206,54 @@ Steps 2a, 2b and 3 depend on the tag in the form of `vX.Y.Z` (e.g. `v0.1.5`) to 
 
 All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b and Step 3. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
+### Conda packaging
+
+E2SAR provides an `e2sar` Conda package (primarily for use with Python bindings). The Conda configuration allows building `linux-64` as well as `osx-arm64` packages for multiple Python versions (generally 3.9, 3.10 and 3.11). 
+
+0. Install and initialize Conda
+```bash
+$ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+$ chmod +x Miniconda3-latest-Linux-x86_64.sh
+$ ./Miniconda3-latest-Linux-x86_64.sh
+$ source ~/.bashrc
+$ conda config --add channels conda-forge && conda config --set channel_priority strict
+```
+1. Create and initialize a Conda environment:
+```bash
+$ conda create -n e2sar-dev
+$ conda activate e2sar-dev
+$ conda install conda-build conda-verify anaconda-client
+$ conda config --add channels defaults
+$ conda config --add channels conda-forge
+$ conda config --set channel_priority strict
+```
+2. Build the Conda packages for multiple Python versions:
+```bash
+$ ./conda/conda-build.sh
+```
+3. Login
+```bash
+$ anaconda login --username <username> --password <password>
+```
+4. Publish
+```bash
+$ anaconda upload \
+    /home/ubuntu/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a6-h2bc3f7f_py3.11_1.conda \
+    /home/ubuntu/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a6-h2bc3f7f_py3.9_1.conda \
+    /home/ubuntu/miniconda3/envs/e2sar-dev/conda-bld/linux-64/e2sar-0.2.1a6-h2bc3f7f_py3.10_1.conda
+```
+5. Verify and install (shown for python 3.9, also supported 3.10 and 3.11)
+```bash
+$ conda search -c ibaldin -i e2sar
+$ conda install -c ibaldin e2sar python=3.9
+```
+A quick test script may look like this:
+```python
+>>> import e2sar_py
+>>> e2sar_py.get_version()
+'0.2.1a5'
+```
+
 ## Testing
 
 ### C++
@@ -216,7 +264,14 @@ There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which 
 
 ### Python
 
-The C++ unit tests `e2sar_uri_test` and `e2sar_reas_test` have been reproduced in Python Jupyter notebooks, which can be found at [scripts/notebooks/pybind11_examples/](scripts/notebooks/pybind11_examples/). The Python `e2sar_lbcp_live_test` is currently under development.
+The code can be tested using pytest
+
+- Make sure to pip install pytest and numpy
+- Set `PYTHONPATH` to point to build/src/pybind directory (so .so of the python bindings can be located)
+- Set `E2SARCONFIGDIR` to point to (absolute path) the location of E2SAR directory (e.g. ``cd E2SAR; export E2SARCONFIGDIR=`pwd` ``)
+- Run `cd src/pytest; pytest -m unit` to run unit tests (substitute `b2b` or other labels found in src/pytest/pytest.ini for other test suites)
+
+There are some example tests in have been reproduced in Python Jupyter notebooks, which can be found at [scripts/notebooks/pybind11_examples/](scripts/notebooks/pybind11_examples/). 
 
 ### Scapy
 

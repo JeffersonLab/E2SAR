@@ -73,6 +73,11 @@ namespace e2sar
     {
       return _error_msg;
     }
+    
+    char *what() const noexcept
+    {
+      return const_cast<char *>(_error_msg.c_str());
+    }
   };
 
 }

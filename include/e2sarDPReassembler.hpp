@@ -57,41 +57,36 @@ namespace e2sar
             // and an associated atomic variable that reflects
             // how many event entries are in it.
 
-            // hold one receive buffer
-            struct Segment {
-                u_int8_t *segment; // start of the received buffer including headers
-                size_t length; // length of useful payloads minus REHdr (and LBHdr if appropriate)
-                Segment(): segment{nullptr}, length{0} {}
-                Segment(u_int8_t *s, size_t l): segment{s}, length{l} {}
-            };
-
-            // custom comparator of REHdr buffers/segments - placing outside the event queue 
-            // item class just not to confuse things - needed for priority queue
-            // orders segments in the increasing order of offset
-            struct SegmentComparator {
-                bool operator() (const Segment &l, const Segment &r) const {
-                    REHdr *lhdr = reinterpret_cast<REHdr*>(l.segment);
-                    REHdr *rhdr = reinterpret_cast<REHdr*>(r.segment);
-                    return lhdr->bufferOffset > rhdr->bufferOffset;
-                }   
-            };
-
             // Structure to hold each recv-queue item
             struct EventQueueItem {
                 boost::chrono::steady_clock::time_point firstSegment; // when first segment arrived
                 size_t numFragments; // how many fragments received (in and out of order)
                 size_t bytes;  // total length
-                size_t curEnd; // current end during reassembly
+                size_t curBytes; // current bytes accumulated (could be scattered across fragments)
                 EventNum_t eventNum;
                 u_int8_t *event;
                 u_int16_t dataId;
-                boost::heap::priority_queue<Segment, 
-                    boost::heap::compare<SegmentComparator>> oodQueue; // out-of-order segments in a priority queue
-                EventQueueItem(): bytes{0}, curEnd{0}, eventNum{0}, event{nullptr}, dataId{0} {}
+
+                EventQueueItem(): numFragments{0},  bytes{0}, curBytes{0},  
+                    eventNum{0}, event{nullptr}, dataId{0}  {}
+
+                ~EventQueueItem() {}
+
+                EventQueueItem& operator=(const EventQueueItem &i) = delete;
+
+                EventQueueItem(const EventQueueItem &i): firstSegment{i.firstSegment}, 
+                    numFragments{i.numFragments},               
+                    bytes{i.bytes}, curBytes{i.curBytes}, 
+                    eventNum{i.eventNum},   event{i.event},  dataId{i.dataId} {}
                 /**
                  * Initialize from REHdr
                  */
-                EventQueueItem(REHdr *rehdr): numFragments{0}, curEnd{0}
+                EventQueueItem(REHdr *rehdr): EventQueueItem()
+                {
+                    this->initFromHeader(rehdr);
+                }
+
+                inline void initFromHeader(REHdr *rehdr)
                 {
                     bytes = rehdr->get_bufferLength();
                     dataId = rehdr->get_dataId();
@@ -99,18 +94,7 @@ namespace e2sar
                     // user deallocates this, so we don't use a pool
                     event = new u_int8_t[rehdr->get_bufferLength()];
                     // set the timestamp
-                    firstSegment = boost::chrono::steady_clock::now();
-                }
-                // not a proper destructor on purpose
-                void cleanup(boost::pool<> &rbp)
-                {
-                    // clean up memory
-                    while(!oodQueue.empty()) 
-                    {
-                        auto i = oodQueue.top();
-                        rbp.free(i.segment);
-                        oodQueue.pop();     
-                    }
+                    firstSegment = boost::chrono::steady_clock::now();  
                 }
             };
 
@@ -143,13 +127,19 @@ namespace e2sar
 
             // push event on the common event queue
             // return 1 if event is lost, 0 on success
-            inline int enqueue(EventQueueItem* item) noexcept
+            inline int enqueue(const std::shared_ptr<EventQueueItem> &item) noexcept
             {
                 int ret = 0;
-                if (eventQueue.push(item))
+                // get rid of the shared object here
+                // lockfree queue uses atomic operations and cannot use shared_ptr type
+                auto newItem = new EventQueueItem(*item.get());
+                if (eventQueue.push(newItem))
                     eventQueueDepth++;
                 else 
+                {
+                    delete newItem; // the shared ptr object will be released by caller
                     ret = 1; // event lost, queue was full
+                }
                 // queue is lock free so we don't lock
                 recvThreadCond.notify_all();
                 return ret;
@@ -158,7 +148,7 @@ namespace e2sar
             // pop event off the event queue
             inline EventQueueItem* dequeue() noexcept
             {
-                EventQueueItem *item{nullptr};
+                EventQueueItem* item{nullptr};
                 auto a = eventQueue.pop(item);
                 if (a) 
                 {
@@ -189,6 +179,24 @@ namespace e2sar
 
             // have we registered a worker
             bool registeredWorker{false};
+
+
+            /**
+             * This thread does GC for all of the recv threads disposing of partially
+             * assembled events that have been there too long.
+             */
+            struct GCThreadState {
+                Reassembler &reas;
+                boost::thread threadObj;
+
+                GCThreadState(Reassembler &r): reas{r} {}
+
+                // Go through the list of threads on the recv thread list and
+                // do garbage collection on their partially assembled events
+                void _threadBody(); 
+            };
+            GCThreadState gcThreadState;
+
             /**
              * This thread receives data, reassembles into events and puts them onto the 
              * event queue for getEvent()
@@ -209,14 +217,16 @@ namespace e2sar
 
                 // object pool from which receive frames come from
                 // template parameter is allocator
-                boost::pool<> recvBufferPool{RECV_BUFFER_SIZE};
-                // map from <event number, data id> to event queue item
+                //boost::pool<> recvBufferPool{RECV_BUFFER_SIZE};
+                // map from <event number, data id> to event queue item (shared pointer)
                 // for those items that are in assembly. Note that event
                 // is uniquely identified by <event number, data id> and
                 // so long as the entropy doesn't change while the event
                 // segments are transmitted, they are guarangeed to go
                 // to the same port
-                boost::unordered_map<std::pair<EventNum_t, u_int16_t>, EventQueueItem*, pair_hash, pair_equal> eventsInProgress;
+                boost::unordered_map<std::pair<EventNum_t, u_int16_t>, std::shared_ptr<EventQueueItem>, pair_hash, pair_equal> eventsInProgress;
+                // mutex for guarding access to events in progress (recv thread, gc thread)
+                boost::mutex evtsInProgressMutex;
                 // thread local instance of events we lost
                 boost::container::flat_set<std::pair<EventNum_t, u_int16_t>> lostEvents;
 
@@ -234,7 +244,7 @@ namespace e2sar
 
                 inline ~RecvThreadState()
                 {
-                    recvBufferPool.purge_memory();
+                    //recvBufferPool.purge_memory();
                 }
 
                 // open v4/v6 sockets
@@ -244,9 +254,10 @@ namespace e2sar
                 // thread loop
                 void _threadBody();
 
-                // log a lost event via a set of known lost
-                // ad add to lost queue for external inspection
-                inline void logLostEvent(EventQueueItem* item, bool enqueLoss)
+                // log a lost event and add to lost queue for external inspection
+                // boolean flag discriminates between enqueue losses (true)
+                // and reassembly losses (false)
+                inline void logLostEvent(std::shared_ptr<EventQueueItem> item, bool enqueLoss)
                 {
                     std::pair<EventNum_t, u_int16_t> evt(item->eventNum, item->dataId);
 
@@ -503,6 +514,8 @@ namespace e2sar
 
                 for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
                     i->threadObj.join();
+
+                gcThreadState.threadObj.join();
 
                 // pool memory is implicitly freed when pool goes out of scope
             }

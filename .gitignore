@@ -40,3 +40,6 @@ __pycache__
 .venv
 
 .DS_Store
+
+# Claude Code development guidance
+CLAUDE.md

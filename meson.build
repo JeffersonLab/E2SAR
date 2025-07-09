@@ -3,6 +3,13 @@ project('E2SAR', 'cpp',
 
 compiler = meson.get_compiler('cpp')
 
+# adding -fsanitize if needed:
+# you can add -fsanitize=address for address sanitizer or 
+# -fsanitize=thread to look for race conditions. Need to be
+# added to both compile and link arguments
+#add_project_arguments('-fsanitize=address', language : 'cpp')
+#add_project_link_arguments('-fsanitize=address', language : 'cpp')
+
 if compiler.has_header('linux/netlink.h')
         add_project_arguments('-DNETLINK_CAPABLE', language: ['cpp'])
 endif
@@ -79,7 +86,7 @@ thread_dep = dependency('threads')
 stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
 # On many platforms, gRPC C++ has to be manually installed and found.
-grpc_dep = dependency('grpc++', version: '>=1.54.1')
+grpc_dep = dependency('grpc++', version: '>=1.51.1')
 
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible

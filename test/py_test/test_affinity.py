@@ -23,7 +23,7 @@ def test_set_process():
     """Test set_process() method."""
     cpu_cores = [0]
     res = affinity.set_process(cpu_cores)
-    assert res.has_error() is False
+    assert res.has_error() is False, f"Error: {res.error().message}"
     assert res.value() == 0, "Affinity set_process() did not succeed!"
 
 
@@ -32,7 +32,7 @@ def test_set_thread():
     """Test set_thread() method."""
     cpu_core = 0
     res = affinity.set_thread(cpu_core)
-    assert res.has_error() is False
+    assert res.has_error() is False, f"Error: {res.error().message}"
     assert res.value() == 0, "Affinity set_thread() failed!"
 
 
@@ -41,7 +41,7 @@ def test_set_thread_xor():
     """Test set_thread_xor() method."""
     cpu_cores = [1]
     res = affinity.set_thread_xor(cpu_cores)
-    assert res.has_error() is False
+    assert res.has_error() is False, f"Error: {res.error().message}"
     assert res.value() == 0, "Affinity set_thread_xor() failed!"
 
 
@@ -50,5 +50,5 @@ def test_numa_bind():
     """Test set_numa_bind() method."""
     node = 0
     res = affinity.set_numa_bind(node)
-    assert res.has_error() is False
+    assert res.has_error() is False, f"Error: {res.error().message}"
     assert res.value() == 0, "Affinity set_numa_bind() failed!"

@@ -36,6 +36,7 @@ def get_segmenter():
     sflags.useCP = False  # turn off CP. Default value is True
     sflags.syncPeriodMs = 1000
     sflags.syncPeriods = 5
+    sflags.rateGbps = 1.0
     return e2sar_py.DataPlane.Segmenter(seg_uri, DATA_ID, EVENTSRC_ID, sflags)
 
 def get_reassembler():
@@ -44,12 +45,15 @@ def get_reassembler():
     rflags = e2sar_py.DataPlane.Reassembler.ReassemblerFlags()
     rflags.useCP = False  # turn off CP. Default value is True
     rflags.withLBHeader = True  # LB header will be attached since there is no LB
+    #rflags.eventTimeout_ms = 4500 # make sure event timeout is long enough to receive events
     return e2sar_py.DataPlane.Reassembler(
         reas_uri, e2sar_py.IPAddress.from_string(DP_IPV4_ADDR), DP_IPV4_PORT, 1, rflags)
 
 
 def verify_result_obj(res_obj):
     """Helper function to check some of the return objects."""
+    if res_obj.has_error():
+        print(res_obj.error().message)
     assert res_obj.has_error() is False, f"{res_obj.error()}"
     assert res_obj.value() == 0
 
@@ -135,8 +139,40 @@ def test_b2b_send_numpy_get_numpy():
 
     time.sleep(1)
 
+    total_bytes = 0
+    sleep_cnt = 0
     # Receive the numpy array
-    recv_len, recv_array, recv_event_num, recv_data_id = reas.get1DNumpyArray(np.float32().dtype)
+    while sleep_cnt < 5:
+        print(f"Entering loop {sleep_cnt=}")
+        recv_len, recv_array, recv_event_num, recv_data_id = reas.get1DNumpyArray(np.float32().dtype)
+        if (recv_len == -2 or sleep_cnt > 4 or total_bytes >= send_array.nbytes):
+            print(f"Receiving error")
+            break
+
+        if recv_len == -1:
+            sleep_cnt += 1
+            time.sleep(5)
+            continue
+
+        # success
+        if recv_len > 0:
+            break
+
+
+    stats = reas.getStats()
+    print(f"{stats.lastErrno=}")
+    print(f"{stats.dataErrCnt=}")
+    print(f"{stats.grpcErrCnt=}")
+    print(f"{stats.reassemblyLoss=}")
+    print(f"{stats.enqueueLoss=}")
+    print(f"{stats.eventSuccess=}")
+
+    lost = reas.get_LostEvent()
+    if len(lost) > 0:
+        print(f"Lost Event: {lost[0]}:{lost[1]} Fragments received: {lost[2]} ")
+    else:
+        print('No events lost')
+
     # print(recv_bytes, recv_array.nbytes, recv_event_num, recv_data_id)
     assert recv_len > 0
     assert recv_len == recv_array.nbytes
@@ -145,6 +181,12 @@ def test_b2b_send_numpy_get_numpy():
     assert np.array_equal(send_array.flatten(), recv_array), "recv_array did not match"
 
     reas.stopThreads()
+
+
+# Callback function that will be executed when the event is sent
+def send_completion_callback(cb_arg):
+    """Called when the event transmission completes"""
+    print(f"Event sent successfully! Callback argument: {cb_arg}")
 
 
 @pytest.mark.b2b
@@ -170,8 +212,14 @@ def test_b2b_send_numpy_queue_recv_bytes():
     # Create a 2D numpy array and each time send 1 row
     send_array = np.array([np.full((num_elements,), i, dtype=np.uint8) for i in range(5)])
     for i in range(5):
+        # print(f'Sending {send_array[i]=}')
         send_bytes = send_array[i].nbytes
-        res = seg.addToSendQueue(send_array[i], send_bytes)
+        callback_arg = {
+            'event_id': i,
+            'user_data': 'Important event marker'
+        }
+        res = seg.addNumpyArrayToSendQueue(numpy_array=send_array[i], nbytes=send_bytes, 
+                                 callback=send_completion_callback, cbArg=callback_arg)
         verify_result_obj(res)
 
     time.sleep(1)
@@ -200,7 +248,13 @@ def test_b2b_send_numpy_queue_recv_bytes():
         # Validate the recv buffer
         # Decode the buffer as numpy 1D array
         recv_array = np.frombuffer(recv_data, dtype=np.uint8)
-        assert np.array_equal(send_array[i - 1], recv_array)
+        # search for input data - may not arrive in-order
+        found = False
+        for j in range(5):
+            if np.array_equal(recv_array, send_array[j]):
+                found = True
+        assert found == True
+        #assert np.array_equal(send_array[i - 1], recv_array)
         assert recv_data_id == DATA_ID
 
         if total_bytes >= send_array.nbytes:
@@ -229,6 +283,7 @@ def test_b2b_send_numpy_queue_recv_bytes():
 # No message received, continuing
 # Receiving error after recv 600000000 bytes
 #
+#@pytest.mark.skip(reason="Excluded from main suite")
 @pytest.mark.skip(reason="Excluded from main suite")
 def test_b2b_send_numpy_queue_get_numpy():
     """

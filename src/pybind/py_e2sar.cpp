@@ -50,6 +50,8 @@ PYBIND11_MODULE(e2sar_py, m) {
 
     m.doc() = "Python bindings for the E2SAR library.";
 
+    py::register_exception<E2SARException>(m, "E2SARException");
+
     // Constants belong to the top module
     m.attr("_dp_port") = py::int_(DATAPLANE_PORT);
     m.attr("_iphdr_len") = py::int_(IP_HDRLEN);
