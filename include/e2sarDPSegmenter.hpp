@@ -418,9 +418,6 @@ namespace e2sar
             {
                 stopThreads();
 
-                // wait to exit
-                syncThreadState.threadObj.join();
-                sendThreadState.threadObj.join();
 #ifdef LIBURING_AVAILABLE
                 if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                 {
@@ -514,7 +511,13 @@ namespace e2sar
             */ 
             inline void stopThreads() 
             {
-                threadsStop = true;
+                if (not threadsStop)
+                {
+                    threadsStop = true;
+                    // wait to exit
+                    syncThreadState.threadObj.join();
+                    sendThreadState.threadObj.join();
+                }
             }
         private:
             // Calculate the average event rate from circular buffer

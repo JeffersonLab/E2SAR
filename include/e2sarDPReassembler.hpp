@@ -506,16 +506,6 @@ namespace e2sar
                     auto res = lbman.deregisterWorker();
 
                 stopThreads();
-                recvThreadCond.notify_all();
-
-                // wait to exit
-                if (useCP)
-                    sendStateThreadState.threadObj.join();
-
-                for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
-                    i->threadObj.join();
-
-                gcThreadState.threadObj.join();
 
                 // pool memory is implicitly freed when pool goes out of scope
             }
@@ -653,7 +643,21 @@ namespace e2sar
              */
             void stopThreads() 
             {
-                threadsStop = true;
+                if (not threadsStop)
+                {
+                    threadsStop = true;
+
+                    recvThreadCond.notify_all();
+
+                    // wait to exit
+                    if (useCP)
+                        sendStateThreadState.threadObj.join();
+
+                    for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
+                        i->threadObj.join();
+
+                    gcThreadState.threadObj.join();
+                }
             }
         protected:
         private:
