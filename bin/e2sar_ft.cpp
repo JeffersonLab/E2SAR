@@ -80,6 +80,37 @@ void ctrlCHandler(int sig)
             std::cout << "\tPort: " << fds.first << " Received: " << fds.second << std::endl;
         }
         std::cout << "Total: " << totalFragments << std::endl;
+
+        auto stats = reasPtr->getStats();
+        std::vector<boost::tuple<EventNum_t, u_int16_t, size_t>> lostEvents;
+
+        // get the lost events
+        while(true)
+        {
+            auto res = reasPtr->get_LostEvent();
+            if (res.has_error())
+                break;
+            lostEvents.push_back(res.value());
+        }
+
+        std::cout << "Stats:" << std::endl;
+        std::cout << "\tEvents Received: " << stats.eventSuccess << std::endl;
+        std::cout << "\tEvents Lost in reassembly: " << stats.reassemblyLoss << std::endl;
+        std::cout << "\tEvents Lost in enqueue: " << stats.enqueueLoss << std::endl;
+        std::cout << "\tData Errors: " << stats.dataErrCnt << std::endl;
+        if (stats.dataErrCnt > 0)
+            std::cout << "\tLast Data Error: " << strerror(stats.lastErrno) << std::endl;
+        std::cout << "\tgRPC Errors: " << stats.grpcErrCnt << std::endl;
+        if (stats.lastE2SARError != E2SARErrorc::NoError)
+            std::cout << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
+
+        std::cout << "\tEvents lost so far (<Evt ID:Data ID/num frags rcvd>): ";
+        for(auto evt: lostEvents)
+        {
+            std::cout << "<" << evt.get<0>() << ":" << evt.get<1>() << "/" << evt.get<2>() << "> ";
+        }
+        std::cout << std::endl;
+
         delete reasPtr;
     }
 
