@@ -352,8 +352,8 @@ namespace e2sar
                 if (numRecvPorts > (2 << 13))
                     throw E2SARException("Too many receive ports reqiuested, limit 2^14");
 
-                if (eventTimeout_ms > 5000)
-                    throw E2SARException("Event timeout exception unreasonably long, limit 5s");
+                if (eventTimeout_ms > 10000)
+                    throw E2SARException("Event timeout exception unreasonably long, limit 10s");
 
                 if (dataPort < 1024)
                     throw E2SARException("Base receive port in the privileged range (<1024)");

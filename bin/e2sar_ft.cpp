@@ -375,6 +375,8 @@ result<int> recvFiles(Reassembler *r, const std::string &path, const std::string
         // construct a path
         filePath /= fileName.str();
 
+        std::cout << "Writing file " << filePath << " for event " << evtNum << std::endl;
+
         // create, truncate to size and mmap destination file
         int fdOut = open(filePath.c_str(), O_RDWR|O_CREAT|O_EXCL, mode);
         if (fdOut < 0)
