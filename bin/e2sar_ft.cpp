@@ -655,6 +655,19 @@ int main(int argc, char **argv)
             std::cout << "Sending sockets/threads:       " << numSockets << std::endl;
             std::cout << "Enqueue file reading threads:  " << readThreads << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
+            std::cout << "Sending average bit rate is:   ";
+
+            if (rateGbps > 0.) 
+            {
+                std::cout << rateGbps << " Gbps ";
+                if (smooth)
+                    std::cout << "(smoothed out with per send thread rate " << rateGbps/numSockets << " Gbps)";
+                else
+                    std::cout << "(with file-sized line-rate bursts)";
+            } else
+                std::cout << "unlimited";
+            std::cout << std::endl;
+
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
