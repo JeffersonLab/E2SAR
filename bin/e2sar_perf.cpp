@@ -361,6 +361,7 @@ int main(int argc, char **argv)
     std::vector<int> coreList;
     std::vector<std::string> optimizations;
     int numaNode;
+    int eventTimeoutMS;
 
     // parameters
     opts("send,s", "send traffic");
@@ -394,6 +395,8 @@ int main(int argc, char **argv)
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
     opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
+    opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
+
 
     po::variables_map vm;
 
@@ -424,6 +427,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "withcp", "multiport");
         conflicting_options(vm, "recv", "multiport");
         conflicting_options(vm, "recv", "smooth");
+        conflicting_options(vm, "send", "timeout");
         // these are optional
         conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
@@ -621,10 +625,12 @@ int main(int argc, char **argv)
                 rflags.rcvSocketBufSize = sockBufSize;
                 rflags.useHostAddress = preferHostAddr;
                 rflags.validateCert = validate;
+                rflags.eventTimeout_ms = eventTimeoutMS;
             }
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
+            std::cout << "Event reassembly timeout (ms): " << eventTimeoutMS << std::endl;
             std::cout << "Will run for:                  " << (durationSec ? std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
 
             try {

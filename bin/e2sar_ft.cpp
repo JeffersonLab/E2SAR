@@ -434,6 +434,7 @@ int main(int argc, char **argv)
     std::vector<std::string> filePaths;
     std::string fileExtension, filePrefix;
     size_t writeThreads, readThreads;
+    int eventTimeoutMS;
 
     auto opts = od.add_options()("help,h", "show this help message");
 
@@ -466,6 +467,8 @@ int main(int argc, char **argv)
     opts("recurse", po::bool_switch()->default_value(false), "recurse into specified directories looking for files [s]");
     opts("prefix", po::value<std::string>(&filePrefix)->default_value("e2sar_out"), "prefix of the files to create [r]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
+    opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
+
 
     po::positional_options_description p;
     // path is a positional argument as well
@@ -493,6 +496,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "ipv4", "ipv6");
         conflicting_options(vm, "recv", "smooth");
+        conflicting_options(vm, "send", "timeout");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -708,9 +712,12 @@ int main(int argc, char **argv)
             rflags.rcvSocketBufSize = sockBufSize;
             rflags.useHostAddress = preferHostAddr;
             rflags.validateCert = validate;
+            rflags.eventTimeout_ms = eventTimeoutMS;
+
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
+            std::cout << "Event reassembly timeout (ms): " << eventTimeoutMS << std::endl;
 
             try {
                 if (vm.count("cores"))
