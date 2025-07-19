@@ -83,13 +83,12 @@ fi
 # Calculate byte count (MB to bytes)
 BYTE_COUNT=$((FILE_LENGTH_MB * 1024 * 1024))
 
-# Check if destination directory exists, create if it doesn't
+# Check if destination directory exists and is writable
 if [ ! -d "$DESTINATION_DIR" ]; then
-    echo "Creating destination directory: $DESTINATION_DIR"
-    mkdir -p "$DESTINATION_DIR"
+    echo "Error: Destination directory does not exist: $DESTINATION_DIR"
+    exit 1
 fi
 
-# Check if destination directory is writable
 if [ ! -w "$DESTINATION_DIR" ]; then
     echo "Error: Cannot write to destination directory: $DESTINATION_DIR"
     exit 1
