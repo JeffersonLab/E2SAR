@@ -354,15 +354,13 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP;
-    bool autoIP;
+    bool withCP, multiPort, smooth, autoIP;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
     std::vector<int> coreList;
     std::vector<std::string> optimizations;
     int numaNode;
-    bool multiPort;
 
     // parameters
     opts("send,s", "send traffic");
@@ -395,6 +393,7 @@ int main(int argc, char **argv)
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
     opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
+    opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
 
     po::variables_map vm;
 
@@ -424,6 +423,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "send", "ip");
         conflicting_options(vm, "withcp", "multiport");
         conflicting_options(vm, "recv", "multiport");
+        conflicting_options(vm, "recv", "smooth");
         // these are optional
         conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
@@ -472,7 +472,7 @@ int main(int argc, char **argv)
         auto numaRes = Affinity::setNUMABind(numaNode);
         if (numaRes.has_error())
         {
-            std::cout << "Unable to bind to specified NUMA node: " << numaRes.error().message() << std::endl;
+            std::cerr << "Unable to bind to specified NUMA node: " << numaRes.error().message() << std::endl;
             return -1;
         }
     }
@@ -480,10 +480,11 @@ int main(int argc, char **argv)
     withCP = vm["withcp"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
     multiPort = vm["multiport"].as<bool>();
+    smooth = vm["smooth"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
-        std::cout << "One of --ip or --autoip must be specified. --autoip attempts to auto-detect the address" <<
+        std::cerr << "One of --ip or --autoip must be specified. --autoip attempts to auto-detect the address" <<
             " of the outgoing or incoming interface using 'data=' portion of the EJFAT_URI" << std::endl;
         return -1;
     }
@@ -503,6 +504,11 @@ int main(int argc, char **argv)
     if (vm.count("novalidate"))
         validate = false;
 
+    if (rateGbps < 0. and smooth)
+    {
+        std::cerr << "Smoothing turned on, while the rate is unlimited." << std::endl;
+        return -1;
+    }
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::instance};
 
@@ -570,9 +576,11 @@ int main(int argc, char **argv)
                 sflags.numSendSockets = numSockets;
                 sflags.rateGbps = rateGbps;
                 sflags.multiPort = multiPort;
+                sflags.smooth = smooth;
             }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
+            std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :

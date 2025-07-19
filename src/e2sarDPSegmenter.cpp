@@ -32,6 +32,7 @@ namespace e2sar
         sndSocketBufSize{sflags.sndSocketBufSize},
         rateGbps{sflags.rateGbps},
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
+        smooth{sflags.smooth},
         multiPort{sflags.multiPort},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
@@ -374,6 +375,9 @@ namespace e2sar
         thread_local boost::asio::thread_pool threadPool(seg.numSendSockets);
         boost::chrono::high_resolution_clock::time_point nowTE;
         int64_t interEventSleepUsec{0};
+        // per thread rate and inter-frame sleep if needed
+        const float smoothThreadRateGbps{seg.smooth ? seg.rateGbps/seg.numSendSockets : (float)-1.0};
+        int64_t interFrameSleepUsec{static_cast<int64_t>(seg.smooth ? seg.getMTU()*8/(smoothThreadRateGbps * 1000): 0)};
 
         while(!seg.threadsStop)
         {
@@ -384,7 +388,7 @@ namespace e2sar
             EventQueueItem *item{nullptr};
             while(seg.eventQueue.pop(item))
             {
-                if (seg.rateLimit)
+                if (not seg.smooth && seg.rateLimit)
                 {
                     // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
                     nowTE = boost::chrono::high_resolution_clock::now();
@@ -404,14 +408,14 @@ namespace e2sar
                 // by a separate thread that looks at completion queue
                 // and reflects into the stats block
                 boost::asio::post(threadPool,
-                    [this, rri, item]() {
+                    [this, rri, item, interFrameSleepUsec]() {
 #ifdef LIBURING_AVAILABLE
                         if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
                             seg.ringMtxs[rri].lock();
 #endif 
                         auto res = _send(item->event, item->bytes, 
                             item->eventNum, item->dataId,
-                            item->entropy, rri, 
+                            item->entropy, rri, interFrameSleepUsec,
                             item->callback, item->cbArg);
 
 #ifdef LIBURING_AVAILABLE
@@ -434,7 +438,8 @@ namespace e2sar
                 });
 
                 // busy wait if needed for inter-event period 
-                if (seg.rateLimit && interEventSleepUsec > 0)
+                // with smoothing on the waiting is in each send thread
+                if (not seg.smooth && seg.rateLimit && interEventSleepUsec > 0)
                 {
                     busyWaitUsecs(nowTE, interEventSleepUsec);       
                 }
@@ -647,7 +652,7 @@ namespace e2sar
     // fragment and send the event
     result<int> Segmenter::SendThreadState::_send(u_int8_t *event, size_t bytes, 
         EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy, size_t roundRobinIndex,
-        void (*callback)(boost::any), boost::any cbArg)
+        int64_t interFrameSleepUsec, void (*callback)(boost::any), boost::any cbArg)
     {
         int err;
         int sendSocket{0};
@@ -656,6 +661,8 @@ namespace e2sar
         int flags{0};
         // number of buffers we will send
         size_t numBuffers{(bytes + maxPldLen - 1)/ maxPldLen}; // round up
+        // if needed for interframe wait
+        boost::chrono::high_resolution_clock::time_point nowTF;
 
 #ifdef SENDMMSG_AVAILABLE 
         // allocate mmsg vector based on event buffer size using fast int ceiling
@@ -711,6 +718,8 @@ namespace e2sar
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
         {
+            if (interFrameSleepUsec > 0)
+                nowTF = boost::chrono::high_resolution_clock::now();
             // fill out LB and RE headers
             void *hdrspace = malloc(sizeof(LBREHdr));
             // placement-new to construct the headers
@@ -793,6 +802,9 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
+                // this is only set if smoothing is on. only works at low rates with reasonable MTUs
+                if (interFrameSleepUsec > 0)
+                    busyWaitUsecs(nowTF, interFrameSleepUsec);
             } 
         }
 #ifdef SENDMMSG_AVAILABLE
@@ -944,6 +956,8 @@ namespace e2sar
             sFlags.sndSocketBufSize);
         sFlags.rateGbps = paramTree.get<float>("data-plane.rateGbps",
             sFlags.rateGbps);
+        sFlags.smooth = paramTree.get<bool>("data-plane.smooth",
+            sFlags.smooth);
         sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
             sFlags.multiPort);
 

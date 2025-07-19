@@ -421,13 +421,14 @@ int main(int argc, char **argv)
 
     u_int16_t mtu;
     size_t numThreads, numSockets;
+    float rateGbps;
     int sockBufSize;
     std::string sndrcvIP;
     u_int16_t recvStartPort;
     std::vector<int> coreList;
     std::vector<std::string> optimizations;
     int numaNode;
-    bool withCP, autoIP, recurse;
+    bool withCP, autoIP, recurse, smooth;
     u_int32_t eventSourceId;
     u_int16_t dataId;
     std::vector<std::string> filePaths;
@@ -444,6 +445,7 @@ int main(int argc, char **argv)
     opts("mtu,m", po::value<u_int16_t>(&mtu)->default_value(1500), "MTU (default 1500) [s]");
     opts("threads", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
     opts("sockets", po::value<size_t>(&numSockets)->default_value(4), "number of send sockets (defaults to 4) [r]");
+    opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0, negative value means no limit)");
     opts("src", po::value<u_int32_t>(&eventSourceId)->default_value(1234), "Event source (default 1234) [s]");
     opts("dataid", po::value<u_int16_t>(&dataId)->default_value(4321), "Data id (default 4321) [s]");
     opts("withcp,c", po::bool_switch()->default_value(false), "enable control plane interactions");
@@ -463,6 +465,7 @@ int main(int argc, char **argv)
     opts("enq", po::value<size_t>(&readThreads)->default_value(1), "number of enqueue threads in sender reading files (defaults to 1) [s]");
     opts("recurse", po::bool_switch()->default_value(false), "recurse into specified directories looking for files [s]");
     opts("prefix", po::value<std::string>(&filePrefix)->default_value("e2sar_out"), "prefix of the files to create [r]");
+    opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
 
     po::positional_options_description p;
     // path is a positional argument as well
@@ -489,6 +492,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "recv", "dataid");
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "ipv4", "ipv6");
+        conflicting_options(vm, "recv", "smooth");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -551,6 +555,7 @@ int main(int argc, char **argv)
     withCP = vm["withcp"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
     recurse  = vm["recurse"].as<bool>();
+    smooth = vm["smooth"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -574,6 +579,11 @@ int main(int argc, char **argv)
     if (vm.count("novalidate"))
         validate = false;
 
+    if (rateGbps < 0. and smooth)
+    {
+        std::cerr << "Smoothing turned on, while the rate is unlimited." << std::endl;
+        return -1;
+    }
     // prepend extension with a '.'
     fileExtension.insert(fileExtension.begin(), '.');
 
@@ -630,9 +640,11 @@ int main(int argc, char **argv)
             sflags.mtu = mtu;
             sflags.sndSocketBufSize = sockBufSize;
             sflags.numSendSockets = numSockets;
-            sflags.rateGbps = -1.0; // unlimited
+            sflags.rateGbps = rateGbps; // unlimited
+            sflags.smooth = smooth;
 
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Sending sockets/threads:       " << numSockets << std::endl;
             std::cout << "Enqueue file reading threads:  " << readThreads << std::endl;

@@ -68,6 +68,10 @@ namespace e2sar
             const float rateGbps;
             // used to avoid floating point comparisons, set to false if rateGbps <= 0
             const bool rateLimit;
+            // use smoothing rate shaping, i.e. only in sendmsg wait after every call
+            // WARNING: Incompatible with optimizations that send entire batches of 
+            // frames to the kernel, i.e. sendMmsg and io_uring
+            const bool smooth;
             // use multiple destination ports (for back-to-back testing only)
             const bool multiPort;
 
@@ -247,7 +251,7 @@ namespace e2sar
                 result<int> _waitAndCloseFd(int fd);
                 // fragment and send the event
                 result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
-                    u_int16_t entropy, size_t roundRobinIndex, 
+                    u_int16_t entropy, size_t roundRobinIndex, int64_t interFrameSleepUsec = 0, 
                     void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
                 // thread loop
                 void _threadBody();
@@ -349,6 +353,8 @@ namespace e2sar
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.wmem_max) to be higher. {3MB}
              * - rateGbps - send rate as floating point expression in Gbps. Negative value means unlimited. {-1.0}
+             * - smooth - shape on a per sendmsg() call rather than after every event, doesn't work for
+             * send optimizations and only works at low speeds (~<3Gbps) {false}
              * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
              * rather than a single port; source ports are still randomized (incompatible with a load balancer, 
              * only useful in back-to-back testing) {false}
@@ -364,12 +370,14 @@ namespace e2sar
                 u_int16_t mtu;
                 size_t numSendSockets;
                 int sndSocketBufSize;
-                float rateGbps; 
+                float rateGbps;
+                bool smooth;
                 bool multiPort; 
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, multiPort{false} {}
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
+                    multiPort{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
