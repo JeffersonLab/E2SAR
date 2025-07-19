@@ -513,6 +513,9 @@ namespace e2sar
             {
                 if (not threadsStop)
                 {
+                    // wait until queue empties
+                    while (not eventQueue.empty()) {}
+                    
                     threadsStop = true;
                     // wait to exit
                     syncThreadState.threadObj.join();
