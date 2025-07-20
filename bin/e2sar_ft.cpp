@@ -316,7 +316,6 @@ result<int> traversePaths(Segmenter* seg, const std::vector<std::string>& filePa
 
 result<int> prepareToReceive(Reassembler &r)
 {
-    std::cout << "Receiving on ports " << r.get_recvPorts().first << ":" << r.get_recvPorts().second << std::endl;
 
     // register the worker (will be NOOP if withCP is set to false)
     auto hostname_res = NetUtil::getHostName();
@@ -324,14 +323,14 @@ result<int> prepareToReceive(Reassembler &r)
     {
         return E2SARErrorInfo{hostname_res.error().code(), hostname_res.error().message()};
     }
+    std::cout << "Registering the worker " << hostname_res.value() << " ...";
     auto regres = r.registerWorker(hostname_res.value());
     if (regres.has_error())
     {
         return E2SARErrorInfo{E2SARErrorc::RPCError, 
             "Unable to register worker node due to " + regres.error().message()};
     }
-    if (regres.value() == 1)
-        std::cout << "Registered the worker" << std::endl;
+    std::cout << "done" << std::endl;
 
     // NOTE: if we switch the order of registerWorker and openAndStart
     // you get into a race condition where the sendState thread starts and tries
@@ -620,7 +619,7 @@ int main(int argc, char **argv)
                     senders.push_back(sndrcvIP);
                     for (auto s: senders)
                         std::cout << s << " ";
-                    std::cout << std::endl;
+                    std::cout << "... ";
                     auto addres = lbmPtr->addSenders(senders);
                     if (addres.has_error()) 
                     {
@@ -630,7 +629,7 @@ int main(int argc, char **argv)
                     }
                 } else
                 {
-                    std::cout << "autodetected" << std::endl;
+                    std::cout << "autodetected ... ";
                     auto addres = lbmPtr->addSenderSelf();
                     if (addres.has_error()) 
                     {
@@ -639,6 +638,7 @@ int main(int argc, char **argv)
                         return -1;
                     }
                 }
+                std::cout << "done" << std::endl;
             }
 
             Segmenter::SegmenterFlags sflags;
@@ -756,6 +756,7 @@ int main(int argc, char **argv)
                 }
 
                 std::cout << "Using IP address:              " << reasPtr->get_dataIP() << std::endl;
+                std::cout << "Receiving on ports:            " << reasPtr->get_recvPorts().first << ":" << reasPtr->get_recvPorts().second << std::endl;
                 std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                     "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 

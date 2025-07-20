@@ -9,6 +9,9 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Segmenter::stopThreads() now blocks until the internal threads exit (previously the wait was in the destructor).
 - Reassember::stopThreads() now blocks until the internal threads exit (previously the wait was in the destructor).
 
+Bug Fixes:
+- Under certain conditions Sync thread in Segmenter could quit earlier than expected thus potentially leading to losses, this has now been fixed.
+
 ## v0.2.1
 
 Added rate pacing for the Segmenter. An additional field has been added: SegmenterFlags.rateGbps which specifies a floating point value of rate in Gbps. A negative value means ignore the setting and send as fast as possible. When a positive value is specified the sending code busy waits for the desired number of usecs either between frames (for sendmsg and io_uring) or between events (for sendmmsg). Note that when using Segmenter.addToSendQueue() the user must be careful to check that it doesn't return a E2SARErrorc::MemoryError which indicates that the queue is full (in this case the event should be resubmitted at a later time, the method by which the event submission code waits is left to the user).
