@@ -212,7 +212,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 result<int> prepareToReceive(Reassembler &r)
 {
     // register the worker (will be NOOP if withCP is set to false)
-    std::cout << "Getting hostname ... ";
+    std::cout << "Getting hostname ... " << std::flush;
     auto hostname_res = NetUtil::getHostName();
     if (hostname_res.has_error()) 
     {
@@ -220,7 +220,7 @@ result<int> prepareToReceive(Reassembler &r)
     }
     std::cout << "done" << std::endl;
     
-    std::cout << "Registering the worker " << hostname_res.value() << " ...";
+    std::cout << "Registering the worker " << hostname_res.value() << " ..." << std::flush;
     auto regres = r.registerWorker(hostname_res.value());
     if (regres.has_error())
     {
@@ -524,17 +524,17 @@ int main(int argc, char **argv)
             // if using control plane
             if (withCP)
             {
+                std::cout << "Adding senders to LB: " << std::flush;
                 // create LBManager
                 lbmPtr = new LBManager(uri, validate, preferHostAddr);
 
                 // register senders
-                std::cout << "Adding senders to LB: ";
                 if (not autoIP)
                 {
                     senders.push_back(sndrcvIP);
                     for (auto s: senders)
                         std::cout << s << " ";
-                    std::cout <<  "... ";
+                    std::cout <<  "... " << std::flush;
                     auto addres = lbmPtr->addSenders(senders);
                     if (addres.has_error()) 
                     {
@@ -544,7 +544,7 @@ int main(int argc, char **argv)
                     }
                 } else
                 {
-                    std::cout << "autodetected ... ";
+                    std::cout << "autodetected ... " << std::flush;
                     auto addres = lbmPtr->addSenderSelf();
                     if (addres.has_error()) 
                     {
