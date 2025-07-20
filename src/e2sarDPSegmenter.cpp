@@ -236,7 +236,7 @@ namespace e2sar
 
     void Segmenter::SyncThreadState::_threadBody()
     {
-        while(!seg.threadsStop)
+        while(!seg.syncThreadStop)
         {
             // Get the current time point
             auto nowT = boost::chrono::system_clock::now();

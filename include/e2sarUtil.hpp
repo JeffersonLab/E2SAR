@@ -480,12 +480,12 @@ namespace e2sar
     /**  
      * clock entropy test to validate that system clock produces sufficient randomness
      * in the least 8 bits of the microsecond timestamp (required by LB). Normally runs
-     * for 10 seconds to collect 5k samples
+     * for 1 second to collect 1k samples
      * @param totalTests - number of samples to collect
      * @param sleepMs - number of milliseconds to sleep between each sample
      * @return entropy in bits
      */
-    static inline float clockEntropyTest(int totalTests = 5000, int sleepMs = 1) 
+    static inline float clockEntropyTest(int totalTests = 1000, int sleepMs = 1) 
     {
         std::vector<int_least64_t> points;
         std::vector<int> bins(256, 0);

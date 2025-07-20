@@ -315,6 +315,8 @@ namespace e2sar
 
             /** Threads keep running while this is false */
             bool threadsStop{false};
+            /** sync thread stopper */
+            bool syncThreadStop{false};
         public:
             /**
              * Structure in which statistics are reported back to user, sync
@@ -524,10 +526,13 @@ namespace e2sar
                     // wait until queue empties
                     while (not eventQueue.empty()) {}
                     
+                    // tell sending threads to stop and
+                    // wait till they are done
                     threadsStop = true;
-                    // wait to exit
-                    syncThreadState.threadObj.join();
                     sendThreadState.threadObj.join();
+                    // now we can stop the sync thread
+                    syncThreadStop = true;
+                    syncThreadState.threadObj.join();
                 }
             }
         private:
