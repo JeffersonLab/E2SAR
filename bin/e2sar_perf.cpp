@@ -220,7 +220,7 @@ result<int> prepareToReceive(Reassembler &r)
     }
     std::cout << "done" << std::endl;
     
-    std::cout << "Registering the worker " << hostname_res.value() << " ..." << std::flush;
+    std::cout << "Registering the worker " << hostname_res.value() << " ... " << std::flush;
     auto regres = r.registerWorker(hostname_res.value());
     if (regres.has_error())
     {
