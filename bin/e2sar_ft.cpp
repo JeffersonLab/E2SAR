@@ -198,7 +198,7 @@ result<int> sendFile(Segmenter* s, const bfs::path& path, EventNum_t num) {
     // put on queue with a callback to free this buffer
     while(true)
     {
-        std::cout << "Sending file " << path << "  as event " << num << std::endl;
+        std::cout << "Queueing file " << path << "  as event " << num << std::endl;
         auto sendRes = s->addToSendQueue(static_cast<u_int8_t*>(inPtr), inFileSize, 0, 0, 0,
             &unmapFileCallback, callbackParams(inPtr, inFileSize, fdIn));
         if (sendRes.has_error()) 
@@ -318,11 +318,14 @@ result<int> prepareToReceive(Reassembler &r)
 {
 
     // register the worker (will be NOOP if withCP is set to false)
+    std::cout << "Getting hostname ... ";
     auto hostname_res = NetUtil::getHostName();
     if (hostname_res.has_error()) 
     {
         return E2SARErrorInfo{hostname_res.error().code(), hostname_res.error().message()};
     }
+    std::cout << "done" << std::endl;
+
     std::cout << "Registering the worker " << hostname_res.value() << " ...";
     auto regres = r.registerWorker(hostname_res.value());
     if (regres.has_error())

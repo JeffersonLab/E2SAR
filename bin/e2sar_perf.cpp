@@ -212,12 +212,14 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 result<int> prepareToReceive(Reassembler &r)
 {
     // register the worker (will be NOOP if withCP is set to false)
+    std::cout << "Getting hostname ... ";
     auto hostname_res = NetUtil::getHostName();
     if (hostname_res.has_error()) 
     {
         return E2SARErrorInfo{hostname_res.error().code(), hostname_res.error().message()};
     }
-
+    std::cout << "done" << std::endl;
+    
     std::cout << "Registering the worker " << hostname_res.value() << " ...";
     auto regres = r.registerWorker(hostname_res.value());
     if (regres.has_error())
