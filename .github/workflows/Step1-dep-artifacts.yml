@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04","debian:bullseye", "debian:bookworm"]
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "rockylinux/rockylinux:9.6", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04","debian:bullseye", "debian:bookworm"]
         #container: ["debian:bullseye", "debian:bookworm", "debian:trixie"]
     container:
       image: ${{ matrix.container }}
