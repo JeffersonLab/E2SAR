@@ -380,24 +380,33 @@ result<int> recvFiles(Reassembler *r, const std::string &path, const std::string
         std::cout << "Writing file " << filePath << " for event " << evtNum << std::endl;
 
         // create, truncate to size and mmap destination file
-        int fdOut = open(filePath.c_str(), O_RDWR|O_CREAT|O_EXCL, mode);
+        int fdOut = open(filePath.c_str(), O_RDWR|O_CREAT, mode);
         if (fdOut < 0)
         {
-            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to open output file"};
+            std::cerr << "Unable to open output file " << filePath << ", continuing" << std::endl;
+            delete [] evtBuf;
+            evtBuf = nullptr;
+            continue;
         }
 
         if (ftruncate(fdOut, evtSize) == -1)
         {
+            std::cerr << "Unable to truncate output file " << filePath << ", continuing" << std::endl;
             close(fdOut);
-            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to open output file"};
+            delete[] evtBuf;
+            evtBuf = nullptr;
+            continue;
         }
 
         void *outPtr = mmap(NULL, evtSize, PROT_WRITE, MAP_SHARED, fdOut, 0);
 
         if (outPtr == MAP_FAILED)
         {
+            std::cerr << "Unable to mmap output file " << filePath << ", continuing" << std::endl;
             close(fdOut);
-            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to mmap output file"};
+            delete[] evtBuf;
+            evtBuf = nullptr;
+            continue; 
         }
 
         // copy the data into file
@@ -407,10 +416,14 @@ result<int> recvFiles(Reassembler *r, const std::string &path, const std::string
         auto ret = munmap(outPtr, evtSize);
         if (ret == -1)
         {
+            std::cerr << "Unable to unmap output file " << filePath <<  ", continuing" << std::endl;
             close(fdOut);
-            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to unmap output file"};
+            delete[] evtBuf;
+            evtBuf = nullptr;
+            continue;
         }
 
+        close(fdOut);
         // delete event
         delete[] evtBuf;
         evtBuf = nullptr;
