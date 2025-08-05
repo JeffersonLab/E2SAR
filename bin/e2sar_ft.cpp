@@ -676,16 +676,16 @@ int main(int argc, char **argv)
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
-            std::cout << "Sending sockets/threads:       " << numSockets << std::endl;
+            std::cout << "Sending sockets/threads:       " << sflags.numSendSockets << std::endl;
             std::cout << "Enqueue file reading threads:  " << readThreads << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
             std::cout << "Sending average bit rate is:   ";
 
-            if (rateGbps > 0.) 
+            if (sflags.rateGbps > 0.) 
             {
-                std::cout << rateGbps << " Gbps ";
-                if (smooth)
-                    std::cout << "(smoothed out with per send thread rate " << rateGbps/numSockets << " Gbps)";
+                std::cout << sflags.rateGbps << " Gbps ";
+                if (sflags.smooth)
+                    std::cout << "(smoothed out with per send thread rate " << sflags.rateGbps/sflags.numSendSockets << " Gbps)";
                 else
                     std::cout << "(with file-sized line-rate bursts)";
             } else
@@ -756,7 +756,7 @@ int main(int argc, char **argv)
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
-            std::cout << "Event reassembly timeout (ms): " << eventTimeoutMS << std::endl;
+            std::cout << "Event reassembly timeout (ms): " << rflags.eventTimeout_ms << std::endl;
 
             try {
                 if (vm.count("cores"))
