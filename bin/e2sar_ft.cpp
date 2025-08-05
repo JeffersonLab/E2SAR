@@ -369,13 +369,18 @@ result<int> recvFiles(Reassembler *r, const std::string &path, const std::string
             continue;
 
         // generate file name
-        std::ostringstream fileName;
-        fileName << prefix << "_" << evtNum << "_" << dataId;
+        std::ostringstream finalFileName, fileName;
+        // create a temporary filename
+        finalFileName << prefix << "_" << evtNum << "_" << dataId;
         if (extension != ".")
-            fileName << extension;
-        bfs::path filePath{path};
-        // construct a path
+            finalFileName << extension;
+        // this is a temporary filename starting with "."
+        fileName << "." << finalFileName.str();
+
+        bfs::path filePath{path}, finalFilePath{path};
+        // construct temporary and final path
         filePath /= fileName.str();
+        finalFilePath /= finalFileName.str();
 
         std::cout << "Writing file " << filePath << " for event " << evtNum << std::endl;
 
@@ -424,6 +429,9 @@ result<int> recvFiles(Reassembler *r, const std::string &path, const std::string
         }
 
         close(fdOut);
+        std::cout << "Renaming to " << finalFilePath << std::endl;
+        rename(filePath.c_str(), finalFilePath.c_str());
+
         // delete event
         delete[] evtBuf;
         evtBuf = nullptr;
