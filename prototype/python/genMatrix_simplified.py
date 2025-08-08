@@ -387,7 +387,7 @@ if (True) :
       print("-----  Generator Matrix Construction -----\n")
 
    d = [1,2,3,4,5,6,7,8]    # use this to define a specific message else a random one will be generated
-   t = 3                    # 2*t parity words for 2*t erasure correction
+   t = 1                    # 2*t parity words for 2*t erasure correction
 
    try : d
    except :
@@ -514,6 +514,13 @@ if (True) :
    gf_exp_seq_sorted = dict(sorted(gf_exp_seq.items()))
    print(f''' static const char _ejfat_rs_gf_exp_seq[{len(gf_exp_seq_sorted)}] = {{ {",".join(map(str,list(gf_exp_seq_sorted.values())))} }}; ''', file = C_Model_File)
 
+   print(f'static const char _ejfat_rs_gf_mul_table[{GF.order}][{GF.order}] = {{' , file = C_Model_File);
+   if GF.order <= 16 :
+      for i in range(0,GF.order) :
+         row = ', '.join(map(str,[gf_mul(i,j) for j in range(0,GF.order)]))
+         print(f''' {{ {row} }} ,''', file = C_Model_File)
+   print('};', file = C_Model_File)
+   
    print('\n', file = C_Model_File);
    print(f''' static const int _ejfat_rs_n = {n}; // data words ''' , file = C_Model_File);
    print(f''' static const int _ejfat_rs_p = {2*t}; // parity words  ''' , file = C_Model_File);
