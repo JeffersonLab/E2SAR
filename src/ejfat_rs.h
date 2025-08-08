@@ -1,6 +1,8 @@
 #ifndef __ejfat_rs_h
 #define __ejfat_rs_h
 
+#include <arm_neon.h>
+
 // --------------------------------------------------------------------------------------
 
 typedef struct {
@@ -204,7 +206,8 @@ typedef struct {
   int k;    // number of message symbols (n+p)
 
   rs_poly_matrix *G;        // full G matrix  [ I | P ]
-  rs_poly_matrix *Genc;     // Gtranspose without I  transpose([P})
+  rs_poly_matrix *Genc;     // Gtranspose without I  transpose([P])
+  char **Genc_exp;         // P in log space for direct use by the encoder
 } rs_model;
 
 
@@ -269,6 +272,28 @@ rs_model *init_rs() {
     }
   }
 
+
+  rs->Genc_exp = malloc(rs->Genc->rows * sizeof(char *));
+  if (rs->Genc_exp == NULL) {
+    perror("malloc failed");
+    return NULL;
+  };
+
+  // Step 2: Allocate each row (a char array)
+  for (int i = 0; i < rs->Genc->rows; i++) {
+    rs->Genc_exp[i] = malloc(rs->Genc->cols * sizeof(char));
+    if (rs->Genc_exp[i] == NULL) {
+      perror("malloc failed");
+      return NULL;
+    }
+  }
+
+  for (int row = 0 ; row < rs->Genc->rows ; row++) {
+    for (int col = 0 ; col < rs->Genc->cols ; col++) {
+      rs->Genc_exp[row][col] = _ejfat_rs_gf_exp_seq[rs->Genc->val[row]->val[col]];
+    }
+  }
+
   printf(" ---- RS model after init \n");
   print_rs_model(rs);
   
@@ -279,16 +304,29 @@ void free_rs(rs_model *rs) {
 
   printf("freeing rs model\n");
 
+  // ---- Free the G matrix
+  
   for (int row = 0 ; row < rs->G->rows ; row++) {
     free(rs->G->val[row]);
   };
   free(rs->G);
 
+
+  // ---- Free the Genc_exp   exponent space matrix.  Uses Genc->rows
+  //  so free this first.  Then Genc
+
+  for (int row = 0 ; row < rs->Genc->rows ; row++) {
+    free(rs->Genc_exp[row]);
+  };
+  free(rs->Genc_exp);
+  
+  // ---- Free the Genc matrix  
+
   for (int row = 0 ; row < rs->Genc->rows ; row++) {
     free(rs->Genc->val[row]);
   };
   free(rs->Genc);
-
+  
   free(rs);
 
   printf("done freeing\n");
@@ -304,6 +342,67 @@ void rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
   poly_matrix_vector_mul(rs->Genc , d , p);
 }
 
+void fast_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
+
+  char exp_d;
+  char exp_sum;
+  
+  for (int row=0 ; row < rs->Genc->rows ; row++ ) {
+    p->val[row] = 0;
+    for (int j=0 ; j < d->len ; j++ ) {
+
+      char exp_d = _ejfat_rs_gf_exp_seq[d->val[j]];
+      char exp_sum = (exp_d + rs->Genc_exp[row][j]) % 15;
+    
+      p->val[row] ^= (_ejfat_rs_gf_log_seq[exp_sum]);
+    };
+  };
+}
+
+void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
+
+  // --- for speed reasons, we do not check assmptions.  But the following must be true:
+  //     d must be exactly 8 data words
+  //     p must be exactly 2 pariy words
+  // ------------------------------------------------------------------------------------
+
+  uint8x8x2_t exp_table;
+  uint8x8x2_t log_table;  
+  
+  exp_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[0]);   // t[0] to t[7]
+  exp_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[8]);   // t[8] to t[15]
+
+  log_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[0]);   // t[0] to t[7]
+  log_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[8]);   // t[8] to t[15]
+  
+// Load indices
+  uint8x8_t indices = vld1_u8((unsigned const char *) d->val);
+
+  // Do the lookup: y[i] = t[a[i]]
+  uint8x8_t d_vec = vtbl2_u8(exp_table, indices);
+
+  uint8x8_t mod = vdup_n_u8(15);  // used by mod instruction
+  
+  for (int i=0; i < rs->p; i++) {
+    uint8x8_t enc_vec = vld1_u8((uint8_t *) rs->Genc_exp[i]);
+    uint8x8_t sum = vadd_u8(d_vec, enc_vec);
+
+    // Step 3: Compare: sum >= 15
+    uint8x8_t mask = vcge_u8(sum, mod);  // returns 0xFF where sum >= 15
+    // Step 4: Subtract 15 where needed
+    uint8x8_t mod15 = vand_u8(mod, mask); // get 15 where needed, 0 elsewhere
+    uint8x8_t exp_sum = vsub_u8(sum, mod15);
+
+    uint8x8_t sum_vec = vtbl2_u8(log_table, exp_sum);
+
+    uint8_t sum_vec_array[8];
+    vst1_u8(sum_vec_array,sum_vec);
+    p->val[i] = 0;
+    for (int j=0 ; j < 8 ; j++ ){
+      p->val[i] ^= sum_vec_array[j];
+    }
+  }
+}
 
 
 #endif
