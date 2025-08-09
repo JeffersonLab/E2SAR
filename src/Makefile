@@ -29,3 +29,7 @@ test_avx2_enc_dec : test_avx2_enc_dec.c ejfat_rs_avx2_encoder.h ejfat_rs_avx2_de
 	@echo "Building AVX2 encoder/decoder integrated test (will use scalar fallback on non-x86_64 platforms)"
 	gcc -o test_avx2_enc_dec test_avx2_enc_dec.c -O3 $(shell if [ "$$(uname -m)" = "x86_64" ]; then echo "-mavx2"; fi)
 
+test_avx2_optimization : test_avx2_optimization.c ejfat_rs_avx2_encoder.h ejfat_rs_common.h
+	@echo "Building AVX2 encoder optimization comparison test (will use scalar fallback on non-x86_64 platforms)"
+	gcc -o test_avx2_optimization test_avx2_optimization.c -O3 $(shell if [ "$$(uname -m)" = "x86_64" ]; then echo "-mavx2"; fi)
+

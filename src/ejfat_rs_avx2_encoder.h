@@ -151,6 +151,61 @@ void avx2_rs_encode(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
     }
 }
 
+// AVX2-optimized RS encoder with vectorized table lookups and reductions
+void avx2_rs_encode_optimized(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
+    
+    // --- For speed reasons, we do not check assumptions. But the following must be true:
+    //     d must be exactly 8 data words
+    //     p must be exactly 2 parity words
+    // ------------------------------------------------------------------------------------
+
+    // Load data vector (8 bytes -> lower 8 elements of 256-bit register)
+    __m128i data_128 = _mm_loadl_epi64((__m128i*)d->val);
+    __m256i data_vec = _mm256_cvtepu8_epi32(data_128);
+    
+    // Create zero mask for data elements (will be used later for masking)
+    __m256i zero_mask = _mm256_cmpeq_epi32(data_vec, _mm256_setzero_si256());
+    
+    // Vectorized table lookup: Convert data to exponent space using gather
+    __m256i d_exp = _mm256_i32gather_epi32((const int*)_ejfat_rs_gf_exp_seq, data_vec, sizeof(char));
+    
+    for (int i = 0; i < rs->p; i++) {
+        // Load encoder vector (8 bytes)
+        __m128i enc_128 = _mm_loadl_epi64((__m128i*)rs->Genc_exp[i]);
+        __m256i enc_vec = _mm256_cvtepu8_epi32(enc_128);
+        
+        // Add exponents (vectorized)
+        __m256i sum = _mm256_add_epi32(d_exp, enc_vec);
+        
+        // Optimized modulo 15 operation: if sum > 14, subtract 15
+        __m256i gt_14_mask = _mm256_cmpgt_epi32(sum, _mm256_set1_epi32(14));
+        __m256i mod_correction = _mm256_and_si256(gt_14_mask, _mm256_set1_epi32(15));
+        __m256i exp_sum = _mm256_sub_epi32(sum, mod_correction);
+        
+        // Vectorized table lookup: Convert back to normal space using gather
+        __m256i result_vec = _mm256_i32gather_epi32((const int*)_ejfat_rs_gf_log_seq, exp_sum, sizeof(char));
+        
+        // Apply zero mask: if original data element was zero, result should be zero
+        // Use andnot to clear bits where zero_mask is true (inverted logic)
+        result_vec = _mm256_andnot_si256(zero_mask, result_vec);
+        
+        // Vectorized horizontal XOR reduction
+        // Step 1: XOR upper 128 bits with lower 128 bits
+        __m128i low_128 = _mm256_castsi256_si128(result_vec);
+        __m128i high_128 = _mm256_extracti128_si256(result_vec, 1);
+        __m128i xor_128 = _mm_xor_si128(low_128, high_128);
+        
+        // Step 2: XOR 64-bit halves within the 128-bit result
+        __m128i xor_64 = _mm_xor_si128(xor_128, _mm_srli_si128(xor_128, 8));
+        
+        // Step 3: XOR 32-bit halves within the 64-bit result
+        __m128i xor_32 = _mm_xor_si128(xor_64, _mm_srli_si128(xor_64, 4));
+        
+        // Extract final result
+        p->val[i] = (char)_mm_cvtsi128_si32(xor_32);
+    }
+}
+
 #else
 // Fallback implementation when AVX2 is not available
 #warning "AVX2 not supported on this platform, using scalar fallback"
@@ -227,6 +282,12 @@ void avx2_rs_encode(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
             }
         }
     }
+}
+
+// Fallback optimized version (same as regular version for non-AVX2 platforms)
+void avx2_rs_encode_optimized(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
+    // Use the same scalar implementation
+    avx2_rs_encode(rs, d, p);
 }
 
 #endif /* AVX2 support check */
