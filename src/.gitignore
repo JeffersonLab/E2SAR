@@ -7,4 +7,5 @@ test_avx2_enc
 test_avx2_dec
 test_avx2_enc_dec
 test_avx2_optimization
+test_avx2_opt
 
