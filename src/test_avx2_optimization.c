@@ -6,6 +6,26 @@
 
 #include "./ejfat_rs_avx2_encoder.h"
 
+// Pure scalar implementation for comparison (no SIMD)
+void scalar_rs_encode(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
+    // Pure scalar implementation without any SIMD optimizations
+    // This provides a baseline for performance comparison
+    
+    for (int row = 0; row < rs->p; row++) {
+        p->val[row] = 0;
+        for (int col = 0; col < rs->n; col++) {
+            if (d->val[col] != 0) {  // Handle zero case properly
+                // GF multiplication using lookup tables in scalar form
+                char exp_d = _ejfat_rs_gf_exp_seq[d->val[col]];
+                char exp_enc = rs->Genc_exp[row][col];
+                char exp_sum = (exp_d + exp_enc) % 15;
+                char result = _ejfat_rs_gf_log_seq[exp_sum];
+                p->val[row] ^= result;
+            }
+        }
+    }
+}
+
 // Utility function to print polynomial vectors
 void print_rs_poly_vector(rs_poly_vector *v) {
     printf("[ ");
@@ -15,9 +35,9 @@ void print_rs_poly_vector(rs_poly_vector *v) {
     printf("]\n");
 }
 
-// Test correctness of both implementations
+// Test correctness of all three implementations
 void test_correctness_comparison() {
-    printf("\n=============== Testing Correctness Comparison ===============\n");
+    printf("\n=============== Testing Correctness Comparison (3 Versions) ===============\n");
     
     // Check if we're using AVX2 or fallback
     #if defined(__AVX2__) && (defined(__x86_64__) || defined(_M_X64))
@@ -59,6 +79,7 @@ void test_correctness_comparison() {
         
         // Setup test data
         rs_poly_vector data = { .len = 8 };
+        rs_poly_vector parity_scalar = { .len = 2 };
         rs_poly_vector parity_orig = { .len = 2 };
         rs_poly_vector parity_opt = { .len = 2 };
         
@@ -67,32 +88,43 @@ void test_correctness_comparison() {
         printf("Input data: ");
         print_rs_poly_vector(&data);
         
-        // Test original implementation
+        // Test scalar implementation (baseline)
+        scalar_rs_encode(encoder, &data, &parity_scalar);
+        printf("Scalar parity:    ");
+        print_rs_poly_vector(&parity_scalar);
+        
+        // Test original AVX2 implementation
         avx2_rs_encode(encoder, &data, &parity_orig);
-        printf("Original parity: ");
+        printf("Original parity:  ");
         print_rs_poly_vector(&parity_orig);
         
-        // Test optimized implementation
+        // Test optimized AVX2 implementation
         avx2_rs_encode_optimized(encoder, &data, &parity_opt);
         printf("Optimized parity: ");
         print_rs_poly_vector(&parity_opt);
         
-        // Compare results
+        // Compare all results
         total_tests++;
-        int results_match = 1;
+        int scalar_vs_orig = 1;
+        int scalar_vs_opt = 1;
+        int orig_vs_opt = 1;
+        
         for (int i = 0; i < 2; i++) {
-            if (parity_orig.val[i] != parity_opt.val[i]) {
-                results_match = 0;
-                break;
-            }
+            if (parity_scalar.val[i] != parity_orig.val[i]) scalar_vs_orig = 0;
+            if (parity_scalar.val[i] != parity_opt.val[i]) scalar_vs_opt = 0;
+            if (parity_orig.val[i] != parity_opt.val[i]) orig_vs_opt = 0;
         }
         
-        if (results_match) {
-            printf("Result: MATCH ✓\n");
+        printf("Results: ");
+        if (scalar_vs_orig && scalar_vs_opt && orig_vs_opt) {
+            printf("ALL MATCH ✓\n");
             passed_tests++;
         } else {
-            printf("Result: MISMATCH ✗\n");
-            printf("Difference detected in parity symbols!\n");
+            printf("MISMATCH ✗ ");
+            if (!scalar_vs_orig) printf("(scalar≠original) ");
+            if (!scalar_vs_opt) printf("(scalar≠optimized) ");
+            if (!orig_vs_opt) printf("(original≠optimized) ");
+            printf("\n");
         }
     }
     
@@ -107,9 +139,9 @@ void test_correctness_comparison() {
     printf("\n=============== Correctness Tests Complete ===============\n");
 }
 
-// Performance comparison test
+// Performance comparison test for all three implementations
 void test_performance_comparison() {
-    printf("\n=============== Performance Comparison Test ===============\n");
+    printf("\n=============== Performance Comparison Test (3 Versions) ===============\n");
     
     // Initialize encoder
     rs_model_avx2 *encoder = init_avx2_rs_encoder();
@@ -120,6 +152,7 @@ void test_performance_comparison() {
     
     int test_iterations = 1000000;  // 1 million iterations for good measurement
     rs_poly_vector test_data = { .len = 8, .val = {1, 2, 3, 4, 5, 6, 7, 8} };
+    rs_poly_vector parity_scalar = { .len = 2 };
     rs_poly_vector parity_orig = { .len = 2 };
     rs_poly_vector parity_opt = { .len = 2 };
     
@@ -127,20 +160,32 @@ void test_performance_comparison() {
     printf("Test data: ");
     print_rs_poly_vector(&test_data);
     
-    // Test 1: Original implementation
-    printf("\n--- Testing Original Implementation ---\n");
+    // Test 1: Scalar implementation (baseline)
+    printf("\n--- Testing Scalar Implementation (Baseline) ---\n");
     clock_t start_time = clock();
+    for (int i = 0; i < test_iterations; i++) {
+        scalar_rs_encode(encoder, &test_data, &parity_scalar);
+    }
+    clock_t end_time = clock();
+    double time_scalar = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    
+    printf("Scalar implementation: %.6f seconds (%.1f ops/sec)\n", 
+           time_scalar, test_iterations / time_scalar);
+    
+    // Test 2: Original AVX2 implementation
+    printf("\n--- Testing Original AVX2 Implementation ---\n");
+    start_time = clock();
     for (int i = 0; i < test_iterations; i++) {
         avx2_rs_encode(encoder, &test_data, &parity_orig);
     }
-    clock_t end_time = clock();
+    end_time = clock();
     double time_original = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     
-    printf("Original implementation: %.6f seconds (%.1f ops/sec)\n", 
+    printf("Original AVX2 implementation: %.6f seconds (%.1f ops/sec)\n", 
            time_original, test_iterations / time_original);
     
-    // Test 2: Optimized implementation
-    printf("\n--- Testing Optimized Implementation ---\n");
+    // Test 3: Optimized AVX2 implementation
+    printf("\n--- Testing Optimized AVX2 Implementation ---\n");
     start_time = clock();
     for (int i = 0; i < test_iterations; i++) {
         avx2_rs_encode_optimized(encoder, &test_data, &parity_opt);
@@ -148,41 +193,72 @@ void test_performance_comparison() {
     end_time = clock();
     double time_optimized = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     
-    printf("Optimized implementation: %.6f seconds (%.1f ops/sec)\n", 
+    printf("Optimized AVX2 implementation: %.6f seconds (%.1f ops/sec)\n", 
            time_optimized, test_iterations / time_optimized);
     
-    // Verify final results match
-    int final_match = 1;
+    // Verify all results match
+    int scalar_vs_orig = 1, scalar_vs_opt = 1, orig_vs_opt = 1;
     for (int i = 0; i < 2; i++) {
-        if (parity_orig.val[i] != parity_opt.val[i]) {
-            final_match = 0;
-            break;
-        }
+        if (parity_scalar.val[i] != parity_orig.val[i]) scalar_vs_orig = 0;
+        if (parity_scalar.val[i] != parity_opt.val[i]) scalar_vs_opt = 0;
+        if (parity_orig.val[i] != parity_opt.val[i]) orig_vs_opt = 0;
     }
-    printf("Final result verification: %s\n", final_match ? "MATCH" : "MISMATCH");
+    printf("Final result verification: %s\n", 
+           (scalar_vs_orig && scalar_vs_opt && orig_vs_opt) ? "ALL MATCH" : "MISMATCH DETECTED");
     
     // Performance analysis
     printf("\n=== Performance Analysis ===\n");
-    if (time_optimized > 0) {
-        double speedup = time_original / time_optimized;
-        printf("Speedup: %.2fx ", speedup);
-        if (speedup > 1.1) {
-            printf("(Optimized version is %.1f%% faster)\n", (speedup - 1.0) * 100.0);
-        } else if (speedup < 0.9) {
-            printf("(Optimized version is %.1f%% slower)\n", (1.0 / speedup - 1.0) * 100.0);
+    
+    // Speedup calculations relative to scalar baseline
+    if (time_scalar > 0) {
+        double speedup_orig = time_scalar / time_original;
+        double speedup_opt = time_scalar / time_optimized;
+        
+        printf("Speedup vs Scalar Baseline:\n");
+        printf("  Original AVX2:   %.2fx ", speedup_orig);
+        if (speedup_orig > 1.1) {
+            printf("(%.1f%% faster than scalar)\n", (speedup_orig - 1.0) * 100.0);
+        } else if (speedup_orig < 0.9) {
+            printf("(%.1f%% slower than scalar)\n", (1.0 / speedup_orig - 1.0) * 100.0);
         } else {
-            printf("(Performance is similar)\n");
+            printf("(similar to scalar)\n");
         }
         
-        // Throughput calculations (assuming 8-byte packets)
-        double throughput_orig = (test_iterations * 8.0) / time_original / 1e6;  // MB/s
+        printf("  Optimized AVX2:  %.2fx ", speedup_opt);
+        if (speedup_opt > 1.1) {
+            printf("(%.1f%% faster than scalar)\n", (speedup_opt - 1.0) * 100.0);
+        } else if (speedup_opt < 0.9) {
+            printf("(%.1f%% slower than scalar)\n", (1.0 / speedup_opt - 1.0) * 100.0);
+        } else {
+            printf("(similar to scalar)\n");
+        }
+    }
+    
+    // Direct comparison between AVX2 versions
+    if (time_optimized > 0 && time_original > 0) {
+        double speedup_opt_vs_orig = time_original / time_optimized;
+        printf("\nOptimized vs Original AVX2: %.2fx ", speedup_opt_vs_orig);
+        if (speedup_opt_vs_orig > 1.1) {
+            printf("(%.1f%% improvement)\n", (speedup_opt_vs_orig - 1.0) * 100.0);
+        } else if (speedup_opt_vs_orig < 0.9) {
+            printf("(%.1f%% regression)\n", (1.0 / speedup_opt_vs_orig - 1.0) * 100.0);
+        } else {
+            printf("(similar performance)\n");
+        }
+    }
+    
+    // Throughput calculations (assuming 8-byte packets)
+    printf("\nThroughput Comparison (8-byte packets):\n");
+    if (time_scalar > 0) {
+        double throughput_scalar = (test_iterations * 8.0) / time_scalar / 1e6;  // MB/s
+        double throughput_orig = (test_iterations * 8.0) / time_original / 1e6;
         double throughput_opt = (test_iterations * 8.0) / time_optimized / 1e6;
         
-        printf("Original throughput: %.1f MB/s\n", throughput_orig);
-        printf("Optimized throughput: %.1f MB/s\n", throughput_opt);
-        printf("Throughput improvement: %.1f MB/s (%.1f%% gain)\n", 
-               throughput_opt - throughput_orig, 
-               (throughput_opt / throughput_orig - 1.0) * 100.0);
+        printf("  Scalar:      %.1f MB/s\n", throughput_scalar);
+        printf("  Original:    %.1f MB/s (+%.1f MB/s vs scalar)\n", 
+               throughput_orig, throughput_orig - throughput_scalar);
+        printf("  Optimized:   %.1f MB/s (+%.1f MB/s vs scalar, +%.1f MB/s vs original)\n", 
+               throughput_opt, throughput_opt - throughput_scalar, throughput_opt - throughput_orig);
     }
     
     // Clean up
@@ -230,15 +306,23 @@ void test_micro_benchmarks() {
         rs_poly_vector parity = { .len = 2 };
         memcpy(data.val, micro_patterns[p].data, 8);
         
-        // Original version
+        // Scalar version (baseline)
         clock_t start = clock();
+        for (int i = 0; i < micro_iterations; i++) {
+            scalar_rs_encode(encoder, &data, &parity);
+        }
+        clock_t end = clock();
+        double time_scalar = (double)(end - start) / CLOCKS_PER_SEC;
+        
+        // Original AVX2 version
+        start = clock();
         for (int i = 0; i < micro_iterations; i++) {
             avx2_rs_encode(encoder, &data, &parity);
         }
-        clock_t end = clock();
+        end = clock();
         double time_orig = (double)(end - start) / CLOCKS_PER_SEC;
         
-        // Optimized version  
+        // Optimized AVX2 version  
         start = clock();
         for (int i = 0; i < micro_iterations; i++) {
             avx2_rs_encode_optimized(encoder, &data, &parity);
@@ -246,14 +330,18 @@ void test_micro_benchmarks() {
         end = clock();
         double time_opt = (double)(end - start) / CLOCKS_PER_SEC;
         
-        printf("Original: %.6f sec (%.1f M ops/sec)\n", 
+        printf("Scalar:    %.6f sec (%.1f M ops/sec)\n", 
+               time_scalar, micro_iterations / time_scalar / 1e6);
+        printf("Original:  %.6f sec (%.1f M ops/sec)\n", 
                time_orig, micro_iterations / time_orig / 1e6);
         printf("Optimized: %.6f sec (%.1f M ops/sec)\n", 
                time_opt, micro_iterations / time_opt / 1e6);
         
-        if (time_opt > 0) {
-            double speedup = time_orig / time_opt;
-            printf("Speedup: %.2fx\n", speedup);
+        if (time_scalar > 0) {
+            double speedup_orig = time_scalar / time_orig;
+            double speedup_opt = time_scalar / time_opt;
+            printf("Speedup vs scalar: Original %.2fx, Optimized %.2fx\n", 
+                   speedup_orig, speedup_opt);
         }
     }
     
@@ -294,8 +382,13 @@ void test_platform_info() {
 }
 
 int main() {
-    printf("AVX2 Reed-Solomon Encoder Optimization Comparison\n");
-    printf("=================================================\n");
+    printf("Reed-Solomon Encoder Implementation Comparison\n");
+    printf("==============================================\n");
+    printf("Comparing 3 implementations:\n");
+    printf("  1. Scalar (pure C, no SIMD)\n");
+    printf("  2. Original AVX2 (hybrid vectorization)\n");
+    printf("  3. Optimized AVX2 (enhanced vectorization)\n");
+    printf("==============================================\n");
     
     // Show platform information
     test_platform_info();
