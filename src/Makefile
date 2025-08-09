@@ -17,3 +17,7 @@ test_avx512_enc : test_avx512_enc.c ejfat_rs_avx512_encoder.h ejfat_rs_neon_comm
 	@echo "Building AVX-512 encoder (will use scalar fallback on non-x86_64 platforms)"
 	gcc -o test_avx512_enc test_avx512_enc.c -O3 $(shell if [ "$$(uname -m)" = "x86_64" ]; then echo "-mavx512f -mavx512bw"; fi)
 
+test_avx2_enc : test_avx2_enc.c ejfat_rs_avx2_encoder.h ejfat_rs_common.h
+	@echo "Building AVX2 encoder (will use scalar fallback on non-x86_64 platforms)"
+	gcc -o test_avx2_enc test_avx2_enc.c -O3 $(shell if [ "$$(uname -m)" = "x86_64" ]; then echo "-mavx2"; fi)
+
