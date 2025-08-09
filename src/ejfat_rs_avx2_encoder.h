@@ -166,8 +166,22 @@ void avx2_rs_encode_optimized(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vect
     // Create zero mask for data elements (will be used later for masking)
     __m256i zero_mask = _mm256_cmpeq_epi32(data_vec, _mm256_setzero_si256());
     
-    // Vectorized table lookup: Convert data to exponent space using gather
-    __m256i d_exp = _mm256_i32gather_epi32((const int*)_ejfat_rs_gf_exp_seq, data_vec, sizeof(char));
+    // Manual vectorized table lookup for 8-bit tables
+    // Since gather operations work on 32-bit boundaries, we'll use a hybrid approach
+    uint32_t data_indices[8];
+    _mm256_storeu_si256((__m256i*)data_indices, data_vec);
+    
+    // Convert data to exponent space using vectorized loads
+    __m256i d_exp = _mm256_setr_epi32(
+        _ejfat_rs_gf_exp_seq[data_indices[0]],
+        _ejfat_rs_gf_exp_seq[data_indices[1]], 
+        _ejfat_rs_gf_exp_seq[data_indices[2]],
+        _ejfat_rs_gf_exp_seq[data_indices[3]],
+        _ejfat_rs_gf_exp_seq[data_indices[4]],
+        _ejfat_rs_gf_exp_seq[data_indices[5]],
+        _ejfat_rs_gf_exp_seq[data_indices[6]],
+        _ejfat_rs_gf_exp_seq[data_indices[7]]
+    );
     
     for (int i = 0; i < rs->p; i++) {
         // Load encoder vector (8 bytes)
@@ -182,8 +196,20 @@ void avx2_rs_encode_optimized(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vect
         __m256i mod_correction = _mm256_and_si256(gt_14_mask, _mm256_set1_epi32(15));
         __m256i exp_sum = _mm256_sub_epi32(sum, mod_correction);
         
-        // Vectorized table lookup: Convert back to normal space using gather
-        __m256i result_vec = _mm256_i32gather_epi32((const int*)_ejfat_rs_gf_log_seq, exp_sum, sizeof(char));
+        // Convert back to normal space using vectorized table lookup
+        uint32_t exp_indices[8];
+        _mm256_storeu_si256((__m256i*)exp_indices, exp_sum);
+        
+        __m256i result_vec = _mm256_setr_epi32(
+            _ejfat_rs_gf_log_seq[exp_indices[0]],
+            _ejfat_rs_gf_log_seq[exp_indices[1]],
+            _ejfat_rs_gf_log_seq[exp_indices[2]],
+            _ejfat_rs_gf_log_seq[exp_indices[3]],
+            _ejfat_rs_gf_log_seq[exp_indices[4]],
+            _ejfat_rs_gf_log_seq[exp_indices[5]],
+            _ejfat_rs_gf_log_seq[exp_indices[6]],
+            _ejfat_rs_gf_log_seq[exp_indices[7]]
+        );
         
         // Apply zero mask: if original data element was zero, result should be zero
         // Use andnot to clear bits where zero_mask is true (inverted logic)
