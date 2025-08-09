@@ -1,22 +1,11 @@
 #ifndef __ejfat_rs_neon_decoder_h
 #define __ejfat_rs_neon_decoder_h
 
-#include <arm_neon.h>
-#include <stdint.h>
+#include "ejfat_rs_neon_common.h"
 
 // --------------------------------------------------------------------------
 // NEON-Optimized Reed-Solomon Decoder (Minimal Implementation)
 // --------------------------------------------------------------------------
-
-// GF(16) lookup tables (from rs_model.h)
-static const char _ejfat_rs_gf_log_seq[16] = { 1,2,4,8,3,6,12,11,5,10,7,14,15,13,9,0 }; 
-static const char _ejfat_rs_gf_exp_seq[16] = { 15,0,1,4,2,8,5,10,3,14,9,7,6,13,11,12 };
-
-// Polynomial vector structure
-typedef struct {
-  int len;
-  char val[16];  // Max RS(10,8) + some padding
-} rs_poly_vector;
 
 // Table entry for pre-computed inverse matrices
 typedef struct {
