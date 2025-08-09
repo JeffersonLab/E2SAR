@@ -1,1 +1,4 @@
 encode
+test_neon_dec
+test_neon_enc
+
