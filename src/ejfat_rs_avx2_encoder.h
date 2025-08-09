@@ -232,6 +232,56 @@ void avx2_rs_encode_optimized(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vect
     }
 }
 
+// Ultra-optimized AVX2 RS encoder with aggressive optimizations
+void avx2_rs_encode_ultra(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
+    
+    // --- For speed reasons, we do not check assumptions. But the following must be true:
+    //     d must be exactly 8 data words
+    //     p must be exactly 2 parity words
+    // ------------------------------------------------------------------------------------
+
+    // Prefetch lookup tables to L1 cache
+    _mm_prefetch((const char*)_ejfat_rs_gf_exp_seq, _MM_HINT_T0);
+    _mm_prefetch((const char*)_ejfat_rs_gf_log_seq, _MM_HINT_T0);
+    
+    // Load data once and reuse
+    uint64_t data_64 = *(uint64_t*)d->val;
+    
+    // Unroll both parity computations
+    uint8_t p0 = 0, p1 = 0;
+    
+    // Pre-load encoder matrices
+    uint64_t enc0_64 = *(uint64_t*)rs->Genc_exp[0];
+    uint64_t enc1_64 = *(uint64_t*)rs->Genc_exp[1];
+    
+    // Extract bytes for parallel processing
+    uint8_t* data_bytes = (uint8_t*)&data_64;
+    uint8_t* enc0_bytes = (uint8_t*)&enc0_64;
+    uint8_t* enc1_bytes = (uint8_t*)&enc1_64;
+    
+    // Process all 8 bytes with unrolled loop
+    #pragma unroll 8
+    for (int j = 0; j < 8; j++) {
+        uint8_t dj = data_bytes[j];
+        if (dj != 0) {
+            uint8_t d_exp = _ejfat_rs_gf_exp_seq[dj];
+            
+            // Parity 0
+            uint8_t sum0 = d_exp + enc0_bytes[j];
+            if (sum0 >= 15) sum0 -= 15;
+            p0 ^= _ejfat_rs_gf_log_seq[sum0];
+            
+            // Parity 1
+            uint8_t sum1 = d_exp + enc1_bytes[j];
+            if (sum1 >= 15) sum1 -= 15;
+            p1 ^= _ejfat_rs_gf_log_seq[sum1];
+        }
+    }
+    
+    p->val[0] = p0;
+    p->val[1] = p1;
+}
+
 #else
 // Fallback implementation when AVX2 is not available
 #warning "AVX2 not supported on this platform, using scalar fallback"
@@ -312,6 +362,12 @@ void avx2_rs_encode(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
 
 // Fallback optimized version (same as regular version for non-AVX2 platforms)
 void avx2_rs_encode_optimized(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
+    // Use the same scalar implementation
+    avx2_rs_encode(rs, d, p);
+}
+
+// Fallback ultra version (same as regular version for non-AVX2 platforms)
+void avx2_rs_encode_ultra(rs_model_avx2 *rs, rs_poly_vector *d, rs_poly_vector *p) {
     // Use the same scalar implementation
     avx2_rs_encode(rs, d, p);
 }

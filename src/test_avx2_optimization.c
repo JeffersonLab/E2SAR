@@ -35,9 +35,9 @@ void print_rs_poly_vector(rs_poly_vector *v) {
     printf("]\n");
 }
 
-// Test correctness of all three implementations
+// Test correctness of all four implementations
 void test_correctness_comparison() {
-    printf("\n=============== Testing Correctness Comparison (3 Versions) ===============\n");
+    printf("\n=============== Testing Correctness Comparison (4 Versions) ===============\n");
     
     // Check if we're using AVX2 or fallback
     #if defined(__AVX2__) && (defined(__x86_64__) || defined(_M_X64))
@@ -82,6 +82,7 @@ void test_correctness_comparison() {
         rs_poly_vector parity_scalar = { .len = 2 };
         rs_poly_vector parity_orig = { .len = 2 };
         rs_poly_vector parity_opt = { .len = 2 };
+        rs_poly_vector parity_ultra = { .len = 2 };
         
         memcpy(data.val, test_patterns[p].data, 8);
         
@@ -103,28 +104,34 @@ void test_correctness_comparison() {
         printf("Optimized parity: ");
         print_rs_poly_vector(&parity_opt);
         
+        // Test ultra-optimized AVX2 implementation
+        avx2_rs_encode_ultra(encoder, &data, &parity_ultra);
+        printf("Ultra parity:     ");
+        print_rs_poly_vector(&parity_ultra);
+        
         // Compare all results
         total_tests++;
-        int scalar_vs_orig = 1;
-        int scalar_vs_opt = 1;
-        int orig_vs_opt = 1;
+        int all_match = 1;
         
         for (int i = 0; i < 2; i++) {
-            if (parity_scalar.val[i] != parity_orig.val[i]) scalar_vs_orig = 0;
-            if (parity_scalar.val[i] != parity_opt.val[i]) scalar_vs_opt = 0;
-            if (parity_orig.val[i] != parity_opt.val[i]) orig_vs_opt = 0;
+            if (parity_scalar.val[i] != parity_orig.val[i] ||
+                parity_scalar.val[i] != parity_opt.val[i] ||
+                parity_scalar.val[i] != parity_ultra.val[i]) {
+                all_match = 0;
+                break;
+            }
         }
         
         printf("Results: ");
-        if (scalar_vs_orig && scalar_vs_opt && orig_vs_opt) {
+        if (all_match) {
             printf("ALL MATCH ✓\n");
             passed_tests++;
         } else {
-            printf("MISMATCH ✗ ");
-            if (!scalar_vs_orig) printf("(scalar≠original) ");
-            if (!scalar_vs_opt) printf("(scalar≠optimized) ");
-            if (!orig_vs_opt) printf("(original≠optimized) ");
-            printf("\n");
+            printf("MISMATCH ✗\n");
+            printf("  Scalar:    [%d, %d]\n", parity_scalar.val[0], parity_scalar.val[1]);
+            printf("  Original:  [%d, %d]\n", parity_orig.val[0], parity_orig.val[1]);
+            printf("  Optimized: [%d, %d]\n", parity_opt.val[0], parity_opt.val[1]);
+            printf("  Ultra:     [%d, %d]\n", parity_ultra.val[0], parity_ultra.val[1]);
         }
     }
     
@@ -139,9 +146,9 @@ void test_correctness_comparison() {
     printf("\n=============== Correctness Tests Complete ===============\n");
 }
 
-// Performance comparison test for all three implementations
+// Performance comparison test for all four implementations
 void test_performance_comparison() {
-    printf("\n=============== Performance Comparison Test (3 Versions) ===============\n");
+    printf("\n=============== Performance Comparison Test (4 Versions) ===============\n");
     
     // Initialize encoder
     rs_model_avx2 *encoder = init_avx2_rs_encoder();
@@ -155,6 +162,7 @@ void test_performance_comparison() {
     rs_poly_vector parity_scalar = { .len = 2 };
     rs_poly_vector parity_orig = { .len = 2 };
     rs_poly_vector parity_opt = { .len = 2 };
+    rs_poly_vector parity_ultra = { .len = 2 };
     
     printf("Performance test with %d iterations:\n", test_iterations);
     printf("Test data: ");
@@ -196,15 +204,29 @@ void test_performance_comparison() {
     printf("Optimized AVX2 implementation: %.6f seconds (%.1f ops/sec)\n", 
            time_optimized, test_iterations / time_optimized);
     
-    // Verify all results match
-    int scalar_vs_orig = 1, scalar_vs_opt = 1, orig_vs_opt = 1;
-    for (int i = 0; i < 2; i++) {
-        if (parity_scalar.val[i] != parity_orig.val[i]) scalar_vs_orig = 0;
-        if (parity_scalar.val[i] != parity_opt.val[i]) scalar_vs_opt = 0;
-        if (parity_orig.val[i] != parity_opt.val[i]) orig_vs_opt = 0;
+    // Test 4: Ultra-optimized AVX2 implementation
+    printf("\n--- Testing Ultra-Optimized AVX2 Implementation ---\n");
+    start_time = clock();
+    for (int i = 0; i < test_iterations; i++) {
+        avx2_rs_encode_ultra(encoder, &test_data, &parity_ultra);
     }
-    printf("Final result verification: %s\n", 
-           (scalar_vs_orig && scalar_vs_opt && orig_vs_opt) ? "ALL MATCH" : "MISMATCH DETECTED");
+    end_time = clock();
+    double time_ultra = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    
+    printf("Ultra AVX2 implementation: %.6f seconds (%.1f ops/sec)\n", 
+           time_ultra, test_iterations / time_ultra);
+    
+    // Verify all results match
+    int all_match = 1;
+    for (int i = 0; i < 2; i++) {
+        if (parity_scalar.val[i] != parity_orig.val[i] ||
+            parity_scalar.val[i] != parity_opt.val[i] ||
+            parity_scalar.val[i] != parity_ultra.val[i]) {
+            all_match = 0;
+            break;
+        }
+    }
+    printf("Final result verification: %s\n", all_match ? "ALL MATCH" : "MISMATCH DETECTED");
     
     // Performance analysis
     printf("\n=== Performance Analysis ===\n");
@@ -213,6 +235,7 @@ void test_performance_comparison() {
     if (time_scalar > 0) {
         double speedup_orig = time_scalar / time_original;
         double speedup_opt = time_scalar / time_optimized;
+        double speedup_ultra = time_scalar / time_ultra;
         
         printf("Speedup vs Scalar Baseline:\n");
         printf("  Original AVX2:   %.2fx ", speedup_orig);
@@ -232,16 +255,47 @@ void test_performance_comparison() {
         } else {
             printf("(similar to scalar)\n");
         }
+        
+        printf("  Ultra AVX2:      %.2fx ", speedup_ultra);
+        if (speedup_ultra > 1.1) {
+            printf("(%.1f%% faster than scalar)\n", (speedup_ultra - 1.0) * 100.0);
+        } else if (speedup_ultra < 0.9) {
+            printf("(%.1f%% slower than scalar)\n", (1.0 / speedup_ultra - 1.0) * 100.0);
+        } else {
+            printf("(similar to scalar)\n");
+        }
     }
     
     // Direct comparison between AVX2 versions
-    if (time_optimized > 0 && time_original > 0) {
+    if (time_optimized > 0 && time_original > 0 && time_ultra > 0) {
         double speedup_opt_vs_orig = time_original / time_optimized;
-        printf("\nOptimized vs Original AVX2: %.2fx ", speedup_opt_vs_orig);
+        double speedup_ultra_vs_orig = time_original / time_ultra;
+        double speedup_ultra_vs_opt = time_optimized / time_ultra;
+        
+        printf("\nDirect AVX2 Comparisons:\n");
+        printf("  Optimized vs Original: %.2fx ", speedup_opt_vs_orig);
         if (speedup_opt_vs_orig > 1.1) {
             printf("(%.1f%% improvement)\n", (speedup_opt_vs_orig - 1.0) * 100.0);
         } else if (speedup_opt_vs_orig < 0.9) {
             printf("(%.1f%% regression)\n", (1.0 / speedup_opt_vs_orig - 1.0) * 100.0);
+        } else {
+            printf("(similar performance)\n");
+        }
+        
+        printf("  Ultra vs Original:     %.2fx ", speedup_ultra_vs_orig);
+        if (speedup_ultra_vs_orig > 1.1) {
+            printf("(%.1f%% improvement)\n", (speedup_ultra_vs_orig - 1.0) * 100.0);
+        } else if (speedup_ultra_vs_orig < 0.9) {
+            printf("(%.1f%% regression)\n", (1.0 / speedup_ultra_vs_orig - 1.0) * 100.0);
+        } else {
+            printf("(similar performance)\n");
+        }
+        
+        printf("  Ultra vs Optimized:    %.2fx ", speedup_ultra_vs_opt);
+        if (speedup_ultra_vs_opt > 1.1) {
+            printf("(%.1f%% improvement)\n", (speedup_ultra_vs_opt - 1.0) * 100.0);
+        } else if (speedup_ultra_vs_opt < 0.9) {
+            printf("(%.1f%% regression)\n", (1.0 / speedup_ultra_vs_opt - 1.0) * 100.0);
         } else {
             printf("(similar performance)\n");
         }
@@ -253,12 +307,15 @@ void test_performance_comparison() {
         double throughput_scalar = (test_iterations * 8.0) / time_scalar / 1e6;  // MB/s
         double throughput_orig = (test_iterations * 8.0) / time_original / 1e6;
         double throughput_opt = (test_iterations * 8.0) / time_optimized / 1e6;
+        double throughput_ultra = (test_iterations * 8.0) / time_ultra / 1e6;
         
         printf("  Scalar:      %.1f MB/s\n", throughput_scalar);
         printf("  Original:    %.1f MB/s (+%.1f MB/s vs scalar)\n", 
                throughput_orig, throughput_orig - throughput_scalar);
         printf("  Optimized:   %.1f MB/s (+%.1f MB/s vs scalar, +%.1f MB/s vs original)\n", 
                throughput_opt, throughput_opt - throughput_scalar, throughput_opt - throughput_orig);
+        printf("  Ultra:       %.1f MB/s (+%.1f MB/s vs scalar, +%.1f MB/s vs optimized)\n", 
+               throughput_ultra, throughput_ultra - throughput_scalar, throughput_ultra - throughput_opt);
     }
     
     // Clean up
@@ -330,18 +387,29 @@ void test_micro_benchmarks() {
         end = clock();
         double time_opt = (double)(end - start) / CLOCKS_PER_SEC;
         
+        // Ultra-optimized AVX2 version
+        start = clock();
+        for (int i = 0; i < micro_iterations; i++) {
+            avx2_rs_encode_ultra(encoder, &data, &parity);
+        }
+        end = clock();
+        double time_ultra = (double)(end - start) / CLOCKS_PER_SEC;
+        
         printf("Scalar:    %.6f sec (%.1f M ops/sec)\n", 
                time_scalar, micro_iterations / time_scalar / 1e6);
         printf("Original:  %.6f sec (%.1f M ops/sec)\n", 
                time_orig, micro_iterations / time_orig / 1e6);
         printf("Optimized: %.6f sec (%.1f M ops/sec)\n", 
                time_opt, micro_iterations / time_opt / 1e6);
+        printf("Ultra:     %.6f sec (%.1f M ops/sec)\n", 
+               time_ultra, micro_iterations / time_ultra / 1e6);
         
         if (time_scalar > 0) {
             double speedup_orig = time_scalar / time_orig;
             double speedup_opt = time_scalar / time_opt;
-            printf("Speedup vs scalar: Original %.2fx, Optimized %.2fx\n", 
-                   speedup_orig, speedup_opt);
+            double speedup_ultra = time_scalar / time_ultra;
+            printf("Speedup vs scalar: Original %.2fx, Optimized %.2fx, Ultra %.2fx\n", 
+                   speedup_orig, speedup_opt, speedup_ultra);
         }
     }
     
@@ -384,10 +452,11 @@ void test_platform_info() {
 int main() {
     printf("Reed-Solomon Encoder Implementation Comparison\n");
     printf("==============================================\n");
-    printf("Comparing 3 implementations:\n");
+    printf("Comparing 4 implementations:\n");
     printf("  1. Scalar (pure C, no SIMD)\n");
     printf("  2. Original AVX2 (hybrid vectorization)\n");
     printf("  3. Optimized AVX2 (enhanced vectorization)\n");
+    printf("  4. Ultra AVX2 (aggressive optimizations)\n");
     printf("==============================================\n");
     
     // Show platform information
