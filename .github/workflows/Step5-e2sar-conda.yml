@@ -1,4 +1,4 @@
-name: Step 5 - E2SAR Package using Conda
+name: Step 4 - E2SAR Package using Conda
 
 on:
   workflow_dispatch:
