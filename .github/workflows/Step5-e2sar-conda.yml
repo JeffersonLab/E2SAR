@@ -49,6 +49,7 @@ jobs:
           token: ${{ secrets.CLASSIC_REPO_PAT }}
       - name: Build Conda packages
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate e2sar-dev
           cd E2SAR && ./conda/conda-build.sh
       - name: Tar the conda files
