@@ -215,7 +215,8 @@ E2SAR provides an `e2sar` Conda package (primarily for use with Python bindings)
 $ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 $ chmod +x Miniconda3-latest-Linux-x86_64.sh
 $ ./Miniconda3-latest-Linux-x86_64.sh
-$ source ~/.bashrc
+$ source ~/.bashrc 
+# or eval "$(/home/ubuntu/miniconda3/bin/conda shell.bash hook)"
 $ conda config --add channels conda-forge && conda config --set channel_priority strict
 ```
 1. Create and initialize a Conda environment:

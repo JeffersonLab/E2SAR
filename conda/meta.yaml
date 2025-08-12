@@ -28,6 +28,7 @@ requirements:
     - protobuf
     - pybind11
     - libstdcxx-ng [linux64]
+    - glib [linux64]
   run:
     - {{ pin_compatible('python', max_pin='x.x') }}
     - {{ pin_compatible('grpc-cpp', max_pin='x.x') }}
