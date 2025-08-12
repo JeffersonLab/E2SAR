@@ -9,6 +9,8 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Segmenter::stopThreads() now blocks until the internal threads exit (previously the wait was in the destructor).
 - Reassember::stopThreads() now blocks until the internal threads exit (previously the wait was in the destructor).
 
+- Updated Docker.cli definition to include network debug tools frequently needed by users
+
 Bug Fixes:
 - Under certain conditions Sync thread in Segmenter could quit earlier than expected thus potentially leading to losses, this has now been fixed.
 
