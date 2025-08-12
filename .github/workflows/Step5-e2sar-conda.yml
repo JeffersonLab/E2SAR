@@ -58,6 +58,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-            name: e2sar-conda-${{env.BOOST_VER}}
-            path: e2sar-conda-${{env.BOOST_VER}}.tar.gz
+            name: e2sar-conda-${{env.E2SAR_VER}}
+            path: e2sar-conda-${{env.E2SAR_VER}}.tar.gz
         
