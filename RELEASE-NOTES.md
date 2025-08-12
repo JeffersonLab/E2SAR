@@ -13,6 +13,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 Bug Fixes:
 - Under certain conditions Sync thread in Segmenter could quit earlier than expected thus potentially leading to losses, this has now been fixed.
+- Fixed self-race condition in Ctrl-C handlers in e2sar_perf and e2sar_ft 
 
 ## v0.2.1
 

@@ -33,9 +33,12 @@ Reassembler *reasPtr{nullptr};
 Segmenter *segPtr{nullptr};
 LBManager *lbmPtr{nullptr};
 std::vector<std::string> senders;
+std::atomic<bool> handlerTriggered{false};
 
 void ctrlCHandler(int sig) 
 {
+    if (handlerTriggered.exchange(true))
+        return;
     std::cout << "Stopping threads" << std::endl;
     threadsRunning = false;
     boost::chrono::milliseconds duration(1000);

@@ -31,8 +31,13 @@ std::vector<std::string> senders;
 // app-level stats
 std::atomic<u_int64_t> receivedWithError{0};
 
+// avoid handler executing multiple times
+std::atomic<bool> handlerTriggered{false};
+
 void ctrlCHandler(int sig) 
 {
+    if (handlerTriggered.exchange(true))
+        return;
     std::cout << "Stopping threads" << std::endl;
     threadsRunning = false;
     boost::chrono::milliseconds duration(1000);
