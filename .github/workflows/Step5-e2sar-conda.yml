@@ -1,0 +1,61 @@
+name: E2SAR Package using Conda
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2sar_ver:
+        description: 'E2SAR Version'
+        default: '0.1.5'
+        type: string
+        required: true
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 5
+
+    steps:
+      - name: Set up environment
+        run: |
+          echo "E2SAR_VER=${{ inputs.e2sar_ver }}" >> $GITHUB_ENV
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
+      - name: Install dependencies
+        run: |
+          conda config --add channels conda-forge && conda config --set channel_priority strict
+          conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+          conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+          conda create -y -n e2sar-dev
+          conda activate e2sar-dev
+          conda install -y -q conda-build conda-verify anaconda-client
+          conda config --add channels defaults
+          conda config --add channels conda-forge
+          conda config --set channel_priority strict
+      - name: Checkout E2SAR code
+        uses: actions/checkout@v4
+        with:
+          path: E2SAR
+          submodules: true
+          ref: v${{ env.E2SAR_VER }}
+          fetch-tags: true
+          token: ${{ secrets.CLASSIC_REPO_PAT }}
+      - name: Build Conda packages
+        run: |
+          conda activate e2sar-dev
+          cd E2SAR && ./conda/conda-build.sh
+      - name: Tar the conda files
+        run: |
+            tar -zcf e2sar-conda-${{env.BOOST_VER}}.tar.gz $CONDA/envs/e2sar-dev/conda-bld/linux-64/
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+            name: e2sar-conda-${{env.BOOST_VER}}
+            path: e2sar-conda-${{env.BOOST_VER}}.tar.gz
+        
