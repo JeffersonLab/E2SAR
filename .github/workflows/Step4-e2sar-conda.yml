@@ -8,6 +8,11 @@ on:
         default: '0.1.5'
         type: string
         required: true
+      conda_build:
+        description: 'Conda Build Number'
+        default: '1'
+        type: string
+        required: true
 
 jobs:
   build-linux:
@@ -19,6 +24,7 @@ jobs:
       - name: Set up environment
         run: |
           echo "E2SAR_VER=${{ inputs.e2sar_ver }}" >> $GITHUB_ENV
+          echo "CONDA_BUILD=${{ inputs.conda_build }}" >> $GITHUB_ENV
       - name: Set up Python 3.10
         uses: actions/setup-python@v3
         with:
@@ -51,7 +57,7 @@ jobs:
         run: |
           eval "$(conda shell.bash hook)"
           conda activate e2sar-dev
-          cd E2SAR && ./conda/conda-build.sh
+          cd E2SAR && ./conda/conda-build.sh ${{env.CONDA_BUILD}}
       - name: Tar the conda files
         run: |
             tar -zcf e2sar-conda-${{env.BOOST_VER}}.tar.gz $CONDA/envs/e2sar-dev/conda-bld/linux-64/
