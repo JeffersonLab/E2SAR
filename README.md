@@ -221,16 +221,19 @@ $ conda config --add channels conda-forge && conda config --set channel_priority
 ```
 1. Create and initialize a Conda environment:
 ```bash
-$ conda create -n e2sar-dev
+$ conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+$ conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+$ conda create -y -n e2sar-dev
 $ conda activate e2sar-dev
-$ conda install conda-build conda-verify anaconda-client
+$ conda install -y -q conda-build conda-verify anaconda-client
 $ conda config --add channels defaults
 $ conda config --add channels conda-forge
 $ conda config --set channel_priority strict
 ```
 2. Build the Conda packages for multiple Python versions:
 ```bash
-$ ./conda/conda-build.sh
+# this script takes build number as an optional parameter
+$ ./conda/conda-build.sh 
 ```
 3. Login
 ```bash
