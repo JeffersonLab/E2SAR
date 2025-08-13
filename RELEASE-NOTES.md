@@ -2,6 +2,19 @@
 
 API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
 
+## v0.2.2
+
+- Added a new tool specifically for sending file: `e2sar_ft`. It has many common invocation parameters with `e2sar_perf`. It can scan a list of provided directories filtering files by optionally provided extension. On receive side it names the files according to the provided prefix and extension using event id and data id to name individual files. Both send and receive use mmap for efficiency. Multiple paths/files can be specified either with `--path` option or simply as a space-separated list at the end of the command. Globbing is also supported.
+
+- Segmenter::stopThreads() now blocks until the internal threads exit (previously the wait was in the destructor).
+- Reassember::stopThreads() now blocks until the internal threads exit (previously the wait was in the destructor).
+
+- Updated Docker.cli definition to include network debug tools frequently needed by users
+
+Bug Fixes:
+- Under certain conditions Sync thread in Segmenter could quit earlier than expected thus potentially leading to losses, this has now been fixed.
+- Fixed self-race condition in Ctrl-C handlers in e2sar_perf and e2sar_ft 
+
 ## v0.2.1
 
 Added rate pacing for the Segmenter. An additional field has been added: SegmenterFlags.rateGbps which specifies a floating point value of rate in Gbps. A negative value means ignore the setting and send as fast as possible. When a positive value is specified the sending code busy waits for the desired number of usecs either between frames (for sendmsg and io_uring) or between events (for sendmmsg). Note that when using Segmenter.addToSendQueue() the user must be careful to check that it doesn't return a E2SARErrorc::MemoryError which indicates that the queue is full (in this case the event should be resubmitted at a later time, the method by which the event submission code waits is left to the user).

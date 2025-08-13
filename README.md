@@ -215,21 +215,25 @@ E2SAR provides an `e2sar` Conda package (primarily for use with Python bindings)
 $ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 $ chmod +x Miniconda3-latest-Linux-x86_64.sh
 $ ./Miniconda3-latest-Linux-x86_64.sh
-$ source ~/.bashrc
+$ source ~/.bashrc 
+# or eval "$(/home/ubuntu/miniconda3/bin/conda shell.bash hook)"
 $ conda config --add channels conda-forge && conda config --set channel_priority strict
 ```
 1. Create and initialize a Conda environment:
 ```bash
-$ conda create -n e2sar-dev
+$ conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+$ conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+$ conda create -y -n e2sar-dev
 $ conda activate e2sar-dev
-$ conda install conda-build conda-verify anaconda-client
+$ conda install -y -q conda-build conda-verify anaconda-client
 $ conda config --add channels defaults
 $ conda config --add channels conda-forge
 $ conda config --set channel_priority strict
 ```
 2. Build the Conda packages for multiple Python versions:
 ```bash
-$ ./conda/conda-build.sh
+# this script takes build number as an optional parameter
+$ ./conda/conda-build.sh 
 ```
 3. Login
 ```bash
@@ -258,7 +262,7 @@ A quick test script may look like this:
 
 ### C++
 
-E2SAR code comes with a set of tests under [test/](test/) folder. It relies on Boost unit-testing framework as well as meson testing capabilities. The easiest way is to execute `meson test` or `meson test --suite unit` or `meson test --suite live`. The latter requires an instance of UDPLBd running and `EJFAT_URI` environment variable to be set to point to it (e.g. `export EJFAT_URI="ejfats://udplbd@192.168.0.3:18347/").
+E2SAR code comes with a set of tests under [test/](test/) folder. It relies on Boost unit-testing framework as well as meson testing capabilities. The easiest way is to execute `meson test` or `meson test --suite unit` or `meson test --suite live`. Normally you need to add `--timeout 0` as some tests run long. The `live` suite requires an instance of UDPLBd running and `EJFAT_URI` environment variable to be set to point to it (e.g. `export EJFAT_URI="ejfats://udplbd@192.168.0.3:18347/").
 
 There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which runs all the tests on FABRIC testbed.
 
