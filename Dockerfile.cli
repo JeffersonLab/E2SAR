@@ -15,10 +15,15 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 ENV PATH=/usr/local/bin:$PATH
 ENV E2SARINSTALL=/e2sar-install
-ENV E2SAR_DEPS_DEB=E2SAR-main-0.1.5-ubuntu-22.04/e2sar-deps_0.1.5_amd64.deb
+ENV DEPS_VER=0.2.1
+ENV E2SAR_DEPS_DEB=E2SAR-${DEPS_VER}-main-ubuntu-22.04/e2sar-deps_${DEPS_VER}_amd64.deb
 ENV E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
 
+# build system
 RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb wget
+
+# add various network utilities for debugging
+RUN apt-get -yq install netcat net-tools bc ethtool iproute2 iputils-ping nano
 
 RUN pip3 install pybind11 scapy meson
 
