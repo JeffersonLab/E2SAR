@@ -409,7 +409,7 @@ namespace e2sar
             {
                 om[j].name = i->name();
                 om[j].lbid = i->reservation().lbid();
-                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipaddress());
+                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipv4address());
                 om[j].syncAddressAndPort.second = i->reservation().syncudpport();
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
@@ -428,7 +428,7 @@ namespace e2sar
             {
                 om[j].name = i->name();
                 om[j].lbid = i->reservation().lbid();
-                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipaddress());
+                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipv4address());
                 om[j].syncAddressAndPort.second = i->reservation().syncudpport();
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());

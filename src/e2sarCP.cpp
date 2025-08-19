@@ -99,11 +99,11 @@ namespace e2sar
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
-        if (!rep.syncipaddress().empty())
+        if (!rep.syncipv4address().empty())
         {
             /** protobuf definition uses u_int32 */
             u_int16_t short_port = rep.syncudpport();
-            auto o = string_to_ip(rep.syncipaddress());
+            auto o = string_to_ip(rep.syncipv4address());
             if (o.has_error())
                 return o.error();
             std::pair<ip::address, u_int16_t> a(o.value(), short_port);
@@ -271,11 +271,11 @@ namespace e2sar
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
-        if (!rep.syncipaddress().empty())
+        if (!rep.syncipv4address().empty())
         {
             /** protobuf definition uses u_int32 */
             u_int16_t short_port = rep.syncudpport();
-            auto o = string_to_ip(rep.syncipaddress());
+            auto o = string_to_ip(rep.syncipv4address());
             if (o.has_error())
                 return o.error();
             std::pair<ip::address, u_int16_t> a(o.value(), short_port);

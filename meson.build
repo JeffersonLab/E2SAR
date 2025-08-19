@@ -107,7 +107,7 @@ protoc_cmd = find_program('protoc', required: true, version : '>=3.21.12')
 grpc_cpp_plugin_cmd = find_program('grpc_cpp_plugin', required: true)
 
 # gRPC definitions
-lb_proto_dir = '../udplbd/pkg/pb'
+lb_proto_dir = '../udplbd2/proto/loadbalancer'
 lb_proto = lb_proto_dir + '/loadbalancer.proto'
 
 # subdirectories
