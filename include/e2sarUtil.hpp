@@ -438,18 +438,16 @@ namespace e2sar
     {
 
         std::vector<ip::address> addresses;
-        boost::asio::io_service io_service;
+        boost::asio::io_context io_context;
 
         try
         {
-            ip::udp::resolver resolver(io_service);
-            ip::udp::resolver::query query(host_name, "443");
-            ip::udp::resolver::iterator iter = resolver.resolve(query);
-            ip::udp::resolver::iterator end; // End marker.
+            ip::udp::resolver resolver(io_context);
+            ip::udp::resolver::results_type results = resolver.resolve(host_name, "443");
 
-            while (iter != end)
+            for(auto i = results.begin(); i != results.end(); ++i)
             {
-                ip::udp::endpoint endpoint = *iter++;
+                ip::udp::endpoint endpoint = *i;
                 addresses.push_back(endpoint.address());
             }
             return addresses;

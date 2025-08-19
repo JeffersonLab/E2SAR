@@ -10,8 +10,8 @@ ENV DISTRO=ubuntu22
 ENV HOME=/home/ubuntu
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PATH=/usr/local/bin:$PATH
-ENV DEPSVER=0.1.5
-ENV DEPSDEB=e2sar-deps_0.1.5_amd64.deb
+ENV DEPSVER=0.3.0
+ENV DEPSDEB=e2sar-deps_${DEPS_VER}_amd64.deb
 
 RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb curl git vim
 

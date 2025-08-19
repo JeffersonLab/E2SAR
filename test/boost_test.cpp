@@ -79,15 +79,13 @@ int main()
     std::cout << "IPv6 " << ipv6 << ' ' << ipv6.is_v6() << '\n';
 
     // Test name resolution
-    boost::asio::io_service io_service;
+    boost::asio::io_context io_context;
 
-    ip::udp::resolver resolver(io_service);
-    ip::udp::resolver::query query("www.renci.org", "445");
-    ip::udp::resolver::iterator iter = resolver.resolve(query);
-    ip::udp::resolver::iterator end; // End marker.
-    while (iter != end)
+    ip::udp::resolver resolver(io_context);
+    ip::udp::resolver::results_type resres = resolver.resolve("www.renci.org", "445");
+    for(auto i = resres.begin(); i != resres.end(); ++i)
     {
-        ip::udp::endpoint endpoint = *iter++;
+        ip::udp::endpoint endpoint = *i;
         ip::address address = endpoint.address();
         std::cout << address << ' ' << address.is_v4() << ' ' << std::endl;
     }

@@ -23,8 +23,8 @@ requirements:
     - python
     - meson
     - ninja
-    - boost-cpp ==1.85.0, <1.87.0
-    - grpc-cpp >=1.51.1
+    - boost-cpp ==1.89.0
+    - grpc-cpp >=1.74.1
     - protobuf
     - pybind11
     - libstdcxx-ng [linux64]

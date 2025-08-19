@@ -86,14 +86,14 @@ thread_dep = dependency('threads')
 stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
 # On many platforms, gRPC C++ has to be manually installed and found.
-grpc_dep = dependency('grpc++', version: '>=1.51.1')
+grpc_dep = dependency('grpc++', version: '>=1.74.1')
 
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
 # and meson can ONLY find it via BOOST_ROOT env variable
 # (i.e. setting cmake_prefix_path doesn't work)
-boost_dep = dependency('boost', modules: ['system', 'url', 'program_options', 'chrono', 'thread', 'filesystem'], method: 'cmake', 
-        version: ['>=1.83.0', '<=1.86.0'])
+boost_dep = dependency('boost', modules: ['url', 'program_options', 'chrono', 'thread', 'filesystem'], method: 'cmake', 
+        version: ['>=1.89.0', '<=1.89.0'])
 
 # we include 'src' because auto-generated headers for gRPC stubs go there 
 inc = include_directories('include', 'src')
