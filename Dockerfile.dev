@@ -4,9 +4,9 @@
 # Single-stage development container for E2SAR - contains compiler, debugger and other tools
 #
 
-FROM ubuntu:22.04 AS base
+FROM ubuntu:24.04 AS base
 
-ENV DISTRO=ubuntu22
+ENV DISTRO=ubuntu24
 ENV HOME=/home/ubuntu
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PATH=/usr/local/bin:$PATH
@@ -29,7 +29,7 @@ WORKDIR /src
 COPY ./docker-dev-entrypoint.sh /src/docker-dev-entrypoint.sh
 
 # download and install boost and grpc deps
-RUN curl -Ls https://github.com/JeffersonLab/E2SAR/releases/download/E2SAR-main-$DEPSVER-ubuntu-22.04/$DEPSDEB > $DEPSDEB  
+RUN curl -Ls https://github.com/JeffersonLab/E2SAR/releases/download/E2SAR-main-$DEPSVER-ubuntu-24.04/$DEPSDEB > $DEPSDEB  
 RUN dpkg -i $DEPSDEB
 
 ENTRYPOINT ["/src/docker-dev-entrypoint.sh"]
