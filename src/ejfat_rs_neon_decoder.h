@@ -132,4 +132,144 @@ int neon_rs_decode_table_lookup_v2(rs_decode_table *table, rs_poly_vector *recei
   return 0;
 }
 
+// --------------------------------------------------------------------------
+// Dual-nibble NEON RS decoder - operates on full bytes (both upper and lower nibbles)
+// --------------------------------------------------------------------------
+
+int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
+                                int *erasure_locations, int num_erasures,
+                                char *decoded_bytes) {
+
+  if (num_erasures > 2) {
+    return -1;
+  }
+
+  // Load 10 received bytes (8 data + 2 parity) into NEON registers
+  uint8x8_t data_vec = vld1_u8((uint8_t *)received_bytes);  // First 8 bytes
+
+  // SIMD nibble extraction from data bytes
+  uint8x8_t nibble_mask = vdup_n_u8(0x0F);
+  uint8x8_t lower_data = vand_u8(data_vec, nibble_mask);    // bits 0-3
+  uint8x8_t upper_data = vshr_n_u8(data_vec, 4);            // bits 4-7
+
+  // Extract parity nibbles
+  uint8_t lower_parity[2] = {received_bytes[8] & 0x0F, received_bytes[9] & 0x0F};
+  uint8_t upper_parity[2] = {(received_bytes[8] >> 4) & 0x0F, (received_bytes[9] >> 4) & 0x0F};
+
+  // Load GF lookup tables
+  uint8x8x2_t exp_table;
+  uint8x8x2_t log_table;
+  exp_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[0]);
+  exp_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[8]);
+  log_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[0]);
+  log_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[8]);
+
+  // Find matching table entry for erasure pattern
+  rs_decode_table_entry *entry = NULL;
+  for (int t = 0; t < table->size; t++) {
+    rs_decode_table_entry *candidate = &table->entries[t];
+
+    if (!candidate->valid || candidate->num_erasures != num_erasures) {
+      continue;
+    }
+
+    int match = 0;
+    if (num_erasures == 0) {
+      match = 1;
+    } else if (num_erasures == 1) {
+      match = (candidate->erasure_pattern[0] == erasure_locations[0]);
+    } else if (num_erasures == 2) {
+      match = ((candidate->erasure_pattern[0] == erasure_locations[0] &&
+                candidate->erasure_pattern[1] == erasure_locations[1]) ||
+               (candidate->erasure_pattern[0] == erasure_locations[1] &&
+                candidate->erasure_pattern[1] == erasure_locations[0]));
+    }
+
+    if (match) {
+      entry = candidate;
+      break;
+    }
+  }
+
+  if (!entry) {
+    return -1;  // Pattern not found
+  }
+
+  // ---- Decode lower nibble stream ----
+
+  // Prepare lower nibble received vector with parity substitutions
+  uint8_t lower_rx_modified[8] __attribute__((aligned(16)));
+  vst1_u8(lower_rx_modified, lower_data);
+
+  // Replace erased symbols with parity symbols
+  for (int i = 0; i < num_erasures; i++) {
+    if (erasure_locations[i] < 8) {
+      lower_rx_modified[erasure_locations[i]] = lower_parity[i];
+    }
+  }
+
+  uint8x8_t lower_rx_vec = vld1_u8(lower_rx_modified);
+
+  // Apply pre-computed inverse matrix to lower nibbles
+  uint8_t lower_decoded[8];
+  for (int i = 0; i < 8; i++) {
+    uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix[i]);
+    uint8x8_t prod_vec = neon_gf_mul_vec(matrix_row, lower_rx_vec, exp_table, log_table);
+
+    // Horizontal XOR reduction
+    uint8_t temp[8];
+    vst1_u8(temp, prod_vec);
+    char result = 0;
+    for (int j = 0; j < 8; j++) {
+      result ^= temp[j];
+    }
+
+    lower_decoded[i] = result & 0x0F;
+  }
+
+  // ---- Decode upper nibble stream ----
+
+  // Prepare upper nibble received vector with parity substitutions
+  uint8_t upper_rx_modified[8] __attribute__((aligned(16)));
+  vst1_u8(upper_rx_modified, upper_data);
+
+  // Replace erased symbols with parity symbols
+  for (int i = 0; i < num_erasures; i++) {
+    if (erasure_locations[i] < 8) {
+      upper_rx_modified[erasure_locations[i]] = upper_parity[i];
+    }
+  }
+
+  uint8x8_t upper_rx_vec = vld1_u8(upper_rx_modified);
+
+  // Apply pre-computed inverse matrix to upper nibbles
+  uint8_t upper_decoded[8];
+  for (int i = 0; i < 8; i++) {
+    uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix[i]);
+    uint8x8_t prod_vec = neon_gf_mul_vec(matrix_row, upper_rx_vec, exp_table, log_table);
+
+    // Horizontal XOR reduction
+    uint8_t temp[8];
+    vst1_u8(temp, prod_vec);
+    char result = 0;
+    for (int j = 0; j < 8; j++) {
+      result ^= temp[j];
+    }
+
+    upper_decoded[i] = result & 0x0F;
+  }
+
+  // ---- SIMD combine decoded nibbles ----
+
+  uint8x8_t lower_vec = vld1_u8(lower_decoded);
+  uint8x8_t upper_vec = vld1_u8(upper_decoded);
+  uint8x8_t upper_shifted = vshl_n_u8(upper_vec, 4);
+  uint8x8_t combined = vorr_u8(upper_shifted, lower_vec);
+
+  // Store result
+  vst1_u8((uint8_t *)decoded_bytes, combined);
+
+  return 0;
+}
+
 #endif
