@@ -3,8 +3,8 @@
 #include <string.h>
 #include <time.h>
 
-#include "./ejfat_rs.h"
-#include "./ejfat_rs_decoder.h"
+#include "../common/ejfat_rs.h"
+#include "../common/ejfat_rs_decoder.h"
 
 void test_decoder() {
     printf("\n=============== Testing RS Decoder ===============\n");

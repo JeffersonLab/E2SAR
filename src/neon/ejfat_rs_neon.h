@@ -10,7 +10,7 @@
 // --------------------------------------------------------------------------------------
 
 // Include shared RS model with GF(16) lookup tables and encoding matrices
-#include "../prototype/python/rs_model.h"
+#include "../../prototype/python/rs_model.h"
 
 // Pre-computed encoding matrix in exponent space (P matrix from [I|P])
 // This is computed at initialization from _ejfat_rs_G columns 8-9

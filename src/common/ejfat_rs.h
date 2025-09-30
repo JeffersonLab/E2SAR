@@ -87,7 +87,7 @@ void print_rs_poly_matrix(rs_poly_matrix *m) {
 
 // --------------------------------------------------------------------------
 
-#include "../prototype/python/rs_model.h"
+#include "../../prototype/python/rs_model.h"
 
 /*
 def gf_mul(a,b):

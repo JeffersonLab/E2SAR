@@ -1,39 +1,39 @@
-#ifndef __ejfat_rs_avx512_h
-#define __ejfat_rs_avx512_h
+#ifndef __ejfat_rs_avx2_h
+#define __ejfat_rs_avx2_h
 
 #include <immintrin.h>
 #include <stdint.h>
 
 // --------------------------------------------------------------------------------------
-// Minimal Reed-Solomon FEC library with AVX-512 SIMD optimizations
+// Minimal Reed-Solomon FEC library with AVX2 SIMD optimizations
 // RS(10,8) configuration: 8 data symbols + 2 parity symbols over GF(16)
 // --------------------------------------------------------------------------------------
 
 // Include shared RS model with GF(16) lookup tables and encoding matrices
-#include "../prototype/python/rs_model.h"
+#include "../../prototype/python/rs_model.h"
 
 // Pre-computed encoding matrix in exponent space (P matrix from [I|P])
 // This is computed at initialization from _ejfat_rs_G columns 8-9
-static char _ejfat_rs_Genc_exp_avx512[2][8];
+static char _ejfat_rs_Genc_exp_avx2[2][8];
 
 // --------------------------------------------------------------------------------------
-// Initialize the AVX-512 encoder by pre-computing the exponent-space encoding matrix
+// Initialize the AVX2 encoder by pre-computing the exponent-space encoding matrix
 // Must be called once before using the encoder functions
 // --------------------------------------------------------------------------------------
-static inline void init_ejfat_rs_avx512() {
+static inline void init_ejfat_rs_avx2() {
   for (int row = 0; row < _ejfat_rs_p; row++) {
     for (int col = 0; col < _ejfat_rs_n; col++) {
-      _ejfat_rs_Genc_exp_avx512[row][col] = _ejfat_rs_gf_exp_seq[_ejfat_rs_G[col][_ejfat_rs_n + row]];
+      _ejfat_rs_Genc_exp_avx2[row][col] = _ejfat_rs_gf_exp_seq[_ejfat_rs_G[col][_ejfat_rs_n + row]];
     }
   }
 }
 
 // --------------------------------------------------------------------------------------
-// Single-nibble AVX-512 RS encoder
+// Single-nibble AVX2 RS encoder
 // Encodes 8 nibble-sized (4-bit) data symbols into 2 parity symbols
 // --------------------------------------------------------------------------------------
-void avx512_rs_encode(const char *data, char *parity) {
-  // Scalar fallback for now - can be optimized with AVX-512 in future
+void avx2_rs_encode(const char *data, char *parity) {
+  // Scalar fallback for now - can be optimized with AVX2 in future
   // Load encoding matrix from exponent space
 
   // Compute each parity symbol: p[i] = sum(data[j] * Genc[i][j]) in GF(16)
@@ -44,7 +44,7 @@ void avx512_rs_encode(const char *data, char *parity) {
       if (d == 0) continue;  // GF(16) property: 0 * x = 0
 
       char d_exp = _ejfat_rs_gf_exp_seq[d];
-      char coeff_exp = _ejfat_rs_Genc_exp_avx512[i][j];
+      char coeff_exp = _ejfat_rs_Genc_exp_avx2[i][j];
 
       // Multiply in GF(16): add exponents mod 15
       char prod_exp = (d_exp + coeff_exp) % 15;
@@ -57,11 +57,11 @@ void avx512_rs_encode(const char *data, char *parity) {
 }
 
 // --------------------------------------------------------------------------------------
-// Dual-nibble AVX-512 RS encoder
+// Dual-nibble AVX2 RS encoder
 // Processes 8 bytes as two independent RS(10,8) streams (upper and lower nibbles)
 // Generates 2 parity bytes (4 parity nibbles combined)
 // --------------------------------------------------------------------------------------
-void avx512_rs_encode_dual_nibble(const char *data_bytes, char *parity_bytes) {
+void avx2_rs_encode_dual_nibble(const char *data_bytes, char *parity_bytes) {
 
   // Extract lower and upper nibbles from each byte
   char lower_nibbles[8];
@@ -81,7 +81,7 @@ void avx512_rs_encode_dual_nibble(const char *data_bytes, char *parity_bytes) {
       if (d == 0) continue;
 
       char d_exp = _ejfat_rs_gf_exp_seq[d];
-      char coeff_exp = _ejfat_rs_Genc_exp_avx512[i][j];
+      char coeff_exp = _ejfat_rs_Genc_exp_avx2[i][j];
       char prod_exp = (d_exp + coeff_exp) % 15;
       char prod = _ejfat_rs_gf_log_seq[prod_exp];
 
@@ -98,7 +98,7 @@ void avx512_rs_encode_dual_nibble(const char *data_bytes, char *parity_bytes) {
       if (d == 0) continue;
 
       char d_exp = _ejfat_rs_gf_exp_seq[d];
-      char coeff_exp = _ejfat_rs_Genc_exp_avx512[i][j];
+      char coeff_exp = _ejfat_rs_Genc_exp_avx2[i][j];
       char prod_exp = (d_exp + coeff_exp) % 15;
       char prod = _ejfat_rs_gf_log_seq[prod_exp];
 

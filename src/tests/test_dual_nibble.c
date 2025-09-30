@@ -20,7 +20,7 @@
 #endif
 
 // Include main RS header which has all the core types and tables
-#include "./ejfat_rs.h"
+#include "../common/ejfat_rs.h"
 
 // Forward declare the decoder table structures from ejfat_rs_neon_decoder.h
 typedef struct {

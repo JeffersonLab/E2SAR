@@ -3,9 +3,9 @@
 #include <string.h>
 #include <time.h>
 
-#include <immintrin.h>
+#include <arm_neon.h>
 
-#include "./ejfat_rs_avx512.h"
+#include "../neon/ejfat_rs_neon.h"
 
 void test_single_nibble_encoder() {
   printf("\n=== Testing Single Nibble Encoder ===\n");
@@ -14,7 +14,7 @@ void test_single_nibble_encoder() {
   char data[8] = {1, 2, 3, 4, 5, 6, 7, 8};
   char parity[2];
 
-  avx512_rs_encode(data, parity);
+  neon_rs_encode(data, parity);
 
   printf("Data symbols:   ");
   for (int i = 0; i < 8; i++) {
@@ -32,7 +32,7 @@ void test_dual_nibble_encoder() {
   char data_bytes[8] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0};
   char parity_bytes[2];
 
-  avx512_rs_encode_dual_nibble(data_bytes, parity_bytes);
+  neon_rs_encode_dual_nibble(data_bytes, parity_bytes);
 
   printf("Data bytes:   ");
   for (int i = 0; i < 8; i++) {
@@ -57,7 +57,7 @@ void benchmark_single_nibble() {
   clock_t start_time = clock();
   for (int i = 0; i < test_frames; i++) {
     for (int j = 0; j < test_packet_length; j++) {
-      avx512_rs_encode(data, parity);
+      neon_rs_encode(data, parity);
     }
   }
   clock_t end_time = clock();
@@ -83,7 +83,7 @@ void benchmark_dual_nibble() {
   clock_t start_time = clock();
   for (int i = 0; i < test_frames; i++) {
     for (int j = 0; j < test_packet_length; j++) {
-      avx512_rs_encode_dual_nibble(data_bytes, parity_bytes);
+      neon_rs_encode_dual_nibble(data_bytes, parity_bytes);
     }
   }
   clock_t end_time = clock();
@@ -108,20 +108,20 @@ void test_zero_handling() {
   char data3[8] = {0, 0, 0, 0, 0, 0, 0, 0};
   char parity[2];
 
-  avx512_rs_encode(data1, parity);
+  neon_rs_encode(data1, parity);
   printf("Data [0,2,3,4,5,6,7,8]: Parity = %d %d\n", parity[0], parity[1]);
 
-  avx512_rs_encode(data2, parity);
+  neon_rs_encode(data2, parity);
   printf("Data [1,0,3,4,5,6,7,8]: Parity = %d %d\n", parity[0], parity[1]);
 
-  avx512_rs_encode(data3, parity);
+  neon_rs_encode(data3, parity);
   printf("Data [0,0,0,0,0,0,0,0]: Parity = %d %d\n", parity[0], parity[1]);
 
   // Test dual nibble with zeros
   char data_bytes[8] = {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70};
   char parity_bytes[2];
 
-  avx512_rs_encode_dual_nibble(data_bytes, parity_bytes);
+  neon_rs_encode_dual_nibble(data_bytes, parity_bytes);
   printf("Dual nibble with zeros: Parity = %02X %02X\n",
          (unsigned char)parity_bytes[0],
          (unsigned char)parity_bytes[1]);
@@ -130,7 +130,7 @@ void test_zero_handling() {
 int main() {
 
   printf("========================================\n");
-  printf("EJFAT Reed-Solomon AVX512 Encoder Tests\n");
+  printf("EJFAT Reed-Solomon NEON Encoder Tests\n");
   printf("========================================\n");
   printf("Configuration: RS(10,8) over GF(16)\n");
   printf("- 8 data symbols + 2 parity symbols\n");
@@ -138,7 +138,7 @@ int main() {
   printf("- Dual nibble: processes full bytes\n");
 
   // Initialize the encoder
-  init_ejfat_rs_avx512();
+  init_ejfat_rs_neon();
 
   test_single_nibble_encoder();
   test_dual_nibble_encoder();

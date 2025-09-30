@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "./ejfat_rs.h"
+#include "../common/ejfat_rs.h"
 
 int main() {
     rs_model *rs = init_rs();
