@@ -437,6 +437,10 @@ void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_byt
 
   // ---- Encode lower nibbles ----
 
+  // Create zero mask for lower nibbles
+  uint8x8_t zero_vec = vdup_n_u8(0);
+  uint8x8_t lower_zero_mask = vceq_u8(lower_nibbles, zero_vec);
+
   // Convert lower nibbles to exponent space
   uint8x8_t lower_exp = vtbl2_u8(exp_table, lower_nibbles);
 
@@ -453,6 +457,9 @@ void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_byt
     // Convert back to normal space
     uint8x8_t sum_vec = vtbl2_u8(log_table, exp_sum);
 
+    // Apply zero mask: if lower nibble was zero, result should be zero
+    sum_vec = vbic_u8(sum_vec, lower_zero_mask);
+
     // Horizontal XOR reduction
     uint8_t sum_vec_array[8];
     vst1_u8(sum_vec_array, sum_vec);
@@ -463,6 +470,9 @@ void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_byt
   }
 
   // ---- Encode upper nibbles ----
+
+  // Create zero mask for upper nibbles
+  uint8x8_t upper_zero_mask = vceq_u8(upper_nibbles, zero_vec);
 
   // Convert upper nibbles to exponent space
   uint8x8_t upper_exp = vtbl2_u8(exp_table, upper_nibbles);
@@ -479,6 +489,9 @@ void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_byt
 
     // Convert back to normal space
     uint8x8_t sum_vec = vtbl2_u8(log_table, exp_sum);
+
+    // Apply zero mask: if upper nibble was zero, result should be zero
+    sum_vec = vbic_u8(sum_vec, upper_zero_mask);
 
     // Horizontal XOR reduction
     uint8_t sum_vec_array[8];

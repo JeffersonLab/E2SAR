@@ -4,6 +4,21 @@
 #include <time.h>
 #include <arm_neon.h>
 
+// Debug logging control - set to 1 to enable detailed debug output
+#define DEBUG_DUAL_NIBBLE 1
+
+#if DEBUG_DUAL_NIBBLE
+#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#define DEBUG_PRINT_ARRAY(label, arr, len) do { \
+    printf("%s: ", label); \
+    for (int _i = 0; _i < (len); _i++) printf("%X ", (arr)[_i]); \
+    printf("\n"); \
+} while(0)
+#else
+#define DEBUG_PRINT(...)
+#define DEBUG_PRINT_ARRAY(label, arr, len)
+#endif
+
 // Include main RS header which has all the core types and tables
 #include "./ejfat_rs.h"
 
@@ -43,6 +58,9 @@ static inline uint8x8_t neon_gf_mul_vec(uint8x8_t a, uint8x8_t b,
 
   return result;
 }
+
+// Forward declare the dual-nibble encoder function
+void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_bytes);
 
 // Forward declare the dual-nibble decoder function
 int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
@@ -324,7 +342,7 @@ void test_nibble_independence() {
 
     // Test 1: Same lower nibbles, different upper nibbles
     char data1[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    char data2[8] = {0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0x91, 0x88};
+    char data2[8] = {0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0x17, 0x28};
 
     char parity1[2], parity2[2];
 
@@ -362,6 +380,14 @@ int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
                                 int *erasure_locations, int num_erasures,
                                 char *decoded_bytes) {
 
+  DEBUG_PRINT("\n=== DUAL-NIBBLE DECODER DEBUG ===\n");
+  DEBUG_PRINT("Number of erasures: %d\n", num_erasures);
+  if (num_erasures > 0) {
+    DEBUG_PRINT("Erasure locations: ");
+    for (int i = 0; i < num_erasures; i++) DEBUG_PRINT("%d ", erasure_locations[i]);
+    DEBUG_PRINT("\n");
+  }
+
   if (num_erasures > 2) {
     return -1;
   }
@@ -374,6 +400,10 @@ int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
 
   uint8_t lower_parity[2] = {received_bytes[8] & 0x0F, received_bytes[9] & 0x0F};
   uint8_t upper_parity[2] = {(received_bytes[8] >> 4) & 0x0F, (received_bytes[9] >> 4) & 0x0F};
+
+  DEBUG_PRINT("Parity bytes: 0x%02X 0x%02X\n", (uint8_t)received_bytes[8], (uint8_t)received_bytes[9]);
+  DEBUG_PRINT_ARRAY("Lower parity", lower_parity, 2);
+  DEBUG_PRINT_ARRAY("Upper parity", upper_parity, 2);
 
   uint8x8x2_t exp_table;
   uint8x8x2_t log_table;
@@ -409,18 +439,28 @@ int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
   }
 
   if (!entry) {
+    DEBUG_PRINT("ERROR: No matching decode table entry found!\n");
     return -1;
   }
+
+  DEBUG_PRINT("Using decode table entry for %d erasure(s)\n", entry->num_erasures);
 
   // Decode lower nibble stream
   uint8_t lower_rx_modified[8] __attribute__((aligned(16)));
   vst1_u8(lower_rx_modified, lower_data);
 
+  DEBUG_PRINT("\n--- LOWER NIBBLE STREAM ---\n");
+  DEBUG_PRINT_ARRAY("Original lower data", lower_rx_modified, 8);
+
   for (int i = 0; i < num_erasures; i++) {
     if (erasure_locations[i] < 8) {
+      DEBUG_PRINT("Substituting position %d with lower_parity[%d] = %X\n",
+                  erasure_locations[i], i, lower_parity[i]);
       lower_rx_modified[erasure_locations[i]] = lower_parity[i];
     }
   }
+
+  DEBUG_PRINT_ARRAY("After substitution", lower_rx_modified, 8);
 
   uint8x8_t lower_rx_vec = vld1_u8(lower_rx_modified);
 
@@ -431,23 +471,52 @@ int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
 
     uint8_t temp[8];
     vst1_u8(temp, prod_vec);
+
+    #if DEBUG_DUAL_NIBBLE
+    if (i == 3 && num_erasures > 0) {  // Debug row 3 for erasure cases
+      uint8_t matrix_row_vals[8];
+      vst1_u8(matrix_row_vals, matrix_row);
+      DEBUG_PRINT("LOWER Row 3 matrix: ");
+      for (int k = 0; k < 8; k++) DEBUG_PRINT("%X ", matrix_row_vals[k]);
+      DEBUG_PRINT("\n");
+      DEBUG_PRINT("LOWER Row 3 products: ");
+      for (int k = 0; k < 8; k++) DEBUG_PRINT("%X ", temp[k]);
+      DEBUG_PRINT("\n");
+    }
+    #endif
+
     char result = 0;
     for (int j = 0; j < 8; j++) {
       result ^= temp[j];
     }
 
     lower_decoded[i] = result & 0x0F;
+
+    #if DEBUG_DUAL_NIBBLE
+    if (i == 3 && num_erasures > 0) {
+      DEBUG_PRINT("LOWER Row 3 XOR result: %X (expected: 7)\n", lower_decoded[i]);
+    }
+    #endif
   }
+
+  DEBUG_PRINT_ARRAY("Lower decoded", lower_decoded, 8);
 
   // Decode upper nibble stream
   uint8_t upper_rx_modified[8] __attribute__((aligned(16)));
   vst1_u8(upper_rx_modified, upper_data);
 
+  DEBUG_PRINT("\n--- UPPER NIBBLE STREAM ---\n");
+  DEBUG_PRINT_ARRAY("Original upper data", upper_rx_modified, 8);
+
   for (int i = 0; i < num_erasures; i++) {
     if (erasure_locations[i] < 8) {
+      DEBUG_PRINT("Substituting position %d with upper_parity[%d] = %X\n",
+                  erasure_locations[i], i, upper_parity[i]);
       upper_rx_modified[erasure_locations[i]] = upper_parity[i];
     }
   }
+
+  DEBUG_PRINT_ARRAY("After substitution", upper_rx_modified, 8);
 
   uint8x8_t upper_rx_vec = vld1_u8(upper_rx_modified);
 
@@ -458,13 +527,35 @@ int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
 
     uint8_t temp[8];
     vst1_u8(temp, prod_vec);
+
+    #if DEBUG_DUAL_NIBBLE
+    if (i == 3 && num_erasures > 0) {  // Debug row 3 for erasure cases
+      uint8_t matrix_row_vals[8];
+      vst1_u8(matrix_row_vals, matrix_row);
+      DEBUG_PRINT("Row 3 matrix: ");
+      for (int k = 0; k < 8; k++) DEBUG_PRINT("%X ", matrix_row_vals[k]);
+      DEBUG_PRINT("\n");
+      DEBUG_PRINT("Row 3 products: ");
+      for (int k = 0; k < 8; k++) DEBUG_PRINT("%X ", temp[k]);
+      DEBUG_PRINT("\n");
+    }
+    #endif
+
     char result = 0;
     for (int j = 0; j < 8; j++) {
       result ^= temp[j];
     }
 
     upper_decoded[i] = result & 0x0F;
+
+    #if DEBUG_DUAL_NIBBLE
+    if (i == 3 && num_erasures > 0) {
+      DEBUG_PRINT("Row 3 XOR result: %X (expected: 6)\n", upper_decoded[i]);
+    }
+    #endif
   }
+
+  DEBUG_PRINT_ARRAY("Upper decoded", upper_decoded, 8);
 
   // SIMD combine decoded nibbles
   uint8x8_t lower_vec = vld1_u8(lower_decoded);
@@ -473,6 +564,10 @@ int neon_rs_decode_dual_nibble(rs_decode_table *table, char *received_bytes,
   uint8x8_t combined = vorr_u8(upper_shifted, lower_vec);
 
   vst1_u8((uint8_t *)decoded_bytes, combined);
+
+  DEBUG_PRINT("\n--- FINAL RESULT ---\n");
+  DEBUG_PRINT_ARRAY("Decoded bytes", (uint8_t*)decoded_bytes, 8);
+  DEBUG_PRINT("=================================\n\n");
 
   return 0;
 }
