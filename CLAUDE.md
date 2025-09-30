@@ -64,3 +64,5 @@ Uses GF(16) with irreducible polynomial [1,0,0,1,1]. All arithmetic operations (
 - ARM NEON optimizations target 8 data symbols with 2 parity symbols
 - Performance testing measures encoding throughput in Mbps
 - Current configuration: RS(10,8) - 8 data + 2 parity symbols
+- always use rosetta to build and test avx2 and avx512 tests
+- only run neon tests on an arm platform
