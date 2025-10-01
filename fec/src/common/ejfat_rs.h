@@ -87,7 +87,7 @@ void print_rs_poly_matrix(rs_poly_matrix *m) {
 
 // --------------------------------------------------------------------------
 
-#include "../prototype/python/rs_model.h"
+#include "ejfat_rs_tables.h"
 
 /*
 def gf_mul(a,b):
@@ -402,110 +402,6 @@ void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
       p->val[i] ^= sum_vec_array[j];
     }
   }
-}
-
-// --------------------------------------------------------------------------------------
-// Dual-nibble NEON RS encoder - operates on full bytes (both upper and lower nibbles)
-// --------------------------------------------------------------------------------------
-
-void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_bytes) {
-
-  // --- Assumptions:
-  //     data_bytes must be exactly 8 bytes
-  //     parity_bytes will receive 2 bytes (4 parity nibbles combined)
-  //     rs->p must be 2 (two parity symbols per nibble stream)
-  // ------------------------------------------------------------------------------------
-
-  // Load 8 data bytes into NEON register
-  uint8x8_t data_vec = vld1_u8((uint8_t *)data_bytes);
-
-  // SIMD nibble extraction
-  uint8x8_t nibble_mask = vdup_n_u8(0x0F);
-  uint8x8_t lower_nibbles = vand_u8(data_vec, nibble_mask);     // bits 0-3
-  uint8x8_t upper_nibbles = vshr_n_u8(data_vec, 4);              // bits 4-7 shifted down
-
-  // Load GF lookup tables (shared by both nibble streams)
-  uint8x8x2_t exp_table;
-  uint8x8x2_t log_table;
-
-  exp_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[0]);
-  exp_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[8]);
-  log_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[0]);
-  log_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[8]);
-
-  uint8x8_t mod = vdup_n_u8(15);  // used by mod instruction
-
-  // ---- Encode lower nibbles ----
-
-  // Create zero mask for lower nibbles
-  uint8x8_t zero_vec = vdup_n_u8(0);
-  uint8x8_t lower_zero_mask = vceq_u8(lower_nibbles, zero_vec);
-
-  // Convert lower nibbles to exponent space
-  uint8x8_t lower_exp = vtbl2_u8(exp_table, lower_nibbles);
-
-  char lower_parity[2];
-  for (int i = 0; i < rs->p; i++) {
-    uint8x8_t enc_vec = vld1_u8((uint8_t *) rs->Genc_exp[i]);
-    uint8x8_t sum = vadd_u8(lower_exp, enc_vec);
-
-    // Modulo 15 operation
-    uint8x8_t mask = vcge_u8(sum, mod);
-    uint8x8_t mod15 = vand_u8(mod, mask);
-    uint8x8_t exp_sum = vsub_u8(sum, mod15);
-
-    // Convert back to normal space
-    uint8x8_t sum_vec = vtbl2_u8(log_table, exp_sum);
-
-    // Apply zero mask: if lower nibble was zero, result should be zero
-    sum_vec = vbic_u8(sum_vec, lower_zero_mask);
-
-    // Horizontal XOR reduction
-    uint8_t sum_vec_array[8];
-    vst1_u8(sum_vec_array, sum_vec);
-    lower_parity[i] = 0;
-    for (int j = 0; j < 8; j++) {
-      lower_parity[i] ^= sum_vec_array[j];
-    }
-  }
-
-  // ---- Encode upper nibbles ----
-
-  // Create zero mask for upper nibbles
-  uint8x8_t upper_zero_mask = vceq_u8(upper_nibbles, zero_vec);
-
-  // Convert upper nibbles to exponent space
-  uint8x8_t upper_exp = vtbl2_u8(exp_table, upper_nibbles);
-
-  char upper_parity[2];
-  for (int i = 0; i < rs->p; i++) {
-    uint8x8_t enc_vec = vld1_u8((uint8_t *) rs->Genc_exp[i]);
-    uint8x8_t sum = vadd_u8(upper_exp, enc_vec);
-
-    // Modulo 15 operation
-    uint8x8_t mask = vcge_u8(sum, mod);
-    uint8x8_t mod15 = vand_u8(mod, mask);
-    uint8x8_t exp_sum = vsub_u8(sum, mod15);
-
-    // Convert back to normal space
-    uint8x8_t sum_vec = vtbl2_u8(log_table, exp_sum);
-
-    // Apply zero mask: if upper nibble was zero, result should be zero
-    sum_vec = vbic_u8(sum_vec, upper_zero_mask);
-
-    // Horizontal XOR reduction
-    uint8_t sum_vec_array[8];
-    vst1_u8(sum_vec_array, sum_vec);
-    upper_parity[i] = 0;
-    for (int j = 0; j < 8; j++) {
-      upper_parity[i] ^= sum_vec_array[j];
-    }
-  }
-
-  // ---- Combine parity nibbles into bytes ----
-
-  parity_bytes[0] = ((upper_parity[0] & 0x0F) << 4) | (lower_parity[0] & 0x0F);
-  parity_bytes[1] = ((upper_parity[1] & 0x0F) << 4) | (lower_parity[1] & 0x0F);
 }
 
 

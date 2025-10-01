@@ -6,7 +6,7 @@
 
 #include <arm_neon.h>
 
-#include "./ejfat_rs.h"
+#include "../common/ejfat_rs.h"
 
 void neon_test() {
   printf(" testing ARM NEON mode \n");
