@@ -1,7 +1,12 @@
 encode
+test
+test_neon
 test_neon_dec
 test_neon_enc
 test_neon_enc_dec
+test_enc_dec
+test_avx2
+test_avx512
 test_avx512_enc
 test_avx2_enc
 test_avx2_dec
