@@ -1,0 +1,5 @@
+# Build options for E2SAR
+
+# Build FEC test programs (default: false, as this is integrated as a library)
+option('build_fec_tests', type: 'boolean', value: false,
+    description: 'Build Packet-RS-FEC test programs')

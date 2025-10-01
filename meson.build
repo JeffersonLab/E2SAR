@@ -111,6 +111,7 @@ lb_proto_dir = '../udplbd/pkg/pb'
 lb_proto = lb_proto_dir + '/loadbalancer.proto'
 
 # subdirectories
+subdir('fec')
 subdir('include')
 subdir('src')
 subdir('test')
