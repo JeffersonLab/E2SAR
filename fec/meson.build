@@ -2,6 +2,10 @@
 # EJFAT Reed-Solomon FEC - Meson Build Configuration
 # ============================================================================
 
+project('ejfat-fec', 'c',
+    version: '1.0.0',
+    default_options: ['c_std=c11'])
+
 c_compiler = meson.get_compiler('c')
 
 # Detect architecture for SIMD support
@@ -12,7 +16,7 @@ message('Building FEC tests for architecture: ' + host_cpu)
 fec_src_dir = meson.current_source_dir() / 'src'
 
 # Include directories
-fec_inc = include_directories('src')
+fec_inc = include_directories('src', 'src/common', 'src/neon', 'src/avx2', 'src/avx512')
 
 # Common flags
 fec_cflags = ['-O3', '-Wall']
@@ -67,42 +71,54 @@ endif
 # Basic Tests (common/)
 # ============================================================================
 
-fec_test_basic = executable('fec_test',
+fec_test_basic = executable('test',
     fec_src_dir / 'tests' / 'test.c',
     include_directories: fec_inc,
     c_args: fec_cflags)
 
-fec_test_enc_dec = executable('fec_test_enc_dec',
+fec_test_enc_dec = executable('test_enc_dec',
     fec_src_dir / 'tests' / 'test_enc_dec.c',
+    include_directories: fec_inc,
+    c_args: fec_cflags)
+
+fec_test_dual_nibble = executable('test_dual_nibble',
+    fec_src_dir / 'tests' / 'test_dual_nibble.c',
+    include_directories: fec_inc,
+    c_args: fec_cflags)
+
+fec_test_single_nibble_verify = executable('test_single_nibble_verify',
+    fec_src_dir / 'tests' / 'test_single_nibble_verify.c',
+    include_directories: fec_inc,
+    c_args: fec_cflags)
+
+fec_verify_gf_mul = executable('verify_gf_mul',
+    fec_src_dir / 'tests' / 'verify_gf_mul.c',
+    include_directories: fec_inc,
+    c_args: fec_cflags)
+
+fec_verify_matrix = executable('verify_matrix',
+    fec_src_dir / 'tests' / 'verify_matrix.c',
     include_directories: fec_inc,
     c_args: fec_cflags)
 
 test('FEC Basic Test', fec_test_basic, suite: 'fec-basic')
 test('FEC Encode/Decode Test', fec_test_enc_dec, suite: 'fec-basic')
+test('FEC Dual Nibble Test', fec_test_dual_nibble, suite: 'fec-basic')
+test('FEC Single Nibble Verify Test', fec_test_single_nibble_verify, suite: 'fec-basic')
+test('FEC Verify GF Multiplication', fec_verify_gf_mul, suite: 'fec-basic')
+test('FEC Verify Matrix', fec_verify_matrix, suite: 'fec-basic')
 
 # ============================================================================
 # ARM NEON Tests (neon/)
 # ============================================================================
 
 if neon_available
-    fec_test_neon_enc = executable('fec_test_neon_enc',
-        fec_src_dir / 'tests' / 'test_neon_enc.c',
+    fec_test_neon = executable('test_neon',
+        fec_src_dir / 'tests' / 'test_neon.c',
         include_directories: fec_inc,
         c_args: fec_cflags)
 
-    fec_test_neon_dec = executable('fec_test_neon_dec',
-        fec_src_dir / 'tests' / 'test_neon_dec.c',
-        include_directories: fec_inc,
-        c_args: fec_cflags)
-
-    fec_test_neon_enc_dec = executable('fec_test_neon_enc_dec',
-        fec_src_dir / 'tests' / 'test_neon_enc_dec.c',
-        include_directories: fec_inc,
-        c_args: fec_cflags)
-
-    test('FEC NEON Encoder Test', fec_test_neon_enc, suite: 'fec-neon')
-    test('FEC NEON Decoder Test', fec_test_neon_dec, suite: 'fec-neon')
-    test('FEC NEON Encode/Decode Test', fec_test_neon_enc_dec, suite: 'fec-neon')
+    test('FEC NEON Test', fec_test_neon, suite: 'fec-neon')
 
     message('NEON tests configured')
 else
@@ -116,30 +132,12 @@ endif
 if avx2_available
     avx2_cflags = fec_cflags + ['-mavx2']
 
-    fec_test_avx2_enc = executable('fec_test_avx2_enc',
-        fec_src_dir / 'tests' / 'test_avx2_enc.c',
+    fec_test_avx2 = executable('test_avx2',
+        fec_src_dir / 'tests' / 'test_avx2.c',
         include_directories: fec_inc,
         c_args: avx2_cflags)
 
-    fec_test_avx2_dec = executable('fec_test_avx2_dec',
-        fec_src_dir / 'tests' / 'test_avx2_dec.c',
-        include_directories: fec_inc,
-        c_args: avx2_cflags)
-
-    fec_test_avx2_enc_dec = executable('fec_test_avx2_enc_dec',
-        fec_src_dir / 'tests' / 'test_avx2_enc_dec.c',
-        include_directories: fec_inc,
-        c_args: avx2_cflags)
-
-    fec_test_avx2_optimization = executable('fec_test_avx2_optimization',
-        fec_src_dir / 'tests' / 'test_avx2_optimization.c',
-        include_directories: fec_inc,
-        c_args: avx2_cflags)
-
-    test('FEC AVX2 Encoder Test', fec_test_avx2_enc, suite: 'fec-avx2')
-    test('FEC AVX2 Decoder Test', fec_test_avx2_dec, suite: 'fec-avx2')
-    test('FEC AVX2 Encode/Decode Test', fec_test_avx2_enc_dec, suite: 'fec-avx2')
-    test('FEC AVX2 Optimization Test', fec_test_avx2_optimization, suite: 'fec-avx2')
+    test('FEC AVX2 Test', fec_test_avx2, suite: 'fec-avx2')
 
     message('AVX2 tests configured')
 else
@@ -153,12 +151,12 @@ endif
 if avx512_available
     avx512_cflags = fec_cflags + ['-mavx512f', '-mavx512bw']
 
-    fec_test_avx512_enc = executable('fec_test_avx512_enc',
-        fec_src_dir / 'tests' / 'test_avx512_enc.c',
+    fec_test_avx512 = executable('test_avx512',
+        fec_src_dir / 'tests' / 'test_avx512.c',
         include_directories: fec_inc,
         c_args: avx512_cflags)
 
-    test('FEC AVX-512 Encoder Test', fec_test_avx512_enc, suite: 'fec-avx512')
+    test('FEC AVX-512 Test', fec_test_avx512, suite: 'fec-avx512')
 
     message('AVX-512 tests configured')
 else
@@ -170,8 +168,8 @@ endif
 # ============================================================================
 
 summary({
-    'FEC Basic Tests': 'enabled',
-    'FEC NEON Tests': neon_available ? 'enabled' : 'disabled (platform)',
-    'FEC AVX2 Tests': avx2_available ? 'enabled' : 'disabled (platform)',
-    'FEC AVX-512 Tests': avx512_available ? 'enabled' : 'disabled (platform)',
+    'FEC Basic Tests': 'enabled (6 tests)',
+    'FEC NEON Tests': neon_available ? 'enabled (1 test)' : 'disabled (platform)',
+    'FEC AVX2 Tests': avx2_available ? 'enabled (1 test)' : 'disabled (platform)',
+    'FEC AVX-512 Tests': avx512_available ? 'enabled (1 test)' : 'disabled (platform)',
 }, section: 'FEC Test Configuration')

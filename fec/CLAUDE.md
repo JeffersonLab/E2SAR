@@ -8,13 +8,25 @@ This is a **Reed-Solomon Forward Error Correction (RS-FEC)** implementation for 
 
 ## Build and Test Commands
 
-### C Implementation (src/)
+### Using Make (standalone builds)
 ```bash
-# Build the test program
-cd src && make test
+# Build and run basic test
+cd src && make test && ./tests/test
 
-# Run the test program  
-cd src && ./test
+# Build and run encoder/decoder test
+cd src && make test_enc_dec && ./tests/test_enc_dec
+
+# Build SIMD-optimized tests
+cd src && make test_neon && ./tests/test_neon      # ARM only
+cd src && make test_avx2 && ./tests/test_avx2      # x86_64
+```
+
+### Using Meson (integrated with E2SAR)
+```bash
+# From E2SAR root directory
+meson setup builddir
+meson compile -C builddir
+meson test -C builddir --suite fec-basic
 ```
 
 ### Python Prototypes (prototype/python/)

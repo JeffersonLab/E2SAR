@@ -65,10 +65,10 @@ The configuration defines four test suites:
 
 | Suite | Tests | Platform Requirement |
 |-------|-------|---------------------|
-| `fec-basic` | `fec_test`, `fec_test_enc_dec` | All platforms |
-| `fec-neon` | `fec_test_neon_enc`, `fec_test_neon_dec`, `fec_test_neon_enc_dec` | ARM with NEON |
-| `fec-avx2` | `fec_test_avx2_enc`, `fec_test_avx2_dec`, `fec_test_avx2_enc_dec`, `fec_test_avx2_optimization` | x86_64 with AVX2 |
-| `fec-avx512` | `fec_test_avx512_enc` | x86_64 with AVX-512 |
+| `fec-basic` | `test`, `test_enc_dec`, `test_dual_nibble`, `test_single_nibble_verify`, `verify_gf_mul`, `verify_matrix` | All platforms |
+| `fec-neon` | `test_neon` | ARM with NEON |
+| `fec-avx2` | `test_avx2` | x86_64 with AVX2 |
+| `fec-avx512` | `test_avx512` | x86_64 with AVX-512 |
 
 ### Compiler Flags
 
@@ -108,8 +108,8 @@ At the end of configuration:
 
 ```
 FEC Test Configuration
-  FEC Basic Tests  : enabled
-  FEC NEON Tests   : enabled
+  FEC Basic Tests  : enabled (6 tests)
+  FEC NEON Tests   : enabled (1 test)
   FEC AVX2 Tests   : disabled (platform)
   FEC AVX-512 Tests: disabled (platform)
 ```
@@ -128,8 +128,8 @@ meson setup builddir
 meson compile -C builddir
 
 # Build specific test
-meson compile -C builddir fec_test
-meson compile -C builddir fec_test_neon_enc    # ARM only
+meson compile -C builddir test
+meson compile -C builddir test_neon    # ARM only
 ```
 
 ### Running FEC Tests
@@ -157,10 +157,10 @@ Test executables are built in the `builddir` directory:
 
 ```bash
 # Run directly
-./builddir/fec_test
-./builddir/fec_test_enc_dec
-./builddir/fec_test_neon_enc      # ARM only
-./builddir/fec_test_avx2_enc      # x86_64 only
+./builddir/test
+./builddir/test_enc_dec
+./builddir/test_neon              # ARM only
+./builddir/test_avx2              # x86_64 only
 ```
 
 ## Integration with E2SAR
@@ -182,11 +182,13 @@ This means:
 ### On ARM (Apple Silicon, ARM servers)
 
 ```
-✅ fec_test
-✅ fec_test_enc_dec
-✅ fec_test_neon_enc
-✅ fec_test_neon_dec
-✅ fec_test_neon_enc_dec
+✅ test
+✅ test_enc_dec
+✅ test_dual_nibble
+✅ test_single_nibble_verify
+✅ verify_gf_mul
+✅ verify_matrix
+✅ test_neon
 ❌ AVX2 tests (skipped)
 ❌ AVX-512 tests (skipped)
 ```
@@ -194,14 +196,15 @@ This means:
 ### On x86_64 (Intel/AMD)
 
 ```
-✅ fec_test
-✅ fec_test_enc_dec
+✅ test
+✅ test_enc_dec
+✅ test_dual_nibble
+✅ test_single_nibble_verify
+✅ verify_gf_mul
+✅ verify_matrix
 ❌ NEON tests (skipped)
-✅ fec_test_avx2_enc (if CPU supports AVX2)
-✅ fec_test_avx2_dec (if CPU supports AVX2)
-✅ fec_test_avx2_enc_dec (if CPU supports AVX2)
-✅ fec_test_avx2_optimization (if CPU supports AVX2)
-✅ fec_test_avx512_enc (if CPU supports AVX-512)
+✅ test_avx2 (if CPU supports AVX2)
+✅ test_avx512 (if CPU supports AVX-512)
 ```
 
 ## Troubleshooting
@@ -258,20 +261,21 @@ fec/
 ### Include Directories
 
 ```meson
-fec_inc = include_directories('src')
+fec_inc = include_directories('src', 'src/common', 'src/neon', 'src/avx2', 'src/avx512')
 ```
 
-All tests can include headers relative to `fec/src/`:
+All tests can include headers directly:
 ```c
-#include "common/ejfat_rs.h"
-#include "neon/ejfat_rs_neon_encoder.h"
-#include "avx2/ejfat_rs_avx2_encoder.h"
+#include "ejfat_rs.h"
+#include "ejfat_rs_neon.h"
+#include "ejfat_rs_avx2.h"
+#include "ejfat_rs_avx512.h"
 ```
 
 ### Test Definition Example
 
 ```meson
-fec_test_basic = executable('fec_test',
+fec_test_basic = executable('test',
     fec_src_dir / 'tests' / 'test.c',
     include_directories: fec_inc,
     c_args: fec_cflags)
@@ -280,9 +284,9 @@ test('FEC Basic Test', fec_test_basic, suite: 'fec-basic')
 ```
 
 This:
-1. Creates an executable named `fec_test`
+1. Creates an executable named `test`
 2. Compiles `src/tests/test.c`
-3. Uses `src/` as include directory
+3. Uses `src/`, `src/common/`, `src/neon/`, `src/avx2/`, `src/avx512/` as include directories
 4. Applies `-O3 -Wall` flags
 5. Registers as a test named "FEC Basic Test" in suite "fec-basic"
 
@@ -291,10 +295,11 @@ This:
 | Feature | Makefile | Meson |
 |---------|----------|-------|
 | Location | `fec/src/Makefile` | `fec/meson.build` |
-| Output dir | `fec/src/` | `builddir/` |
-| Test runner | `make run-*` | `meson test` |
+| Output dir | `fec/src/tests/` | `builddir/` |
+| Build all | N/A (build individually) | `meson compile -C builddir` |
+| Test runner | Direct execution | `meson test` |
 | Integration | Standalone | Part of E2SAR build |
 | Dependencies | None | E2SAR dependencies |
-| Best for | FEC development | E2SAR integration |
+| Best for | Quick individual tests | E2SAR integration & comprehensive testing |
 
-Both build systems are fully supported and produce identical test executables.
+Both build systems are supported. Meson provides more comprehensive build and test management.

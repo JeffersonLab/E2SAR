@@ -8,8 +8,8 @@ This guide explains how to build and test the EJFAT Reed-Solomon FEC implementat
 
 ```bash
 cd fec/src
-make all           # Build all tests
-make run-all       # Build and run all tests
+make test          # Build basic test
+./tests/test       # Run the test
 ```
 
 ### Using Meson (Integrated with E2SAR)
@@ -27,10 +27,11 @@ meson test -C builddir --suite fec-basic
 | Feature | Make | Meson (Integrated) |
 |---------|------|-------------------|
 | Dependencies | C compiler only | Full E2SAR deps (gRPC, Boost, etc.) |
-| Configuration | Automatic arch detection | Automatic arch detection + feature detection |
+| Configuration | Automatic arch detection in compiler | Automatic arch detection + feature detection |
 | Location | `fec/src/` | E2SAR root |
+| Output Location | `fec/src/tests/` | `builddir/` |
 | Use Case | FEC development/testing | Full E2SAR build |
-| Test Runner | Make targets | `meson test` |
+| Test Runner | Direct execution | `meson test` |
 
 ## Building with Make
 
@@ -44,18 +45,12 @@ meson test -C builddir --suite fec-basic
 ```bash
 cd fec/src
 
-# Build all tests for your platform
-make all
-
 # Build specific tests
 make test                    # Basic test
 make test_enc_dec           # Encoder/decoder test
-make test_neon_enc          # NEON encoder (ARM only)
-make test_avx2_enc          # AVX2 encoder (x86_64 only)
-make test_avx512_enc        # AVX-512 encoder (x86_64 only)
-
-# Clean build artifacts
-make clean
+make test_neon              # NEON test (ARM only)
+make test_avx2              # AVX2 test (with fallback on non-x86_64)
+make test_avx512            # AVX-512 test (with fallback on non-x86_64)
 ```
 
 ### Run Commands
@@ -63,19 +58,19 @@ make clean
 ```bash
 cd fec/src
 
-# Run all tests
-make run-all
-
-# Run tests by architecture
-make run-basic    # Platform-independent tests
-make run-neon     # ARM NEON tests
-make run-avx2     # x86 AVX2 tests
-make run-avx512   # x86 AVX-512 tests
-
-# Run individual test
-./test
-./test_neon_enc
+# Run individual tests directly
+./tests/test
+./tests/test_enc_dec
+./tests/test_neon
+./tests/test_avx2
+./tests/test_avx512
 ```
+
+### Notes
+
+- Test executables are built in the `tests/` directory
+- AVX2 and AVX-512 tests automatically use scalar fallback on non-x86_64 platforms
+- Each test target builds only that specific test (no `all` or `clean` targets)
 
 ## Building with Meson
 
@@ -97,9 +92,9 @@ meson setup builddir
 meson compile -C builddir
 
 # Build specific FEC test
-meson compile -C builddir fec_test
-meson compile -C builddir fec_test_neon_enc  # ARM only
-meson compile -C builddir fec_test_avx2_enc  # x86_64 only
+meson compile -C builddir test
+meson compile -C builddir test_neon          # ARM only
+meson compile -C builddir test_avx2          # x86_64 only
 ```
 
 ### Run Tests
@@ -118,11 +113,11 @@ meson test -C builddir --suite fec-basic -v
 
 # Run specific test by name
 meson test -C builddir 'FEC Basic Test'
-meson test -C builddir 'FEC NEON Encoder Test'
+meson test -C builddir 'FEC NEON Test'
 
 # Run executable directly
-./builddir/fec_test
-./builddir/fec_test_neon_enc
+./builddir/test
+./builddir/test_neon
 ```
 
 ## Architecture Support
@@ -149,21 +144,21 @@ On macOS with Apple Silicon, you can test x86 builds using Rosetta:
 cd fec/src
 
 # Build and run with Rosetta
-arch -x86_64 make test_avx2_enc
-arch -x86_64 ./test_avx2_enc
+arch -x86_64 make test_avx2
+arch -x86_64 ./tests/test_avx2
 ```
 
 ## Test Suites
 
-### Make Test Targets
+### Make Build Targets
 
-| Target | Description |
-|--------|-------------|
-| `make run-all` | Run all tests sequentially |
-| `make run-basic` | Run basic (platform-independent) tests |
-| `make run-neon` | Run ARM NEON tests |
-| `make run-avx2` | Run x86 AVX2 tests |
-| `make run-avx512` | Run x86 AVX-512 tests |
+| Target | Description | Output |
+|--------|-------------|--------|
+| `make test` | Build basic test | `tests/test` |
+| `make test_enc_dec` | Build encoder/decoder test | `tests/test_enc_dec` |
+| `make test_neon` | Build ARM NEON test | `tests/test_neon` |
+| `make test_avx2` | Build AVX2 test | `tests/test_avx2` |
+| `make test_avx512` | Build AVX-512 test | `tests/test_avx512` |
 
 ### Meson Test Suites
 
@@ -191,8 +186,8 @@ sudo apt install build-essential
 sudo dnf install gcc
 ```
 
-**Problem**: NEON tests fail on x86_64
-- This is expected - NEON tests only run on ARM processors
+**Problem**: NEON tests fail to build on x86_64
+- This is expected - NEON tests require ARM processors
 - Use AVX2/AVX-512 tests instead on x86_64
 
 ### Meson Build Issues
@@ -220,7 +215,7 @@ cd fec/src
 # Edit code...
 
 # Quick rebuild and test
-make clean && make test && ./test
+make test && ./tests/test
 ```
 
 ### For E2SAR Integration
@@ -238,14 +233,17 @@ meson test -C builddir --suite fec-basic
 Several tests include performance measurements:
 
 ```bash
-# Run optimization comparison test
+# Run encoder/decoder test with performance metrics
 cd fec/src
-make test_avx2_optimization  # x86_64
-./test_avx2_optimization
+make test_enc_dec
+./tests/test_enc_dec
 
-# Or with NEON
-make test_neon_enc_dec       # ARM
-./test_neon_enc_dec
+# Run SIMD-optimized tests
+make test_avx2       # x86_64
+./tests/test_avx2
+
+make test_neon       # ARM
+./tests/test_neon
 ```
 
 Performance metrics include:
@@ -260,9 +258,8 @@ Performance metrics include:
 ```bash
 # Make-based CI
 cd fec/src
-make clean
-make all
-make run-all
+make test && ./tests/test
+make test_enc_dec && ./tests/test_enc_dec
 
 # Meson-based CI (with E2SAR)
 meson setup builddir
@@ -274,5 +271,5 @@ meson test -C builddir --suite fec-basic --suite fec-neon --suite fec-avx2 --pri
 
 - [FEC README](README.md) - Detailed architecture and test documentation
 - [Main E2SAR README](../README.md) - E2SAR project documentation
-- [Makefile](src/Makefile) - Make build configuration
-- [meson.build](meson.build) - Meson build configuration
+- [Makefile](src/Makefile) - Simple Make build configuration
+- [meson.build](meson.build) - Comprehensive Meson build configuration
