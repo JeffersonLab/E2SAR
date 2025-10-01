@@ -1,12 +1,12 @@
-#ifndef __ejfat_rs_avx2_decoder_h
-#define __ejfat_rs_avx2_decoder_h
+#ifndef __ejfat_rs_avx512_decoder_h
+#define __ejfat_rs_avx512_decoder_h
 
 #include <immintrin.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 // --------------------------------------------------------------------------------------
-// Minimal Reed-Solomon Decoder with AVX2 SIMD optimizations
+// Minimal Reed-Solomon Decoder with AVX-512 SIMD optimizations
 // RS(10,8) configuration: 8 data symbols + 2 parity symbols over GF(16)
 // --------------------------------------------------------------------------------------
 
@@ -23,19 +23,19 @@ typedef struct {
   int num_erasures;        // Number of erasures in this pattern
   char inv_matrix[8][8];   // Pre-computed 8x8 inverse matrix
   int valid;               // 1 if this entry is valid, 0 otherwise
-} rs_decode_table_entry_avx2;
+} rs_decode_table_entry_avx512;
 
 // Decoder table structure
 typedef struct {
-  rs_decode_table_entry_avx2 *entries;  // Dynamic array of table entries
-  int size;                              // Number of entries in table
-  int capacity;                          // Allocated capacity
-} rs_decode_table_avx2;
+  rs_decode_table_entry_avx512 *entries;  // Dynamic array of table entries
+  int size;                                // Number of entries in table
+  int capacity;                            // Allocated capacity
+} rs_decode_table_avx512;
 
 // --------------------------------------------------------------------------------------
-// Helper: Scalar GF multiplication (AVX2 version to be optimized later)
+// Helper: Scalar GF multiplication (AVX-512 version to be optimized later)
 // --------------------------------------------------------------------------------------
-static inline char avx2_gf_mul(char a, char b) {
+static inline char avx512_gf_mul(char a, char b) {
   if (a == 0 || b == 0) return 0;
   char a_exp = _ejfat_rs_gf_exp_seq[a];
   char b_exp = _ejfat_rs_gf_exp_seq[b];
@@ -44,7 +44,7 @@ static inline char avx2_gf_mul(char a, char b) {
 }
 
 // --------------------------------------------------------------------------------------
-// Single-nibble AVX2 RS decoder
+// Single-nibble AVX-512 RS decoder
 // Decodes received symbols with erasures using pre-computed inverse matrices
 // Parameters:
 //   - table: Pre-computed decoder table with inverse matrices
@@ -54,18 +54,18 @@ static inline char avx2_gf_mul(char a, char b) {
 //   - decoded: Output buffer for 8 decoded data symbols
 // Returns: 0 on success, -1 on error
 // --------------------------------------------------------------------------------------
-int avx2_rs_decode(rs_decode_table_avx2 *table, const char *received,
-                   int *erasure_locations, int num_erasures,
-                   char *decoded) {
+int avx512_rs_decode(rs_decode_table_avx512 *table, const char *received,
+                     int *erasure_locations, int num_erasures,
+                     char *decoded) {
 
   if (num_erasures > 2) {
     return -1;
   }
 
   // Find matching table entry
-  rs_decode_table_entry_avx2 *entry = NULL;
+  rs_decode_table_entry_avx512 *entry = NULL;
   for (int t = 0; t < table->size; t++) {
-    rs_decode_table_entry_avx2 *candidate = &table->entries[t];
+    rs_decode_table_entry_avx512 *candidate = &table->entries[t];
 
     if (!candidate->valid || candidate->num_erasures != num_erasures) {
       continue;
@@ -108,7 +108,7 @@ int avx2_rs_decode(rs_decode_table_avx2 *table, const char *received,
   for (int i = 0; i < 8; i++) {
     char result = 0;
     for (int j = 0; j < 8; j++) {
-      result ^= avx2_gf_mul(entry->inv_matrix[i][j], rx_modified[j]);
+      result ^= avx512_gf_mul(entry->inv_matrix[i][j], rx_modified[j]);
     }
     decoded[i] = result;
   }
@@ -117,7 +117,7 @@ int avx2_rs_decode(rs_decode_table_avx2 *table, const char *received,
 }
 
 // --------------------------------------------------------------------------------------
-// Dual-nibble AVX2 RS decoder
+// Dual-nibble AVX-512 RS decoder
 // Decodes received bytes with erasures for both upper and lower nibble streams
 // Parameters:
 //   - table: Pre-computed decoder table with inverse matrices
@@ -127,9 +127,9 @@ int avx2_rs_decode(rs_decode_table_avx2 *table, const char *received,
 //   - decoded_bytes: Output buffer for 8 decoded data bytes
 // Returns: 0 on success, -1 on error
 // --------------------------------------------------------------------------------------
-int avx2_rs_decode_dual_nibble(rs_decode_table_avx2 *table, const char *received_bytes,
-                                int *erasure_locations, int num_erasures,
-                                char *decoded_bytes) {
+int avx512_rs_decode_dual_nibble(rs_decode_table_avx512 *table, const char *received_bytes,
+                                  int *erasure_locations, int num_erasures,
+                                  char *decoded_bytes) {
 
   if (num_erasures > 2) {
     return -1;
@@ -148,9 +148,9 @@ int avx2_rs_decode_dual_nibble(rs_decode_table_avx2 *table, const char *received
   char upper_parity[2] = {(received_bytes[8] >> 4) & 0x0F, (received_bytes[9] >> 4) & 0x0F};
 
   // Find matching table entry for erasure pattern
-  rs_decode_table_entry_avx2 *entry = NULL;
+  rs_decode_table_entry_avx512 *entry = NULL;
   for (int t = 0; t < table->size; t++) {
-    rs_decode_table_entry_avx2 *candidate = &table->entries[t];
+    rs_decode_table_entry_avx512 *candidate = &table->entries[t];
 
     if (!candidate->valid || candidate->num_erasures != num_erasures) {
       continue;
@@ -193,7 +193,7 @@ int avx2_rs_decode_dual_nibble(rs_decode_table_avx2 *table, const char *received
   for (int i = 0; i < 8; i++) {
     char result = 0;
     for (int j = 0; j < 8; j++) {
-      result ^= avx2_gf_mul(entry->inv_matrix[i][j], lower_rx_modified[j]);
+      result ^= avx512_gf_mul(entry->inv_matrix[i][j], lower_rx_modified[j]);
     }
     lower_decoded[i] = result & 0x0F;
   }
@@ -213,7 +213,7 @@ int avx2_rs_decode_dual_nibble(rs_decode_table_avx2 *table, const char *received
   for (int i = 0; i < 8; i++) {
     char result = 0;
     for (int j = 0; j < 8; j++) {
-      result ^= avx2_gf_mul(entry->inv_matrix[i][j], upper_rx_modified[j]);
+      result ^= avx512_gf_mul(entry->inv_matrix[i][j], upper_rx_modified[j]);
     }
     upper_decoded[i] = result & 0x0F;
   }
