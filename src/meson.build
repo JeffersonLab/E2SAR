@@ -16,5 +16,7 @@ libe2sar = static_library('e2sar',
                                    liblbgrpc.extract_all_objects(recursive: false)],
 			install : true)
 
-# The pybind
-subdir('pybind')
+# The pybind (skip if building FEC tests only)
+if not get_option('build_fec_tests')
+    subdir('pybind')
+endif
