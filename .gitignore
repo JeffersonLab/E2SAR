@@ -31,6 +31,13 @@
 *.out
 *.app
 
+# Test executables
+fec/src/tests/test
+fec/src/tests/test_avx2
+fec/src/tests/test_avx512
+fec/src/tests/test_enc_dec
+fec/src/tests/test_neon
+
 **/.vscode
 
 **/.ipynb_checkpoints
