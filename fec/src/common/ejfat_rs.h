@@ -334,7 +334,7 @@ void free_rs(rs_model *rs) {
 
 // --------------------------------------------------------------------------
 // Using model (rs), encode data vector (d), to produce parity words (p) which
-// can be appended to (d) for transmission.  This assumes we are using a 
+// can be appended to (d) for transmission.  This assumes we are using a
 // systematic rs model, which transmits the data words as is.
 // --------------------------------------------------------------------------
 
@@ -342,21 +342,56 @@ void rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
   poly_matrix_vector_mul(rs->Genc , d , p);
 }
 
+// Unpacked version: accepts individual char* parameters for data and parity
+void rs_encode_unpacked(rs_model *rs,
+                        char *d0, char *d1, char *d2, char *d3, char *d4, char *d5, char *d6, char *d7,
+                        char *p0, char *p1) {
+  rs_poly_vector d = { .len = 8, .val = { *d0, *d1, *d2, *d3, *d4, *d5, *d6, *d7 } };
+  rs_poly_vector p = { .len = 2 };
+
+  poly_matrix_vector_mul(rs->Genc, &d, &p);
+
+  *p0 = p.val[0];
+  *p1 = p.val[1];
+}
+
 void fast_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
 
   char exp_d;
   char exp_sum;
-  
+
   for (int row=0 ; row < rs->Genc->rows ; row++ ) {
     p->val[row] = 0;
     for (int j=0 ; j < d->len ; j++ ) {
 
       char exp_d = _ejfat_rs_gf_exp_seq[d->val[j]];
       char exp_sum = (exp_d + rs->Genc_exp[row][j]) % 15;
-    
+
       p->val[row] ^= (_ejfat_rs_gf_log_seq[exp_sum]);
     };
   };
+}
+
+void fast_rs_encode_unpacked(rs_model *rs,
+                              char *d0, char *d1, char *d2, char *d3, char *d4, char *d5, char *d6, char *d7,
+                              char *p0, char *p1) {
+  rs_poly_vector d = { .len = 8, .val = { *d0, *d1, *d2, *d3, *d4, *d5, *d6, *d7 } };
+  rs_poly_vector p = { .len = 2 };
+
+  char exp_d;
+  char exp_sum;
+
+  for (int row=0 ; row < rs->Genc->rows ; row++ ) {
+    p.val[row] = 0;
+    for (int j=0 ; j < d.len ; j++ ) {
+      char exp_d = _ejfat_rs_gf_exp_seq[d.val[j]];
+      char exp_sum = (exp_d + rs->Genc_exp[row][j]) % 15;
+      p.val[row] ^= (_ejfat_rs_gf_log_seq[exp_sum]);
+    };
+  };
+
+  *p0 = p.val[0];
+  *p1 = p.val[1];
 }
 
 void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
@@ -367,14 +402,14 @@ void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
   // ------------------------------------------------------------------------------------
 
   uint8x8x2_t exp_table;
-  uint8x8x2_t log_table;  
-  
+  uint8x8x2_t log_table;
+
   exp_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[0]);   // t[0] to t[7]
   exp_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[8]);   // t[8] to t[15]
 
   log_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[0]);   // t[0] to t[7]
   log_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[8]);   // t[8] to t[15]
-  
+
 // Load indices
   uint8x8_t indices = vld1_u8((unsigned const char *) d->val);
 
@@ -382,7 +417,7 @@ void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
   uint8x8_t d_vec = vtbl2_u8(exp_table, indices);
 
   uint8x8_t mod = vdup_n_u8(15);  // used by mod instruction
-  
+
   for (int i=0; i < rs->p; i++) {
     uint8x8_t enc_vec = vld1_u8((uint8_t *) rs->Genc_exp[i]);
     uint8x8_t sum = vadd_u8(d_vec, enc_vec);
@@ -402,6 +437,47 @@ void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
       p->val[i] ^= sum_vec_array[j];
     }
   }
+}
+
+void neon_rs_encode_unpacked(rs_model *rs,
+                              char *d0, char *d1, char *d2, char *d3, char *d4, char *d5, char *d6, char *d7,
+                              char *p0, char *p1) {
+  uint8_t d_array[8] = { *d0, *d1, *d2, *d3, *d4, *d5, *d6, *d7 };
+
+  uint8x8x2_t exp_table;
+  uint8x8x2_t log_table;
+
+  exp_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[0]);
+  exp_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_exp_seq[8]);
+
+  log_table.val[0] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[0]);
+  log_table.val[1] = vld1_u8((unsigned const char *) &_ejfat_rs_gf_log_seq[8]);
+
+  uint8x8_t indices = vld1_u8(d_array);
+  uint8x8_t d_vec = vtbl2_u8(exp_table, indices);
+  uint8x8_t mod = vdup_n_u8(15);
+
+  char p[2];
+  for (int i=0; i < rs->p; i++) {
+    uint8x8_t enc_vec = vld1_u8((uint8_t *) rs->Genc_exp[i]);
+    uint8x8_t sum = vadd_u8(d_vec, enc_vec);
+
+    uint8x8_t mask = vcge_u8(sum, mod);
+    uint8x8_t mod15 = vand_u8(mod, mask);
+    uint8x8_t exp_sum = vsub_u8(sum, mod15);
+
+    uint8x8_t sum_vec = vtbl2_u8(log_table, exp_sum);
+
+    uint8_t sum_vec_array[8];
+    vst1_u8(sum_vec_array,sum_vec);
+    p[i] = 0;
+    for (int j=0 ; j < 8 ; j++ ){
+      p[i] ^= sum_vec_array[j];
+    }
+  }
+
+  *p0 = p[0];
+  *p1 = p[1];
 }
 
 // --------------------------------------------------------------------------------------
@@ -506,6 +582,325 @@ void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_byt
 
   parity_bytes[0] = ((upper_parity[0] & 0x0F) << 4) | (lower_parity[0] & 0x0F);
   parity_bytes[1] = ((upper_parity[1] & 0x0F) << 4) | (lower_parity[1] & 0x0F);
+}
+
+// --------------------------------------------------------------------------------------
+// Batched RS Encoding - Blocked Transposed Layout
+// --------------------------------------------------------------------------------------
+
+// Helper: Convert vector-major to blocked transposed layout (data symbols)
+// Input:  vector_major[N][8] - N vectors, each with 8 symbols
+// Output: blocked[blocks][8][block_size] - blocked transposed layout
+void convert_to_blocked_transposed_data(char *vector_major, char *blocked,
+                                        int num_vectors, int block_size) {
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+
+    for (int symbol = 0; symbol < 8; symbol++) {
+      for (int v = 0; v < vecs_in_block; v++) {
+        int vec_idx = block * block_size + v;
+        blocked[block * block_size * 8 + symbol * block_size + v] =
+            vector_major[vec_idx * 8 + symbol];
+      }
+    }
+  }
+}
+
+// Helper: Convert vector-major to blocked transposed layout (parity symbols)
+// Input:  vector_major[N][2] - N vectors, each with 2 parity symbols
+// Output: blocked[blocks][2][block_size] - blocked transposed layout
+void convert_to_blocked_transposed_parity(char *vector_major, char *blocked,
+                                          int num_vectors, int block_size) {
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+
+    for (int symbol = 0; symbol < 2; symbol++) {
+      for (int v = 0; v < vecs_in_block; v++) {
+        int vec_idx = block * block_size + v;
+        blocked[block * block_size * 2 + symbol * block_size + v] =
+            vector_major[vec_idx * 2 + symbol];
+      }
+    }
+  }
+}
+
+// Helper: Convert blocked transposed back to vector-major layout (data)
+void convert_from_blocked_transposed_data(char *blocked, char *vector_major,
+                                          int num_vectors, int block_size) {
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+
+    for (int symbol = 0; symbol < 8; symbol++) {
+      for (int v = 0; v < vecs_in_block; v++) {
+        int vec_idx = block * block_size + v;
+        vector_major[vec_idx * 8 + symbol] =
+            blocked[block * block_size * 8 + symbol * block_size + v];
+      }
+    }
+  }
+}
+
+// Helper: Convert blocked transposed back to vector-major layout (parity)
+void convert_from_blocked_transposed_parity(char *blocked, char *vector_major,
+                                            int num_vectors, int block_size) {
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+
+    for (int symbol = 0; symbol < 2; symbol++) {
+      for (int v = 0; v < vecs_in_block; v++) {
+        int vec_idx = block * block_size + v;
+        vector_major[vec_idx * 2 + symbol] =
+            blocked[block * block_size * 2 + symbol * block_size + v];
+      }
+    }
+  }
+}
+
+// Vectorized GF multiplication for 128-bit NEON (16 elements)
+static inline uint8x16_t neon_gf_mul_vec_128(uint8x16_t a, uint8x16_t b,
+                                              uint8x16x2_t exp_table, uint8x16x2_t log_table) {
+  // Handle zero case
+  uint8x16_t zero_vec = vdupq_n_u8(0);
+  uint8x16_t a_zero_mask = vceqq_u8(a, zero_vec);
+  uint8x16_t b_zero_mask = vceqq_u8(b, zero_vec);
+  uint8x16_t zero_mask = vorrq_u8(a_zero_mask, b_zero_mask);
+
+  // Convert to exponent space using vtbx (extended table lookup)
+  uint8x16_t a_exp = vqtbl2q_u8(exp_table, a);
+  uint8x16_t b_exp = vqtbl2q_u8(exp_table, b);
+
+  // Add exponents (mod 15)
+  uint8x16_t sum_exp = vaddq_u8(a_exp, b_exp);
+  uint8x16_t mod = vdupq_n_u8(15);
+  uint8x16_t mask = vcgeq_u8(sum_exp, mod);
+  uint8x16_t mod15 = vandq_u8(mod, mask);
+  sum_exp = vsubq_u8(sum_exp, mod15);
+
+  // Convert back to normal space
+  uint8x16_t result = vqtbl2q_u8(log_table, sum_exp);
+
+  // Apply zero mask
+  result = vbicq_u8(result, zero_mask);
+
+  return result;
+}
+
+// Batched NEON encoder with blocked transposed layout (nibble version)
+// data_blocked: [num_vectors * 8] in blocked transposed format
+// parity_blocked: [num_vectors * 2] output in blocked transposed format
+// block_size: recommended 128 or 256 for cache efficiency
+void neon_rs_encode_batch_blocked(rs_model *rs, char *data_blocked,
+                                  char *parity_blocked, int num_vectors, int block_size) {
+
+  if (block_size <= 0 || num_vectors <= 0) return;
+
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  // Load GF tables once (128-bit version for processing 16 elements)
+  uint8x16x2_t exp_table, log_table;
+
+  // Replicate 8-element tables to 16-element tables
+  uint8_t exp_16[16], log_16[16];
+  for (int i = 0; i < 16; i++) {
+    exp_16[i] = _ejfat_rs_gf_exp_seq[i];
+    log_16[i] = _ejfat_rs_gf_log_seq[i];
+  }
+
+  exp_table.val[0] = vld1q_u8(&exp_16[0]);
+  exp_table.val[1] = vld1q_u8(&exp_16[0]);  // Duplicate for extended lookup
+  log_table.val[0] = vld1q_u8(&log_16[0]);
+  log_table.val[1] = vld1q_u8(&log_16[0]);
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+    int block_data_offset = block * block_size * 8;
+    int block_parity_offset = block * block_size * 2;
+
+    // For each parity symbol (p0, p1)
+    for (int parity_idx = 0; parity_idx < rs->p; parity_idx++) {
+      int parity_symbol_offset = block_parity_offset + parity_idx * block_size;
+
+      // Process vectors in chunks of 16
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+
+        uint8x16_t parity_acc = vdupq_n_u8(0);
+
+        // Dot product: Genc_exp[parity_idx][:] · data_symbols
+        for (int j = 0; j < 8; j++) {
+          // Load up to 16 copies of symbol j
+          uint8x16_t data_vec;
+          if (chunk == 16) {
+            data_vec = vld1q_u8((uint8_t*)&data_blocked[block_data_offset + j * block_size + v]);
+          } else {
+            // Handle partial chunk
+            uint8_t temp[16] = {0};
+            for (int i = 0; i < chunk; i++) {
+              temp[i] = data_blocked[block_data_offset + j * block_size + v + i];
+            }
+            data_vec = vld1q_u8(temp);
+          }
+
+          // Convert data to exponent space
+          uint8x16_t data_exp = vqtbl2q_u8(exp_table, data_vec);
+
+          // Coefficient for this (parity, data_symbol) pair
+          uint8x16_t coeff_exp = vdupq_n_u8(rs->Genc_exp[parity_idx][j]);
+
+          // GF multiply: exp(a*b) = (exp(a) + exp(b)) % 15
+          uint8x16_t sum_exp = vaddq_u8(data_exp, coeff_exp);
+          uint8x16_t mod = vdupq_n_u8(15);
+          uint8x16_t mask = vcgeq_u8(sum_exp, mod);
+          uint8x16_t mod15 = vandq_u8(mod, mask);
+          sum_exp = vsubq_u8(sum_exp, mod15);
+
+          // Convert back to normal space
+          uint8x16_t prod = vqtbl2q_u8(log_table, sum_exp);
+
+          // Handle zeros: if data[j] == 0, result should be 0
+          uint8x16_t zero_vec = vdupq_n_u8(0);
+          uint8x16_t data_zero_mask = vceqq_u8(data_vec, zero_vec);
+          prod = vbicq_u8(prod, data_zero_mask);
+
+          // GF addition (XOR)
+          parity_acc = veorq_u8(parity_acc, prod);
+        }
+
+        // Store parity results
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&parity_blocked[parity_symbol_offset + v], parity_acc);
+        } else {
+          uint8_t temp[16];
+          vst1q_u8(temp, parity_acc);
+          for (int i = 0; i < chunk; i++) {
+            parity_blocked[parity_symbol_offset + v + i] = temp[i];
+          }
+        }
+      }
+    }
+  }
+}
+
+// Batched dual-nibble encoder with blocked transposed layout
+// data_bytes_blocked: [num_vectors * 8] full bytes in blocked transposed format
+// parity_bytes_blocked: [num_vectors * 2] output parity bytes in blocked transposed format
+void neon_rs_encode_dual_nibble_batch_blocked(rs_model *rs, char *data_bytes_blocked,
+                                               char *parity_bytes_blocked,
+                                               int num_vectors, int block_size) {
+
+  if (block_size <= 0 || num_vectors <= 0) return;
+
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  // Load GF tables
+  uint8x16x2_t exp_table, log_table;
+  uint8_t exp_16[16], log_16[16];
+  for (int i = 0; i < 16; i++) {
+    exp_16[i] = _ejfat_rs_gf_exp_seq[i];
+    log_16[i] = _ejfat_rs_gf_log_seq[i];
+  }
+  exp_table.val[0] = vld1q_u8(&exp_16[0]);
+  exp_table.val[1] = vld1q_u8(&exp_16[0]);
+  log_table.val[0] = vld1q_u8(&log_16[0]);
+  log_table.val[1] = vld1q_u8(&log_16[0]);
+
+  uint8x16_t nibble_mask = vdupq_n_u8(0x0F);
+  uint8x16_t zero_vec = vdupq_n_u8(0);
+  uint8x16_t mod = vdupq_n_u8(15);
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+    int block_offset = block * block_size * 8;
+    int parity_offset = block * block_size * 2;
+
+    // For each parity byte (2 total)
+    for (int parity_idx = 0; parity_idx < rs->p; parity_idx++) {
+      int parity_byte_offset = parity_offset + parity_idx * block_size;
+
+      // Process in chunks of 16 vectors
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+
+        uint8x16_t lower_parity_acc = vdupq_n_u8(0);
+        uint8x16_t upper_parity_acc = vdupq_n_u8(0);
+
+        // Process each of 8 data bytes
+        for (int j = 0; j < 8; j++) {
+          // Load data bytes
+          uint8x16_t data_bytes;
+          if (chunk == 16) {
+            data_bytes = vld1q_u8((uint8_t*)&data_bytes_blocked[block_offset + j * block_size + v]);
+          } else {
+            uint8_t temp[16] = {0};
+            for (int i = 0; i < chunk; i++) {
+              temp[i] = data_bytes_blocked[block_offset + j * block_size + v + i];
+            }
+            data_bytes = vld1q_u8(temp);
+          }
+
+          // Extract nibbles
+          uint8x16_t lower_nibbles = vandq_u8(data_bytes, nibble_mask);
+          uint8x16_t upper_nibbles = vshrq_n_u8(data_bytes, 4);
+
+          // --- Encode lower nibbles ---
+          uint8x16_t lower_zero_mask = vceqq_u8(lower_nibbles, zero_vec);
+          uint8x16_t lower_exp = vqtbl2q_u8(exp_table, lower_nibbles);
+          uint8x16_t coeff_exp = vdupq_n_u8(rs->Genc_exp[parity_idx][j]);
+
+          uint8x16_t lower_sum_exp = vaddq_u8(lower_exp, coeff_exp);
+          uint8x16_t lower_mask = vcgeq_u8(lower_sum_exp, mod);
+          uint8x16_t lower_mod15 = vandq_u8(mod, lower_mask);
+          lower_sum_exp = vsubq_u8(lower_sum_exp, lower_mod15);
+
+          uint8x16_t lower_prod = vqtbl2q_u8(log_table, lower_sum_exp);
+          lower_prod = vbicq_u8(lower_prod, lower_zero_mask);
+          lower_parity_acc = veorq_u8(lower_parity_acc, lower_prod);
+
+          // --- Encode upper nibbles ---
+          uint8x16_t upper_zero_mask = vceqq_u8(upper_nibbles, zero_vec);
+          uint8x16_t upper_exp = vqtbl2q_u8(exp_table, upper_nibbles);
+
+          uint8x16_t upper_sum_exp = vaddq_u8(upper_exp, coeff_exp);
+          uint8x16_t upper_mask = vcgeq_u8(upper_sum_exp, mod);
+          uint8x16_t upper_mod15 = vandq_u8(mod, upper_mask);
+          upper_sum_exp = vsubq_u8(upper_sum_exp, upper_mod15);
+
+          uint8x16_t upper_prod = vqtbl2q_u8(log_table, upper_sum_exp);
+          upper_prod = vbicq_u8(upper_prod, upper_zero_mask);
+          upper_parity_acc = veorq_u8(upper_parity_acc, upper_prod);
+        }
+
+        // Combine parity nibbles into bytes
+        uint8x16_t parity_bytes = vorrq_u8(vshlq_n_u8(vandq_u8(upper_parity_acc, nibble_mask), 4),
+                                           vandq_u8(lower_parity_acc, nibble_mask));
+
+        // Store parity bytes
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&parity_bytes_blocked[parity_byte_offset + v], parity_bytes);
+        } else {
+          uint8_t temp[16];
+          vst1q_u8(temp, parity_bytes);
+          for (int i = 0; i < chunk; i++) {
+            parity_bytes_blocked[parity_byte_offset + v + i] = temp[i];
+          }
+        }
+      }
+    }
+  }
 }
 
 

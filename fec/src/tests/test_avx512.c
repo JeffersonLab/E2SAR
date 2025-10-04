@@ -67,7 +67,7 @@ void benchmark_single_nibble() {
   printf("Time:           %f seconds\n", time_taken);
   printf("Frames/second:  %f\n", test_frames / time_taken);
   printf("Data rate:      %f Mbps\n",
-         1/1E6 * 8 * 8 * test_packet_length * test_frames / time_taken);
+         1/1E6 * 4 * 8 * test_packet_length * test_frames / time_taken);  // 4 bits per nibble
   printf("Parity result:  %d %d\n", parity[0], parity[1]);
 }
 

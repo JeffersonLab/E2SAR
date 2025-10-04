@@ -127,23 +127,23 @@ void free_poly_matrix(rs_poly_matrix *m) {
 }
 
 // Decode with known erasure locations (up to 2*t erasures)
-int rs_decode_erasures(rs_model *rs, rs_poly_vector *received, 
-                       int *erasure_locations, int num_erasures, 
+int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
+                       int *erasure_locations, int num_erasures,
                        rs_poly_vector *decoded) {
-  
+
   if (num_erasures > rs->p) {
-    printf("Error: Too many erasures (%d), can only correct up to %d\n", 
+    printf("Error: Too many erasures (%d), can only correct up to %d\n",
            num_erasures, rs->p);
     return -1;
   }
-  
+
   // Method 1: Create G* by removing erased rows, then invert
   if (num_erasures > 0) {
     // Create G* matrix by removing erased symbol rows
     rs_poly_matrix *g_star = (rs_poly_matrix *) malloc(sizeof(rs_poly_matrix) + rs->n * sizeof(rs_poly_vector *));
     g_star->rows = rs->n;
     g_star->cols = rs->n;
-    
+
     int valid_row = 0;
     for (int i = 0; i < rs->n; i++) {
       // Check if this row is not erased
@@ -154,7 +154,7 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
           break;
         }
       }
-      
+
       if (!is_erased) {
         g_star->val[valid_row] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
         g_star->val[valid_row]->len = rs->n;
@@ -165,7 +165,7 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
         valid_row++;
       }
     }
-    
+
     // Add parity constraints to make it square
     for (int i = 0; i < num_erasures; i++) {
       g_star->val[valid_row] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
@@ -175,7 +175,7 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
       }
       valid_row++;
     }
-    
+
     // Invert G*
     rs_poly_matrix *g_inv;
     if (poly_matrix_invert(g_star, &g_inv) != 0) {
@@ -184,12 +184,12 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
       free(g_star);
       return -1;
     }
-    
+
     // Create received vector without erased symbols, adding parity
     rs_poly_vector rx_reduced;
     rx_reduced.len = rs->n;
     valid_row = 0;
-    
+
     for (int i = 0; i < rs->n; i++) {
       int is_erased = 0;
       for (int j = 0; j < num_erasures; j++) {
@@ -198,28 +198,28 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
           break;
         }
       }
-      
+
       if (!is_erased) {
         rx_reduced.val[valid_row] = received->val[i];
         valid_row++;
       }
     }
-    
+
     // Add parity symbols
     for (int i = 0; i < num_erasures; i++) {
       rx_reduced.val[valid_row] = received->val[rs->n + i];
       valid_row++;
     }
-    
+
     // Decode: decoded = G_inv * rx_reduced
     poly_matrix_vector_mul(g_inv, &rx_reduced, decoded);
-    
+
     // Clean up
     free_poly_matrix(g_star);
     free(g_star);
     free_poly_matrix(g_inv);
     free(g_inv);
-    
+
   } else {
     // No erasures, just copy data symbols
     decoded->len = rs->n;
@@ -227,8 +227,32 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
       decoded->val[i] = received->val[i];
     }
   }
-  
+
   return 0;
+}
+
+// Unpacked version: accepts individual char* parameters and updates in-place
+int rs_decode_erasures_unpacked(rs_model *rs,
+                                 char *d0, char *d1, char *d2, char *d3, char *d4, char *d5, char *d6, char *d7,
+                                 char *p0, char *p1,
+                                 int *erasure_locations, int num_erasures) {
+  rs_poly_vector received = { .len = 10, .val = { *d0, *d1, *d2, *d3, *d4, *d5, *d6, *d7, *p0, *p1 } };
+  rs_poly_vector decoded = { .len = 8 };
+
+  int result = rs_decode_erasures(rs, &received, erasure_locations, num_erasures, &decoded);
+
+  if (result == 0) {
+    *d0 = decoded.val[0];
+    *d1 = decoded.val[1];
+    *d2 = decoded.val[2];
+    *d3 = decoded.val[3];
+    *d4 = decoded.val[4];
+    *d5 = decoded.val[5];
+    *d6 = decoded.val[6];
+    *d7 = decoded.val[7];
+  }
+
+  return result;
 }
 
 // Simple decode for the case where we substitute parity for erased data
@@ -488,20 +512,20 @@ void free_rs_decode_table(rs_decode_table *table) {
 int rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received,
                           int *erasure_locations, int num_erasures,
                           rs_poly_vector *decoded) {
-  
+
   if (num_erasures > 2) {
     printf("Error: Table-based decoder supports up to 2 erasures\n");
     return -1;
   }
-  
+
   // Look up erasure pattern in table
   for (int t = 0; t < table->size; t++) {
     rs_decode_table_entry *entry = &table->entries[t];
-    
+
     if (!entry->valid || entry->num_erasures != num_erasures) {
       continue;
     }
-    
+
     // Check if erasure pattern matches
     int match = 1;
     if (num_erasures == 0) {
@@ -510,46 +534,70 @@ int rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received,
       match = (entry->erasure_pattern[0] == erasure_locations[0]);
     } else if (num_erasures == 2) {
       // Check both orderings for double erasures
-      match = ((entry->erasure_pattern[0] == erasure_locations[0] && 
+      match = ((entry->erasure_pattern[0] == erasure_locations[0] &&
                 entry->erasure_pattern[1] == erasure_locations[1]) ||
-               (entry->erasure_pattern[0] == erasure_locations[1] && 
+               (entry->erasure_pattern[0] == erasure_locations[1] &&
                 entry->erasure_pattern[1] == erasure_locations[0]));
     }
-    
+
     if (match) {
       // Found matching pattern, use pre-computed inverse
       rs_poly_vector rx_modified;
       rx_modified.len = 8;
-      
+
       // Create received vector with parity substitutions
       for (int i = 0; i < 8; i++) {
         rx_modified.val[i] = received->val[i];
       }
-      
+
       // Replace erased symbols with parity symbols
       for (int i = 0; i < num_erasures; i++) {
         if (erasure_locations[i] < 8) {
           rx_modified.val[erasure_locations[i]] = received->val[8 + i];
         }
       }
-      
+
       // Apply pre-computed inverse matrix
       decoded->len = 8;
       for (int i = 0; i < 8; i++) {
         decoded->val[i] = 0;
         for (int j = 0; j < 8; j++) {
-          decoded->val[i] = gf_sum(decoded->val[i], 
-                                   gf_mul(entry->inv_matrix[i][j], 
+          decoded->val[i] = gf_sum(decoded->val[i],
+                                   gf_mul(entry->inv_matrix[i][j],
                                           rx_modified.val[j]));
         }
       }
-      
+
       return 0;
     }
   }
-  
+
   printf("Warning: Erasure pattern not found in table\n");
   return -1;
+}
+
+// Unpacked version of table-based decoder: accepts char* parameters and updates in-place
+int rs_decode_table_lookup_unpacked(rs_decode_table *table,
+                                     char *d0, char *d1, char *d2, char *d3, char *d4, char *d5, char *d6, char *d7,
+                                     char *p0, char *p1,
+                                     int *erasure_locations, int num_erasures) {
+  rs_poly_vector received = { .len = 10, .val = { *d0, *d1, *d2, *d3, *d4, *d5, *d6, *d7, *p0, *p1 } };
+  rs_poly_vector decoded = { .len = 8 };
+
+  int result = rs_decode_table_lookup(table, &received, erasure_locations, num_erasures, &decoded);
+
+  if (result == 0) {
+    *d0 = decoded.val[0];
+    *d1 = decoded.val[1];
+    *d2 = decoded.val[2];
+    *d3 = decoded.val[3];
+    *d4 = decoded.val[4];
+    *d5 = decoded.val[5];
+    *d6 = decoded.val[6];
+    *d7 = decoded.val[7];
+  }
+
+  return result;
 }
 
 // NEON-optimized table-based decoder for maximum performance
@@ -671,8 +719,32 @@ int neon_rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received
     
     decoded->val[i] = result;
   }
-  
+
   return 0;
+}
+
+// Unpacked version of NEON table-based decoder: accepts char* parameters and updates in-place
+int neon_rs_decode_table_lookup_unpacked(rs_decode_table *table,
+                                          char *d0, char *d1, char *d2, char *d3, char *d4, char *d5, char *d6, char *d7,
+                                          char *p0, char *p1,
+                                          int *erasure_locations, int num_erasures) {
+  rs_poly_vector received = { .len = 10, .val = { *d0, *d1, *d2, *d3, *d4, *d5, *d6, *d7, *p0, *p1 } };
+  rs_poly_vector decoded = { .len = 8 };
+
+  int result = neon_rs_decode_table_lookup(table, &received, erasure_locations, num_erasures, &decoded);
+
+  if (result == 0) {
+    *d0 = decoded.val[0];
+    *d1 = decoded.val[1];
+    *d2 = decoded.val[2];
+    *d3 = decoded.val[3];
+    *d4 = decoded.val[4];
+    *d5 = decoded.val[5];
+    *d6 = decoded.val[6];
+    *d7 = decoded.val[7];
+  }
+
+  return result;
 }
 
 // Vectorized GF multiplication for 8 elements at once
@@ -782,6 +854,337 @@ int neon_rs_decode_table_lookup_v2(rs_decode_table *table, rs_poly_vector *recei
     decoded->val[i] = result;
   }
   
+  return 0;
+}
+
+// --------------------------------------------------------------------------------------
+// Batched RS Decoding - Blocked Transposed Layout
+// --------------------------------------------------------------------------------------
+
+// Batched NEON decoder with blocked transposed layout (nibble version)
+// All vectors share the SAME erasure pattern
+// data_blocked: [num_vectors * 8] data symbols in blocked transposed format (modified in-place)
+// parity_blocked: [num_vectors * 2] parity symbols in blocked transposed format
+// erasure_locations: shared erasure pattern for all vectors
+// num_erasures: number of erasures (0-2)
+int neon_rs_decode_batch_blocked(rs_decode_table *table, char *data_blocked,
+                                 char *parity_blocked, int *erasure_locations,
+                                 int num_erasures, int num_vectors, int block_size) {
+
+  if (num_erasures > 2 || block_size <= 0 || num_vectors <= 0) {
+    return -1;
+  }
+
+  // Lookup inverse matrix ONCE for all vectors (shared erasure pattern)
+  rs_decode_table_entry *entry = NULL;
+  for (int t = 0; t < table->size; t++) {
+    rs_decode_table_entry *candidate = &table->entries[t];
+
+    if (!candidate->valid || candidate->num_erasures != num_erasures) {
+      continue;
+    }
+
+    int match = 0;
+    if (num_erasures == 0) {
+      match = 1;
+    } else if (num_erasures == 1) {
+      match = (candidate->erasure_pattern[0] == erasure_locations[0]);
+    } else if (num_erasures == 2) {
+      match = ((candidate->erasure_pattern[0] == erasure_locations[0] &&
+                candidate->erasure_pattern[1] == erasure_locations[1]) ||
+               (candidate->erasure_pattern[0] == erasure_locations[1] &&
+                candidate->erasure_pattern[1] == erasure_locations[0]));
+    }
+
+    if (match) {
+      entry = candidate;
+      break;
+    }
+  }
+
+  if (!entry) {
+    return -1;  // Pattern not found
+  }
+
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  // Load GF tables once
+  uint8x16x2_t exp_table, log_table;
+  uint8_t exp_16[16], log_16[16];
+  for (int i = 0; i < 16; i++) {
+    exp_16[i] = _ejfat_rs_gf_exp_seq[i];
+    log_16[i] = _ejfat_rs_gf_log_seq[i];
+  }
+  exp_table.val[0] = vld1q_u8(&exp_16[0]);
+  exp_table.val[1] = vld1q_u8(&exp_16[0]);
+  log_table.val[0] = vld1q_u8(&log_16[0]);
+  log_table.val[1] = vld1q_u8(&log_16[0]);
+
+  uint8x16_t zero_vec = vdupq_n_u8(0);
+  uint8x16_t mod = vdupq_n_u8(15);
+
+  // Temporary storage for decoded output
+  char *decoded_blocked = malloc(num_vectors * 8);
+  if (!decoded_blocked) return -1;
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+    int block_data_offset = block * block_size * 8;
+    int block_parity_offset = block * block_size * 2;
+    int decoded_offset = block * block_size * 8;
+
+    // Step 1: Substitute erased symbols with parity symbols (in-place in data_blocked)
+    for (int e = 0; e < num_erasures; e++) {
+      int erased_pos = erasure_locations[e];
+      if (erased_pos < 8) {
+        // Copy parity symbol e into erased data position
+        for (int v = 0; v < vecs_in_block; v++) {
+          data_blocked[block_data_offset + erased_pos * block_size + v] =
+              parity_blocked[block_parity_offset + e * block_size + v];
+        }
+      }
+    }
+
+    // Step 2: Apply inverse matrix: decoded = inv_matrix × rx_modified
+    for (int i = 0; i < 8; i++) {  // Output symbol index
+      int output_offset = decoded_offset + i * block_size;
+
+      // Process in chunks of 16
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+        uint8x16_t acc = vdupq_n_u8(0);
+
+        // Matrix-vector multiply: inv_matrix[i][:] · rx_modified
+        for (int j = 0; j < 8; j++) {
+          uint8x16_t rx_vec;
+          if (chunk == 16) {
+            rx_vec = vld1q_u8((uint8_t*)&data_blocked[block_data_offset + j * block_size + v]);
+          } else {
+            uint8_t temp[16] = {0};
+            for (int k = 0; k < chunk; k++) {
+              temp[k] = data_blocked[block_data_offset + j * block_size + v + k];
+            }
+            rx_vec = vld1q_u8(temp);
+          }
+
+          uint8x16_t coeff = vdupq_n_u8(entry->inv_matrix[i][j]);
+
+          // GF multiply using exponent/log tables
+          uint8x16_t rx_zero_mask = vceqq_u8(rx_vec, zero_vec);
+          uint8x16_t coeff_zero_mask = vceqq_u8(coeff, zero_vec);
+          uint8x16_t zero_mask = vorrq_u8(rx_zero_mask, coeff_zero_mask);
+
+          uint8x16_t rx_exp = vqtbl2q_u8(exp_table, rx_vec);
+          uint8x16_t coeff_exp = vqtbl2q_u8(exp_table, coeff);
+
+          uint8x16_t sum_exp = vaddq_u8(rx_exp, coeff_exp);
+          uint8x16_t mask = vcgeq_u8(sum_exp, mod);
+          uint8x16_t mod15 = vandq_u8(mod, mask);
+          sum_exp = vsubq_u8(sum_exp, mod15);
+
+          uint8x16_t prod = vqtbl2q_u8(log_table, sum_exp);
+          prod = vbicq_u8(prod, zero_mask);
+
+          // GF addition (XOR)
+          acc = veorq_u8(acc, prod);
+        }
+
+        // Store decoded output
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&decoded_blocked[output_offset + v], acc);
+        } else {
+          uint8_t temp[16];
+          vst1q_u8(temp, acc);
+          for (int k = 0; k < chunk; k++) {
+            decoded_blocked[output_offset + v + k] = temp[k];
+          }
+        }
+      }
+    }
+  }
+
+  // Copy decoded result back to data_blocked
+  memcpy(data_blocked, decoded_blocked, num_vectors * 8);
+  free(decoded_blocked);
+
+  return 0;
+}
+
+// Batched dual-nibble decoder with blocked transposed layout
+// Decodes both upper and lower nibbles of full bytes
+// All vectors share the SAME erasure pattern
+int neon_rs_decode_dual_nibble_batch_blocked(rs_decode_table *table,
+                                             char *data_bytes_blocked,
+                                             char *parity_bytes_blocked,
+                                             int *erasure_locations,
+                                             int num_erasures,
+                                             int num_vectors,
+                                             int block_size) {
+
+  if (num_erasures > 2 || block_size <= 0 || num_vectors <= 0) {
+    return -1;
+  }
+
+  // We need to decode lower and upper nibbles separately as independent RS codewords
+  // Extract nibbles into separate buffers, decode, then recombine
+
+  // Allocate buffers for lower and upper nibbles
+  char *lower_data_blocked = malloc(num_vectors * 8);
+  char *upper_data_blocked = malloc(num_vectors * 8);
+  char *lower_parity_blocked = malloc(num_vectors * 2);
+  char *upper_parity_blocked = malloc(num_vectors * 2);
+
+  if (!lower_data_blocked || !upper_data_blocked || !lower_parity_blocked || !upper_parity_blocked) {
+    free(lower_data_blocked);
+    free(upper_data_blocked);
+    free(lower_parity_blocked);
+    free(upper_parity_blocked);
+    return -1;
+  }
+
+  int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+  // Extract nibbles using SIMD
+  uint8x16_t nibble_mask = vdupq_n_u8(0x0F);
+
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+    int block_offset = block * block_size * 8;
+    int parity_offset = block * block_size * 2;
+
+    // Extract data nibbles
+    for (int symbol = 0; symbol < 8; symbol++) {
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+
+        uint8x16_t data_bytes;
+        if (chunk == 16) {
+          data_bytes = vld1q_u8((uint8_t*)&data_bytes_blocked[block_offset + symbol * block_size + v]);
+        } else {
+          uint8_t temp[16] = {0};
+          for (int i = 0; i < chunk; i++) {
+            temp[i] = data_bytes_blocked[block_offset + symbol * block_size + v + i];
+          }
+          data_bytes = vld1q_u8(temp);
+        }
+
+        uint8x16_t lower = vandq_u8(data_bytes, nibble_mask);
+        uint8x16_t upper = vshrq_n_u8(data_bytes, 4);
+
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&lower_data_blocked[block_offset + symbol * block_size + v], lower);
+          vst1q_u8((uint8_t*)&upper_data_blocked[block_offset + symbol * block_size + v], upper);
+        } else {
+          uint8_t temp_lower[16], temp_upper[16];
+          vst1q_u8(temp_lower, lower);
+          vst1q_u8(temp_upper, upper);
+          for (int i = 0; i < chunk; i++) {
+            lower_data_blocked[block_offset + symbol * block_size + v + i] = temp_lower[i];
+            upper_data_blocked[block_offset + symbol * block_size + v + i] = temp_upper[i];
+          }
+        }
+      }
+    }
+
+    // Extract parity nibbles
+    for (int p = 0; p < 2; p++) {
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+
+        uint8x16_t parity_bytes;
+        if (chunk == 16) {
+          parity_bytes = vld1q_u8((uint8_t*)&parity_bytes_blocked[parity_offset + p * block_size + v]);
+        } else {
+          uint8_t temp[16] = {0};
+          for (int i = 0; i < chunk; i++) {
+            temp[i] = parity_bytes_blocked[parity_offset + p * block_size + v + i];
+          }
+          parity_bytes = vld1q_u8(temp);
+        }
+
+        uint8x16_t lower = vandq_u8(parity_bytes, nibble_mask);
+        uint8x16_t upper = vshrq_n_u8(parity_bytes, 4);
+
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&lower_parity_blocked[parity_offset + p * block_size + v], lower);
+          vst1q_u8((uint8_t*)&upper_parity_blocked[parity_offset + p * block_size + v], upper);
+        } else {
+          uint8_t temp_lower[16], temp_upper[16];
+          vst1q_u8(temp_lower, lower);
+          vst1q_u8(temp_upper, upper);
+          for (int i = 0; i < chunk; i++) {
+            lower_parity_blocked[parity_offset + p * block_size + v + i] = temp_lower[i];
+            upper_parity_blocked[parity_offset + p * block_size + v + i] = temp_upper[i];
+          }
+        }
+      }
+    }
+  }
+
+  // Decode lower nibbles
+  int result_lower = neon_rs_decode_batch_blocked(table, lower_data_blocked, lower_parity_blocked,
+                                                  erasure_locations, num_erasures, num_vectors, block_size);
+
+  // Decode upper nibbles
+  int result_upper = neon_rs_decode_batch_blocked(table, upper_data_blocked, upper_parity_blocked,
+                                                  erasure_locations, num_erasures, num_vectors, block_size);
+
+  if (result_lower != 0 || result_upper != 0) {
+    free(lower_data_blocked);
+    free(upper_data_blocked);
+    free(lower_parity_blocked);
+    free(upper_parity_blocked);
+    return -1;
+  }
+
+  // Recombine nibbles into bytes using SIMD
+  for (int block = 0; block < num_blocks; block++) {
+    int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
+                        block_size : (num_vectors - block * block_size);
+    int block_offset = block * block_size * 8;
+
+    for (int symbol = 0; symbol < 8; symbol++) {
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+
+        uint8x16_t lower, upper;
+        if (chunk == 16) {
+          lower = vld1q_u8((uint8_t*)&lower_data_blocked[block_offset + symbol * block_size + v]);
+          upper = vld1q_u8((uint8_t*)&upper_data_blocked[block_offset + symbol * block_size + v]);
+        } else {
+          uint8_t temp_lower[16] = {0}, temp_upper[16] = {0};
+          for (int i = 0; i < chunk; i++) {
+            temp_lower[i] = lower_data_blocked[block_offset + symbol * block_size + v + i];
+            temp_upper[i] = upper_data_blocked[block_offset + symbol * block_size + v + i];
+          }
+          lower = vld1q_u8(temp_lower);
+          upper = vld1q_u8(temp_upper);
+        }
+
+        // Combine: (upper << 4) | lower
+        uint8x16_t combined = vorrq_u8(vshlq_n_u8(vandq_u8(upper, nibble_mask), 4),
+                                       vandq_u8(lower, nibble_mask));
+
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&data_bytes_blocked[block_offset + symbol * block_size + v], combined);
+        } else {
+          uint8_t temp[16];
+          vst1q_u8(temp, combined);
+          for (int i = 0; i < chunk; i++) {
+            data_bytes_blocked[block_offset + symbol * block_size + v + i] = temp[i];
+          }
+        }
+      }
+    }
+  }
+
+  free(lower_data_blocked);
+  free(upper_data_blocked);
+  free(lower_parity_blocked);
+  free(upper_parity_blocked);
+
   return 0;
 }
 

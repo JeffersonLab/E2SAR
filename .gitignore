@@ -37,6 +37,9 @@ fec/src/tests/test_avx2
 fec/src/tests/test_avx512
 fec/src/tests/test_enc_dec
 fec/src/tests/test_neon
+fec/src/tests/test_unpacked
+fec/src/tests/test_batch
+fec/src/tests/test_performance
 
 **/.vscode
 
