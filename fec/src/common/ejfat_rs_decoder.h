@@ -139,7 +139,24 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
 
   // Method 1: Create G* by removing erased rows, then invert
   if (num_erasures > 0) {
-    // Create G* matrix by removing erased symbol rows
+    // Count data erasures (positions 0 to rs->n-1)
+    int data_erasures = 0;
+    for (int j = 0; j < num_erasures; j++) {
+      if (erasure_locations[j] < rs->n) {
+        data_erasures++;
+      }
+    }
+
+    // If no data erasures (only parity erased), just copy data
+    if (data_erasures == 0) {
+      decoded->len = rs->n;
+      for (int i = 0; i < rs->n; i++) {
+        decoded->val[i] = received->val[i];
+      }
+      return 0;
+    }
+
+    // Create G* matrix by removing erased data symbol rows
     rs_poly_matrix *g_star = (rs_poly_matrix *) malloc(sizeof(rs_poly_matrix) + rs->n * sizeof(rs_poly_vector *));
     g_star->rows = rs->n;
     g_star->cols = rs->n;
@@ -166,14 +183,27 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
       }
     }
 
-    // Add parity constraints to make it square
-    for (int i = 0; i < num_erasures; i++) {
-      g_star->val[valid_row] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
-      g_star->val[valid_row]->len = rs->n;
-      for (int col = 0; col < rs->n; col++) {
-        g_star->val[valid_row]->val[col] = rs->Genc->val[i]->val[col];
+    // Add parity constraints to make it square (need data_erasures parity rows)
+    // Use only non-erased parity symbols
+    int parity_added = 0;
+    for (int p = 0; p < rs->p && parity_added < data_erasures; p++) {
+      int parity_pos = rs->n + p;
+      int is_erased = 0;
+      for (int j = 0; j < num_erasures; j++) {
+        if (parity_pos == erasure_locations[j]) {
+          is_erased = 1;
+          break;
+        }
       }
-      valid_row++;
+      if (!is_erased) {
+        g_star->val[valid_row] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
+        g_star->val[valid_row]->len = rs->n;
+        for (int col = 0; col < rs->n; col++) {
+          g_star->val[valid_row]->val[col] = rs->Genc->val[p]->val[col];
+        }
+        valid_row++;
+        parity_added++;
+      }
     }
 
     // Invert G*
@@ -205,10 +235,20 @@ int rs_decode_erasures(rs_model *rs, rs_poly_vector *received,
       }
     }
 
-    // Add parity symbols
+    // Add non-erased parity symbols
     for (int i = 0; i < num_erasures; i++) {
-      rx_reduced.val[valid_row] = received->val[rs->n + i];
-      valid_row++;
+      int parity_pos = rs->n + i;
+      int is_erased = 0;
+      for (int j = 0; j < num_erasures; j++) {
+        if (parity_pos == erasure_locations[j]) {
+          is_erased = 1;
+          break;
+        }
+      }
+      if (!is_erased) {
+        rx_reduced.val[valid_row] = received->val[parity_pos];
+        valid_row++;
+      }
     }
 
     // Decode: decoded = G_inv * rx_reduced
@@ -355,8 +395,9 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
   printf("Initializing RS decoder table...\n");
   
   // Calculate total number of possible erasure patterns
-  // For RS(10,8): no erasures (1) + single erasures (8) + double erasures (8*7/2 = 28)
-  int max_patterns = 1 + rs->n + (rs->n * (rs->n - 1)) / 2;
+  // For RS(10,8): no erasures (1) + single erasures (10) + double erasures (10*9/2 = 45)
+  int total_positions = rs->n + rs->p;  // 10 positions (8 data + 2 parity)
+  int max_patterns = 1 + total_positions + (total_positions * (total_positions - 1)) / 2;
   
   table->entries = malloc(max_patterns * sizeof(rs_decode_table_entry));
   if (!table->entries) {
@@ -376,13 +417,30 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
   // No matrix rows needed - systematic code just copies valid data
   table->size++;
   
-  // Generate all single erasure patterns
-  for (int e1 = 0; e1 < rs->n; e1++) {
+  // Generate all single erasure patterns (data and parity positions)
+  for (int e1 = 0; e1 < total_positions; e1++) {
     entry = &table->entries[table->size];
     entry->num_erasures = 1;
     entry->erasure_pattern[0] = e1;
     entry->erasure_pattern[1] = -1;
     entry->valid = 0;  // Will be computed below
+
+    // If erasing parity symbol, no decoding needed (systematic code)
+    if (e1 >= rs->n) {
+      entry->valid = 1;  // Valid but no matrix needed
+      table->size++;
+      continue;
+    }
+
+    // Find first available (non-erased) parity symbol
+    int parity_idx = 0;  // Default to parity 0
+    for (int p = 0; p < rs->p; p++) {
+      int parity_pos = rs->n + p;
+      if (parity_pos != e1) {  // Not erased
+        parity_idx = p;
+        break;
+      }
+    }
 
     // Create modified G matrix for this erasure pattern
     rs_poly_matrix *g_mod = (rs_poly_matrix *) malloc(sizeof(rs_poly_matrix) + rs->n * sizeof(rs_poly_vector *));
@@ -394,9 +452,9 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
       g_mod->val[i]->len = rs->n;
 
       if (i == e1) {
-        // Replace erased row with parity constraint (use Genc transpose)
+        // Replace erased row with available parity constraint
         for (int j = 0; j < rs->n; j++) {
-          g_mod->val[i]->val[j] = rs->Genc->val[0]->val[j];
+          g_mod->val[i]->val[j] = rs->Genc->val[parity_idx]->val[j];
         }
       } else {
         // Use original data row (only the identity part)
@@ -424,13 +482,40 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
   }
   
   // Generate all double erasure patterns
-  for (int e1 = 0; e1 < rs->n - 1; e1++) {
-    for (int e2 = e1 + 1; e2 < rs->n; e2++) {
+  for (int e1 = 0; e1 < total_positions - 1; e1++) {
+    for (int e2 = e1 + 1; e2 < total_positions; e2++) {
       entry = &table->entries[table->size];
       entry->num_erasures = 2;
       entry->erasure_pattern[0] = e1;
       entry->erasure_pattern[1] = e2;
       entry->valid = 0;
+
+      // Count data erasures (positions < rs->n)
+      int data_erasures = 0;
+      int data_pos[2];
+      if (e1 < rs->n) data_pos[data_erasures++] = e1;
+      if (e2 < rs->n) data_pos[data_erasures++] = e2;
+
+      // If both erasures are parity, no decoding needed (systematic code)
+      if (data_erasures == 0) {
+        entry->valid = 1;  // Valid but no matrix needed
+        table->size++;
+        continue;
+      }
+
+      // Find available (non-erased) parity symbols
+      int parity_indices[2];
+      int parity_count = 0;
+      for (int p = 0; p < rs->p && parity_count < data_erasures; p++) {
+        int parity_pos = rs->n + p;
+        int is_erased = 0;
+        if (parity_pos == e1 || parity_pos == e2) {
+          is_erased = 1;
+        }
+        if (!is_erased) {
+          parity_indices[parity_count++] = p;
+        }
+      }
 
       // Create modified G matrix for this erasure pattern
       rs_poly_matrix *g_mod = (rs_poly_matrix *) malloc(sizeof(rs_poly_matrix) + rs->n * sizeof(rs_poly_vector *));
@@ -441,15 +526,15 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
         g_mod->val[i] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
         g_mod->val[i]->len = rs->n;
 
-        if (i == e1) {
-          // Replace first erased row with first parity constraint
+        if (data_erasures >= 1 && i == data_pos[0]) {
+          // Replace first erased data row with first available parity constraint
           for (int j = 0; j < rs->n; j++) {
-            g_mod->val[i]->val[j] = rs->Genc->val[0]->val[j];
+            g_mod->val[i]->val[j] = rs->Genc->val[parity_indices[0]]->val[j];
           }
-        } else if (i == e2) {
-          // Replace second erased row with second parity constraint
+        } else if (data_erasures >= 2 && i == data_pos[1]) {
+          // Replace second erased data row with second available parity constraint
           for (int j = 0; j < rs->n; j++) {
-            g_mod->val[i]->val[j] = rs->Genc->val[1]->val[j];
+            g_mod->val[i]->val[j] = rs->Genc->val[parity_indices[1]]->val[j];
           }
         } else {
           // Use original data row (identity part)
@@ -462,10 +547,11 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
       // Compute inverse matrix
       rs_poly_matrix *g_inv;
       if (poly_matrix_invert(g_mod, &g_inv) == 0) {
-        // Only store rows for erased positions (systematic code optimization)
-        for (int j = 0; j < 8; j++) {
-          entry->inv_matrix_rows[0][j] = g_inv->val[e1]->val[j];
-          entry->inv_matrix_rows[1][j] = g_inv->val[e2]->val[j];
+        // Only store rows for erased data positions (systematic code optimization)
+        for (int k = 0; k < data_erasures; k++) {
+          for (int j = 0; j < 8; j++) {
+            entry->inv_matrix_rows[k][j] = g_inv->val[data_pos[k]]->val[j];
+          }
         }
         entry->valid = 1;
         free_poly_matrix(g_inv);
@@ -549,29 +635,62 @@ int rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received,
           decoded->val[i] = received->val[i];
         }
 
+        // Count data erasures and identify available parity symbols
+        int data_erasure_count = 0;
+        int data_erasure_indices[2];
+        char available_parity[2];
+        int available_parity_count = 0;
+
+        for (int i = 0; i < num_erasures; i++) {
+          if (erasure_locations[i] < 8) {
+            data_erasure_indices[data_erasure_count++] = i;
+          }
+        }
+
+        // If no data erasures (only parity erased), we're done
+        if (data_erasure_count == 0) {
+          return 0;
+        }
+
+        // Find non-erased parity symbols
+        for (int p = 0; p < 2; p++) {
+          int parity_pos = 8 + p;
+          int is_erased = 0;
+          for (int i = 0; i < num_erasures; i++) {
+            if (erasure_locations[i] == parity_pos) {
+              is_erased = 1;
+              break;
+            }
+          }
+          if (!is_erased) {
+            available_parity[available_parity_count++] = received->val[parity_pos];
+          }
+        }
+
         // Step 2: Create modified received vector with parity substitutions
         rs_poly_vector rx_modified;
         rx_modified.len = 8;
         for (int i = 0; i < 8; i++) {
           rx_modified.val[i] = received->val[i];
         }
-        for (int i = 0; i < num_erasures; i++) {
-          if (erasure_locations[i] < 8) {
-            rx_modified.val[erasure_locations[i]] = received->val[8 + i];
-          }
+
+        // Substitute available parity for erased data positions
+        for (int i = 0; i < data_erasure_count; i++) {
+          int erasure_idx = data_erasure_indices[i];
+          int erased_pos = erasure_locations[erasure_idx];
+          rx_modified.val[erased_pos] = available_parity[i];
         }
 
-        // Step 3: Compute ONLY erased symbols using vector-vector dot product
-        for (int e = 0; e < num_erasures; e++) {
-          int erased_pos = erasure_locations[e];
-          if (erased_pos < 8) {
-            char result = 0;
-            for (int j = 0; j < 8; j++) {
-              result = gf_sum(result, gf_mul(entry->inv_matrix_rows[e][j],
-                                             rx_modified.val[j]));
-            }
-            decoded->val[erased_pos] = result;
+        // Step 3: Compute ONLY erased data symbols using vector-vector dot product
+        for (int i = 0; i < data_erasure_count; i++) {
+          int erasure_idx = data_erasure_indices[i];
+          int erased_pos = erasure_locations[erasure_idx];
+          char result = 0;
+          for (int j = 0; j < 8; j++) {
+            result = gf_sum(result, gf_mul(entry->inv_matrix_rows[i][j],
+                                           rx_modified.val[j]));
           }
+          decoded->val[erased_pos] = result;
         }
       }
 
@@ -681,26 +800,58 @@ int neon_rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received
     decoded->val[i] = received->val[i];
   }
 
+  // Count data erasures and identify available parity symbols
+  int data_erasure_count = 0;
+  int data_erasure_indices[2];
+  char available_parity[2];
+  int available_parity_count = 0;
+
+  for (int i = 0; i < num_erasures; i++) {
+    if (erasure_locations[i] < 8) {
+      data_erasure_indices[data_erasure_count++] = i;
+    }
+  }
+
+  // If no data erasures (only parity erased), we're done
+  if (data_erasure_count == 0) {
+    return 0;
+  }
+
+  // Find non-erased parity symbols
+  for (int p = 0; p < 2; p++) {
+    int parity_pos = 8 + p;
+    int is_erased = 0;
+    for (int i = 0; i < num_erasures; i++) {
+      if (erasure_locations[i] == parity_pos) {
+        is_erased = 1;
+        break;
+      }
+    }
+    if (!is_erased) {
+      available_parity[available_parity_count++] = received->val[parity_pos];
+    }
+  }
+
   // Step 2: Create received vector with parity substitutions
   uint8_t rx_modified[8] __attribute__((aligned(16)));
   for (int i = 0; i < 8; i++) {
     rx_modified[i] = received->val[i];
   }
-  for (int i = 0; i < num_erasures; i++) {
-    if (erasure_locations[i] < 8) {
-      rx_modified[erasure_locations[i]] = received->val[8 + i];
-    }
+  for (int i = 0; i < data_erasure_count; i++) {
+    int erasure_idx = data_erasure_indices[i];
+    int erased_pos = erasure_locations[erasure_idx];
+    rx_modified[erased_pos] = available_parity[i];
   }
 
   // Load received vector into NEON register
   uint8x8_t rx_vec = vld1_u8(rx_modified);
 
-  // Step 3: Compute ONLY erased symbols using NEON vector-vector dot product
-  for (int e = 0; e < num_erasures; e++) {
-    int erased_pos = erasure_locations[e];
-    if (erased_pos < 8) {
-      // Load matrix row for this erased position
-      uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix_rows[e]);
+  // Step 3: Compute ONLY erased data symbols using NEON vector-vector dot product
+  for (int i = 0; i < data_erasure_count; i++) {
+    int erasure_idx = data_erasure_indices[i];
+    int erased_pos = erasure_locations[erasure_idx];
+    // Load matrix row for this erased position
+    uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix_rows[i]);
 
       // Convert matrix elements to exponent space for GF multiplication
       uint8x8_t matrix_row_exp = vtbl2_u8(exp_table, matrix_row);
@@ -729,17 +880,16 @@ int neon_rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received
       // Set result to 0 where either operand was 0
       prod_normal = vbic_u8(prod_normal, zero_mask);
 
-      // Sum all elements using horizontal XOR (GF addition)
-      uint8_t result_array[8];
-      vst1_u8(result_array, prod_normal);
+    // Sum all elements using horizontal XOR (GF addition)
+    uint8_t result_array[8];
+    vst1_u8(result_array, prod_normal);
 
-      char result = 0;
-      for (int j = 0; j < 8; j++) {
-        result ^= result_array[j];  // GF addition is XOR
-      }
-
-      decoded->val[erased_pos] = result;
+    char result = 0;
+    for (int j = 0; j < 8; j++) {
+      result ^= result_array[j];  // GF addition is XOR
     }
+
+    decoded->val[erased_pos] = result;
   }
 
   return 0;
@@ -863,36 +1013,67 @@ int neon_rs_decode_table_lookup_v2(rs_decode_table *table, rs_poly_vector *recei
     decoded->val[i] = received->val[i];
   }
 
+  // Count data erasures and identify available parity symbols
+  int data_erasure_count = 0;
+  int data_erasure_indices[2];
+  char available_parity[2];
+  int available_parity_count = 0;
+
+  for (int i = 0; i < num_erasures; i++) {
+    if (erasure_locations[i] < 8) {
+      data_erasure_indices[data_erasure_count++] = i;
+    }
+  }
+
+  // If no data erasures (only parity erased), we're done
+  if (data_erasure_count == 0) {
+    return 0;
+  }
+
+  // Find non-erased parity symbols
+  for (int p = 0; p < 2; p++) {
+    int parity_pos = 8 + p;
+    int is_erased = 0;
+    for (int i = 0; i < num_erasures; i++) {
+      if (erasure_locations[i] == parity_pos) {
+        is_erased = 1;
+        break;
+      }
+    }
+    if (!is_erased) {
+      available_parity[available_parity_count++] = received->val[parity_pos];
+    }
+  }
+
   // Step 2: Prepare received vector with parity substitutions
   uint8_t rx_modified[8] __attribute__((aligned(16)));
   for (int i = 0; i < 8; i++) {
     rx_modified[i] = received->val[i];
   }
-  for (int i = 0; i < num_erasures; i++) {
-    if (erasure_locations[i] < 8) {
-      rx_modified[erasure_locations[i]] = received->val[8 + i];
-    }
+  for (int i = 0; i < data_erasure_count; i++) {
+    int erasure_idx = data_erasure_indices[i];
+    int erased_pos = erasure_locations[erasure_idx];
+    rx_modified[erased_pos] = available_parity[i];
   }
 
   uint8x8_t rx_vec = vld1_u8(rx_modified);
 
-  // Step 3: Compute ONLY erased symbols using vectorized GF multiply
-  for (int e = 0; e < num_erasures; e++) {
-    int erased_pos = erasure_locations[e];
-    if (erased_pos < 8) {
-      uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix_rows[e]);
-      uint8x8_t prod_vec = neon_gf_mul_vec(matrix_row, rx_vec, exp_table, log_table);
+  // Step 3: Compute ONLY erased data symbols using vectorized GF multiply
+  for (int i = 0; i < data_erasure_count; i++) {
+    int erasure_idx = data_erasure_indices[i];
+    int erased_pos = erasure_locations[erasure_idx];
+    uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix_rows[i]);
+    uint8x8_t prod_vec = neon_gf_mul_vec(matrix_row, rx_vec, exp_table, log_table);
 
-      // Horizontal XOR reduction
-      uint8_t temp[8];
-      vst1_u8(temp, prod_vec);
-      char result = 0;
-      for (int j = 0; j < 8; j++) {
-        result ^= temp[j];
-      }
-
-      decoded->val[erased_pos] = result;
+    // Horizontal XOR reduction
+    uint8_t temp[8];
+    vst1_u8(temp, prod_vec);
+    char result = 0;
+    for (int j = 0; j < 8; j++) {
+      result ^= temp[j];
     }
+
+    decoded->val[erased_pos] = result;
   }
 
   return 0;
@@ -952,6 +1133,38 @@ int neon_rs_decode_batch_blocked(rs_decode_table *table, char *data_blocked,
     return 0;
   }
 
+  // Count data erasures
+  int data_erasure_count = 0;
+  int data_erasure_indices[2];
+  int parity_indices[2];  // Which parity symbols to use
+  int parity_count = 0;
+
+  for (int i = 0; i < num_erasures; i++) {
+    if (erasure_locations[i] < 8) {
+      data_erasure_indices[data_erasure_count++] = i;
+    }
+  }
+
+  // If no data erasures (only parity erased), we're done
+  if (data_erasure_count == 0) {
+    return 0;
+  }
+
+  // Find non-erased parity indices (0 or 1)
+  for (int p = 0; p < 2; p++) {
+    int parity_pos = 8 + p;
+    int is_erased = 0;
+    for (int i = 0; i < num_erasures; i++) {
+      if (erasure_locations[i] == parity_pos) {
+        is_erased = 1;
+        break;
+      }
+    }
+    if (!is_erased) {
+      parity_indices[parity_count++] = p;
+    }
+  }
+
   // Systematic code optimization: only compute erased symbol positions
 
   int num_blocks = (num_vectors + block_size - 1) / block_size;
@@ -986,72 +1199,71 @@ int neon_rs_decode_batch_blocked(rs_decode_table *table, char *data_blocked,
     // First, copy all data
     memcpy(&rx_modified_blocked[rx_offset], &data_blocked[block_data_offset], vecs_in_block * 8);
 
-    // Then substitute erased positions with parity symbols
-    for (int e = 0; e < num_erasures; e++) {
-      int erased_pos = erasure_locations[e];
-      if (erased_pos < 8) {
-        for (int v = 0; v < vecs_in_block; v++) {
-          rx_modified_blocked[rx_offset + erased_pos * block_size + v] =
-              parity_blocked[block_parity_offset + e * block_size + v];
-        }
+    // Then substitute erased data positions with available parity symbols
+    for (int i = 0; i < data_erasure_count; i++) {
+      int erasure_idx = data_erasure_indices[i];
+      int erased_pos = erasure_locations[erasure_idx];
+      int parity_idx = parity_indices[i];
+      for (int v = 0; v < vecs_in_block; v++) {
+        rx_modified_blocked[rx_offset + erased_pos * block_size + v] =
+            parity_blocked[block_parity_offset + parity_idx * block_size + v];
       }
     }
 
-    // Step 2: Compute ONLY erased symbols using inverse matrix rows
-    for (int e = 0; e < num_erasures; e++) {
-      int erased_pos = erasure_locations[e];
-      if (erased_pos < 8) {
-        int output_offset = block_data_offset + erased_pos * block_size;
+    // Step 2: Compute ONLY erased data symbols using inverse matrix rows
+    for (int i = 0; i < data_erasure_count; i++) {
+      int erasure_idx = data_erasure_indices[i];
+      int erased_pos = erasure_locations[erasure_idx];
+      int output_offset = block_data_offset + erased_pos * block_size;
 
-        // Process in chunks of 16 vectors at a time
-        for (int v = 0; v < vecs_in_block; v += 16) {
-          int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
-          uint8x16_t acc = vdupq_n_u8(0);
+      // Process in chunks of 16 vectors at a time
+      for (int v = 0; v < vecs_in_block; v += 16) {
+        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+        uint8x16_t acc = vdupq_n_u8(0);
 
-          // Vector dot product: inv_matrix_rows[e][:] · rx_modified
-          for (int j = 0; j < 8; j++) {
-            uint8x16_t rx_vec;
-            if (chunk == 16) {
-              rx_vec = vld1q_u8((uint8_t*)&rx_modified_blocked[rx_offset + j * block_size + v]);
-            } else {
-              uint8_t temp[16] = {0};
-              for (int k = 0; k < chunk; k++) {
-                temp[k] = rx_modified_blocked[rx_offset + j * block_size + v + k];
-              }
-              rx_vec = vld1q_u8(temp);
+        // Vector dot product: inv_matrix_rows[i][:] · rx_modified
+        for (int j = 0; j < 8; j++) {
+          uint8x16_t rx_vec;
+          if (chunk == 16) {
+            rx_vec = vld1q_u8((uint8_t*)&rx_modified_blocked[rx_offset + j * block_size + v]);
+          } else {
+            uint8_t temp[16] = {0};
+            for (int k = 0; k < chunk; k++) {
+              temp[k] = rx_modified_blocked[rx_offset + j * block_size + v + k];
             }
-
-            uint8x16_t coeff = vdupq_n_u8(entry->inv_matrix_rows[e][j]);
-
-            // GF multiply using exponent/log tables
-            uint8x16_t rx_zero_mask = vceqq_u8(rx_vec, zero_vec);
-            uint8x16_t coeff_zero_mask = vceqq_u8(coeff, zero_vec);
-            uint8x16_t zero_mask = vorrq_u8(rx_zero_mask, coeff_zero_mask);
-
-            uint8x16_t rx_exp = vqtbl2q_u8(exp_table, rx_vec);
-            uint8x16_t coeff_exp = vqtbl2q_u8(exp_table, coeff);
-
-            uint8x16_t sum_exp = vaddq_u8(rx_exp, coeff_exp);
-            uint8x16_t mask = vcgeq_u8(sum_exp, mod);
-            uint8x16_t mod15 = vandq_u8(mod, mask);
-            sum_exp = vsubq_u8(sum_exp, mod15);
-
-            uint8x16_t prod = vqtbl2q_u8(log_table, sum_exp);
-            prod = vbicq_u8(prod, zero_mask);
-
-            // GF addition (XOR)
-            acc = veorq_u8(acc, prod);
+            rx_vec = vld1q_u8(temp);
           }
 
-          // Store decoded erased symbol
-          if (chunk == 16) {
-            vst1q_u8((uint8_t*)&data_blocked[output_offset + v], acc);
-          } else {
-            uint8_t temp[16];
-            vst1q_u8(temp, acc);
-            for (int k = 0; k < chunk; k++) {
-              data_blocked[output_offset + v + k] = temp[k];
-            }
+          uint8x16_t coeff = vdupq_n_u8(entry->inv_matrix_rows[i][j]);
+
+          // GF multiply using exponent/log tables
+          uint8x16_t rx_zero_mask = vceqq_u8(rx_vec, zero_vec);
+          uint8x16_t coeff_zero_mask = vceqq_u8(coeff, zero_vec);
+          uint8x16_t zero_mask = vorrq_u8(rx_zero_mask, coeff_zero_mask);
+
+          uint8x16_t rx_exp = vqtbl2q_u8(exp_table, rx_vec);
+          uint8x16_t coeff_exp = vqtbl2q_u8(exp_table, coeff);
+
+          uint8x16_t sum_exp = vaddq_u8(rx_exp, coeff_exp);
+          uint8x16_t mask = vcgeq_u8(sum_exp, mod);
+          uint8x16_t mod15 = vandq_u8(mod, mask);
+          sum_exp = vsubq_u8(sum_exp, mod15);
+
+          uint8x16_t prod = vqtbl2q_u8(log_table, sum_exp);
+          prod = vbicq_u8(prod, zero_mask);
+
+          // GF addition (XOR)
+          acc = veorq_u8(acc, prod);
+        }
+
+        // Store decoded erased symbol
+        if (chunk == 16) {
+          vst1q_u8((uint8_t*)&data_blocked[output_offset + v], acc);
+        } else {
+          uint8_t temp[16];
+          vst1q_u8(temp, acc);
+          for (int k = 0; k < chunk; k++) {
+            data_blocked[output_offset + v + k] = temp[k];
           }
         }
       }

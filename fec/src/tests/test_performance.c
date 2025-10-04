@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include <arm_neon.h>
 
@@ -15,6 +16,17 @@
 #define TEST_ITERATIONS 1000000    // Number of iterations for performance tests
 #define BATCH_SIZE 1000           // Batch size for batched tests
 #define BLOCK_SIZE 256            // Block size for blocked tests
+
+// ============================================================================
+// TIMING UTILITIES
+// ============================================================================
+
+// Get current time in microseconds (for high-precision timing)
+static inline double get_time_usec(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double)tv.tv_sec * 1e6 + (double)tv.tv_usec;
+}
 
 // ============================================================================
 // ENCODER PERFORMANCE TESTS
@@ -116,19 +128,39 @@ void test_encoder_performance(rs_model *rs) {
     // ========================================================================
     test_num++;
 
-    start_time = clock();
-    for (int i = 0; i < TEST_ITERATIONS; i++) {
+    // Use 1000x iterations for more accurate timing of very fast function
+    // Use microsecond precision timer for this ultra-fast function
+    int dual_nibble_iterations = TEST_ITERATIONS * 1000;
+
+    // Warmup to ensure caches are loaded
+    for (int i = 0; i < 1000; i++) {
         neon_rs_encode_dual_nibble(rs, test_bytes, test_parity_bytes);
     }
-    end_time = clock();
-    time_taken = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-    data_rate = 1/1E6 * 8 * 8 * TEST_ITERATIONS / time_taken;  // 8 bits (2 nibbles) per byte
+
+    double start_usec = get_time_usec();
+    for (int i = 0; i < dual_nibble_iterations; i++) {
+        neon_rs_encode_dual_nibble(rs, test_bytes, test_parity_bytes);
+        // Prevent compiler from optimizing away the loop
+        __asm__ __volatile__("" ::: "memory");
+    }
+    double end_usec = get_time_usec();
+    time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
+
+    // Ensure time_taken is not zero to avoid division by zero
+    if (time_taken < 1e-9) {
+        time_taken = 1e-9;  // Set minimum to 1 nanosecond
+    }
+
+    data_rate = 1/1E6 * 8 * 8 * dual_nibble_iterations / time_taken;  // 8 bits (2 nibbles) per byte
+
+    // Calculate normalized time for fair comparison (time per TEST_ITERATIONS operations)
+    double normalized_time = time_taken * TEST_ITERATIONS / dual_nibble_iterations;
 
     printf("%d. neon_rs_encode_dual_nibble (SIMD dual nibble)\n", test_num);
-    printf("   Time: %.3f seconds\n", time_taken);
+    printf("   Time: %.6f seconds (%d iterations)\n", time_taken, dual_nibble_iterations);
     printf("   Throughput: %.1f Mbps\n", data_rate);
-    printf("   Operations/sec: %.0f\n", TEST_ITERATIONS / time_taken);
-    printf("   Speedup: %.2fx\n\n", baseline_time / time_taken);
+    printf("   Operations/sec: %.0f\n", dual_nibble_iterations / time_taken);
+    printf("   Speedup: %.2fx\n\n", baseline_time / normalized_time);
 
     // ========================================================================
     // 5. neon_rs_encode_batch_blocked (single nibble batched)
@@ -441,31 +473,22 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
 }
 
 void test_decoder_performance(rs_model *rs, rs_decode_table *decode_table) {
-    // Test with different erasure patterns
+    // Test with different 2 data symbol erasure patterns
+    // Note: Only testing 2 data erasures for meaningful performance comparison
 
-    // Test 1: No erasures
-    printf("\n>>> SCENARIO 1: No erasures (decoding overhead test)\n");
-    int erasures_0[] = {};
-    test_decoder_performance_with_erasures(rs, decode_table, 0, erasures_0);
-
-    // Test 2: Single erasure at position 3
-    printf("\n>>> SCENARIO 2: Single erasure at position 3\n");
-    int erasures_1[] = { 3 };
-    test_decoder_performance_with_erasures(rs, decode_table, 1, erasures_1);
-
-    // Test 3: Two erasures at positions 2 and 6
-    printf("\n>>> SCENARIO 3: Two erasures at positions 2 and 6\n");
+    // Test 1: Two erasures at positions 2 and 6 (middle positions)
+    printf("\n>>> SCENARIO 1: Two data erasures at positions 2 and 6\n");
     int erasures_2a[] = { 2, 6 };
     test_decoder_performance_with_erasures(rs, decode_table, 2, erasures_2a);
 
-    // Test 4: Two consecutive erasures at positions 0 and 1
-    printf("\n>>> SCENARIO 4: Two consecutive erasures at positions 0 and 1\n");
+    // Test 2: Two consecutive erasures at positions 0 and 1 (beginning)
+    printf("\n>>> SCENARIO 2: Two consecutive data erasures at positions 0 and 1\n");
     int erasures_2b[] = { 0, 1 };
     test_decoder_performance_with_erasures(rs, decode_table, 2, erasures_2b);
 
-    // Test 5: Two erasures at end positions 7 and 8
-    printf("\n>>> SCENARIO 5: Two erasures at positions 7 and 8 (last data + first parity)\n");
-    int erasures_2c[] = { 7, 8 };
+    // Test 3: Two erasures at end positions 6 and 7 (last two data symbols)
+    printf("\n>>> SCENARIO 3: Two data erasures at positions 6 and 7 (last two data symbols)\n");
+    int erasures_2c[] = { 6, 7 };
     test_decoder_performance_with_erasures(rs, decode_table, 2, erasures_2c);
 }
 

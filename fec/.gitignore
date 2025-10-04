@@ -1,6 +1,5 @@
 # Build artifacts
-src/test
-src/test_enc_dec
+src/tests/bin/
 src/a.out
 *.o
 *.so
