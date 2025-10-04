@@ -335,11 +335,12 @@ int rs_decode_substitute(rs_model *rs, rs_poly_vector *received,
 }
 
 // Table-based decoder for specific erasure patterns (optimized version)
+// Systematic code optimization: only store rows for erased positions
 typedef struct {
-  int erasure_pattern[2];  // Up to 2 erasures for RS(10,8)
-  int num_erasures;        // Number of erasures in this pattern
-  char inv_matrix[8][8];   // Pre-computed 8x8 inverse matrix
-  int valid;               // 1 if this entry is valid, 0 otherwise
+  int erasure_pattern[2];     // Up to 2 erasures for RS(10,8)
+  int num_erasures;           // Number of erasures in this pattern
+  char inv_matrix_rows[2][8]; // Only store rows for erased positions (max 2)
+  int valid;                  // 1 if this entry is valid, 0 otherwise
 } rs_decode_table_entry;
 
 // Decoder table structure
@@ -366,19 +367,13 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
   table->capacity = max_patterns;
   table->size = 0;
   
-  // Pattern 0: No erasures (identity - just copy data)
+  // Pattern 0: No erasures (just copy data - no matrix needed)
   rs_decode_table_entry *entry = &table->entries[table->size];
   entry->num_erasures = 0;
   entry->erasure_pattern[0] = -1;
   entry->erasure_pattern[1] = -1;
   entry->valid = 1;
-  
-  // Identity matrix for no erasures
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j < 8; j++) {
-      entry->inv_matrix[i][j] = (i == j) ? 1 : 0;
-    }
-  }
+  // No matrix rows needed - systematic code just copies valid data
   table->size++;
   
   // Generate all single erasure patterns
@@ -388,16 +383,16 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
     entry->erasure_pattern[0] = e1;
     entry->erasure_pattern[1] = -1;
     entry->valid = 0;  // Will be computed below
-    
+
     // Create modified G matrix for this erasure pattern
     rs_poly_matrix *g_mod = (rs_poly_matrix *) malloc(sizeof(rs_poly_matrix) + rs->n * sizeof(rs_poly_vector *));
     g_mod->rows = rs->n;
     g_mod->cols = rs->n;
-    
+
     for (int i = 0; i < rs->n; i++) {
       g_mod->val[i] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
       g_mod->val[i]->len = rs->n;
-      
+
       if (i == e1) {
         // Replace erased row with parity constraint (use Genc transpose)
         for (int j = 0; j < rs->n; j++) {
@@ -410,21 +405,19 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
         }
       }
     }
-    
+
     // Compute inverse matrix
     rs_poly_matrix *g_inv;
     if (poly_matrix_invert(g_mod, &g_inv) == 0) {
-      // Copy inverse to table
-      for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-          entry->inv_matrix[i][j] = g_inv->val[i]->val[j];
-        }
+      // Only store the row for the erased position (systematic code optimization)
+      for (int j = 0; j < 8; j++) {
+        entry->inv_matrix_rows[0][j] = g_inv->val[e1]->val[j];
       }
       entry->valid = 1;
       free_poly_matrix(g_inv);
       free(g_inv);
     }
-    
+
     free_poly_matrix(g_mod);
     free(g_mod);
     table->size++;
@@ -438,16 +431,16 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
       entry->erasure_pattern[0] = e1;
       entry->erasure_pattern[1] = e2;
       entry->valid = 0;
-      
+
       // Create modified G matrix for this erasure pattern
       rs_poly_matrix *g_mod = (rs_poly_matrix *) malloc(sizeof(rs_poly_matrix) + rs->n * sizeof(rs_poly_vector *));
       g_mod->rows = rs->n;
       g_mod->cols = rs->n;
-      
+
       for (int i = 0; i < rs->n; i++) {
         g_mod->val[i] = (rs_poly_vector *) malloc(sizeof(rs_poly_vector));
         g_mod->val[i]->len = rs->n;
-        
+
         if (i == e1) {
           // Replace first erased row with first parity constraint
           for (int j = 0; j < rs->n; j++) {
@@ -465,21 +458,20 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
           }
         }
       }
-      
+
       // Compute inverse matrix
       rs_poly_matrix *g_inv;
       if (poly_matrix_invert(g_mod, &g_inv) == 0) {
-        // Copy inverse to table
-        for (int i = 0; i < 8; i++) {
-          for (int j = 0; j < 8; j++) {
-            entry->inv_matrix[i][j] = g_inv->val[i]->val[j];
-          }
+        // Only store rows for erased positions (systematic code optimization)
+        for (int j = 0; j < 8; j++) {
+          entry->inv_matrix_rows[0][j] = g_inv->val[e1]->val[j];
+          entry->inv_matrix_rows[1][j] = g_inv->val[e2]->val[j];
         }
         entry->valid = 1;
         free_poly_matrix(g_inv);
         free(g_inv);
       }
-      
+
       free_poly_matrix(g_mod);
       free(g_mod);
       table->size++;
@@ -541,30 +533,45 @@ int rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received,
     }
 
     if (match) {
-      // Found matching pattern, use pre-computed inverse
-      rs_poly_vector rx_modified;
-      rx_modified.len = 8;
-
-      // Create received vector with parity substitutions
-      for (int i = 0; i < 8; i++) {
-        rx_modified.val[i] = received->val[i];
-      }
-
-      // Replace erased symbols with parity symbols
-      for (int i = 0; i < num_erasures; i++) {
-        if (erasure_locations[i] < 8) {
-          rx_modified.val[erasure_locations[i]] = received->val[8 + i];
-        }
-      }
-
-      // Apply pre-computed inverse matrix
+      // Found matching pattern
       decoded->len = 8;
-      for (int i = 0; i < 8; i++) {
-        decoded->val[i] = 0;
-        for (int j = 0; j < 8; j++) {
-          decoded->val[i] = gf_sum(decoded->val[i],
-                                   gf_mul(entry->inv_matrix[i][j],
-                                          rx_modified.val[j]));
+
+      if (num_erasures == 0) {
+        // No erasures: just copy data (systematic code property)
+        for (int i = 0; i < 8; i++) {
+          decoded->val[i] = received->val[i];
+        }
+      } else {
+        // Systematic code optimization: copy valid symbols, compute only erased ones
+
+        // Step 1: Copy valid (non-erased) data symbols directly
+        for (int i = 0; i < 8; i++) {
+          decoded->val[i] = received->val[i];
+        }
+
+        // Step 2: Create modified received vector with parity substitutions
+        rs_poly_vector rx_modified;
+        rx_modified.len = 8;
+        for (int i = 0; i < 8; i++) {
+          rx_modified.val[i] = received->val[i];
+        }
+        for (int i = 0; i < num_erasures; i++) {
+          if (erasure_locations[i] < 8) {
+            rx_modified.val[erasure_locations[i]] = received->val[8 + i];
+          }
+        }
+
+        // Step 3: Compute ONLY erased symbols using vector-vector dot product
+        for (int e = 0; e < num_erasures; e++) {
+          int erased_pos = erasure_locations[e];
+          if (erased_pos < 8) {
+            char result = 0;
+            for (int j = 0; j < 8; j++) {
+              result = gf_sum(result, gf_mul(entry->inv_matrix_rows[e][j],
+                                             rx_modified.val[j]));
+            }
+            decoded->val[erased_pos] = result;
+          }
         }
       }
 
@@ -656,68 +663,83 @@ int neon_rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received
   if (!entry) {
     return -1;  // Pattern not found
   }
-  
-  // Create received vector with parity substitutions
+
+  decoded->len = 8;
+
+  if (num_erasures == 0) {
+    // No erasures: just copy data (systematic code property)
+    for (int i = 0; i < 8; i++) {
+      decoded->val[i] = received->val[i];
+    }
+    return 0;
+  }
+
+  // Systematic code optimization: copy valid symbols, compute only erased ones
+
+  // Step 1: Copy valid data symbols directly
+  for (int i = 0; i < 8; i++) {
+    decoded->val[i] = received->val[i];
+  }
+
+  // Step 2: Create received vector with parity substitutions
   uint8_t rx_modified[8] __attribute__((aligned(16)));
   for (int i = 0; i < 8; i++) {
     rx_modified[i] = received->val[i];
   }
-  
-  // Replace erased symbols with parity symbols
   for (int i = 0; i < num_erasures; i++) {
     if (erasure_locations[i] < 8) {
       rx_modified[erasure_locations[i]] = received->val[8 + i];
     }
   }
-  
+
   // Load received vector into NEON register
   uint8x8_t rx_vec = vld1_u8(rx_modified);
-  
-  // Apply pre-computed inverse matrix using NEON operations
-  decoded->len = 8;
-  
-  // Process all 8 output symbols
-  for (int i = 0; i < 8; i++) {
-    // Load matrix row into NEON register
-    uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix[i]);
-    
-    // Convert matrix elements to exponent space for GF multiplication
-    uint8x8_t matrix_row_exp = vtbl2_u8(exp_table, matrix_row);
-    
-    // Convert received vector to exponent space  
-    uint8x8_t rx_exp = vtbl2_u8(exp_table, rx_vec);
-    
-    // Perform GF multiplication in exponent space: exp(a*b) = exp(a) + exp(b) mod 15
-    uint8x8_t prod_exp = vadd_u8(matrix_row_exp, rx_exp);
-    
-    // Handle modulo 15 operation
-    uint8x8_t mod = vdup_n_u8(15);
-    uint8x8_t mask = vcge_u8(prod_exp, mod);  // mask where prod_exp >= 15
-    uint8x8_t mod15 = vand_u8(mod, mask);     // 15 where needed, 0 elsewhere
-    prod_exp = vsub_u8(prod_exp, mod15);      // subtract 15 where needed
-    
-    // Convert back to normal space: log(exp(x)) = x
-    uint8x8_t prod_normal = vtbl2_u8(log_table, prod_exp);
-    
-    // Handle zero elements (where matrix_row[j] == 0 or rx_vec[j] == 0)
-    uint8x8_t zero_vec = vdup_n_u8(0);
-    uint8x8_t matrix_zero_mask = vceq_u8(matrix_row, zero_vec);
-    uint8x8_t rx_zero_mask = vceq_u8(rx_vec, zero_vec);
-    uint8x8_t zero_mask = vorr_u8(matrix_zero_mask, rx_zero_mask);
-    
-    // Set result to 0 where either operand was 0
-    prod_normal = vbic_u8(prod_normal, zero_mask);
-    
-    // Sum all elements using horizontal add (XOR for GF addition)
-    uint8_t result_array[8];
-    vst1_u8(result_array, prod_normal);
-    
-    char result = 0;
-    for (int j = 0; j < 8; j++) {
-      result ^= result_array[j];  // GF addition is XOR
+
+  // Step 3: Compute ONLY erased symbols using NEON vector-vector dot product
+  for (int e = 0; e < num_erasures; e++) {
+    int erased_pos = erasure_locations[e];
+    if (erased_pos < 8) {
+      // Load matrix row for this erased position
+      uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix_rows[e]);
+
+      // Convert matrix elements to exponent space for GF multiplication
+      uint8x8_t matrix_row_exp = vtbl2_u8(exp_table, matrix_row);
+
+      // Convert received vector to exponent space
+      uint8x8_t rx_exp = vtbl2_u8(exp_table, rx_vec);
+
+      // Perform GF multiplication in exponent space: exp(a*b) = exp(a) + exp(b) mod 15
+      uint8x8_t prod_exp = vadd_u8(matrix_row_exp, rx_exp);
+
+      // Handle modulo 15 operation
+      uint8x8_t mod = vdup_n_u8(15);
+      uint8x8_t mask = vcge_u8(prod_exp, mod);
+      uint8x8_t mod15 = vand_u8(mod, mask);
+      prod_exp = vsub_u8(prod_exp, mod15);
+
+      // Convert back to normal space: log(exp(x)) = x
+      uint8x8_t prod_normal = vtbl2_u8(log_table, prod_exp);
+
+      // Handle zero elements (where matrix_row[j] == 0 or rx_vec[j] == 0)
+      uint8x8_t zero_vec = vdup_n_u8(0);
+      uint8x8_t matrix_zero_mask = vceq_u8(matrix_row, zero_vec);
+      uint8x8_t rx_zero_mask = vceq_u8(rx_vec, zero_vec);
+      uint8x8_t zero_mask = vorr_u8(matrix_zero_mask, rx_zero_mask);
+
+      // Set result to 0 where either operand was 0
+      prod_normal = vbic_u8(prod_normal, zero_mask);
+
+      // Sum all elements using horizontal XOR (GF addition)
+      uint8_t result_array[8];
+      vst1_u8(result_array, prod_normal);
+
+      char result = 0;
+      for (int j = 0; j < 8; j++) {
+        result ^= result_array[j];  // GF addition is XOR
+      }
+
+      decoded->val[erased_pos] = result;
     }
-    
-    decoded->val[i] = result;
   }
 
   return 0;
@@ -823,8 +845,25 @@ int neon_rs_decode_table_lookup_v2(rs_decode_table *table, rs_poly_vector *recei
   if (!entry) {
     return -1;
   }
-  
-  // Prepare received vector with substitutions
+
+  decoded->len = 8;
+
+  if (num_erasures == 0) {
+    // No erasures: just copy data (systematic code property)
+    for (int i = 0; i < 8; i++) {
+      decoded->val[i] = received->val[i];
+    }
+    return 0;
+  }
+
+  // Systematic code optimization: copy valid symbols, compute only erased ones
+
+  // Step 1: Copy valid data symbols directly
+  for (int i = 0; i < 8; i++) {
+    decoded->val[i] = received->val[i];
+  }
+
+  // Step 2: Prepare received vector with parity substitutions
   uint8_t rx_modified[8] __attribute__((aligned(16)));
   for (int i = 0; i < 8; i++) {
     rx_modified[i] = received->val[i];
@@ -834,26 +873,28 @@ int neon_rs_decode_table_lookup_v2(rs_decode_table *table, rs_poly_vector *recei
       rx_modified[erasure_locations[i]] = received->val[8 + i];
     }
   }
-  
+
   uint8x8_t rx_vec = vld1_u8(rx_modified);
-  
-  // Vectorized matrix-vector multiplication
-  decoded->len = 8;
-  for (int i = 0; i < 8; i++) {
-    uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix[i]);
-    uint8x8_t prod_vec = neon_gf_mul_vec(matrix_row, rx_vec, exp_table, log_table);
-    
-    // Horizontal XOR reduction
-    uint8_t temp[8];
-    vst1_u8(temp, prod_vec);
-    char result = 0;
-    for (int j = 0; j < 8; j++) {
-      result ^= temp[j];
+
+  // Step 3: Compute ONLY erased symbols using vectorized GF multiply
+  for (int e = 0; e < num_erasures; e++) {
+    int erased_pos = erasure_locations[e];
+    if (erased_pos < 8) {
+      uint8x8_t matrix_row = vld1_u8((uint8_t *)entry->inv_matrix_rows[e]);
+      uint8x8_t prod_vec = neon_gf_mul_vec(matrix_row, rx_vec, exp_table, log_table);
+
+      // Horizontal XOR reduction
+      uint8_t temp[8];
+      vst1_u8(temp, prod_vec);
+      char result = 0;
+      for (int j = 0; j < 8; j++) {
+        result ^= temp[j];
+      }
+
+      decoded->val[erased_pos] = result;
     }
-    
-    decoded->val[i] = result;
   }
-  
+
   return 0;
 }
 
@@ -906,6 +947,13 @@ int neon_rs_decode_batch_blocked(rs_decode_table *table, char *data_blocked,
     return -1;  // Pattern not found
   }
 
+  if (num_erasures == 0) {
+    // No erasures: data is already correct (systematic code property)
+    return 0;
+  }
+
+  // Systematic code optimization: only compute erased symbol positions
+
   int num_blocks = (num_vectors + block_size - 1) / block_size;
 
   // Load GF tables once
@@ -923,91 +971,94 @@ int neon_rs_decode_batch_blocked(rs_decode_table *table, char *data_blocked,
   uint8x16_t zero_vec = vdupq_n_u8(0);
   uint8x16_t mod = vdupq_n_u8(15);
 
-  // Temporary storage for decoded output
-  char *decoded_blocked = malloc(num_vectors * 8);
-  if (!decoded_blocked) return -1;
+  // Temporary storage for received vector with parity substitutions
+  char *rx_modified_blocked = malloc(num_vectors * 8);
+  if (!rx_modified_blocked) return -1;
 
   for (int block = 0; block < num_blocks; block++) {
     int vecs_in_block = (block * block_size + block_size <= num_vectors) ?
                         block_size : (num_vectors - block * block_size);
     int block_data_offset = block * block_size * 8;
     int block_parity_offset = block * block_size * 2;
-    int decoded_offset = block * block_size * 8;
+    int rx_offset = block * block_size * 8;
 
-    // Step 1: Substitute erased symbols with parity symbols (in-place in data_blocked)
+    // Step 1: Create rx_modified with parity substitutions
+    // First, copy all data
+    memcpy(&rx_modified_blocked[rx_offset], &data_blocked[block_data_offset], vecs_in_block * 8);
+
+    // Then substitute erased positions with parity symbols
     for (int e = 0; e < num_erasures; e++) {
       int erased_pos = erasure_locations[e];
       if (erased_pos < 8) {
-        // Copy parity symbol e into erased data position
         for (int v = 0; v < vecs_in_block; v++) {
-          data_blocked[block_data_offset + erased_pos * block_size + v] =
+          rx_modified_blocked[rx_offset + erased_pos * block_size + v] =
               parity_blocked[block_parity_offset + e * block_size + v];
         }
       }
     }
 
-    // Step 2: Apply inverse matrix: decoded = inv_matrix × rx_modified
-    for (int i = 0; i < 8; i++) {  // Output symbol index
-      int output_offset = decoded_offset + i * block_size;
+    // Step 2: Compute ONLY erased symbols using inverse matrix rows
+    for (int e = 0; e < num_erasures; e++) {
+      int erased_pos = erasure_locations[e];
+      if (erased_pos < 8) {
+        int output_offset = block_data_offset + erased_pos * block_size;
 
-      // Process in chunks of 16
-      for (int v = 0; v < vecs_in_block; v += 16) {
-        int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
-        uint8x16_t acc = vdupq_n_u8(0);
+        // Process in chunks of 16 vectors at a time
+        for (int v = 0; v < vecs_in_block; v += 16) {
+          int chunk = (v + 16 <= vecs_in_block) ? 16 : (vecs_in_block - v);
+          uint8x16_t acc = vdupq_n_u8(0);
 
-        // Matrix-vector multiply: inv_matrix[i][:] · rx_modified
-        for (int j = 0; j < 8; j++) {
-          uint8x16_t rx_vec;
-          if (chunk == 16) {
-            rx_vec = vld1q_u8((uint8_t*)&data_blocked[block_data_offset + j * block_size + v]);
-          } else {
-            uint8_t temp[16] = {0};
-            for (int k = 0; k < chunk; k++) {
-              temp[k] = data_blocked[block_data_offset + j * block_size + v + k];
+          // Vector dot product: inv_matrix_rows[e][:] · rx_modified
+          for (int j = 0; j < 8; j++) {
+            uint8x16_t rx_vec;
+            if (chunk == 16) {
+              rx_vec = vld1q_u8((uint8_t*)&rx_modified_blocked[rx_offset + j * block_size + v]);
+            } else {
+              uint8_t temp[16] = {0};
+              for (int k = 0; k < chunk; k++) {
+                temp[k] = rx_modified_blocked[rx_offset + j * block_size + v + k];
+              }
+              rx_vec = vld1q_u8(temp);
             }
-            rx_vec = vld1q_u8(temp);
+
+            uint8x16_t coeff = vdupq_n_u8(entry->inv_matrix_rows[e][j]);
+
+            // GF multiply using exponent/log tables
+            uint8x16_t rx_zero_mask = vceqq_u8(rx_vec, zero_vec);
+            uint8x16_t coeff_zero_mask = vceqq_u8(coeff, zero_vec);
+            uint8x16_t zero_mask = vorrq_u8(rx_zero_mask, coeff_zero_mask);
+
+            uint8x16_t rx_exp = vqtbl2q_u8(exp_table, rx_vec);
+            uint8x16_t coeff_exp = vqtbl2q_u8(exp_table, coeff);
+
+            uint8x16_t sum_exp = vaddq_u8(rx_exp, coeff_exp);
+            uint8x16_t mask = vcgeq_u8(sum_exp, mod);
+            uint8x16_t mod15 = vandq_u8(mod, mask);
+            sum_exp = vsubq_u8(sum_exp, mod15);
+
+            uint8x16_t prod = vqtbl2q_u8(log_table, sum_exp);
+            prod = vbicq_u8(prod, zero_mask);
+
+            // GF addition (XOR)
+            acc = veorq_u8(acc, prod);
           }
 
-          uint8x16_t coeff = vdupq_n_u8(entry->inv_matrix[i][j]);
-
-          // GF multiply using exponent/log tables
-          uint8x16_t rx_zero_mask = vceqq_u8(rx_vec, zero_vec);
-          uint8x16_t coeff_zero_mask = vceqq_u8(coeff, zero_vec);
-          uint8x16_t zero_mask = vorrq_u8(rx_zero_mask, coeff_zero_mask);
-
-          uint8x16_t rx_exp = vqtbl2q_u8(exp_table, rx_vec);
-          uint8x16_t coeff_exp = vqtbl2q_u8(exp_table, coeff);
-
-          uint8x16_t sum_exp = vaddq_u8(rx_exp, coeff_exp);
-          uint8x16_t mask = vcgeq_u8(sum_exp, mod);
-          uint8x16_t mod15 = vandq_u8(mod, mask);
-          sum_exp = vsubq_u8(sum_exp, mod15);
-
-          uint8x16_t prod = vqtbl2q_u8(log_table, sum_exp);
-          prod = vbicq_u8(prod, zero_mask);
-
-          // GF addition (XOR)
-          acc = veorq_u8(acc, prod);
-        }
-
-        // Store decoded output
-        if (chunk == 16) {
-          vst1q_u8((uint8_t*)&decoded_blocked[output_offset + v], acc);
-        } else {
-          uint8_t temp[16];
-          vst1q_u8(temp, acc);
-          for (int k = 0; k < chunk; k++) {
-            decoded_blocked[output_offset + v + k] = temp[k];
+          // Store decoded erased symbol
+          if (chunk == 16) {
+            vst1q_u8((uint8_t*)&data_blocked[output_offset + v], acc);
+          } else {
+            uint8_t temp[16];
+            vst1q_u8(temp, acc);
+            for (int k = 0; k < chunk; k++) {
+              data_blocked[output_offset + v + k] = temp[k];
+            }
           }
         }
       }
     }
   }
 
-  // Copy decoded result back to data_blocked
-  memcpy(data_blocked, decoded_blocked, num_vectors * 8);
-  free(decoded_blocked);
-
+  free(rx_modified_blocked);
   return 0;
 }
 
