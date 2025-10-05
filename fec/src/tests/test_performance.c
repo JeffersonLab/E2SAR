@@ -61,6 +61,11 @@ void test_encoder_performance(rs_model *rs) {
     double time_taken, data_rate, baseline_time = 0;
     int test_num = 0;
 
+    // Arrays to store results for summary table
+    const char *test_names[6];
+    double throughputs[6];  // in Gbps
+    double speedups[6];
+
     // ========================================================================
     // 1. rs_encode (baseline)
     // ========================================================================
@@ -75,6 +80,10 @@ void test_encoder_performance(rs_model *rs) {
     time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
     data_rate = 1/1E6 * 4 * 8 * TEST_ITERATIONS / time_taken;  // 4 bits per nibble
     baseline_time = time_taken;
+
+    test_names[test_num-1] = "rs_encode (baseline)";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = 1.0;
 
     printf("%d. rs_encode (baseline matrix multiply)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
@@ -96,6 +105,10 @@ void test_encoder_performance(rs_model *rs) {
     time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
     data_rate = 1/1E6 * 4 * 8 * TEST_ITERATIONS / time_taken;  // 4 bits per nibble
 
+    test_names[test_num-1] = "fast_rs_encode (exp/log)";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
+
     printf("%d. fast_rs_encode (exp/log tables)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
     printf("   Throughput: %.1f Mbps\n", data_rate);
@@ -115,6 +128,10 @@ void test_encoder_performance(rs_model *rs) {
     end_usec = get_time_usec();
     time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
     data_rate = 1/1E6 * 4 * 8 * TEST_ITERATIONS / time_taken;  // 4 bits per nibble
+
+    test_names[test_num-1] = "neon_rs_encode (SIMD)";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
 
     printf("%d. neon_rs_encode (SIMD single nibble)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
@@ -141,6 +158,10 @@ void test_encoder_performance(rs_model *rs) {
     end_usec = get_time_usec();
     time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
     data_rate = 1/1E6 * 8 * 8 * TEST_ITERATIONS / time_taken;  // 8 bits (2 nibbles) per byte
+
+    test_names[test_num-1] = "neon_dual_nibble (SIMD)";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
 
     printf("%d. neon_rs_encode_dual_nibble (SIMD dual nibble)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
@@ -175,6 +196,10 @@ void test_encoder_performance(rs_model *rs) {
     time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
     data_rate = 1/1E6 * 4 * 8 * num_batches * BATCH_SIZE / time_taken;  // 4 bits per nibble
 
+    test_names[test_num-1] = "neon_batch_blocked";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
+
     printf("%d. neon_rs_encode_batch_blocked (batched single nibble, %d/batch)\n", test_num, BATCH_SIZE);
     printf("   Time: %.6f seconds\n", time_taken);
     printf("   Throughput: %.1f Mbps\n", data_rate);
@@ -207,6 +232,10 @@ void test_encoder_performance(rs_model *rs) {
     time_taken = (end_usec - start_usec) / 1e6;  // Convert microseconds to seconds
     data_rate = 1/1E6 * 8 * 8 * num_batches * BATCH_SIZE / time_taken;  // 8 bits (2 nibbles) per byte
 
+    test_names[test_num-1] = "neon_dual_batch_blocked";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
+
     printf("%d. neon_rs_encode_dual_nibble_batch_blocked (batched dual nibble, %d/batch)\n", test_num, BATCH_SIZE);
     printf("   Time: %.6f seconds\n", time_taken);
     printf("   Throughput: %.1f Mbps\n", data_rate);
@@ -223,6 +252,16 @@ void test_encoder_performance(rs_model *rs) {
     free(batch_bytes_blocked);
     free(batch_parity_bytes_blocked);
 
+    // Print summary table
+    printf("========================================================================\n");
+    printf("                      ENCODER PERFORMANCE SUMMARY                       \n");
+    printf("========================================================================\n");
+    printf("%-30s %12s %12s\n", "Implementation", "Throughput", "Speedup");
+    printf("%-30s %12s %12s\n", "", "(Gbps)", "(vs baseline)");
+    printf("------------------------------------------------------------------------\n");
+    for (int i = 0; i < 6; i++) {
+        printf("%-30s %12.2f %12.2fx\n", test_names[i], throughputs[i], speedups[i]);
+    }
     printf("========================================================================\n\n");
 }
 
@@ -281,6 +320,11 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
     int test_num = 0;
     int correct;
 
+    // Arrays to store results for summary table
+    const char *test_names[5];
+    double throughputs[5];  // in Gbps
+    double speedups[5];
+
     // ========================================================================
     // 1. rs_decode_erasures (baseline)
     // ========================================================================
@@ -303,6 +347,10 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
             break;
         }
     }
+
+    test_names[test_num-1] = "rs_decode_erasures";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = 1.0;
 
     printf("%d. rs_decode_erasures (baseline Gauss-Jordan)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
@@ -332,6 +380,10 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
         }
     }
 
+    test_names[test_num-1] = "rs_decode_table_lookup";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
+
     printf("%d. rs_decode_table_lookup (precomputed matrices)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
     printf("   Throughput: %.1f Mbps\n", data_rate);
@@ -360,6 +412,10 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
         }
     }
 
+    test_names[test_num-1] = "neon_decode_SIMD";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
+
     printf("%d. neon_rs_decode_table_lookup (SIMD table lookup)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
     printf("   Throughput: %.1f Mbps\n", data_rate);
@@ -387,6 +443,10 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
             break;
         }
     }
+
+    test_names[test_num-1] = "neon_decode_SIMD_v2";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
 
     printf("%d. neon_rs_decode_table_lookup_v2 (optimized SIMD)\n", test_num);
     printf("   Time: %.6f seconds\n", time_taken);
@@ -442,6 +502,10 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
         }
     }
 
+    test_names[test_num-1] = "neon_batch_blocked";
+    throughputs[test_num-1] = data_rate / 1000.0;  // Convert Mbps to Gbps
+    speedups[test_num-1] = baseline_time / time_taken;
+
     printf("%d. neon_rs_decode_batch_blocked (batched single nibble, %d/batch)\n", test_num, BATCH_SIZE);
     printf("   Time: %.6f seconds\n", time_taken);
     printf("   Throughput: %.1f Mbps\n", data_rate);
@@ -456,6 +520,16 @@ void test_decoder_performance_with_erasures(rs_model *rs, rs_decode_table *decod
     free(batch_parity_blocked);
     free(batch_output_vec);
 
+    // Print summary table
+    printf("========================================================================\n");
+    printf("                      DECODER PERFORMANCE SUMMARY                       \n");
+    printf("========================================================================\n");
+    printf("%-30s %12s %12s\n", "Implementation", "Throughput", "Speedup");
+    printf("%-30s %12s %12s\n", "", "(Gbps)", "(vs baseline)");
+    printf("------------------------------------------------------------------------\n");
+    for (int i = 0; i < 5; i++) {
+        printf("%-30s %12.2f %12.2fx\n", test_names[i], throughputs[i], speedups[i]);
+    }
     printf("========================================================================\n\n");
 }
 
