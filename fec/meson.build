@@ -2,10 +2,6 @@
 # EJFAT Reed-Solomon FEC - Meson Build Configuration
 # ============================================================================
 
-project('ejfat-fec', 'c',
-    version: '1.0.0',
-    default_options: ['c_std=c11'])
-
 c_compiler = meson.get_compiler('c')
 
 # Detect architecture for SIMD support
@@ -71,7 +67,7 @@ endif
 # Basic Tests (common/)
 # ============================================================================
 
-fec_test_basic = executable('test',
+fec_test_basic = executable('fec_test_basic',
     fec_src_dir / 'tests' / 'test.c',
     include_directories: fec_inc,
     c_args: fec_cflags)
