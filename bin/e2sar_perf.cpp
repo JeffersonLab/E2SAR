@@ -130,7 +130,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Sending " << numEvents << " event buffers" << std::endl;
     std::cout << "Using interface " << (s.getIntf() == "" ? "unknown"s : s.getIntf()) << std::endl;
     std::cout << "Using MTU " << s.getMTU() << std::endl;
-    u_int32_t expectedFrames = numEvents * ((eventBufSize + s.getMTU() - TOTAL_HDR_LEN - 1)/ (s.getMTU() - TOTAL_HDR_LEN));
+    u_int32_t expectedFrames = numEvents * ((eventBufSize + s.getMTU() - getTotalHeaderLength(s.isUsingIPv6()) - 1)/ (s.getMTU() - getTotalHeaderLength(s.isUsingIPv6())));
 
     if (s.getMaxPldLen() < eventPldStart.size() + eventPldEnd.size())
         return E2SARErrorInfo{E2SARErrorc::LogicError, "MTU is too short to send needed payload"};

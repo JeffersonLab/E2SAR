@@ -235,7 +235,7 @@ namespace e2sar
 
                 inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool cnct=true): 
                     seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
-                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
+                    maxPldLen{mtu - getTotalHeaderLength(v6)}, socketFd4(s.numSendSockets), 
                     socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
@@ -309,7 +309,7 @@ namespace e2sar
                 if (not dpuri.has_dataAddr())
                     throw E2SARException("Data address is not present in the URI");
 
-                if (sendThreadState.mtu <= TOTAL_HDR_LEN)
+                if (sendThreadState.mtu <= getTotalHeaderLength(sendThreadState.useV6))
                     throw E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
             }
 
@@ -515,6 +515,14 @@ namespace e2sar
             inline const size_t getMaxPldLen() const noexcept
             {
                 return sendThreadState.maxPldLen;
+            }
+
+            /**
+             * Check if segmenter is using IPv6 for dataplane
+             */
+            inline const bool isUsingIPv6() const noexcept
+            {
+                return sendThreadState.useV6;
             }
             /*
             * Tell threads to stop

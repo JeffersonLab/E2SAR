@@ -105,7 +105,7 @@ namespace e2sar
 #endif
         // override the values set in constructor
         sendThreadState.mtu = mtu;
-        sendThreadState.maxPldLen = mtu - TOTAL_HDR_LEN;
+        sendThreadState.maxPldLen = mtu - getTotalHeaderLength(sendThreadState.useV6);
         
 #ifdef LIBURING_AVAILABLE
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))

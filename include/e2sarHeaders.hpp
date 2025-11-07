@@ -236,9 +236,22 @@ namespace e2sar
     } __attribute__((__packed__));
 
     // various useful header lengths
-    constexpr size_t IP_HDRLEN = 20;
+    constexpr size_t IPV4_HDRLEN = 20;
+    constexpr size_t IPV6_HDRLEN = 40;
     constexpr size_t UDP_HDRLEN = 8;
+    
+    // Legacy constant for backward compatibility (IPv4 only)
+    constexpr size_t IP_HDRLEN = IPV4_HDRLEN;
     constexpr size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
+
+    // Protocol-aware header length functions
+    inline constexpr size_t getIPHeaderLength(bool useIPv6) {
+        return useIPv6 ? IPV6_HDRLEN : IPV4_HDRLEN;
+    }
+
+    inline constexpr size_t getTotalHeaderLength(bool useIPv6) {
+        return getIPHeaderLength(useIPv6) + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr);
+    }
 }
 
 #endif
