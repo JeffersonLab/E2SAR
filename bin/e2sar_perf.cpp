@@ -185,10 +185,10 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     auto stats = s.getSendStats();
     if (expectedFrames > stats.msgCnt)
-        std::cout << "WARNING: Fewer frames than expected have been sent (" << stats.msgCnt << " of " << 
+        std::cout << "WARNING: Fewer packets than expected have been sent (" << stats.msgCnt << " of " << 
             expectedFrames << ")." << std::endl;
 
-    std::cout << "Completed, " << stats.msgCnt << " frames sent, " << stats.errCnt << " errors" << std::endl;
+    std::cout << "Completed, " << stats.msgCnt << " packets sent, " << stats.errCnt << " errors" << std::endl;
     if (stats.errCnt != 0)
     {
         if (stats.lastE2SARError != E2SARErrorc::NoError)
