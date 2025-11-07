@@ -111,9 +111,8 @@ namespace e2sar
                 std::atomic<int> dataErrCnt{0};
                 // last e2sar error
                 std::atomic<E2SARErrorc> lastE2SARError{E2SARErrorc::NoError};
-                // a limited queue to push lost event numbers to
-                //boost::lockfree::queue<std::pair<EventNum_t, u_int16_t>*> lostEventsQueue{20};
-                boost::lockfree::queue<boost::tuple<EventNum_t, u_int16_t, size_t>*> lostEventsQueue{20};
+                // a now unlimited queue to push lost event numbers to
+                boost::lockfree::queue<boost::tuple<EventNum_t, u_int16_t, size_t>*, boost::lockfree::fixed_sized<false>> lostEventsQueue{0};
                 // this array is accessed by different threads using fd as an index (so no collisions)
                 std::vector<size_t> fragmentsPerFd;
                 std::vector<u_int16_t> portPerFd; // which port assigned to this FD - initialized at the start
