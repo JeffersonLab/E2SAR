@@ -350,7 +350,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP;
+    bool withCP, multiPort, smooth, autoIP, validate;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -383,7 +383,7 @@ int main(int argc, char **argv)
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
-    opts("novalidate,v", "don't validate server certificate [s,r]");
+    opts("novalidate,v", po::bool_switch()->default_value(false), "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
@@ -481,6 +481,7 @@ int main(int argc, char **argv)
     autoIP = vm["autoip"].as<bool>();
     multiPort = vm["multiport"].as<bool>();
     smooth = vm["smooth"].as<bool>();
+    validate = not vm["novalidate"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -499,10 +500,6 @@ int main(int argc, char **argv)
     bool preferHostAddr = false;
     if (vm.count("ipv6") || vm.count("ipv4"))
         preferHostAddr = true;
-
-    bool validate = true;
-    if (vm.count("novalidate"))
-        validate = false;
 
     if (rateGbps < 0. and smooth)
     {
@@ -524,8 +521,44 @@ int main(int argc, char **argv)
         }
         auto uri = uri_r.value();
         if (vm.count("send")) {
+            Segmenter::SegmenterFlags sflags;
+            if (!iniFile.empty())
+            {
+                std::cout << "Loading SegmenterFlags from " << iniFile << std::endl;
+                auto sflagsRes = Segmenter::SegmenterFlags::getFromINI(iniFile);
+                if (sflagsRes.has_error())
+                {
+                    std::cerr << "Unable to parse SegmenterFlags INI file " << iniFile << std::endl;
+                    return -1;
+                }
+                sflags = sflagsRes.value();
+                // deal with command-line overrides
+                if (vm.count("withcp"))
+                    sflags.useCP = withCP;
+                if (vm.count("mtu"))
+                    sflags.mtu = mtu;
+                if (vm.count("bufsize"))
+                    sflags.sndSocketBufSize = sockBufSize;
+                if (vm.count("sockets"))
+                    sflags.numSendSockets = numSockets;
+                if (vm.count("rate"))
+                    sflags.rateGbps = rateGbps;
+                if (vm.count("multiport"))
+                    sflags.multiPort = multiPort;
+                if (vm.count("smooth"))
+                    sflags.smooth = smooth;
+            } else {   
+                sflags.useCP = withCP; 
+                sflags.mtu = mtu;
+                sflags.sndSocketBufSize = sockBufSize;
+                sflags.numSendSockets = numSockets;
+                sflags.rateGbps = rateGbps;
+                sflags.multiPort = multiPort;
+                sflags.smooth = smooth;
+            }
+
             // if using control plane
-            if (withCP)
+            if (sflags.useCP)
             {
                 std::cout << "Adding senders to LB: " << std::flush;
                 // create LBManager
@@ -559,26 +592,6 @@ int main(int argc, char **argv)
                 std::cout << "done" << std::endl;
             }
 
-            Segmenter::SegmenterFlags sflags;
-            if (!iniFile.empty())
-            {
-                std::cout << "Loading SegmenterFlags from " << iniFile << std::endl;
-                auto sflagsRes = Segmenter::SegmenterFlags::getFromINI(iniFile);
-                if (sflagsRes.has_error())
-                {
-                    std::cerr << "Unable to parse SegmenterFlags INI file " << iniFile << std::endl;
-                    return -1;
-                }
-                sflags = sflagsRes.value();
-            } else {   
-                sflags.useCP = withCP; 
-                sflags.mtu = mtu;
-                sflags.sndSocketBufSize = sockBufSize;
-                sflags.numSendSockets = numSockets;
-                sflags.rateGbps = rateGbps;
-                sflags.multiPort = multiPort;
-                sflags.smooth = smooth;
-            }
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
@@ -633,6 +646,18 @@ int main(int argc, char **argv)
                     return -1;
                 }
                 rflags = rflagsRes.value();
+                // deal with command-line overrides
+                if (vm.count("withcp"))
+                    rflags.useCP = withCP;
+                    rflags.withLBHeader = not withCP;
+                if (vm.count("bufsize")) 
+                    rflags.rcvSocketBufSize = sockBufSize;
+                if (vm.count("ipv6") || vm.count("ipv4"))
+                    rflags.useHostAddress = preferHostAddr;
+                if (vm.count("novalidate"))
+                    rflags.validateCert = validate;
+                if (vm.count("timeout"))
+                    rflags.eventTimeout_ms = eventTimeoutMS;
             } else 
             {
                 rflags.useCP = withCP;
