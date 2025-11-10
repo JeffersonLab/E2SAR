@@ -267,6 +267,8 @@ result<int> traversePaths(Segmenter* seg, const std::vector<std::string>& filePa
 
     for(auto p: filePaths)
     {
+        if (not threadsRunning)
+            break;
         if (bfs::exists(p))
         {
             if (checkPath(p, extension)) 

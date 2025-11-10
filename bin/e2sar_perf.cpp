@@ -142,7 +142,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     auto sendStartTime = boost::chrono::high_resolution_clock::now();
     size_t evt = 0;
-    for(; evt < numEvents; evt++)
+    for(; (evt < numEvents) && threadsRunning; evt++)
     {
         // send the event
         auto eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
@@ -151,7 +151,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
 
         // put on queue with a callback to free this buffer
-        while(true)
+        while(threadsRunning)
         {
             auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
                 &freeBuffer, eventBuffer);
@@ -171,7 +171,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     }
 
     // measure this right after we exit the send loop
-    while(true)
+    while(threadsRunning)
     {
         auto stats = s.getSendStats();
 
