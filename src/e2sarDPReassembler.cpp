@@ -645,8 +645,11 @@ namespace e2sar
         boost::property_tree::ptree paramTree;
         Reassembler::ReassemblerFlags rFlags;
 
+        // Expand tilde in file path
+        std::string expandedPath = expandTilde(iniFile);
+
         try {
-            boost::property_tree::ini_parser::read_ini(iniFile, paramTree);
+            boost::property_tree::ini_parser::read_ini(expandedPath, paramTree);
         } catch(boost::property_tree::ini_parser_error &ie) {
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, 
                 "Unable to parse the reassembler flags configuration file "s + iniFile};

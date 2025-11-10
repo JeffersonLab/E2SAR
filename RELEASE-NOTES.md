@@ -2,6 +2,11 @@
 
 API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
 
+## v0.3.0
+
+- Changed the order of evaluation of INI file vs. command line - command line overrides anything specified in the INI file
+- Added tilde expansion to INI file path specifier
+
 ## v0.2.2
 
 - Added a new tool specifically for sending file: `e2sar_ft`. It has many common invocation parameters with `e2sar_perf`. It can scan a list of provided directories filtering files by optionally provided extension. On receive side it names the files according to the provided prefix and extension using event id and data id to name individual files. Both send and receive use mmap for efficiency. Multiple paths/files can be specified either with `--path` option or simply as a space-separated list at the end of the command. Globbing is also supported.

@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <cstdlib>
 #include <boost/url.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -426,5 +427,21 @@ namespace e2sar
 #else
         return E2SARErrorInfo{E2SARErrorc::SystemError, "Capability to determine outgoing address not supported on this platform"};
 #endif
+    }
+
+    std::string expandTilde(const std::string& path) {
+        if (path.empty() || path[0] != '~') {
+            return path;  // No tilde, return as-is
+        }
+        
+        if (path.length() == 1 || path[1] == '/') {
+            // ~/... - expand to current user's home
+            const char* home = std::getenv("HOME");
+            if (home) {
+                return std::string(home) + path.substr(1);  // Replace ~ with HOME
+            }
+            // HOME not set - return original path (will likely fail gracefully in read_ini)
+        }
+        return path;  // Return original for ~username or if HOME not found
     }
 }

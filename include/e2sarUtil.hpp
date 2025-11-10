@@ -643,5 +643,12 @@ namespace e2sar
                 return instance;
             }
     };
+
+    /**
+     * Expand tilde (~) in file paths to home directory.
+     * Only supports ~/path format (not ~username/path).
+     * Falls back to original path if HOME environment variable is not set.
+     */
+    std::string expandTilde(const std::string& path);
 };
 #endif
