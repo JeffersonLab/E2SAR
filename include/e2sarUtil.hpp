@@ -8,11 +8,32 @@
 #include <boost/asio.hpp>
 #include <boost/chrono.hpp>
 #include <boost/thread.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/common.hpp>
+#include <boost/log/sinks.hpp>
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/attributes.hpp>
+#include <boost/log/support/date_time.hpp>
+#include <boost/core/null_deleter.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "e2sarError.hpp"
 
 using namespace boost::asio;
 using namespace std::string_literals;
+using namespace boost::log;
+
+#define BOOST_MLL_START(PREF) { std::ostringstream PREF_ostr;
+#define BOOST_MLL_LOG(PREF) PREF_ostr 
+#define BOOST_MLL_STOP(PREF, LOG, LEV) BOOST_LOG_SEV(LOG, LEV) << PREF_ostr.str(); } 
+#define BOOST_LOG_FLUSH() sink->flush()
+#define BOOST_LOG_INFO() BOOST_LOG_SEV(lg, trivial::info)
+#define BOOST_LOG_WARN() BOOST_LOG_SEV(lg, trivial::warning)
+#define BOOST_LOG_ERR() BOOST_LOG_SEV(lg, trivial::error)
+typedef sinks::asynchronous_sink<sinks::text_ostream_backend> text_sink;
+static boost::shared_ptr<text_sink> sink;
+static sources::severity_logger_mt<trivial::severity_level> lg;
 
 /***
  * Supporting classes for E2SAR
@@ -650,5 +671,10 @@ namespace e2sar
      * Falls back to original path if HOME environment variable is not set.
      */
     std::string expandTilde(const std::string& path);
+
+    /**
+     * Define a std::clog-based logger
+     */
+    void defineClogLogger();
 };
 #endif

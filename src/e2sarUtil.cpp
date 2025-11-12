@@ -444,4 +444,27 @@ namespace e2sar
         }
         return path;  // Return original for ~username or if HOME not found
     }
+
+    BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", int)
+    BOOST_LOG_ATTRIBUTE_KEYWORD(counter, "LineCounter", int)
+    BOOST_LOG_ATTRIBUTE_KEYWORD(timestamp, "Timestamp", boost::posix_time::ptime)
+    boost::shared_ptr<text_sink> sink = boost::make_shared<text_sink>();
+    sources::severity_logger_mt<trivial::severity_level> lg;
+
+    void defineClogLogger()
+    {
+        boost::shared_ptr<std::ostream> stream{&std::clog,
+            boost::null_deleter{}};
+        sink->locked_backend()->add_stream(stream);
+        sink->set_formatter(expressions::stream << 
+            counter <<
+            ": [" << expressions::format_date_time(timestamp, "%H:%M:%S") << "]" <<
+            " {" << trivial::severity << "}" <<
+            " " << expressions::smessage);
+        core::get()->add_sink(sink);
+        core::get()->add_global_attribute("LineCounter",
+            attributes::counter<int>{});
+        core::get()->add_global_attribute("Timestamp",
+            attributes::local_clock{});
+    }
 }

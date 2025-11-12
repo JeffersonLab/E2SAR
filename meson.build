@@ -77,6 +77,7 @@ add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', lang
 
 # -Wall
 warning_level=1
+#add_project_arguments('-Wall -Wno-deprecated-declarations', language: ['cpp'])
 
 # Dependencies that can be installed by package tools such as brew, apt, dnf etc.
 glib_dep = dependency('glib-2.0')
@@ -92,7 +93,7 @@ grpc_dep = dependency('grpc++', version: '>=1.74.1')
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
 # and meson can ONLY find it via BOOST_ROOT env variable
 # (i.e. setting cmake_prefix_path doesn't work)
-boost_dep = dependency('boost', modules: ['url', 'program_options', 'chrono', 'thread', 'filesystem'], method: 'cmake', 
+boost_dep = dependency('boost', modules: ['url', 'program_options', 'chrono', 'thread', 'filesystem', 'log'], method: 'cmake', 
         version: ['>=1.89.0', '<=1.89.0'])
 
 # we include 'src' because auto-generated headers for gRPC stubs go there 
