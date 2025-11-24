@@ -458,7 +458,7 @@ namespace e2sar
         sink->locked_backend()->add_stream(stream);
         sink->set_formatter(expressions::stream << 
             counter <<
-            ": [" << expressions::format_date_time(timestamp, "%H:%M:%S") << "]" <<
+            ": [" << expressions::format_date_time(timestamp, "%H:%M:%S.%f") << "]" <<
             " {" << trivial::severity << "}" <<
             " " << expressions::smessage);
         core::get()->add_sink(sink);

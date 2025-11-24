@@ -24,10 +24,11 @@ using namespace boost::asio;
 using namespace std::string_literals;
 using namespace boost::log;
 
+#define BOOST_LOG_FLUSH() sink->flush()
 #define BOOST_MLL_START(PREF) { std::ostringstream PREF_ostr;
 #define BOOST_MLL_LOG(PREF) PREF_ostr 
-#define BOOST_MLL_STOP(PREF, LOG, LEV) BOOST_LOG_SEV(LOG, LEV) << PREF_ostr.str(); } 
-#define BOOST_LOG_FLUSH() sink->flush()
+#define BOOST_MLL_STOP(PREF) BOOST_LOG_SEV(lg, trivial::info) << PREF_ostr.str(); } BOOST_LOG_FLUSH(); 
+
 #define BOOST_LOG_INFO() BOOST_LOG_SEV(lg, trivial::info)
 #define BOOST_LOG_WARN() BOOST_LOG_SEV(lg, trivial::warning)
 #define BOOST_LOG_ERR() BOOST_LOG_SEV(lg, trivial::error)

@@ -211,6 +211,7 @@ namespace e2sar
 
                 // flags
                 const bool useV6;
+                const bool ticksAsREEventNum;
 
                 // transmit parameters
                 size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
@@ -233,10 +234,11 @@ namespace e2sar
                 // to get random port numbers we skip low numbered privileged ports
                 boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
 
-                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool cnct=true): 
-                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
+                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool tasreenum, bool cnct=true): 
+                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, ticksAsREEventNum{tasreenum}, mtu{mtu}, 
                     maxPldLen{mtu - getTotalHeaderLength(v6)}, socketFd4(s.numSendSockets), 
-                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
+                    socketFd6(s.numSendSockets),
+                    ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
                     auto nowT = boost::chrono::system_clock::now();
@@ -360,6 +362,8 @@ namespace e2sar
              * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
              * rather than a single port; source ports are still randomized (incompatible with a load balancer, 
              * only useful in back-to-back testing) {false}
+             * - ticksAsREEventNum - override the RE event number field with the same event number as LB event number
+             * which is a tick, primarily good for debugging {false}
              */
             struct SegmenterFlags 
             {
@@ -374,12 +378,13 @@ namespace e2sar
                 int sndSocketBufSize;
                 float rateGbps;
                 bool smooth;
-                bool multiPort; 
+                bool multiPort;
+                bool ticksAsREEventNum;
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
-                    multiPort{false} {}
+                    multiPort{false}, ticksAsREEventNum{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

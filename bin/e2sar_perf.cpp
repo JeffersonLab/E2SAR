@@ -301,33 +301,27 @@ void recvStatsThread(Reassembler *r)
                 break;
             lostEvents.push_back(res.value());
         }
-        /*
-             *  - 0 EventNum_t enqueueLoss;  // number of events received and lost on enqueue
-             *  - 1 EventNum_t reassemblyLoss; // number of events lost in reassembly due to missing segments
-             *  - 2 EventNum_t eventSuccess; // events successfully processed
-             *  - 3 int lastErrno; 
-             *  - 4 int grpcErrCnt; 
-             *  - 5 int dataErrCnt; 
-             *  - 6 E2SARErrorc lastE2SARError; 
-        */
-        std::cout << "Stats:" << std::endl;
-        std::cout << "\tEvents Received: " << stats.eventSuccess << std::endl;
-        std::cout << "\tEvents Mangled: " << mangledEvents << std::endl;
-        std::cout << "\tEvents Lost in reassembly: " << stats.reassemblyLoss << std::endl;
-        std::cout << "\tEvents Lost in enqueue: " << stats.enqueueLoss << std::endl;
-        std::cout << "\tData Errors: " << stats.dataErrCnt << std::endl;
+
+        BOOST_MLL_START(stat);
+        BOOST_MLL_LOG(stat) << "Stats:" << std::endl;
+        BOOST_MLL_LOG(stat) << "\tEvents Received: " << stats.eventSuccess << std::endl;
+        BOOST_MLL_LOG(stat) << "\tEvents Mangled: " << mangledEvents << std::endl;
+        BOOST_MLL_LOG(stat) << "\tEvents Lost in reassembly: " << stats.reassemblyLoss << std::endl;
+        BOOST_MLL_LOG(stat) << "\tEvents Lost in enqueue: " << stats.enqueueLoss << std::endl;
+        BOOST_MLL_LOG(stat) << "\tData Errors: " << stats.dataErrCnt << std::endl;
         if (stats.dataErrCnt > 0)
-            std::cout << "\tLast Data Error: " << strerror(stats.lastErrno) << std::endl;
+            BOOST_MLL_LOG(stat) << "\tLast Data Error: " << strerror(stats.lastErrno) << std::endl;
         std::cout << "\tgRPC Errors: " << stats.grpcErrCnt << std::endl;
         if (stats.lastE2SARError != E2SARErrorc::NoError)
-            std::cout << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
+            BOOST_MLL_LOG(stat) << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
 
-        std::cout << "\tEvents lost so far (<Evt ID:Data ID/num frags rcvd>): ";
+        BOOST_MLL_LOG(stat) << "\tEvents lost so far (<Evt ID:Data ID/num frags rcvd>): ";
         for(auto evt: lostEvents)
         {
-            std::cout << "<" << evt.get<0>() << ":" << evt.get<1>() << "/" << evt.get<2>() << "> ";
+            BOOST_MLL_LOG(stat) << "<" << evt.get<0>() << ":" << evt.get<1>() << "/" << evt.get<2>() << "> ";
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
+        BOOST_MLL_STOP(stat);
 
         auto until = nowT + boost::chrono::milliseconds(reportThreadSleepMs);
         boost::this_thread::sleep_until(until);
@@ -358,6 +352,9 @@ int main(int argc, char **argv)
     std::vector<std::string> optimizations;
     int numaNode;
     int eventTimeoutMS;
+
+    // define a simple clog-based logger
+    defineClogLogger();
 
     // parameters
     opts("send,s", "send traffic");

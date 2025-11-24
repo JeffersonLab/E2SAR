@@ -37,7 +37,7 @@ namespace e2sar
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
-        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
+        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.ticksAsREEventNum, sflags.connectedSocket),
         cpuCoreList{cpuCoreList},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
@@ -715,6 +715,11 @@ namespace e2sar
         else
             lbEventNum = now;
 
+        // overwrite EventNum outside the while loop to save time
+        // if the user requests LB and RE event numbers to match
+        if (ticksAsREEventNum)
+            eventNum = lbEventNum;
+
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
         {
@@ -947,6 +952,8 @@ namespace e2sar
             sFlags.syncPeriods);
         sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
             sFlags.syncPeriodMs);
+        sFlags.ticksAsREEventNum = paramTree.get<bool>("control-plane.ticksAsREEventNum",
+            sFlags.ticksAsREEventNum);
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
