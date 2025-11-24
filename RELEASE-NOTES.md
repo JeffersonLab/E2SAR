@@ -6,6 +6,8 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 - Changed the order of evaluation of INI file vs. command line - command line overrides anything specified in the INI file
 - Added tilde expansion to INI file path specifier
+- Added support for Boost::log
+- Added a new SegmenterFlags flag - data-plane.ticksAsREEventNum - when set the RE header event number is overwritten with the corresponding LB event number - primarily to support debugging and defaults to false
 
 ## v0.2.2
 

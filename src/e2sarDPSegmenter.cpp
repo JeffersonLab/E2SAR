@@ -952,13 +952,13 @@ namespace e2sar
             sFlags.syncPeriods);
         sFlags.syncPeriodMs = paramTree.get<u_int16_t>("control-plane.syncPeriodMS", 
             sFlags.syncPeriodMs);
-        sFlags.ticksAsREEventNum = paramTree.get<bool>("control-plane.ticksAsREEventNum",
-            sFlags.ticksAsREEventNum);
 
         // data plane
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
         sFlags.connectedSocket = paramTree.get<bool>("data-plane.connectedSocket", 
             sFlags.connectedSocket);
+        sFlags.ticksAsREEventNum = paramTree.get<bool>("data-plane.ticksAsREEventNum",
+            sFlags.ticksAsREEventNum);
         sFlags.mtu = paramTree.get<u_int16_t>("data-plane.mtu", sFlags.mtu);
         sFlags.numSendSockets = paramTree.get<size_t>("data-plane.numSendSockets", 
             sFlags.numSendSockets);
