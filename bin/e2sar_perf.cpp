@@ -344,7 +344,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP, validate;
+    bool withCP, multiPort, smooth, autoIP, validate, quiet;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -389,6 +389,7 @@ int main(int argc, char **argv)
     opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
+    opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
 
 
     po::variables_map vm;
@@ -414,6 +415,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "send", "period");
         conflicting_options(vm, "ipv4", "ipv6");
+        conflicting_options(vm, "send", "quiet");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -479,6 +481,7 @@ int main(int argc, char **argv)
     multiPort = vm["multiport"].as<bool>();
     smooth = vm["smooth"].as<bool>();
     validate = not vm["novalidate"].as<bool>();
+    quiet = vm["quiet"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -697,7 +700,9 @@ int main(int argc, char **argv)
                 std::cout << (rflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                     "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
-                boost::thread statT(&recvStatsThread, reasPtr);
+                // don't start recv stats thread if told to be quiet - reduces debugging output
+                if (not quiet)
+                    boost::thread statT(&recvStatsThread, reasPtr);
                 auto res = prepareToReceive(*reasPtr);
 
                 if (res.has_error()) {
