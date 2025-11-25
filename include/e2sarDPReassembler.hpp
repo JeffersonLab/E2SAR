@@ -103,6 +103,8 @@ namespace e2sar
                 std::atomic<EventNum_t> enqueueLoss{0}; // number of events received and lost on enqueue
                 std::atomic<EventNum_t> reassemblyLoss{0}; // number of events lost in reassembly (missing segments)
                 std::atomic<EventNum_t> eventSuccess{0}; // events successfully processed
+                std::atomic<size_t> totalBytesReceived{0};
+                std::atomic<size_t> totalPacketsReceived{0};
                 // last error code
                 std::atomic<int> lastErrno{0};
                 // gRPC error count
@@ -337,6 +339,7 @@ namespace e2sar
             friend struct sendStateThreadState;
             SendStateThreadState sendStateThreadState;
             bool useCP; // for debugging we may not want to have CP running
+            bool reportStats; // report worker stats in sendState thread (usually false)
             // global thread stop signal
             bool threadsStop{false};
 
@@ -373,6 +376,8 @@ namespace e2sar
              *  - int grpcErrCnt; // number of gRPC errors
              *  - int dataErrCnt; // number of dataplae errors
              *  - E2SARErrorc lastE2SARError; // last recorded E2SAR error (use make_error_code(stats.lastE2SARError).message())
+             *  - size_t totalPackets; // total packets received
+             *  - size_t totalBytes; // total bytes received
              */
             struct ReportedStats {
                 EventNum_t enqueueLoss;  // number of events received and lost on enqueue
@@ -381,13 +386,15 @@ namespace e2sar
                 int lastErrno; 
                 int grpcErrCnt; 
                 int dataErrCnt; 
-                E2SARErrorc lastE2SARError; 
+                E2SARErrorc lastE2SARError;
+                size_t totalPackets, totalBytes;
 
                 ReportedStats() = delete;
                 ReportedStats(const AtomicStats &as): enqueueLoss{as.enqueueLoss}, 
                     reassemblyLoss{as.reassemblyLoss}, eventSuccess{as.eventSuccess},
                     lastErrno{as.lastErrno}, grpcErrCnt{as.grpcErrCnt}, dataErrCnt{as.dataErrCnt},
-                    lastE2SARError{as.lastE2SARError} 
+                    lastE2SARError{as.lastE2SARError}, totalPackets{as.totalPacketsReceived}, 
+                    totalBytes{as.totalBytesReceived}
                     {}
             };
 
@@ -428,10 +435,12 @@ namespace e2sar
                 int eventTimeout_ms;
                 int rcvSocketBufSize; 
                 float weight, min_factor, max_factor;
+                bool reportStats;
                 ReassemblerFlags(): useCP{true}, useHostAddress{false},
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
-                    rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0} {}
+                    rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0},
+                    reportStats{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

@@ -97,6 +97,19 @@ void init_e2sarCP(py::module_ &m) {
         );
 
     /**
+     * Bindings for optional worker stats
+     */
+    py::class_<WorkerStats>(e2sarCP, "WorkerStats")
+        .def(py::init<>())
+        .def_readwrite("total_events_recv", &WorkerStats::total_events_recv)
+        .def_readwrite("total_events_reassembled", &WorkerStats::total_events_reassembled)
+        .def_readwrite("total_events_reassembly_err", &WorkerStats::total_events_reassembly_err)
+        .def_readwrite("total_events_dequeued", &WorkerStats::total_events_dequeued)
+        .def_readwrite("total_event_enqueue_err", &WorkerStats::total_event_enqueue_err)
+        .def_readwrite("total_bytes_recv", &WorkerStats::total_bytes_recv)
+        .def_readwrite("total_packets_recv", &WorkerStats::total_packets_recv);
+
+    /**
      * Bindings for struct "LBStatus"
      */
     py::class_<LBStatus>(e2sarCP, "LBStatus")
@@ -184,9 +197,10 @@ void init_e2sarCP(py::module_ &m) {
         static_cast<result<u_int32_t> (LBManager::*)(
             const std::string &,
             const double &,
-            const std::vector<std::string> &
+            const std::vector<std::string> &,
+            int ip_family
             )>(&LBManager::reserveLB),
-        py::arg("lb_id"), py::arg("seconds"), py::arg("senders")
+        py::arg("lb_id"), py::arg("seconds"), py::arg("senders"), py::arg("ip_family")
     );
 
     /// NOTE: Bindings for overloaded methods.
@@ -241,9 +255,10 @@ void init_e2sarCP(py::module_ &m) {
 
     lb_manager.def(
         "send_state",
-        static_cast<result<int> (LBManager::*)(float, float, bool)>(&LBManager::sendState),
+        static_cast<result<int> (LBManager::*)(float, float, bool, const WorkerStats&)>(&LBManager::sendState),
         "Send worker state update using session ID and session token from register call.",
-        py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready")
+        py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready"),
+        py::arg("stats")
     );
     /// TODO: type cast between C++ google::protobuf::Timestamp between Python datetime package
     // lb_manager.def(

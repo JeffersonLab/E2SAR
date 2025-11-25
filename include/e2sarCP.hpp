@@ -76,6 +76,26 @@ namespace e2sar
     };
 
     /**
+     * Optional stats sent by individual workers in sendState and received in worker status about their performance
+     * int64 totalEventsRecv - how many event ids the receiver has seen
+     * int64 totalEventsReassembled - how many events has the receiver reassembled
+     * int64 totalEventsReassemblyErr - how many events has the receiver dropped before reassembly
+     * int64 totalEventsDequeued - how many events popped off the queue
+     * int64 totalEventEnqueueErr - how many events has the receiver failed to put on the queue because it's full
+     * int64 totalBytesRecv - total bytes received
+     * int64 totalPacketsRecv - total packets received
+     */
+    struct WorkerStats {
+        int64_t total_events_recv, total_events_reassembled, total_events_reassembly_err, total_events_dequeued,
+            total_event_enqueue_err, total_bytes_recv, total_packets_recv;
+        
+        WorkerStats(): total_events_recv{0}, total_events_reassembled{0}, total_events_reassembly_err{0},
+            total_events_dequeued{0}, total_event_enqueue_err{0}, total_bytes_recv{0}, total_packets_recv{0} {
+            std::cout << "ZEROING OUT" << std::endl;
+            }
+    };
+
+    /**
      * Status of LB (converted to this structure from loadbalancer::LoadBalancerStatusReply)
      */
     struct LBStatus
@@ -197,12 +217,14 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
          * @param senders list of sender IP addresses
+         * @param ip_family whether the load balancer should be IPv4 only, IPv6 only or dual stack (default)
          *
          * @return - FPGA LB ID, for use in correlating logs/metrics
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const TimeUntil &until,
-                              const std::vector<std::string> &senders) noexcept;
+                              const std::vector<std::string> &senders,
+                              int ip_family=loadbalancer::IpFamily::DUAL_STACK) noexcept;
 
         /**
          * Reserve a new load balancer with this name until specified time. It sets the intstance
@@ -212,12 +234,14 @@ namespace e2sar
          * @param duration for how long it is needed as boost::posix_time::time_duration. You can use
          * boost::posix_time::duration_from_string from string like "23:59:59.000"s
          * @param senders list of sender IP addresses
+         * @param ip_family whether the load balancer should be IPv4 only, IPv6 only or dual stack (default)
          *
          * @return - FPGA LB ID, for use in correlating logs/metrics
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
-                              const std::vector<std::string> &senders) noexcept;
+                              const std::vector<std::string> &senders,
+                              int ip_family=loadbalancer::IpFamily::DUAL_STACK) noexcept;
 
         /**
          * Reserve a new load balancer with this name of duration in seconds
@@ -225,12 +249,14 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param durationSeconds for how long it is needed in seconds
          * @param senders list of sender IP addresses
+         * @param ip_family whether the load balancer should be IPv4 only, IPv6 only or dual stack (default)
          *
          * @return - 0 on success or error code with message on failure
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const double &durationSeconds,
-                              const std::vector<std::string> &senders) noexcept;
+                              const std::vector<std::string> &senders,
+                              int ip_family=loadbalancer::IpFamily::DUAL_STACK) noexcept;
 
         /**
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
@@ -466,9 +492,11 @@ namespace e2sar
          * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
          * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
          * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
+         * @param keep_lb_header - don't strip the LB header when processing for this worker (to support hierarchical LBs; defaults to false)
          * @return - 0 on success or an error condition
          */
-        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor) noexcept;
+        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, 
+            float min_factor, float max_factor, bool keep_lb_header=false) noexcept;
 
         /**
          * Register the calling worker workernode/backend with an allocated loadbalancer. 
@@ -486,9 +514,11 @@ namespace e2sar
          * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
          * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
          * @param v6 - use IPv6 dataplane (defaults to false)
+         * @param keep_lb_header - don't strip the LB header when processing for this worker (to support hierarchical LBs; defaults to false)
          * @return - 0 on success or an error condition
          */
-        result<int> registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, bool v6=false) noexcept;
+        result<int> registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, 
+                bool v6=false, bool keep_lb_header=false) noexcept;
 
         /**
          * Deregister worker using session ID and session token from the register call
@@ -496,6 +526,33 @@ namespace e2sar
          * @return - 0 on success or an error condition
          */
         result<int> deregisterWorker() noexcept;
+
+        /**
+         * Send worker state update using session ID and session token from register call. Automatically
+         * uses localtime to set the timestamp. Workers are expected to send state every 100ms or so. Allows
+         * to set worker stats.
+         *
+         * @param fill_percent - [0:1] percentage filled of the queue
+         * @param control_signal - change to data rate
+         * @param is_ready - if true, worker ready to accept more data, else not ready
+         * @param stats - a struct of additional optional worker stats (WorkerStats)
+         */
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready,
+                       const WorkerStats &stats) noexcept;
+
+        /**
+         * Send worker state update using session ID and session token from register call. Allows to explicitly
+         * set the timestamp and set worker stats
+         *
+         * @param fill_percent - [0:1] percentage filled of the queue
+         * @param control_signal - change to data rate
+         * @param is_ready - if true, worker ready to accept more data, else not ready
+         * @param ts - google::protobuf::Timestamp timestamp for this message (if you want to explicitly not
+         * use localtime)
+         * @param stats - a struct of additional optional worker stats (WorkerStats)
+         */
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts,
+                       const WorkerStats &stats) noexcept;
 
         /**
          * Send worker state update using session ID and session token from register call. Automatically

@@ -41,7 +41,8 @@ namespace e2sar
     // reserve load balancer
     result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const TimeUntil &until,
-                                     const std::vector<std::string> &senders) noexcept 
+                                     const std::vector<std::string> &senders,
+                                     int ip_family) noexcept 
     {
 
         ClientContext context;
@@ -67,6 +68,9 @@ namespace e2sar
 
         // Timestamp type is weird. 'Nuf said.
         req.mutable_until()->CopyFrom(until);
+
+        // set single or dual stack LB
+        req.set_ipfamily(static_cast<loadbalancer::IpFamily>(ip_family));
 
         // add sender IP addresses, but check they are valid
         for (auto s : senders)
@@ -134,7 +138,8 @@ namespace e2sar
     // reserve via duration
     result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const boost::posix_time::time_duration &duration,
-                                     const std::vector<std::string> &senders) noexcept 
+                                     const std::vector<std::string> &senders,
+                                     int ip_family) noexcept 
     {
         google::protobuf::Timestamp ts1;
         if (duration.is_zero())
@@ -155,7 +160,8 @@ namespace e2sar
     // reserve via duration in seconds
     result<u_int32_t> LBManager::reserveLB(const std::string &lb_name,
                                      const double &durationSeconds,
-                                     const std::vector<std::string> &senders) noexcept 
+                                     const std::vector<std::string> &senders,
+                                     int ip_family) noexcept 
     {
         /// NOTE: this static casting may lose time accuracy, but should be accepted
         boost::posix_time::time_duration duration = boost::posix_time::seconds(static_cast<long>(durationSeconds));
@@ -389,7 +395,8 @@ namespace e2sar
     }
 
     // register worker nodes
-    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor) noexcept 
+    result<int> LBManager::registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, 
+        float min_factor, float max_factor, bool keep_lb_header) noexcept 
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -430,6 +437,8 @@ namespace e2sar
 
         req.set_ipaddress(node_ip_port.first.to_string());
 
+        req.set_keeplbheader(keep_lb_header);
+
         if (node_ip_port.second <= 1024)
             return E2SARErrorInfo{E2SARErrorc::ParameterError, "Ports below 1024 are generally reserved, worker UDP port too low"s};
 
@@ -455,7 +464,8 @@ namespace e2sar
         return 0;
     }
 
-    result<int> LBManager::registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, bool v6) noexcept
+    result<int> LBManager::registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, 
+        float max_factor, bool v6, bool keep_lb_header) noexcept
     {
 
         auto ipRes = _cpuri.getDataplaneLocalAddresses(v6);
@@ -510,8 +520,9 @@ namespace e2sar
         return 0;
     }
 
-    // send worker queue state with explicit timestamp
-    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts) noexcept 
+    // send worker queue state with explicit timestamp and attach stats
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts,
+        const WorkerStats &stats ) noexcept 
     {
         // we only need lb id from the URI
         ClientContext context;
@@ -549,6 +560,15 @@ namespace e2sar
 
         req.set_isready(is_ready);
 
+        // all the stats. all of them.
+        req.set_totaleventsrecv(stats.total_events_recv);
+        req.set_totaleventsreassembled(stats.total_events_reassembled);
+        req.set_totaleventsreassemblyerr(stats.total_events_reassembly_err);
+        req.set_totaleventsdequeued(stats.total_events_dequeued);
+        req.set_totaleventenqueueerr(stats.total_event_enqueue_err);
+        req.set_totalbytesrecv(stats.total_bytes_recv);
+        req.set_totalpacketsrecv(stats.total_packets_recv);
+
         // Timestamp type is weird. 'Nuf said.
         req.mutable_timestamp()->CopyFrom(ts);
 
@@ -562,11 +582,31 @@ namespace e2sar
         return 0;
     }
 
-    // send worker queue state with using local time
-    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready) noexcept 
+    // send worker queue state with using local time and attach stats
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready,
+        const WorkerStats &stats) noexcept 
     {
         return sendState(fill_percent, control_signal, is_ready,
-                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())));
+                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())),
+                         stats);
+    }
+
+    // send worker queue state with using local time and no stats
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready) noexcept 
+    {
+        WorkerStats stats; // constructor will zero out
+
+        return sendState(fill_percent, control_signal, is_ready,
+                         util::TimeUtil::TimeTToTimestamp(to_time_t(second_clock::universal_time())),
+                         stats);
+    }
+
+    // send worker queue state using explicit time and no stats 
+    result<int> LBManager::sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts) noexcept 
+    {
+        WorkerStats stats; // constructor will zero out
+
+        return sendState(fill_percent, control_signal, is_ready, ts, stats);
     }
 
     result<boost::tuple<std::string, std::string, std::string>> LBManager::version() noexcept {

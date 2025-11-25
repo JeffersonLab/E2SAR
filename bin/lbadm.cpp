@@ -31,11 +31,12 @@ void option_dependency(const po::variables_map &vm,
  * @param lbname is the name of the loadbalancer you give it
  * @param senders is the list of IP addresses of sender nodes
  * @param duration is a string indicating the duration you wish to reserve LB for format "hh:mm::ss"
+ * @param ipfam 0 - dual stack, 1 - ipv4 only, 2 - ipv6 only
  */
 result<int> reserveLB(LBManager &lbman,
                       const std::string &lbname,
                       const std::vector<std::string> &senders,
-                      const std::string &duration,
+                      const std::string &duration, int ipfam, 
                       const bool suppress)
 {
     boost::posix_time::time_duration duration_v;
@@ -61,7 +62,7 @@ result<int> reserveLB(LBManager &lbman,
     }
 
     // attempt to reserve
-    auto res = lbman.reserveLB(lbname, duration_v, senders);
+    auto res = lbman.reserveLB(lbname, duration_v, senders, ipfam);
 
     if (res.has_error())
     {
@@ -113,7 +114,7 @@ result<int> freeLB(LBManager &lbman, const std::string &lbid = "")
 result<int> registerWorker(LBManager &lbman, const std::string &node_name, 
                             const std::string &node_ip, u_int16_t node_port, 
                             float weight, u_int16_t src_cnt, float min_factor, 
-                            float max_factor, const bool suppress)
+                            float max_factor, bool keeplbhdr, const bool suppress)
 {
     if(!suppress)
     {
@@ -154,10 +155,10 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name,
 
     if (node_ip.length() > 0)
     {
-        return handleError(lbman.registerWorker(node_name, std::pair<ip::address, u_int16_t>(ip::make_address(node_ip), node_port), weight, src_cnt, min_factor, max_factor));
+        return handleError(lbman.registerWorker(node_name, std::pair<ip::address, u_int16_t>(ip::make_address(node_ip), node_port), weight, src_cnt, min_factor, max_factor, keeplbhdr));
     } else
     {
-        return handleError(lbman.registerWorkerSelf(node_name, node_port, weight, src_cnt, min_factor, max_factor));
+        return handleError(lbman.registerWorkerSelf(node_name, node_port, weight, src_cnt, min_factor, max_factor, keeplbhdr));
     }
 }
 
@@ -259,14 +260,14 @@ result<int> overview(LBManager &lbman)
     }
 }
 
-result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready)
+result<int> sendState(LBManager &lbman, float fill_percent, float ctrl_signal, bool is_ready, const WorkerStats &stats)
 {
     std::cout << "Sending Worker State " << std::endl;
     std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
         lbman.get_AddrString() << std::endl;
     std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
 
-    auto res = lbman.sendState(fill_percent, ctrl_signal, is_ready);
+    auto res = lbman.sendState(fill_percent, ctrl_signal, is_ready, stats);
 
     if (res.has_error())
     {
@@ -387,7 +388,10 @@ int main(int argc, char **argv)
     float weight;
     u_int16_t count;
     float queue, ctrl, minfactor, maxfactor;
-    bool ready;
+    bool ready, keeplbhdr;
+    int ipfam;
+    // all the sendState stats
+    WorkerStats stats;
 
     // parameters
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
@@ -410,6 +414,18 @@ int main(int argc, char **argv)
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation)");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation)");
     opts("export,e", "suppresses other messages and prints out 'export EJFAT_URI=<the new uri>' returned by the LB");
+    opts("keeplbhdr", po::value<bool>(&keeplbhdr)->default_value(false), "do not remove LB header (in 'register' call; defaults to false)");
+    opts("ipfam", po::value<int>(&ipfam)->default_value(0), "specify whether the LB should be dual stacked [0], ipv4 only [1] or ipv6 only (in 'reserve' call; defaults to 0)");
+
+    // send state (or 'state' command) optional stats
+    opts("total_events_recv", po::value<int64_t>(&stats.total_events_recv)->default_value(0), "optional stats for 'state' command, defaults to 0");
+    opts("total_events_reassembled", po::value<int64_t>(&stats.total_events_reassembled)->default_value(0), "optional stats for 'state' command, defaults to 0");
+    opts("total_events_reassembly_err", po::value<int64_t>(&stats.total_events_reassembly_err)->default_value(0), "optional stats for 'state' command, defaults to 0");
+    opts("total_events_dequeued", po::value<int64_t>(&stats.total_events_dequeued)->default_value(0), "optional stats for 'state' command, defaults to 0");
+    opts("total_event_enqueue_err", po::value<int64_t>(&stats.total_event_enqueue_err)->default_value(0), "optional stats for 'state' command, defaults to 0");
+    opts("total_bytes_recv", po::value<int64_t>(&stats.total_bytes_recv)->default_value(0), "optional stats for 'state' command, defaults to 0");
+    opts("total_packets_recv", po::value<int64_t>(&stats.total_packets_recv)->default_value(0), "optional stats for 'state' command, defaults to 0");
+
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
     opts("free", "free a load balancer. Uses instance or admin token.");
@@ -557,7 +573,7 @@ int main(int argc, char **argv)
         // execute command
         auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
                                (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()),
-                               duration, suppress);
+                               duration, ipfam, suppress);
         if (uri_r.has_error())
         {
             std::cerr << "There was an error reserving LB: " << uri_r.error().message() << std::endl;
@@ -595,6 +611,7 @@ int main(int argc, char **argv)
                                     count,
                                     minfactor,
                                     maxfactor,
+                                    keeplbhdr,
                                     suppress
                                     );
 
@@ -628,7 +645,7 @@ int main(int argc, char **argv)
     }
     else if (vm.count("state"))
     {
-        auto int_r = sendState(lbman, queue, ctrl, ready);
+        auto int_r = sendState(lbman, queue, ctrl, ready, stats);
         if (int_r.has_error())
         {
             std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
