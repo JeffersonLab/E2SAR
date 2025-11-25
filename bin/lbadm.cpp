@@ -248,6 +248,8 @@ result<int> overview(LBManager &lbman)
             std::cout << "LB " << r.name << " ID: " << r.lbid << " FPGA LBID: " << r.fpgaLBId << 
                 " Data Min Port: " << r.dataMinPort << " Data Max Port: " << r.dataMaxPort << 
                 std::endl;
+            std::cout << "  Sync on: " << r.syncIPv4AndPort.first << ":" << r.syncIPv4AndPort.second << " " << 
+                r.syncIPv6AndPort.first << ":" << r.syncIPv6AndPort.second << std::endl;
             std::cout << "  Registered sender addresses: ";
             for (auto a : r.status.senderAddresses)
                 std::cout << a << " "s;

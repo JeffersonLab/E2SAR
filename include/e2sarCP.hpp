@@ -112,7 +112,8 @@ namespace e2sar
     {
         std::string name; // name passed in reserveLB
         std::string lbid; // load balancer id
-        std::pair<ip::address, u_int16_t> syncAddressAndPort;
+        std::pair<ip::address, u_int16_t> syncIPv4AndPort;
+        std::pair<ip::address, u_int16_t> syncIPv6AndPort;
         ip::address dataIPv4;
         ip::address dataIPv6; 
         u_int32_t fpgaLBId; 
@@ -423,8 +424,10 @@ namespace e2sar
             {
                 om[j].name = i->name();
                 om[j].lbid = i->reservation().lbid();
-                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipv4address());
-                om[j].syncAddressAndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv4AndPort.first = ip::make_address(i->reservation().syncipv4address());
+                om[j].syncIPv4AndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv6AndPort.first = ip::make_address(i->reservation().syncipv6address());
+                om[j].syncIPv6AndPort.second = i->reservation().syncudpport();
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
@@ -444,8 +447,10 @@ namespace e2sar
             {
                 om[j].name = i->name();
                 om[j].lbid = i->reservation().lbid();
-                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipv4address());
-                om[j].syncAddressAndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv4AndPort.first = ip::make_address(i->reservation().syncipv4address());
+                om[j].syncIPv4AndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv6AndPort.first = ip::make_address(i->reservation().syncipv6address());
+                om[j].syncIPv6AndPort.second = i->reservation().syncudpport();
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();

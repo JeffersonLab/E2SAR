@@ -130,10 +130,13 @@ void init_e2sarCP(py::module_ &m) {
         
         .def_readonly("name", &OverviewEntry::name)
         .def_readonly("lb_id", &OverviewEntry::lbid)
-        .def_readonly("syncAddressAndPort", &OverviewEntry::syncAddressAndPort)
+        .def_readonly("syncIPv4AndPort", &OverviewEntry::syncIPv4AndPort)
+        .def_readonly("syncIPv6AndPort", &OverviewEntry::syncIPv6AndPort)        
         .def_readonly("data_ip_v4", &OverviewEntry::dataIPv4)
         .def_readonly("data_ip_v6", &OverviewEntry::dataIPv6)
         .def_readonly("fpga_lb_id", &OverviewEntry::fpgaLBId)
+        .def_readonly("data_min_port", &OverviewEntry::dataMinPort)
+        .def_readonly("data_max_port", &OverviewEntry::dataMaxPort)
         .def_readonly("lb_status", &OverviewEntry::status);
 
     /**
