@@ -62,21 +62,7 @@ namespace e2sar
     using TimeUntil = google::protobuf::Timestamp;
 
     /**
-     * Status of individual worker (part of getLBStatus return)
-     */
-    struct LBWorkerStatus
-    {
-        std::string name;
-        float fillPercent;
-        float controlSignal;
-        u_int32_t slotsAssigned;
-        google::protobuf::Timestamp lastUpdated;
-
-        LBWorkerStatus(const std::string &n, float fp, float cs, u_int32_t sa, google::protobuf::Timestamp lu) : name{n}, fillPercent{fp}, controlSignal{cs}, slotsAssigned{sa}, lastUpdated{lu} {}
-    };
-
-    /**
-     * Optional stats sent by individual workers in sendState and received in worker status about their performance
+     * Optional stats sent by individual workers in sendState and received in worker status from lbstatus about their performance
      * int64 totalEventsRecv - how many event ids the receiver has seen
      * int64 totalEventsReassembled - how many events has the receiver reassembled
      * int64 totalEventsReassemblyErr - how many events has the receiver dropped before reassembly
@@ -92,7 +78,7 @@ namespace e2sar
         WorkerStats(): total_events_recv{0}, total_events_reassembled{0}, total_events_reassembly_err{0},
             total_events_dequeued{0}, total_event_enqueue_err{0}, total_bytes_recv{0}, total_packets_recv{0} {
             std::cout << "ZEROING OUT" << std::endl;
-            }
+        }
     };
 
     /**
@@ -130,6 +116,8 @@ namespace e2sar
         ip::address dataIPv4;
         ip::address dataIPv6; 
         u_int32_t fpgaLBId; 
+        u_int32_t dataMinPort;
+        u_int32_t dataMaxPort;
         LBStatus status; // same as in lbstatus call
 
         OverviewEntry() {}
@@ -440,6 +428,8 @@ namespace e2sar
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
+                om[j].dataMinPort = i->reservation().dataminport();
+                om[j].dataMaxPort = i->reservation().datamaxport();
                 om[j].status = asLBStatus(i->status());
             }
             return om;
@@ -459,6 +449,8 @@ namespace e2sar
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
+                om[j].dataMinPort = i->reservation().dataminport();
+                om[j].dataMaxPort = i->reservation().datamaxport();
                 om[j].status = asLBStatus(i->status());
             }
             return om;

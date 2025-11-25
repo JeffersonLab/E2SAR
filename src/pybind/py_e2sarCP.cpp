@@ -75,28 +75,6 @@ void init_e2sarCP(py::module_ &m) {
     });
 
     /**
-     * Bindings for struct "LBWorkerStatus"
-     */
-    py::class_<LBWorkerStatus>(e2sarCP, "LBWorkerStatus")
-        .def(py::init<const std::string&, float, float, int, const google::protobuf::Timestamp&>(),
-            py::arg("name"),
-            py::arg("fill_percent"),
-            py::arg("control_signal"),
-            py::arg("slots_assigned"),
-            py::arg("last_updated")
-        )
-        // For params return from the LB, bind them as _readonly instead of _readwrite 
-        .def_readonly("name", &LBWorkerStatus::name)
-        .def_readonly("fill_percent", &LBWorkerStatus::fillPercent)
-        .def_readonly("control_signal", &LBWorkerStatus::controlSignal)
-        .def_readonly("slots_assigned", &LBWorkerStatus::slotsAssigned)
-        .def_property_readonly("last_updated",
-            [](const LBWorkerStatus &self) {
-                return google::protobuf::util::TimeUtil::ToString(self.lastUpdated); // Access the member directly
-            }
-        );
-
-    /**
      * Bindings for optional worker stats
      */
     py::class_<WorkerStats>(e2sarCP, "WorkerStats")

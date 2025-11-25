@@ -200,7 +200,8 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
     {
         auto lbstatus = LBManager::asLBStatus(res.value());
 
-        std::cout << "LB details: expiresat=" << lbstatus->expiresAt << ", currentepoch=" << lbstatus->currentEpoch << ", predictedeventnum=" << lbstatus->currentPredictedEventNumber << std::endl;
+        std::cout << "LB details: expiresat=" << lbstatus->expiresAt << ", currentepoch=" << lbstatus->currentEpoch << ", predictedeventnum=" << 
+            lbstatus->currentPredictedEventNumber << std::endl;
 
         std::cout << "Registered senders: ";
         for (auto a : lbstatus->senderAddresses)
@@ -210,7 +211,14 @@ result<int> getLBStatus(LBManager &lbman, const std::string &lbid)
         std::cout << "Registered workers: " << std::endl;
         for (auto w : lbstatus->workers)
         {
-            std::cout << "[ name="s << w.name() << ", controlsignal="s << w.controlsignal() << ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
+            std::cout << "[ name="s << w.name() << ", controlsignal="s << w.controlsignal() << ", fillpercent="s << w.fillpercent() << 
+                ", slotsassigned="s << w.slotsassigned() << ", lastupdated=" << *w.mutable_lastupdated() << 
+                ", IP Address=" << w.ipaddress() << ", UDP Port=" << w.udpport() << ", minFactor=" << w.minfactor() <<
+                ", maxFactor=" << w.maxfactor() << ", keepLBHeader=" << w.keeplbheader() << ", totalEventsRecv=" << w.totaleventsrecv() <<
+                ", totalEventsReassembled=" << w.totaleventsreassembled() << ", " << w.totaleventsreassemblyerr() << 
+                ", totalEventsDequeued=" << w.totaleventsdequeued() << ", totalEventEnqueueErr=" << w.totaleventenqueueerr() <<
+                ", totalBytesRecv=" << w.totalbytesrecv() << ", totalPacketsRecv=" << w.totalpacketsrecv() <<
+                "] "s << std::endl;
         }
         std::cout << std::endl;
 
@@ -237,7 +245,9 @@ result<int> overview(LBManager &lbman)
 
         for (auto r: overview) 
         {
-            std::cout << "LB " << r.name << " ID: " << r.lbid << " FPGA LBID: " << r.fpgaLBId << std::endl;
+            std::cout << "LB " << r.name << " ID: " << r.lbid << " FPGA LBID: " << r.fpgaLBId << 
+                " Data Min Port: " << r.dataMinPort << " Data Max Port: " << r.dataMaxPort << 
+                std::endl;
             std::cout << "  Registered sender addresses: ";
             for (auto a : r.status.senderAddresses)
                 std::cout << a << " "s;
