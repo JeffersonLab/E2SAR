@@ -36,13 +36,6 @@ using google::protobuf::Timestamp;
 // default reservation duration for a load balancer in hours
 #define DEFAULT_LB_RESERVE_DURATION 24
 
-// change to '1' to test older versions of UDPLBd where token
-// was sent as a parameter in the body. The new way is to send
-// it in the authorization header as bearer token
-#ifndef TOKEN_IN_BODY
-#define TOKEN_IN_BODY 0
-#endif
-
 /***
  * Control Plane definitions for E2SAR
  */
@@ -124,6 +117,38 @@ namespace e2sar
         OverviewEntry() {}
     };
     using OverviewMessage = std::vector<OverviewEntry>;
+
+    /**
+     * Timeseries sample with timestamp and value for float data
+     */
+    struct FloatSample {
+        int64_t timestamp_ms;  // milliseconds since epoch
+        float value;
+
+        FloatSample(int64_t ts, float v) : timestamp_ms{ts}, value{v} {}
+        FloatSample() : timestamp_ms{0}, value{0.0f} {}
+    };
+
+    /**
+     * Timeseries sample with timestamp and value for integer data
+     */
+    struct IntegerSample {
+        int64_t timestamp_ms;  // milliseconds since epoch
+        int64_t value;
+
+        IntegerSample(int64_t ts, int64_t v) : timestamp_ms{ts}, value{v} {}
+        IntegerSample() : timestamp_ms{0}, value{0} {}
+    };
+
+    /**
+     * Timeseries data - either float or integer samples
+     */
+    using TimeseriesData = std::variant<std::vector<FloatSample>, std::vector<IntegerSample>>;
+
+    /**
+     * Timeseries result containing the response timestamp and sample data
+     */
+    using TimeseriesResult = std::pair<google::protobuf::Timestamp, TimeseriesData>;
 
     class LBManager
     {
@@ -319,6 +344,18 @@ namespace e2sar
          * @param - use IPv6 dataplane (default false)
          */
         result<int> removeSenderSelf(bool v6=false) noexcept;
+
+        /**
+         * Retrieve timeseries data for a specific metric path
+         *
+         * @param path - Timeseries path selector (e.g., "/lb/1/<asterisk>", "/lb/1/session/2/totalEventsReassembled")
+         * @param since - Timestamp to retrieve data from
+         *
+         * @return TimeseriesResult containing the "since" timestamp and vector of samples (float or integer)
+         * Note: Response contains the first timeseries from the response. If multiple series are returned,
+         * only the first is extracted. Use path selectors that return a single series.
+         */
+        result<TimeseriesResult> timeseries(const std::string &path, const Timestamp &since) noexcept;
 
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.

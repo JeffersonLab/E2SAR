@@ -36,6 +36,14 @@ using loadbalancer::AddSendersReply;
 using loadbalancer::RemoveSendersRequest;
 using loadbalancer::RemoveSendersReply;
 
+using loadbalancer::TimeseriesRequest;
+using loadbalancer::TimeseriesResponse;
+using loadbalancer::Timeseries;
+using loadbalancer::FloatTimeseries;
+using loadbalancer::IntegerTimeseries;
+using loadbalancer::FloatSample;
+using loadbalancer::IntegerSample;
+
 namespace e2sar
 {
     // reserve load balancer
@@ -52,13 +60,8 @@ namespace e2sar
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
@@ -181,13 +184,8 @@ namespace e2sar
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
@@ -244,13 +242,8 @@ namespace e2sar
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
@@ -321,13 +314,8 @@ namespace e2sar
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
@@ -362,13 +350,8 @@ namespace e2sar
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
@@ -407,13 +390,8 @@ namespace e2sar
         auto instanceToken = _cpuri.get_InstanceToken();
         if (!instanceToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + instanceToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available in the URI"s};
@@ -492,13 +470,8 @@ namespace e2sar
         auto sessionToken = _cpuri.get_SessionToken();
         if (!sessionToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + sessionToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available in the URI"s};
@@ -533,13 +506,8 @@ namespace e2sar
         auto sessionToken = _cpuri.get_SessionToken();
         if (!sessionToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + sessionToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available in the URI"s};
@@ -619,13 +587,8 @@ namespace e2sar
         auto adminToken = _cpuri.get_AdminToken();
         if (!adminToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_AdminToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available in the URI"s};
@@ -651,13 +614,8 @@ namespace e2sar
         auto instanceToken = _cpuri.get_InstanceToken();
         if (!instanceToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_InstanceToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + instanceToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available in the URI"s};
@@ -702,13 +660,8 @@ namespace e2sar
         auto instanceToken = _cpuri.get_InstanceToken();
         if (!instanceToken.has_error())
         {
-#if TOKEN_IN_BODY
-            // set bearer token in body (the old way)
-            req.set_token(_cpuri.get_InstanceToken());
-#else
             // set bearer token in header
             context.AddMetadata("authorization"s, "Bearer "s + instanceToken.value());
-#endif
         }
         else
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available in the URI"s};
@@ -779,6 +732,93 @@ namespace e2sar
             }
         );
         return removeSenders(strVec);
+    }
+
+    // retrieve timeseries data for a specific metric path
+    result<TimeseriesResult> LBManager::timeseries(const std::string &path, const Timestamp &since) noexcept
+    {
+        ClientContext context;
+        TimeseriesRequest req;
+        TimeseriesResponse rep;
+
+        // NOTE: This uses admin token
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // validate path is not empty
+        if (path.empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Timeseries path cannot be empty"s};
+
+        // add the path selector
+        req.add_seriesselector(path);
+
+        // set the since timestamp
+        req.mutable_since()->CopyFrom(since);
+
+        // make the RPC call
+        Status status = _stub->Timeseries(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in timeseries(): "s + status.error_message()};
+        }
+
+        // check if we got any timeseries back
+        if (rep.timeseries_size() == 0)
+        {
+            return E2SARErrorInfo{E2SARErrorc::NotFound, "No timeseries data returned for path: "s + path};
+        }
+
+        // extract the first timeseries (assuming single path returns single series)
+        const auto &ts = rep.timeseries(0);
+
+        // unpack the timeseries data based on type
+        TimeseriesData data;
+
+        if (ts.has_float_samples())
+        {
+            // float timeseries
+            std::vector<e2sar::FloatSample> samples;
+            const auto &float_ts = ts.float_samples();
+
+            samples.reserve(float_ts.data_size());
+            for (int i = 0; i < float_ts.data_size(); i++)
+            {
+                const auto &sample = float_ts.data(i);
+                samples.emplace_back(sample.timestamp(), sample.value());
+            }
+
+            data = std::move(samples);
+        }
+/*         else if (ts.has_integer_samples())
+        {
+            // integer timeseries
+            std::vector<e2sar::IntegerSample> samples;
+            const auto &int_ts = ts.integer_samples();
+
+            samples.reserve(int_ts.data_size());
+            for (int i = 0; i < int_ts.data_size(); i++)
+            {
+                const auto &sample = int_ts.data(i);
+                // This may fail if the proto bug exists - will need adjustment
+                samples.emplace_back(sample.timestamp(), sample.value());
+            }
+
+            data = std::move(samples);
+        } */
+        else
+        {
+            return E2SARErrorInfo{E2SARErrorc::DataError, "Timeseries has neither float nor integer samples"s};
+        }
+
+        // return the result pair
+        return std::make_pair(rep.since(), std::move(data));
     }
 
     /**

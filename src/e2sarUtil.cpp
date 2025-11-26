@@ -214,18 +214,7 @@ namespace e2sar
 
         if (u.userinfo().length() > 0)
         {
-            switch (tt)
-            {
-            case TokenType::admin:
-                adminToken = u.userinfo();
-                break;
-            case TokenType::instance:
-                instanceToken = u.userinfo();
-                break;
-            case TokenType::session:
-                sessionToken = u.userinfo();
-                break;
-            }
+            tokensByType[static_cast<size_t>(tt)] = u.userinfo();
         }
 
         // see if the host needs resolving
@@ -331,13 +320,16 @@ namespace e2sar
     EjfatURI::operator std::string() const
     {
         // select which token to print
-        auto token = std::cref(adminToken);
+        auto token = std::cref(tokensByType[ttAsIdx(TokenType::all)]);
 
-        if (!instanceToken.empty())
-            token = std::cref(instanceToken);
+        if (!tokensByType[ttAsIdx(TokenType::load_balancer)].empty())
+            token = std::cref(tokensByType[ttAsIdx(TokenType::load_balancer)]);
 
-        if (!sessionToken.empty())
-            token = std::cref(sessionToken);
+        if (!tokensByType[ttAsIdx(TokenType::reservation)].empty())
+            token = std::cref(tokensByType[ttAsIdx(TokenType::reservation)]);
+
+        if (!tokensByType[ttAsIdx(TokenType::session)].empty())
+            token = std::cref(tokensByType[ttAsIdx(TokenType::session)]);
 
         return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
                (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
@@ -353,9 +345,14 @@ namespace e2sar
 
     bool operator==(const EjfatURI &u1, const EjfatURI &u2)
     {
-        return (u1.adminToken == u2.adminToken &&
-                u1.instanceToken == u2.instanceToken &&
-                u1.sessionToken == u2.sessionToken &&
+        return (u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::all)] == 
+                    u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::all)] &&
+                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::load_balancer)] == 
+                    u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::load_balancer)] &&
+                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::reservation)] == 
+                    u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::reservation)] &&
+                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::session)] == 
+                    u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::session)] &&
                 u1.cpAddr == u2.cpAddr &&
                 u1.cpPort == u2.cpPort &&
                 u1.dataAddrv4 == u2.dataAddrv4 &&
@@ -370,18 +367,7 @@ namespace e2sar
     const std::string EjfatURI::to_string(TokenType tt) const
     {
         // select which token to print
-        auto token = std::cref(adminToken);
-
-        switch (tt)
-        {
-        case TokenType::instance:
-            token = std::cref(instanceToken);
-            break;
-        case TokenType::session:
-            token = std::cref(sessionToken);
-        case TokenType::admin:;
-            ;
-        }
+        auto token = std::cref(tokensByType[ttAsIdx(tt)]);
 
         return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
                (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string())  : cpHost) + ":"s +

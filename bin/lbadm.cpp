@@ -260,7 +260,13 @@ result<int> overview(LBManager &lbman)
             {
                 std::cout << "  [ name="s << w.name() << ", controlsignal="s << w.controlsignal() << 
                     ", fillpercent="s << w.fillpercent() << ", slotsassigned="s << w.slotsassigned() << 
-                    ", lastupdated=" << *w.mutable_lastupdated() << "] "s << std::endl;
+                    ", lastupdated=" << *w.mutable_lastupdated() << 
+                    ", IP Address=" << w.ipaddress() << ", UDP Port=" << w.udpport() << ", minFactor=" << w.minfactor() <<
+                    ", maxFactor=" << w.maxfactor() << ", keepLBHeader=" << w.keeplbheader() << ", totalEventsRecv=" << w.totaleventsrecv() <<
+                    ", totalEventsReassembled=" << w.totaleventsreassembled() << ", " << w.totaleventsreassemblyerr() << 
+                    ", totalEventsDequeued=" << w.totaleventsdequeued() << ", totalEventEnqueueErr=" << w.totaleventenqueueerr() <<
+                    ", totalBytesRecv=" << w.totalbytesrecv() << ", totalPacketsRecv=" << w.totalpacketsrecv() <<
+                    "] "s << std::endl;
             }
             std::cout << std::endl;
 

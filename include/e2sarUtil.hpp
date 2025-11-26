@@ -18,6 +18,8 @@
 #include <boost/core/null_deleter.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "grpc/loadbalancer.grpc.pb.h"
+
 #include "e2sarError.hpp"
 
 using namespace boost::asio;
@@ -52,9 +54,22 @@ namespace e2sar
     class EjfatURI
     {
     public:
-        enum class TokenType {
-            admin, instance, session
+        enum class TokenType: u_int16_t {
+            // contains overloaded names according to old and new token type hierarchy
+            all=0, admin=1, load_balancer=admin, instance=2, reservation=instance, session=3, END
         };
+        inline static constexpr size_t ttAsIdx(TokenType tt) 
+        {
+            return static_cast<size_t>(tt);
+        }
+        static const size_t tokenTypeCardinality = static_cast<size_t>(TokenType::END);
+
+
+        enum class TokenPermission: u_int16_t {
+            // 'register' is a keyword in C++, so adding '_' to names
+            _read_only_, _register_, _reserve_, _update_, END
+        };
+        static const size_t tokenPermissionCardinality = static_cast<size_t>(TokenPermission::END);
 
     private:
         std::string rawURI;
@@ -72,19 +87,15 @@ namespace e2sar
         u_int16_t syncPort;
         /** TCP port for grpc communications with CP. */
         u_int16_t cpPort;
-        /** Dataplane port (normally defaults to DATAPLANE_POR) */
+        /** Dataplane port (normally defaults to DATAPLANE_PORT) */
         u_int16_t dataPort;
 
         /** String given by user, during registration, to label an LB instance. */
         std::string lbName;
         /** String identifier of an LB instance, set by the CP on an LB reservation. */
         std::string lbId;
-        /** Admin token for the CP being used. Set from URI string*/
-        std::string adminToken;
         /** Instance token set by the CP on an LB reservation. */
-        std::string instanceToken;
-        /** Session token used by the worker  */
-        std::string sessionToken;
+        std::array<std::string, tokenTypeCardinality> tokensByType;
         /** Session ID issued via register call */
         std::string sessionId;
 
@@ -100,7 +111,7 @@ namespace e2sar
     public:
         /** base constructor, sets instance token from string
          * @param uri - the URI string
-         * @param tt - convert to this token type (admin, instance, session)
+         * @param tt - convert to this token type (all, admin/load_balancer, instance/reservation, session)
          * @param preferV6 - when connecting to the control plane, prefer IPv6 address
          * if the name resolves to both (defaults to v4)
          */
@@ -122,23 +133,30 @@ namespace e2sar
             return useTls;
         }
 
+        /** set the token and token type */
+        inline void set_Token(const std::string &t, TokenType tt)
+        {
+            tokensByType[ttAsIdx(tt)] = t;
+        }
+
         /** set instance token based on gRPC return */
         inline void set_InstanceToken(const std::string &t)
         {
-            instanceToken = t;
+            tokensByType[ttAsIdx(TokenType::instance)] = t;
         }
 
         /** set session token based on gRPC return */
         inline void set_SessionToken(const std::string &t)
         {
-            sessionToken = t;
+            tokensByType[ttAsIdx(TokenType::session)] = t;
         }
 
         /** get instance token */
         inline const result<std::string> get_InstanceToken() const
         {
-            if (!instanceToken.empty())
-                return instanceToken;
+            auto idx = ttAsIdx(TokenType::instance);
+            if (!tokensByType[idx].empty())
+                return tokensByType[idx];
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available"s};
         }
@@ -146,8 +164,9 @@ namespace e2sar
         /** get session token */
         inline const result<std::string> get_SessionToken() const
         {
-            if (!sessionToken.empty())
-                return sessionToken;
+            auto idx = ttAsIdx(TokenType::session);
+            if (!tokensByType[idx].empty())
+                return tokensByType[idx];
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available"s};
         }
@@ -155,8 +174,9 @@ namespace e2sar
         /** return the admin token */
         inline const result<std::string> get_AdminToken() const
         {
-            if (!adminToken.empty())
-                return adminToken;
+            auto idx = ttAsIdx(TokenType::admin);
+            if (!tokensByType[idx].empty())
+                return tokensByType[idx];
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available"s};
         }
