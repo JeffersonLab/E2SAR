@@ -337,7 +337,7 @@ int main()
 
     std::cout << "Test allocate deallocate" << std::endl;
 
-    boost::lockfree::queue<std::pair<int, u_int16_t>*> lostEventsQueue{20};
+    boost::lockfree::queue<std::pair<int, u_int16_t>*, boost::lockfree::fixed_sized<true>> lostEventsQueue{10};
 
     for(int i=0; i<5; i++)
     {
@@ -351,6 +351,16 @@ int main()
         std::cout << "Retrieved " << ret.first << ":" << ret.second << std::endl;
         delete res;
     }
+
+    std::cout << "Test lockfree queue size limit" << std::endl;
+
+    int i = 25;
+    bool pushres = true;
+    while ((i-- > 0) && pushres)
+    {
+        pushres = lostEventsQueue.push(new std::pair<int, u_int16_t>(1, 2));
+    }
+    std::cout << "This is i=" << i << " and result=" << pushres << std::endl;
 
     std::cout << "Clock tests" << std::endl;
 

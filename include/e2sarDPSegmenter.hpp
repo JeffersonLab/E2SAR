@@ -96,7 +96,7 @@ namespace e2sar
             };
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
-            boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
+            boost::lockfree::queue<EventQueueItem*, boost::lockfree::fixed_sized<true>> eventQueue{QSIZE};
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
