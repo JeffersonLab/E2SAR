@@ -13,6 +13,8 @@
 
 #include <iostream>
 #include <atomic>
+#include <thread>
+#include <chrono>
 #include <boost/program_options.hpp>
 #include <boost/asio.hpp>
 
@@ -38,6 +40,7 @@ std::atomic<bool> handlerTriggered{false};
 // For cleanup in signal handler
 int rxSocket{-1};
 int txSocket{-1};
+std::thread statsThread;
 
 /**
  * Print relay statistics to stdout
@@ -52,6 +55,19 @@ void printStats()
 }
 
 /**
+ * Background thread function that prints statistics once per second
+ */
+void statsThreadFunc()
+{
+    while (keepRunning) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (keepRunning) {
+            printStats();
+        }
+    }
+}
+
+/**
  * Signal handler for graceful shutdown (Ctrl-C)
  */
 void signalHandler(int sig)
@@ -61,6 +77,11 @@ void signalHandler(int sig)
 
     std::cout << "\nShutting down..." << std::endl;
     keepRunning = false;
+
+    // Wait for stats thread to finish
+    if (statsThread.joinable()) {
+        statsThread.join();
+    }
 
     // Close sockets
     if (rxSocket >= 0)
@@ -409,6 +430,10 @@ int main(int argc, char **argv)
 
     // Start relay
     std::cout << "\nRelay active... (Press Ctrl-C to stop)" << std::endl;
+
+    // Start statistics thread
+    statsThread = std::thread(statsThreadFunc);
+
     relayLoop(rxSocket, txSocket);
 
     // Cleanup handled by signal handler
