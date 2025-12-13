@@ -399,6 +399,7 @@ int main(int argc, char **argv)
 
     // Register signal handler
     signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
 
     // Print configuration banner
     std::cout << "E2SAR UDP Relay" << std::endl;
