@@ -88,17 +88,17 @@ void conflicting_options(const po::variables_map &vm,
 /**
  * Create and bind a UDP receive socket
  *
+ * @param addr Address to bind to
  * @param port Port to bind to
- * @param useV6 If true, use IPv6, otherwise IPv4
  * @param bufSize Socket buffer size
  * @return Socket file descriptor or error
  */
-result<int> createReceiveSocket(u_int16_t port, bool useV6, int bufSize)
+result<int> createReceiveSocket(ip::address addr, u_int16_t port, int bufSize)
 {
     int fd;
 
-    // Create socket
-    if (useV6) {
+    // Create socket based on address type
+    if (addr.is_v6()) {
         fd = socket(AF_INET6, SOCK_DGRAM, 0);
         if (fd < 0) {
             return E2SARErrorInfo{E2SARErrorc::SocketError,
@@ -112,16 +112,16 @@ result<int> createReceiveSocket(u_int16_t port, bool useV6, int bufSize)
                 "Unable to set receive buffer size: "s + strerror(errno)};
         }
 
-        // Bind to all interfaces
+        // Bind to specified address
         sockaddr_in6 rxAddr{};
         rxAddr.sin6_family = AF_INET6;
-        rxAddr.sin6_addr = in6addr_any;
         rxAddr.sin6_port = htons(port);
+        inet_pton(AF_INET6, addr.to_string().c_str(), &rxAddr.sin6_addr);
 
         if (bind(fd, (sockaddr*)&rxAddr, sizeof(rxAddr)) < 0) {
             close(fd);
             return E2SARErrorInfo{E2SARErrorc::SocketError,
-                "Failed to bind IPv6 socket to port "s + std::to_string(port) + ": "s + strerror(errno)};
+                "Failed to bind IPv6 socket to "s + addr.to_string() + ":"s + std::to_string(port) + ": "s + strerror(errno)};
         }
     } else {
         fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -137,16 +137,16 @@ result<int> createReceiveSocket(u_int16_t port, bool useV6, int bufSize)
                 "Unable to set receive buffer size: "s + strerror(errno)};
         }
 
-        // Bind to all interfaces
+        // Bind to specified address
         sockaddr_in rxAddr{};
         rxAddr.sin_family = AF_INET;
-        rxAddr.sin_addr.s_addr = INADDR_ANY;
         rxAddr.sin_port = htons(port);
+        inet_pton(AF_INET, addr.to_string().c_str(), &rxAddr.sin_addr);
 
         if (bind(fd, (sockaddr*)&rxAddr, sizeof(rxAddr)) < 0) {
             close(fd);
             return E2SARErrorInfo{E2SARErrorc::SocketError,
-                "Failed to bind IPv4 socket to port "s + std::to_string(port) + ": "s + strerror(errno)};
+                "Failed to bind IPv4 socket to "s + addr.to_string() + ":"s + std::to_string(port) + ": "s + strerror(errno)};
         }
     }
 
@@ -277,12 +277,12 @@ int main(int argc, char **argv)
         "help,h", "Show this help message"
     );
 
-    u_int16_t rxPort;
+    std::string rxAddrStr;
     std::string txAddrStr;
     int rxBufSize, txBufSize;
 
     // Define command-line options
-    opts("rx-port,r", po::value<u_int16_t>(&rxPort), "Port to receive on [required]");
+    opts("rx-addr,r", po::value<std::string>(&rxAddrStr)->default_value("127.0.0.1:0"), "Address and port to receive on (e.g., \"192.168.1.1:5000\" or \"[::1]:5000\"). Default: 127.0.0.1:0");
     opts("tx-addr,t", po::value<std::string>(&txAddrStr), "Destination address and port (e.g., \"192.168.1.1:5000\" or \"[::1]:5000\") [required]");
     opts("rx-bufsize", po::value<int>(&rxBufSize)->default_value(1048576), "Receive socket buffer size in bytes (default 1MB)");
     opts("tx-bufsize", po::value<int>(&txBufSize)->default_value(1048576), "Send socket buffer size in bytes (default 1MB)");
@@ -302,27 +302,46 @@ int main(int argc, char **argv)
         std::cout << "E2SAR UDP Relay" << std::endl;
         std::cout << "Version: " << get_Version() << std::endl;
         std::cout << std::endl;
+        std::cout << "A simple UDP packet forwarder that receives packets on one address/port" << std::endl;
+        std::cout << "and forwards them to another. Supports both IPv4 and IPv6, including" << std::endl;
+        std::cout << "mixed protocol relaying (IPv4 to IPv6 and vice versa)." << std::endl;
+        std::cout << std::endl;
         std::cout << od << std::endl;
         std::cout << std::endl;
         std::cout << "Example usage:" << std::endl;
-        std::cout << "  IPv4: e2sar_udp_relay -r 10000 -t 192.168.1.100:10001" << std::endl;
-        std::cout << "  IPv6: e2sar_udp_relay -r 10000 -t [::1]:10001" << std::endl;
+        std::cout << "  IPv4 loopback:  e2sar_udp_relay -r 127.0.0.1:10000 -t 127.0.0.1:10001" << std::endl;
+        std::cout << "  IPv4 specific:  e2sar_udp_relay -r 192.168.1.1:10000 -t 192.168.1.100:10001" << std::endl;
+        std::cout << "  IPv6 loopback:  e2sar_udp_relay -r [::1]:10000 -t [::1]:10001" << std::endl;
+        std::cout << "  Mixed protocol: e2sar_udp_relay -r 127.0.0.1:10000 -t [::1]:10001" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Security note:" << std::endl;
+        std::cout << "  Default receive address is 127.0.0.1 (localhost only) for security." << std::endl;
+        std::cout << "  Binding to 0.0.0.0 or :: exposes the relay to all network interfaces" << std::endl;
+        std::cout << "  and should only be used in trusted environments." << std::endl;
         return 0;
     }
 
     // Validate command-line arguments
     try {
-        conflicting_options(vm, "ipv4", "ipv6");
-
-        if (!vm.count("rx-port")) {
-            throw std::logic_error("--rx-port is required");
-        }
         if (!vm.count("tx-addr")) {
             throw std::logic_error("--tx-addr is required");
         }
     } catch (const std::logic_error &le) {
         std::cerr << "Error: " << le.what() << std::endl;
         std::cerr << "Use --help for usage information" << std::endl;
+        return -1;
+    }
+
+    // Parse receive address and port
+    auto rxRes = string_tuple_to_ip_and_port(rxAddrStr);
+    if (rxRes.has_error()) {
+        std::cerr << "Invalid receive address: " << rxRes.error().message() << std::endl;
+        return -1;
+    }
+    auto [rxAddr, rxPort] = rxRes.value();
+
+    if (rxPort == 0) {
+        std::cerr << "Error: Receive port must be specified in format IP:PORT" << std::endl;
         return -1;
     }
 
@@ -339,15 +358,22 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    // Determine IPv4 vs IPv6
-    bool useV6 = false;
-    if (vm.count("ipv6")) {
-        useV6 = true;
-    } else if (vm.count("ipv4")) {
-        useV6 = false;
+    // Warn if binding to all interfaces
+    bool bindingToAll = false;
+    if (rxAddr.is_v6()) {
+        if (rxAddr.to_string() == "::" || rxAddr.to_string() == "0:0:0:0:0:0:0:0") {
+            bindingToAll = true;
+        }
     } else {
-        // Auto-detect from destination address
-        useV6 = destAddr.is_v6();
+        if (rxAddr.to_string() == "0.0.0.0") {
+            bindingToAll = true;
+        }
+    }
+
+    if (bindingToAll) {
+        std::cerr << "WARNING: Binding to all interfaces (" << rxAddr.to_string() << ") is unsafe for production use!" << std::endl;
+        std::cerr << "         Consider binding to a specific interface address instead." << std::endl;
+        std::cerr << std::endl;
     }
 
     // Register signal handler
@@ -356,21 +382,20 @@ int main(int argc, char **argv)
     // Print configuration banner
     std::cout << "E2SAR UDP Relay" << std::endl;
     std::cout << "Version:      " << get_Version() << std::endl;
-    std::cout << "Protocol:     " << (useV6 ? "IPv6" : "IPv4") << std::endl;
-    std::cout << "Receive port: " << rxPort << std::endl;
-    std::cout << "Destination:  " << destAddr.to_string() << ":" << destPort << std::endl;
+    std::cout << "Receive:      " << rxAddr.to_string() << ":" << rxPort << " (IPv" << (rxAddr.is_v6() ? "6" : "4") << ")" << std::endl;
+    std::cout << "Destination:  " << destAddr.to_string() << ":" << destPort << " (IPv" << (destAddr.is_v6() ? "6" : "4") << ")" << std::endl;
     std::cout << "RX buffer:    " << rxBufSize << " bytes" << std::endl;
     std::cout << "TX buffer:    " << txBufSize << " bytes" << std::endl;
     std::cout << std::endl;
 
     // Create receive socket
-    auto rxRes = createReceiveSocket(rxPort, useV6, rxBufSize);
-    if (rxRes.has_error()) {
-        std::cerr << "Failed to create receive socket: " << rxRes.error().message() << std::endl;
+    auto rxSocketRes = createReceiveSocket(rxAddr, rxPort, rxBufSize);
+    if (rxSocketRes.has_error()) {
+        std::cerr << "Failed to create receive socket: " << rxSocketRes.error().message() << std::endl;
         return -1;
     }
-    rxSocket = rxRes.value();
-    std::cout << "Receive socket created and bound to " << (useV6 ? "[::]" : "0.0.0.0") << ":" << rxPort << std::endl;
+    rxSocket = rxSocketRes.value();
+    std::cout << "Receive socket created and bound to " << rxAddr.to_string() << ":" << rxPort << std::endl;
 
     // Create send socket
     auto txRes = createSendSocket(destAddr, destPort, txBufSize);
