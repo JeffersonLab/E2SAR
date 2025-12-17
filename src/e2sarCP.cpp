@@ -519,7 +519,7 @@ namespace e2sar
 
         req.set_sessionid(_cpuri.get_sessionId());
 
-        if ((fill_percent < 0.0) || (fill_percent > 10))
+        if ((fill_percent < 0.0) || (fill_percent > 1.0))
             return E2SARErrorInfo{E2SARErrorc::ParameterError, "Fill percent must be a number between 0.0 and 1.0"s};
 
         req.set_fillpercent(fill_percent);
@@ -775,50 +775,49 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::NotFound, "No timeseries data returned for path: "s + path};
         }
 
-        // extract the first timeseries (assuming single path returns single series)
-        const auto &ts = rep.timeseries(0);
+        // traverse the returned timeseries
+        std::vector<TimeseriesData> tsd;
+        tsd.reserve(rep.timeseries_size());
 
-        // unpack the timeseries data based on type
-        TimeseriesData data;
-
-        if (ts.has_float_samples())
+        for(auto tsind = 0; tsind < rep.timeseries_size(); tsind++)
         {
-            // float timeseries
-            std::vector<e2sar::FloatSample> samples;
-            const auto &float_ts = ts.float_samples();
-
-            samples.reserve(float_ts.data_size());
-            for (int i = 0; i < float_ts.data_size(); i++)
+            const auto &ts = rep.timeseries(tsind);
+            if (ts.has_float_samples())
             {
-                const auto &sample = float_ts.data(i);
-                samples.emplace_back(sample.timestamp(), sample.value());
+                std::vector<FloatSample> samples;
+                const auto &float_ts = ts.float_samples();
+
+                samples.reserve(float_ts.data_size());
+                for (int i = 0; i < float_ts.data_size(); i++)
+                {
+                    const auto &sample = float_ts.data(i);
+                    samples.emplace_back(sample.timestamp(), sample.value());
+                }
+                tsd.emplace_back(ts.name(), ts.unit(), samples);
             }
-
-            data = std::move(samples);
-        }
-/*         else if (ts.has_integer_samples())
-        {
-            // integer timeseries
-            std::vector<e2sar::IntegerSample> samples;
-            const auto &int_ts = ts.integer_samples();
-
-            samples.reserve(int_ts.data_size());
-            for (int i = 0; i < int_ts.data_size(); i++)
+            else if (ts.has_integer_samples())
             {
-                const auto &sample = int_ts.data(i);
-                // This may fail if the proto bug exists - will need adjustment
-                samples.emplace_back(sample.timestamp(), sample.value());
-            }
+                std::vector<IntegerSample> samples;
+                const auto &int_ts = ts.integer_samples();
 
-            data = std::move(samples);
-        } */
-        else
-        {
-            return E2SARErrorInfo{E2SARErrorc::DataError, "Timeseries has neither float nor integer samples"s};
+                samples.reserve(int_ts.data_size());
+                for (int i = 0; i < int_ts.data_size(); i++)
+                {
+                    const auto &sample = int_ts.data(i);
+                    samples.emplace_back(sample.timestamp(), sample.value());
+                }
+                tsd.emplace_back(ts.name(), ts.unit(), samples);
+            }
+            else
+            {
+                return E2SARErrorInfo{E2SARErrorc::DataError, "Timeseries has neither float nor integer samples"s};
+            }
         }
 
-        // return the result pair
-        return std::make_pair(rep.since(), std::move(data));
+        TimeseriesResult tsr(google::protobuf::util::TimeUtil::TimestampToMilliseconds(rep.since()),tsd);
+
+        // return the result
+        return tsr;
     }
 
     /**

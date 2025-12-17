@@ -1,12 +1,24 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <boost/program_options.hpp>
+
+#include <google/protobuf/util/time_util.h>
 
 #include "e2sar.hpp"
 
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 using namespace e2sar;
+
+// variadic template struct for handling variant lambdas
+template<class... Ts> 
+struct Overload : Ts... {
+    using Ts::operator()...; 
+};
+// accompanying deduction guide
+template<class... Ts> 
+Overload(Ts...) -> Overload<Ts...>;
 
 /* Function used to check that 'opt1' and 'opt2' are not specified
    at the same time. */
@@ -396,13 +408,101 @@ result<int> version(LBManager &lbman)
     }
 }
 
+result<int> timeseries(LBManager &lbman, const std::string& lbpath, const std::string& since, const std::string& csvsaveto)
+{
+    std::cout << "Requesting timeseries " << std::endl;
+    std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::session) << " using address: " << 
+        lbman.get_AddrString() << std::endl;
+    std::cout << "   LB Name: " << (lbman.get_URI().get_lbName().empty() ? "not set"s : lbman.get_URI().get_lbId()) << std::endl;
+    std::cout << "   Query  path: " << lbpath << std::endl;
+    std::cout << "   Since: " << since << std::endl;
+    std::cout << "   Save to CSV: " << csvsaveto << std::endl;
+
+    google::protobuf::Timestamp ts;
+    if (not google::protobuf::util::TimeUtil::FromString(since, &ts))
+        return E2SARErrorInfo{E2SARErrorc::ParameterError,
+                            "unable to convert into timestamp: " + since};
+
+    auto res = lbman.timeseries(lbpath, ts);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to connect to retrieve timeseries, error "s + res.error().message()};
+    }
+ 
+    std::cout << "Success. Saving timeseries to CSV." << std::endl;
+
+    auto rsres(std::move(res.value()));
+
+    //
+    // we will assume timeseries can be of different lengths with different timestamps for values
+    //
+    // 1. Write out column headers
+    // 2. Iterate over timeseries indices writing out rows, putting empty entries as needed (i.e. ',,')
+    // 
+    std::ofstream csvFile(csvsaveto);
+    if (not csvFile)
+    {
+        return E2SARErrorInfo{E2SARErrorc::SystemError,
+                              "unable to write timeseries file "s + csvsaveto};        
+    }
+
+    // write out two columns per series: /lb/path(unit),ts,
+    for(int col=0; col<rsres.td.size(); col++)
+    {
+        csvFile << rsres.td[col].path;
+        if (not rsres.td[col].unit.empty())
+            csvFile << "(" << rsres.td[col].unit << "),";
+        else
+            csvFile << ",";
+        csvFile << "Timestamp(ms),";
+    }
+    csvFile << std::endl;
+    csvFile.flush();
+
+    int tdIdx{0};
+    while(true)
+    {
+        // timeseries can be of different lengths
+        bool finished{true};
+        for(int col=0; col<rsres.td.size(); col++)
+        {
+            std::visit(Overload {
+                [&csvFile, &finished, tdIdx](const std::vector<FloatSample>& samples) {
+                    if (tdIdx < samples.size()) {
+                        csvFile << samples[tdIdx].value << "," << samples[tdIdx].timestamp_ms << ",";
+                        finished = false;
+                    } else
+                        csvFile << ",,"; //skip this column
+                },
+                [&csvFile, &finished, tdIdx](const std::vector<IntegerSample>& samples) {
+                    if (tdIdx < samples.size())
+                    {
+                        csvFile << samples[tdIdx].value << "," << samples[tdIdx].timestamp_ms << ",";
+                        finished = false;
+                    } else
+                        csvFile << ",,"; // skip this column
+                },
+            },rsres.td[col].timeseries);
+        }
+        tdIdx++;
+        csvFile << std::endl;
+        if (finished)
+            break;
+    }
+
+    csvFile.close();
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
 
     po::options_description od("Command-line options");
 
     auto opts = od.add_options()("help,h", "show this help message");
-    std::string duration;
+    std::string duration, lbpath, since, csvsaveto;
     float weight;
     u_int16_t count;
     float queue, ctrl, minfactor, maxfactor;
@@ -434,6 +534,9 @@ int main(int argc, char **argv)
     opts("export,e", "suppresses other messages and prints out 'export EJFAT_URI=<the new uri>' returned by the LB");
     opts("keeplbhdr", po::value<bool>(&keeplbhdr)->default_value(false), "do not remove LB header (in 'register' call; defaults to false)");
     opts("ipfam", po::value<int>(&ipfam)->default_value(0), "specify whether the LB should be dual stacked [0], ipv4 only [1] or ipv6 only (in 'reserve' call; defaults to 0)");
+    opts("lbpath", po::value<std::string>(&lbpath)->default_value("/lb/1/*"), "LB path (used for timeseries(e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled')");
+    opts("since", po::value<std::string>(&since)->default_value("1972-01-01T10:00:20.021Z"), "time stamp in the form of 1972-01-01T10:00:20.021Z (starting point for timeseries)");
+    opts("csv", po::value<std::string>(&csvsaveto)->default_value("timeseries.csv"), "name of the file to save timeseries in CSV format (comma-separated)");
 
     // send state (or 'state' command) optional stats
     opts("total_events_recv", po::value<int64_t>(&stats.total_events_recv)->default_value(0), "optional stats for 'state' command, defaults to 0");
@@ -455,6 +558,7 @@ int main(int argc, char **argv)
     opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
     opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
     opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
+    opts("timeseries", "return requested timeseries based on a path (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled')");
 
     std::vector<std::string> commands{"reserve", "free", "version", "register", 
         "deregister", "status", "state", "overview", "addsenders", "removesenders"};
@@ -483,6 +587,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "queue");
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
+        option_dependency(vm, "timeseries", "lbpath");
         conflicting_options(vm, "root", "novalidate");
         conflicting_options(vm, "ipv4", "ipv6");
 
@@ -696,6 +801,15 @@ int main(int argc, char **argv)
         if (int_r.has_error())
         {
             std::cerr << "There was an error removing senders: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("timeseries"))
+    {
+        auto int_r = timeseries(lbman, lbpath, since, csvsaveto);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error querying for timeseries: " << int_r.error().message() << std::endl;
             return -1;
         }
     }

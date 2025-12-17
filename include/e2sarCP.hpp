@@ -12,6 +12,7 @@
 #include <grpcpp/security/credentials.h>
 
 #include <google/protobuf/util/time_util.h>
+
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "grpc/loadbalancer.grpc.pb.h"
@@ -141,14 +142,29 @@ namespace e2sar
     };
 
     /**
-     * Timeseries data - either float or integer samples
+     * Timeseries data - either float or integer samples with path and units
      */
-    using TimeseriesData = std::variant<std::vector<FloatSample>, std::vector<IntegerSample>>;
+    struct TimeseriesData {
+        std::string path;
+        std::string unit;
+        std::variant<std::vector<FloatSample>, std::vector<IntegerSample>> timeseries;
 
-    /**
-     * Timeseries result containing the response timestamp and sample data
-     */
-    using TimeseriesResult = std::pair<google::protobuf::Timestamp, TimeseriesData>;
+        TimeseriesData(const std::string& p, const std::string &u, std::vector<FloatSample>& fs):
+            path{p}, unit{u}, timeseries{std::move(fs)} {}
+        TimeseriesData(const std::string& p, const std::string &u, std::vector<IntegerSample>& is):
+            path{p}, unit{u}, timeseries{std::move(is)} {}
+    };
+
+    // a collection of timeseries with a common since timestamp
+    struct TimeseriesResult {
+        int64_t since_ms;
+        std::vector<TimeseriesData> td; // possibly multiple vectors of timeseries data returned by the query
+
+        TimeseriesResult(int64_t _ts, std::vector<TimeseriesData> &_td): since_ms{_ts}, td{std::move(_td)} {}
+
+        // be careful this is not a true copy constructor as it uses move to move the timeseries
+        TimeseriesResult(TimeseriesResult&& _tsr): since_ms{_tsr.since_ms}, td{std::move(_tsr.td)} {}
+    };
 
     class LBManager
     {
@@ -351,9 +367,7 @@ namespace e2sar
          * @param path - Timeseries path selector (e.g., "/lb/1/<asterisk>", "/lb/1/session/2/totalEventsReassembled")
          * @param since - Timestamp to retrieve data from
          *
-         * @return TimeseriesResult containing the "since" timestamp and vector of samples (float or integer)
-         * Note: Response contains the first timeseries from the response. If multiple series are returned,
-         * only the first is extracted. Use path selectors that return a single series.
+         * @return TimeseriesResult containing the "since" timestamp and multiple vectors of samples (float or integer)
          */
         result<TimeseriesResult> timeseries(const std::string &path, const Timestamp &since) noexcept;
 
@@ -670,6 +684,7 @@ namespace e2sar
         inline std::string get_AddrString() {
             return addr_string;
         }
+
     };
 
     /**
