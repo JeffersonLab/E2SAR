@@ -306,6 +306,7 @@ void recvStatsThread(Reassembler *r)
         BOOST_MLL_LOG(stat) << "Stats:" << std::endl;
         BOOST_MLL_LOG(stat) << "\tTotal Bytes: " << stats.totalBytes << std::endl;
         BOOST_MLL_LOG(stat) << "\tTotal Packets: " << stats.totalPackets << std::endl;
+        BOOST_MLL_LOG(stat) << "\tBad RE Header Discards: " << stats.badHeaderDiscards << std::endl;
         BOOST_MLL_LOG(stat) << "\tEvents Received: " << stats.eventSuccess << std::endl;
         BOOST_MLL_LOG(stat) << "\tEvents Mangled: " << mangledEvents << std::endl;
         BOOST_MLL_LOG(stat) << "\tEvents Lost in reassembly: " << stats.reassemblyLoss << std::endl;

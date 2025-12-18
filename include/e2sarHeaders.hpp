@@ -82,6 +82,23 @@ namespace e2sar
         {
             return boost::make_tuple(get_dataId(), get_bufferOffset(), get_bufferLength(), get_eventNum());
         }
+
+        /**
+         * Get the version of the header
+         */
+        inline u_int8_t get_HeaderVersion() const 
+        {
+            return preamble[0] >> 4; 
+        }
+
+        /**
+         * Validate this header header
+         * Check that version matches and reserved field is 00s
+         */
+        inline bool validate() const 
+        {
+            return (preamble[0] == rehdrVersionNibble) && (preamble[1] == 0);
+        }
     } __attribute__((__packed__));
 
     constexpr u_int8_t lbhdrVersion = 2;

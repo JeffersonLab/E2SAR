@@ -105,6 +105,7 @@ namespace e2sar
                 std::atomic<EventNum_t> eventSuccess{0}; // events successfully processed
                 std::atomic<size_t> totalBytesReceived{0};
                 std::atomic<size_t> totalPacketsReceived{0};
+                std::atomic<size_t> badHeaderDiscards{0}; // number of frames discarded due to failed header check
                 // last error code
                 std::atomic<int> lastErrno{0};
                 // gRPC error count
@@ -387,14 +388,14 @@ namespace e2sar
                 int grpcErrCnt; 
                 int dataErrCnt; 
                 E2SARErrorc lastE2SARError;
-                size_t totalPackets, totalBytes;
+                size_t totalPackets, totalBytes, badHeaderDiscards;
 
                 ReportedStats() = delete;
                 ReportedStats(const AtomicStats &as): enqueueLoss{as.enqueueLoss}, 
                     reassemblyLoss{as.reassemblyLoss}, eventSuccess{as.eventSuccess},
                     lastErrno{as.lastErrno}, grpcErrCnt{as.grpcErrCnt}, dataErrCnt{as.dataErrCnt},
                     lastE2SARError{as.lastE2SARError}, totalPackets{as.totalPacketsReceived}, 
-                    totalBytes{as.totalBytesReceived}
+                    totalBytes{as.totalBytesReceived}, badHeaderDiscards{as.badHeaderDiscards}
                     {}
             };
 

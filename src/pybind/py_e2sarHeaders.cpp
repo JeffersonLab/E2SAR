@@ -22,6 +22,8 @@ void init_e2sarHeaders(py::module_ &m) {
         .def("get_bufferLength", &REHdr::get_bufferLength)
         .def("get_bufferOffset", &REHdr::get_bufferOffset)
         .def("get_dataId", &REHdr::get_dataId)
+        .def("get_headerVersion", &REHdr::get_HeaderVersion)
+        .def("validate", &REHdr::validate)
         .def("get_fields", [](const REHdr &hdr) {
             auto fields = hdr.get_Fields();
             // Convert boost::tuple to std::tuple, which can be mapped to Python

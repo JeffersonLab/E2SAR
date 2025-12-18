@@ -337,6 +337,14 @@ namespace e2sar
                     nbytes -= sizeof(REHdr);
                 }
 
+                if (not rehdr->validate())
+                {
+                    // discard invalid frames, increment counter
+                    reas.recvStats.badHeaderDiscards++;
+                    free(recvBuffer);
+                    continue;
+                }
+
                 std::shared_ptr<EventQueueItem> item;
 
                 if (rehdr->get_bufferOffset() == 0)
