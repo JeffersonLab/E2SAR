@@ -44,6 +44,18 @@ using loadbalancer::IntegerTimeseries;
 using loadbalancer::FloatSample;
 using loadbalancer::IntegerSample;
 
+using loadbalancer::CreateTokenRequest;
+using loadbalancer::CreateTokenReply;
+using loadbalancer::ListTokenPermissionsRequest;
+using loadbalancer::ListTokenPermissionsReply;
+using loadbalancer::ListChildTokensRequest;
+using loadbalancer::ListChildTokensReply;
+using loadbalancer::RevokeTokenRequest;
+using loadbalancer::RevokeTokenReply;
+using loadbalancer::TokenSelector;
+using loadbalancer::TokenDetails;
+using loadbalancer::TokenPermission;
+
 namespace e2sar
 {
     // reserve load balancer
@@ -732,6 +744,220 @@ namespace e2sar
             }
         );
         return removeSenders(strVec);
+    }
+
+    // create a new delegated token with specific permissions
+    result<std::string> LBManager::createToken(
+        const std::string &name,
+        const std::vector<e2sar::TokenPermission> &permissions) noexcept
+    {
+        ClientContext context;
+        CreateTokenRequest req;
+        CreateTokenReply rep;
+
+        // NOTE: This uses admin token
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // validate parameters
+        if (name.empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Token name cannot be empty"s};
+
+        if (permissions.empty())
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Permissions vector cannot be empty"s};
+
+        // set token name
+        req.set_name(name);
+
+        // convert e2sar::TokenPermission to protobuf TokenPermission and add
+        for (const auto &perm : permissions)
+        {
+            auto* added_perm = req.add_permissions();
+            added_perm->set_resourcetype(static_cast<loadbalancer::TokenPermission::ResourceType>(perm.resourceType));
+            added_perm->set_resourceid(perm.resourceId);
+            added_perm->set_permission(static_cast<loadbalancer::TokenPermission::PermissionType>(perm.permission));
+        }
+
+        // make the RPC call
+        Status status = _stub->CreateToken(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in createToken(): "s + status.error_message()};
+        }
+
+        return rep.token();
+    }
+
+    // list all permissions for a specific token
+    result<e2sar::TokenDetails> LBManager::listTokenPermissions(
+        const e2sar::TokenSelector &target) noexcept
+    {
+        ListTokenPermissionsReply rep;
+        ClientContext context;
+        ListTokenPermissionsRequest req;
+
+        // NOTE: This uses admin token
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // Convert variant TokenSelector to protobuf TokenSelector
+        loadbalancer::TokenSelector pb_selector;
+        if (std::holds_alternative<uint32_t>(target))
+        {
+            pb_selector.set_id(std::get<uint32_t>(target));
+        }
+        else
+        {
+            pb_selector.set_token(std::get<std::string>(target));
+        }
+
+        req.mutable_target()->CopyFrom(pb_selector);
+
+        // make the RPC call
+        Status status = _stub->ListTokenPermissions(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in listTokenPermissions(): "s + status.error_message()};
+        }
+
+        // Convert protobuf TokenDetails to e2sar::TokenDetails
+        e2sar::TokenDetails details;
+        details.name = rep.token().name();
+        details.id = rep.token().id();
+        details.created_at = rep.token().created_at();
+
+        // Convert permissions
+        for (const auto& pb_perm : rep.token().permissions())
+        {
+            e2sar::TokenPermission perm;
+            perm.resourceType = static_cast<EjfatURI::TokenType>(pb_perm.resourcetype());
+            perm.resourceId = pb_perm.resourceid();
+            perm.permission = static_cast<EjfatURI::TokenPermission>(pb_perm.permission());
+            details.permissions.push_back(perm);
+        }
+
+        return details;
+    }
+
+    // list all child tokens created by a parent token
+    result<std::vector<e2sar::TokenDetails>> LBManager::listChildTokens(
+        const e2sar::TokenSelector &target) noexcept
+    {
+        ClientContext context;
+        ListChildTokensRequest req;
+        ListChildTokensReply rep;
+
+        // NOTE: This uses admin token
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // Convert variant TokenSelector to protobuf TokenSelector
+        loadbalancer::TokenSelector pb_selector;
+        if (std::holds_alternative<uint32_t>(target))
+        {
+            pb_selector.set_id(std::get<uint32_t>(target));
+        }
+        else
+        {
+            pb_selector.set_token(std::get<std::string>(target));
+        }
+
+        req.mutable_target()->CopyFrom(pb_selector);
+
+        // make the RPC call
+        Status status = _stub->ListChildTokens(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in listChildTokens(): "s + status.error_message()};
+        }
+
+        // Convert protobuf TokenDetails to e2sar::TokenDetails vector
+        std::vector<e2sar::TokenDetails> ret;
+        ret.reserve(rep.tokens_size());
+
+        for (const auto& pb_token : rep.tokens())
+        {
+            e2sar::TokenDetails details;
+            details.name = pb_token.name();
+            details.id = pb_token.id();
+            details.created_at = pb_token.created_at();
+
+            // Convert permissions
+            for (const auto& pb_perm : pb_token.permissions())
+            {
+                e2sar::TokenPermission perm;
+                perm.resourceType = static_cast<EjfatURI::TokenType>(pb_perm.resourcetype());
+                perm.resourceId = pb_perm.resourceid();
+                perm.permission = static_cast<EjfatURI::TokenPermission>(pb_perm.permission());
+                details.permissions.push_back(perm);
+            }
+
+            ret.push_back(std::move(details));
+        }
+
+        return ret;
+    }
+
+    // revoke a token and all its children
+    result<int> LBManager::revokeToken(const e2sar::TokenSelector &target) noexcept
+    {
+        ClientContext context;
+        RevokeTokenRequest req;
+        RevokeTokenReply rep;
+
+        // NOTE: This uses admin token
+        auto adminToken = _cpuri.get_AdminToken();
+        if (!adminToken.has_error())
+        {
+            // set bearer token in header
+            context.AddMetadata("authorization"s, "Bearer "s + adminToken.value());
+        }
+        else
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available in the URI"s};
+
+        // Convert variant TokenSelector to protobuf TokenSelector
+        loadbalancer::TokenSelector pb_selector;
+        if (std::holds_alternative<uint32_t>(target))
+        {
+            pb_selector.set_id(std::get<uint32_t>(target));
+        }
+        else
+        {
+            pb_selector.set_token(std::get<std::string>(target));
+        }
+
+        req.mutable_target()->CopyFrom(pb_selector);
+
+        // make the RPC call
+        Status status = _stub->RevokeToken(&context, req, &rep);
+
+        if (!status.ok())
+        {
+            return E2SARErrorInfo{E2SARErrorc::RPCError, "Error connecting to LB CP in revokeToken(): "s + status.error_message()};
+        }
+
+        return 0;
     }
 
     // retrieve timeseries data for a specific metric path

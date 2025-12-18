@@ -166,6 +166,42 @@ namespace e2sar
         TimeseriesResult(TimeseriesResult&& _tsr): since_ms{_tsr.since_ms}, td{std::move(_tsr.td)} {}
     };
 
+    /**
+     * Token permission - defines access rights for a token
+     * Mirrors loadbalancer::TokenPermission protobuf without exposing it
+     */
+    struct TokenPermission {
+        EjfatURI::TokenType resourceType;
+        std::string resourceId;  // optional, can be empty
+        EjfatURI::TokenPermission permission;
+
+        TokenPermission():
+            resourceType{EjfatURI::TokenType::all},
+            resourceId{""},
+            permission{EjfatURI::TokenPermission::_read_only_} {}
+        TokenPermission(EjfatURI::TokenType rt, const std::string& rid, EjfatURI::TokenPermission pt):
+            resourceType{rt}, resourceId{rid}, permission{pt} {}
+    };
+
+    /**
+     * Token details - information about a token including permissions
+     * Mirrors loadbalancer::TokenDetails protobuf without exposing it
+     */
+    struct TokenDetails {
+        std::string name;
+        std::vector<TokenPermission> permissions;
+        std::string created_at;
+        uint32_t id;
+
+        TokenDetails(): name{""}, created_at{""}, id{0} {}
+    };
+
+    /**
+     * Token selector - select a token by ID or token string
+     * Uses std::variant instead of loadbalancer::TokenSelector protobuf
+     */
+    using TokenSelector = std::variant<uint32_t, std::string>;
+
     class LBManager
     {
     private:
@@ -360,6 +396,45 @@ namespace e2sar
          * @param - use IPv6 dataplane (default false)
          */
         result<int> removeSenderSelf(bool v6=false) noexcept;
+
+        /**
+         * Create a new delegated token with specific permissions
+         *
+         * @param name - Human-readable token name
+         * @param permissions - Vector of TokenPermission specifying access rights
+         *
+         * @return The created token string
+         */
+        result<std::string> createToken(
+            const std::string &name,
+            const std::vector<TokenPermission> &permissions) noexcept;
+
+        /**
+         * List all permissions for a specific token
+         *
+         * @param target - Token selector (by ID or token string)
+         *
+         * @return TokenDetails with permissions and metadata
+         */
+        result<TokenDetails> listTokenPermissions(const TokenSelector &target) noexcept;
+
+        /**
+         * List all child tokens created by a parent token
+         *
+         * @param target - Token selector for parent token
+         *
+         * @return Vector of TokenDetails for all children
+         */
+        result<std::vector<TokenDetails>> listChildTokens(const TokenSelector &target) noexcept;
+
+        /**
+         * Revoke a token and all its children
+         *
+         * @param target - Token selector to revoke
+         *
+         * @return 0 on success or error code
+         */
+        result<int> revokeToken(const TokenSelector &target) noexcept;
 
         /**
          * Retrieve timeseries data for a specific metric path

@@ -496,6 +496,283 @@ result<int> timeseries(LBManager &lbman, const std::string& lbpath, const std::s
     return 0;
 }
 
+/**
+ * Parse permission strings into e2sar::TokenPermission objects
+ * Format: RESOURCE_TYPE:RESOURCE_ID:PERMISSION_TYPE
+ * Example: "ALL::READ_ONLY" or "LOAD_BALANCER:lb1:UPDATE"
+ */
+result<std::vector<e2sar::TokenPermission>>
+parsePermissions(const std::vector<std::string>& permStrings)
+{
+    using namespace e2sar;
+    std::vector<TokenPermission> perms;
+
+    // Maps for string to enum conversion
+    std::map<std::string, EjfatURI::TokenType> resourceTypeMap = {
+        {"ALL", EjfatURI::TokenType::all},
+        {"LOAD_BALANCER", EjfatURI::TokenType::load_balancer},
+        {"RESERVATION", EjfatURI::TokenType::reservation},
+        {"SESSION", EjfatURI::TokenType::session}
+    };
+
+    std::map<std::string, EjfatURI::TokenPermission> permissionTypeMap = {
+        {"READ_ONLY", EjfatURI::TokenPermission::_read_only_},
+        {"REGISTER", EjfatURI::TokenPermission::_register_},
+        {"RESERVE", EjfatURI::TokenPermission::_reserve_},
+        {"UPDATE", EjfatURI::TokenPermission::_update_}
+    };
+
+    for (const auto& perm_str : permStrings)
+    {
+        // Split by ':' delimiter
+        size_t first_colon = perm_str.find(':');
+        size_t second_colon = perm_str.find(':', first_colon + 1);
+
+        if (first_colon == std::string::npos || second_colon == std::string::npos)
+        {
+            return E2SARErrorInfo{E2SARErrorc::ParameterError,
+                "Invalid permission format: '"s + perm_str +
+                "'. Expected format: RESOURCE_TYPE:RESOURCE_ID:PERMISSION_TYPE"s};
+        }
+
+        std::string res_type_str = perm_str.substr(0, first_colon);
+        std::string res_id = perm_str.substr(first_colon + 1, second_colon - first_colon - 1);
+        std::string perm_type_str = perm_str.substr(second_colon + 1);
+
+        // Validate resource type
+        if (resourceTypeMap.find(res_type_str) == resourceTypeMap.end())
+        {
+            return E2SARErrorInfo{E2SARErrorc::ParameterError,
+                "Invalid resource type: '"s + res_type_str +
+                "'. Valid types: ALL, LOAD_BALANCER, RESERVATION, SESSION"s};
+        }
+
+        // Validate permission type
+        if (permissionTypeMap.find(perm_type_str) == permissionTypeMap.end())
+        {
+            return E2SARErrorInfo{E2SARErrorc::ParameterError,
+                "Invalid permission type: '"s + perm_type_str +
+                "'. Valid types: READ_ONLY, REGISTER, RESERVE, UPDATE"s};
+        }
+
+        // Create TokenPermission object
+        TokenPermission perm;
+        perm.resourceType = resourceTypeMap[res_type_str];
+        perm.resourceId = res_id;  // Can be empty string
+        perm.permission = permissionTypeMap[perm_type_str];
+
+        perms.push_back(perm);
+    }
+
+    return perms;
+}
+
+/**
+ * Create a TokenSelector variant from a string (ID or token string)
+ */
+e2sar::TokenSelector createTokenSelector(const std::string& tokenid_str)
+{
+    // Try to parse as uint32_t first
+    if (!tokenid_str.empty() &&
+        std::all_of(tokenid_str.begin(), tokenid_str.end(), ::isdigit))
+    {
+        try
+        {
+            uint32_t id = std::stoul(tokenid_str);
+            return id;  // Return uint32_t variant
+        }
+        catch (...)
+        {
+            // Parse failed, use as token string
+        }
+    }
+    // Return string variant
+    return tokenid_str;
+}
+
+result<int> createToken(LBManager &lbman,
+                       const std::string &name,
+                       const std::vector<e2sar::TokenPermission> &permissions,
+                       const bool suppress)
+{
+    using namespace e2sar;
+    if(!suppress)
+    {
+        std::cout << "Creating a new token " << std::endl;
+        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin)
+                  << " using address: " << lbman.get_AddrString() << std::endl;
+        std::cout << "   Token name: " << name << std::endl;
+        std::cout << "   Permissions (" << permissions.size() << "):" << std::endl;
+
+        for (const auto& perm : permissions)
+        {
+            std::cout << "      ResourceType=" << static_cast<u_int16_t>(perm.resourceType)
+                      << ", ResourceId=" << (perm.resourceId.empty() ? "(none)"s : perm.resourceId)
+                      << ", Permission=" << static_cast<u_int16_t>(perm.permission) << std::endl;
+        }
+    }
+
+    auto res = lbman.createToken(name, permissions);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to create token, error "s + res.error().message()};
+    }
+    else
+    {
+        if(!suppress)
+        {
+            std::cout << "Success. Token created." << std::endl;
+            std::cout << "Token: " << res.value() << std::endl;
+        }
+        else
+        {
+            std::cout << res.value() << "\n";
+        }
+        return 0;
+    }
+}
+
+result<int> listTokenPermissions(LBManager &lbman,
+                                 const std::string &tokenid_str,
+                                 const bool suppress)
+{
+    using namespace e2sar;
+    if(!suppress)
+    {
+        std::cout << "Listing token permissions " << std::endl;
+        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin)
+                  << " using address: " << lbman.get_AddrString() << std::endl;
+        std::cout << "   Token ID/String: " << tokenid_str << std::endl;
+    }
+
+    auto selector = createTokenSelector(tokenid_str);
+    auto res = lbman.listTokenPermissions(selector);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to list token permissions, error "s + res.error().message()};
+    }
+    else
+    {
+        const auto& details = res.value();
+
+        if(!suppress)
+        {
+            std::cout << "Success." << std::endl;
+            std::cout << "Token Details:" << std::endl;
+            std::cout << "  Name: " << details.name << std::endl;
+            std::cout << "  ID: " << details.id << std::endl;
+            std::cout << "  Created: " << details.created_at << std::endl;
+            std::cout << "  Permissions (" << details.permissions.size() << "):" << std::endl;
+
+            for (const auto& perm : details.permissions)
+            {
+                std::cout << "    [ resourceType=" << static_cast<u_int16_t>(perm.resourceType)
+                          << ", resourceId=" << (perm.resourceId.empty() ? "(none)"s : perm.resourceId)
+                          << ", permission=" << static_cast<u_int16_t>(perm.permission) << " ]" << std::endl;
+            }
+        }
+        else
+        {
+            // Export mode: output token ID
+            std::cout << details.id << "\n";
+        }
+        return 0;
+    }
+}
+
+result<int> listChildTokens(LBManager &lbman,
+                           const std::string &tokenid_str,
+                           const bool suppress)
+{
+    using namespace e2sar;
+    if(!suppress)
+    {
+        std::cout << "Listing child tokens " << std::endl;
+        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin)
+                  << " using address: " << lbman.get_AddrString() << std::endl;
+        std::cout << "   Parent Token ID/String: " << tokenid_str << std::endl;
+    }
+
+    auto selector = createTokenSelector(tokenid_str);
+    auto res = lbman.listChildTokens(selector);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to list child tokens, error "s + res.error().message()};
+    }
+    else
+    {
+        const auto& child_tokens = res.value();
+
+        if(!suppress)
+        {
+            std::cout << "Success." << std::endl;
+            std::cout << "Child tokens (" << child_tokens.size() << "):" << std::endl;
+
+            if (child_tokens.empty())
+            {
+                std::cout << "  (no child tokens)" << std::endl;
+            }
+            else
+            {
+                for (const auto& token : child_tokens)
+                {
+                    std::cout << "  [ name=" << token.name
+                              << ", id=" << token.id
+                              << ", created=" << token.created_at
+                              << ", permissions=" << token.permissions.size() << " ]" << std::endl;
+                }
+            }
+        }
+        else
+        {
+            // Export mode: output count
+            std::cout << child_tokens.size() << "\n";
+        }
+        return 0;
+    }
+}
+
+result<int> revokeToken(LBManager &lbman,
+                       const std::string &tokenid_str,
+                       const bool suppress)
+{
+    using namespace e2sar;
+    if(!suppress)
+    {
+        std::cout << "Revoking token (including all children) " << std::endl;
+        std::cout << "   Contacting: " << lbman.get_URI().to_string(EjfatURI::TokenType::admin)
+                  << " using address: " << lbman.get_AddrString() << std::endl;
+        std::cout << "   Token ID/String: " << tokenid_str << std::endl;
+    }
+
+    auto selector = createTokenSelector(tokenid_str);
+    auto res = lbman.revokeToken(selector);
+
+    if (res.has_error())
+    {
+        return E2SARErrorInfo{E2SARErrorc::RPCError,
+                              "unable to revoke token, error "s + res.error().message()};
+    }
+    else
+    {
+        if(!suppress)
+        {
+            std::cout << "Success. Token revoked (including all child tokens)." << std::endl;
+        }
+        else
+        {
+            std::cout << "0\n";
+        }
+        return 0;
+    }
+}
+
 int main(int argc, char **argv)
 {
 
@@ -547,6 +824,12 @@ int main(int argc, char **argv)
     opts("total_bytes_recv", po::value<int64_t>(&stats.total_bytes_recv)->default_value(0), "optional stats for 'state' command, defaults to 0");
     opts("total_packets_recv", po::value<int64_t>(&stats.total_packets_recv)->default_value(0), "optional stats for 'state' command, defaults to 0");
 
+    // Token management options
+    opts("tokenname", po::value<std::string>(), "name for new token (used with 'createtoken')");
+    opts("permission", po::value<std::vector<std::string>>()->multitoken(),
+         "permission spec: RESOURCE_TYPE:RESOURCE_ID:PERMISSION_TYPE (e.g., 'ALL::READ_ONLY' or 'LOAD_BALANCER:lb1:UPDATE'), can be specified multiple times");
+    opts("tokenid", po::value<std::string>(), "token ID (numeric) or token string to target");
+
     // commands
     opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
     opts("free", "free a load balancer. Uses instance or admin token.");
@@ -559,9 +842,14 @@ int main(int argc, char **argv)
     opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
     opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
     opts("timeseries", "return requested timeseries based on a path (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled')");
+    opts("createtoken", "create a new delegated token (--tokenname, --permission required). Uses admin token.");
+    opts("listtokenpermissions", "list all permissions for a token (--tokenid required). Uses admin token.");
+    opts("listchildtokens", "list all child tokens of a parent (--tokenid required). Uses admin token.");
+    opts("revoketoken", "revoke a token and all its children (--tokenid required). Uses admin token.");
 
-    std::vector<std::string> commands{"reserve", "free", "version", "register", 
-        "deregister", "status", "state", "overview", "addsenders", "removesenders"};
+    std::vector<std::string> commands{"reserve", "free", "version", "register",
+        "deregister", "status", "state", "overview", "addsenders", "removesenders",
+        "timeseries", "createtoken", "listtokenpermissions", "listchildtokens", "revoketoken"};
 
     po::variables_map vm;
 
@@ -588,6 +876,11 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
         option_dependency(vm, "timeseries", "lbpath");
+        option_dependency(vm, "createtoken", "tokenname");
+        option_dependency(vm, "createtoken", "permission");
+        option_dependency(vm, "listtokenpermissions", "tokenid");
+        option_dependency(vm, "listchildtokens", "tokenid");
+        option_dependency(vm, "revoketoken", "tokenid");
         conflicting_options(vm, "root", "novalidate");
         conflicting_options(vm, "ipv4", "ipv6");
 
@@ -622,10 +915,13 @@ int main(int argc, char **argv)
     
     // make sure the token is interpreted as the correct type, depending on the call
     EjfatURI::TokenType tt{EjfatURI::TokenType::admin};
-    if (vm.count("reserve") || vm.count("free") || vm.count("status") || vm.count("version")) 
+    if (vm.count("reserve") || vm.count("free") || vm.count("status") || vm.count("version") ||
+        vm.count("overview") || vm.count("timeseries") ||
+        vm.count("createtoken") || vm.count("listtokenpermissions") ||
+        vm.count("listchildtokens") || vm.count("revoketoken"))
     {
         tt = EjfatURI::TokenType::admin;
-    } else if (vm.count("register") || vm.count("addsenders") || vm.count("removesenders")) 
+    } else if (vm.count("register") || vm.count("addsenders") || vm.count("removesenders"))
     {
         tt = EjfatURI::TokenType::instance;
     } else if (vm.count("deregister") || vm.count("state"))
@@ -810,6 +1106,51 @@ int main(int argc, char **argv)
         if (int_r.has_error())
         {
             std::cerr << "There was an error querying for timeseries: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("createtoken"))
+    {
+        // Parse permissions from command line strings
+        auto perms_r = parsePermissions(vm["permission"].as<std::vector<std::string>>());
+        if (perms_r.has_error())
+        {
+            std::cerr << "Error parsing permissions: " << perms_r.error().message() << std::endl;
+            return -1;
+        }
+
+        auto int_r = createToken(lbman, vm["tokenname"].as<std::string>(),
+                                perms_r.value(), suppress);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error creating token: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("listtokenpermissions"))
+    {
+        auto int_r = listTokenPermissions(lbman, vm["tokenid"].as<std::string>(), suppress);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error listing token permissions: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("listchildtokens"))
+    {
+        auto int_r = listChildTokens(lbman, vm["tokenid"].as<std::string>(), suppress);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error listing child tokens: " << int_r.error().message() << std::endl;
+            return -1;
+        }
+    }
+    else if (vm.count("revoketoken"))
+    {
+        auto int_r = revokeToken(lbman, vm["tokenid"].as<std::string>(), suppress);
+        if (int_r.has_error())
+        {
+            std::cerr << "There was an error revoking token: " << int_r.error().message() << std::endl;
             return -1;
         }
     }
