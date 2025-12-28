@@ -422,7 +422,6 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
-        conflicting_options(vm, "withcp", "multiport");
         conflicting_options(vm, "recv", "multiport");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
