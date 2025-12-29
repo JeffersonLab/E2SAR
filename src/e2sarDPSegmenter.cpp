@@ -34,6 +34,7 @@ namespace e2sar
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
         smooth{sflags.smooth},
         multiPort{sflags.multiPort},
+        lbHdrVersion{sflags.lbHdrVersion},
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
@@ -47,6 +48,9 @@ namespace e2sar
         useCP{sflags.useCP},
         addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
     {
+        if ((lbHdrVersion < 2) || (lbHdrVersion > 3))
+            throw E2SARException("Only allowed LB header version numbers are 2 or 3"s);
+
         size_t mtu = 0;
 #if NETLINK_CAPABLE
         // determine the outgoing interface and its MTU based on URI data address 
@@ -673,10 +677,6 @@ namespace e2sar
             mmsgvec = static_cast<struct mmsghdr*>(malloc(numBuffers*sizeof(struct mmsghdr)));
 #endif
 
-        // new random entropy generated for each event buffer, unless user specified it
-        if (entropy == 0)
-            entropy = randDist(ranlux);
-
         // randomize source port using round robin
         sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
         // prepare msghdr
@@ -734,7 +734,22 @@ namespace e2sar
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
-            hdr->lb.set(entropy, lbEventNum);
+            // new random entropy generated for each segment, unless user specified it
+            if (entropy == 0)
+                entropy = randDist(ranlux);
+            switch(seg.lbHdrVersion) {
+                default:
+                    // default to 2
+                case 2: 
+                    hdr->lbu.lb2.set(entropy, lbEventNum);
+                    break;
+                case 3:
+                    // slot select - 16 lsbs of tick (same for all segments)
+                    // port select - uniform 16 bit (new for each segment)
+                    hdr->lbu.lb3.set(lbEventNum&0xFFFF, entropy, lbEventNum);
+                    break;
+            }
+            
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -970,6 +985,8 @@ namespace e2sar
             sFlags.smooth);
         sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
             sFlags.multiPort);
+        sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion", 
+            sFlags.lbHdrVersion);
 
         return sFlags;
     }

@@ -33,21 +33,42 @@ void init_e2sarHeaders(py::module_ &m) {
         });
 
     // Bind LBHdr struct into Python class
-    py::class_<LBHdr>(m, "LBHdr")
+    py::class_<LBHdrV2>(m, "LBHdrV2")
         .def(py::init<>())
-        .def("set", &LBHdr::set,
+        .def("set", &LBHdrV2::set,
             py::arg("entropy") = 0,
             py::arg("event_num") = 0
             )
-        .def("get_version", &LBHdr::get_version)
-        .def("get_nextProto", &LBHdr::get_nextProto)
-        .def("get_entropy", &LBHdr::get_entropy)
-        .def("get_eventNum", &LBHdr::get_eventNum)
-        .def("get_fields", [](const LBHdr &hdr) {
+        .def("get_version", &LBHdrV2::get_version)
+        .def("get_nextProto", &LBHdrV2::get_nextProto)
+        .def("get_entropy", &LBHdrV2::get_entropy)
+        .def("get_eventNum", &LBHdrV2::get_eventNum)
+        .def("get_fields", [](const LBHdrV2 &hdr) {
             auto fields = hdr.get_Fields();
             // Convert boost::tuple to std::tuple, which can be mapped to Python
             return std::tuple<std::uint8_t, std::uint8_t, std::uint16_t, EventNum_t>{
                 fields.get<0>(), fields.get<1>(), fields.get<2>(), fields.get<3>()
+            };
+        });
+
+    // Bind LBHdr struct into Python class
+    py::class_<LBHdrV3>(m, "LBHdrV3")
+        .def(py::init<>())
+        .def("set", &LBHdrV3::set,
+            py::arg("slotSelect") = 0,
+            py::arg("portSelect") = 0,
+            py::arg("tick") = 0
+            )
+        .def("get_version", &LBHdrV3::get_version)
+        .def("get_nextProto", &LBHdrV3::get_nextProto)
+        .def("get_slotSelect", &LBHdrV3::get_slotSelect)
+        .def("get_portSelect", &LBHdrV3::get_portSelect)
+        .def("get_tick", &LBHdrV3::get_tick)
+        .def("get_fields", [](const LBHdrV3 &hdr) {
+            auto fields = hdr.get_Fields();
+            // Convert boost::tuple to std::tuple, which can be mapped to Python
+            return std::tuple<std::uint8_t, std::uint8_t, std::uint16_t, std::uint16_t, EventNum_t>{
+                fields.get<0>(), fields.get<1>(), fields.get<2>(), fields.get<3>(), fields.get<4>()
             };
         });
 

@@ -328,8 +328,8 @@ namespace e2sar
                 // subtracted
                 if (reas.withLBHeader)
                 {
-                    rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdr));
-                    nbytes -= sizeof(LBHdr) + sizeof(REHdr);
+                    rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdrU));
+                    nbytes -= sizeof(LBHdrU) + sizeof(REHdr);
                 }
                 else
                 {

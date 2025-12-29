@@ -174,7 +174,7 @@ int main()
         std::cout << "  Empty scope executes once" << std::endl;
     }
 
-    std::cout << "  LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdr) << std::endl;
+    std::cout << "  LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdrV2) << std::endl;
     std::cout << "  RE Hdr size (expecting 20) = " << sizeof(e2sar::REHdr) << std::endl;
     std::cout << "  LB+RE Hdr size (expecting 36) = " << sizeof(e2sar::LBREHdr) << std::endl;
 

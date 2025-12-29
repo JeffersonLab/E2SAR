@@ -78,7 +78,7 @@ namespace e2sar
          * 
          * boost::tie(myDataId, myBufferOffset, myBufferLength, myEventNum) = rehdr.get_fields();
          */
-        inline const boost::tuple<u_int16_t, u_int32_t, u_int32_t, EventNum_t> get_Fields() const 
+        const inline boost::tuple<u_int16_t, u_int32_t, u_int32_t, EventNum_t> get_Fields() const 
         {
             return boost::make_tuple(get_dataId(), get_bufferOffset(), get_bufferLength(), get_eventNum());
         }
@@ -101,16 +101,17 @@ namespace e2sar
         }
     } __attribute__((__packed__));
 
-    constexpr u_int8_t lbhdrVersion = 2;
+    constexpr u_int8_t lbhdrVersion2 = 2;
+    constexpr u_int8_t lbhdrVersion3 = 3;
     /**
-        The Load Balancer Header. You should always use the provided methods to set
+        The Load Balancer Header v2. You should always use the provided methods to set
         and interrogate fields as the structure maintains Big-Endian order
         internally.
     */
-    struct LBHdr
+    struct LBHdrV2
     {
         char preamble[2] {'L', 'B'};
-        u_int8_t version{lbhdrVersion};
+        u_int8_t version{lbhdrVersion2};
         u_int8_t nextProto{rehdrVersion};
         u_int16_t rsvd{0};
         u_int16_t entropy{0};
@@ -128,15 +129,23 @@ namespace e2sar
         /**
          * get version
          */
-        u_int8_t get_version() const
+        inline u_int8_t get_version() const
         {
             return version;
         }
 
         /**
+         * check version 2
+         */
+        inline bool check_version() const
+        {
+            return version == lbhdrVersion2;
+        }
+
+        /**
          * get next protocol field
          */
-        u_int8_t get_nextProto() const 
+        inline u_int8_t get_nextProto() const 
         {
             return nextProto;
         }
@@ -144,7 +153,7 @@ namespace e2sar
         /**
          * get entropy in host byte order
          */
-        u_int16_t get_entropy() const
+        inline u_int16_t get_entropy() const
         {
             return be16toh(entropy);
         }
@@ -152,7 +161,7 @@ namespace e2sar
         /**
          * get event number in host byte order
          */
-        EventNum_t get_eventNum() const
+        inline EventNum_t get_eventNum() const
         {
             return be64toh(eventNum);
         }
@@ -168,19 +177,121 @@ namespace e2sar
          * 
          * boost::tie(version, nextProto, entropy, eventNum) = lbhdr.get_Fields();
          */
-        const boost::tuple<u_int8_t, u_int8_t, u_int16_t, EventNum_t> get_Fields() const 
+        const inline boost::tuple<u_int8_t, u_int8_t, u_int16_t, EventNum_t> get_Fields() const 
         {
             return boost::make_tuple(version, nextProto, get_entropy(), get_eventNum());
         }
     } __attribute__((__packed__));
 
+    /**
+        The Load Balancer Header v2. You should always use the provided methods to set
+        and interrogate fields as the structure maintains Big-Endian order
+        internally.
+    */
+    struct LBHdrV3
+    {
+        char preamble[2] {'L', 'B'};
+        u_int8_t version{lbhdrVersion3};
+        u_int8_t nextProto{rehdrVersion};
+        u_int16_t slotSelect{0};
+        u_int16_t portSelect{0};
+        EventNum_t tick{0L};
+
+        /**
+         * Set all fields to network/big-endian byte order values
+         */
+        inline void set(u_int16_t slt, u_int16_t prt, EventNum_t _tick) 
+        {
+            slotSelect = htobe16(slt);
+            portSelect = htobe16(prt);
+            tick = htobe64(tick);
+        }
+
+        /**
+         * get version
+         */
+        inline u_int8_t get_version() const
+        {
+            return version;
+        }
+
+        /**
+         * check version 2
+         */
+        inline bool check_version() const
+        {
+            return version == lbhdrVersion2;
+        }
+
+        /**
+         * get next protocol field
+         */
+        inline u_int8_t get_nextProto() const 
+        {
+            return nextProto;
+        }
+
+        /**
+         * get slot select in host byte order
+         */
+        inline u_int16_t get_slotSelect() const
+        {
+            return be16toh(slotSelect);
+        }
+
+        /**
+         * get port select in host byte order
+         */
+        inline u_int16_t get_portSelect() const
+        {
+            return be16toh(portSelect);
+        }
+
+        /**
+         * get tick in host byte order
+         */
+        inline EventNum_t get_tick() const
+        {
+            return be64toh(tick);
+        }
+
+        /**
+         * Convenience method to get all fields (in host byte order where appropriate). 
+         * Best way to use it is 
+         * 
+         * u_int8_t version;
+         * u_int8_t nextProto;
+         * u_int16_t slotSelect;
+         * u_int16_t portSelect;
+         * EventNum_t tick;
+         * 
+         * boost::tie(version, nextProto, entropy, eventNum) = lbhdr.get_Fields();
+         */
+        const inline boost::tuple<u_int8_t, u_int8_t, u_int16_t, u_int16_t, EventNum_t> get_Fields() const 
+        {
+            return boost::make_tuple(version, nextProto, get_slotSelect(), get_portSelect(), get_tick());
+        }
+    } __attribute__((__packed__));
+
+    
+    // union of LB headers (they are all the same lengths)
+    union LBHdrU {
+        struct LBHdrV2 lb2;
+        struct LBHdrV3 lb3;
+        // explicit c-tor because it's a union
+        LBHdrU()
+        {
+            memset(this, 0, sizeof(LBHdrU));
+        }
+    };
+
     // for memory allocation purposes we need them concatenated
     struct LBREHdr {
-        struct LBHdr lb;
+        union LBHdrU lbu;
         struct REHdr re;
     } __attribute__((__packed__));
 
-    constexpr u_int8_t synchdrVersion = 2;
+    constexpr u_int8_t synchdrVersion2 = 2;
     /**
         The Syncr Header. You should always use the provided methods to set
         and interrogate fields as the structure maintains Big-Endian order
@@ -189,7 +300,7 @@ namespace e2sar
     struct SyncHdr
     {
         char preamble[2] {'L', 'C'};
-        u_int8_t version{synchdrVersion};
+        u_int8_t version{synchdrVersion2};
         u_int8_t rsvd{0};
         u_int32_t eventSrcId{0};
         EventNum_t eventNumber{0LL};
@@ -205,6 +316,22 @@ namespace e2sar
             eventNumber = htobe64(event_num);
             avgEventRateHz = htobe32(avg_rate);
             unixTimeNano = htobe64(ut);
+        }
+
+        /**
+         * get version of SYNC
+         */
+        u_int8_t get_version() const 
+        {
+            return version;
+        }
+
+        /**
+         * check version
+         */
+        bool check_version() const 
+        {
+            return version == synchdrVersion2;
         }
 
         /**
@@ -259,7 +386,7 @@ namespace e2sar
     
     // Legacy constant for backward compatibility (IPv4 only)
     constexpr size_t IP_HDRLEN = IPV4_HDRLEN;
-    constexpr size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr)};
+    constexpr size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdrV2) + sizeof(REHdr)};
 
     // Protocol-aware header length functions
     inline constexpr size_t getIPHeaderLength(bool useIPv6) {
@@ -267,7 +394,7 @@ namespace e2sar
     }
 
     inline constexpr size_t getTotalHeaderLength(bool useIPv6) {
-        return getIPHeaderLength(useIPv6) + UDP_HDRLEN + sizeof(LBHdr) + sizeof(REHdr);
+        return getIPHeaderLength(useIPv6) + UDP_HDRLEN + sizeof(LBHdrV2) + sizeof(REHdr);
     }
 }
 

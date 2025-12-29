@@ -57,10 +57,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     m.attr("_iphdr_len") = py::int_(IP_HDRLEN);
     m.attr("_udphdr_len") = py::int_(UDP_HDRLEN);
     m.attr("_total_hdr_len") = py::int_(TOTAL_HDR_LEN);
-    m.attr("_rehdr_version") = py::int_(rehdrVersion);
     m.attr("_rehdr_version_nibble") = py::int_(rehdrVersionNibble);
-    m.attr("_lbhdr_version") = py::int_(lbhdrVersion);
-    m.attr("_synchdr_version") = py::int_(synchdrVersion);
 
     // Bind the get_Version method
     m.def("get_version", &get_Version);

@@ -343,6 +343,7 @@ int main(int argc, char **argv)
     u_int16_t mtu;
     u_int32_t eventSourceId;
     u_int16_t dataId;
+    u_int8_t lbHdrVer;
     size_t numThreads, numSockets, readThreads;
     float rateGbps;
     int sockBufSize;
@@ -370,6 +371,7 @@ int main(int argc, char **argv)
     opts("mtu,m", po::value<u_int16_t>(&mtu)->default_value(1500), "MTU (default 1500) [s]");
     opts("src", po::value<u_int32_t>(&eventSourceId)->default_value(1234), "Event source (default 1234) [s]");
     opts("dataid", po::value<u_int16_t>(&dataId)->default_value(4321), "Data id (default 4321) [s]");
+    opts("lbhdrversion", po::value<u_int8_t>(&lbHdrVer)->default_value(2), "LB Header version (2 or 3, 2 is default) [s]");
     opts("threads", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
     opts("sockets", po::value<size_t>(&numSockets)->default_value(4), "number of send sockets (defaults to 4) [r]");
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0, negative value means no limit)");
@@ -431,6 +433,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "deq", "send");
         conflicting_options(vm, "cores", "threads");
         conflicting_options(vm, "cores", "sockets");
+        conflicting_options(vm, "recv", "lbhdrversion");
     }
     catch (const std::logic_error &le)
     {
@@ -549,6 +552,8 @@ int main(int argc, char **argv)
                     sflags.multiPort = multiPort;
                 if (vm.count("smooth"))
                     sflags.smooth = smooth;
+                if (vm.count("lbhdrversion"))
+                    sflags.lbHdrVersion = lbHdrVer;
             } else {   
                 sflags.useCP = withCP; 
                 sflags.mtu = mtu;
@@ -557,6 +562,7 @@ int main(int argc, char **argv)
                 sflags.rateGbps = rateGbps;
                 sflags.multiPort = multiPort;
                 sflags.smooth = smooth;
+                sflags.lbHdrVersion = lbHdrVer;
             }
 
             // if using control plane
@@ -600,6 +606,7 @@ int main(int argc, char **argv)
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Sending sockets/threads:       " << sflags.numSendSockets << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
+            std::cout << "Using LB Header Version:       " << sflags.lbHdrVersion << std::endl;
 
             std::cout << "Sending average bit rate is:   ";
             if (sflags.rateGbps > 0.) 
