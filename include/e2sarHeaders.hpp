@@ -304,14 +304,13 @@ namespace e2sar
         struct REHdr re;
         LBREHdr()
         {
-            new (this) LBHdrU();
-            // taking advantage of C++ pointer arithmetic
-            new (this + 1) REHdr();
+            new (&lbu) LBHdrU();
+            new (&re) REHdr();
         }
         LBREHdr(u_int8_t ver)
         {
-            new (this) LBHdrU(ver);
-            new (this + 1) REHdr();
+            new (&lbu) LBHdrU(ver);
+            new (&re) REHdr();
         }
     } __attribute__((__packed__));
 

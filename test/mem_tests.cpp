@@ -93,6 +93,8 @@ int main(int argc, char **argv)
 
     // allocation test
     void *hdrspace = malloc(sizeof(LBREHdr));
+    memset(hdrspace, 0, sizeof(LBREHdr));
+    
     // placement-new to construct the headers
     auto hdr = new (hdrspace) LBREHdr(lbhdrVersion3);
     u_int8_t* hdrbuf = reinterpret_cast<u_int8_t*>(hdr);
