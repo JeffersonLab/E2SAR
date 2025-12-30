@@ -94,20 +94,23 @@ int main(int argc, char **argv)
     // allocation test
     void *hdrspace = malloc(sizeof(LBREHdr));
     memset(hdrspace, 0, sizeof(LBREHdr));
-    
+
     // placement-new to construct the headers
     auto hdr = new (hdrspace) LBREHdr(lbhdrVersion3);
     u_int8_t* hdrbuf = reinterpret_cast<u_int8_t*>(hdr);
 
     std::cout << "LB Header Version2 Check: " << hdr->lbu.lb2.check_version() << std::endl;
     std::cout << "LB Header Version3 Check: " << hdr->lbu.lb3.check_version() << std::endl;
+    std::cout << "LB Header Preamble: " << reinterpret_cast<char*>(hdrbuf)[0] << reinterpret_cast<char*>(hdrbuf)[1] << std::endl;
     std::cout << "LB Header Version: " << static_cast<int>(hdr->lbu.lb2.get_version()) << std::endl;
+
     std::cout << "RE Header Version: " << static_cast<int>(hdr->re.get_HeaderVersion()) << std::endl;
     hdr->lbu.lb3.set(1, 2, 3);
     hdr->re.set(4, 5, 6, 7);
     
     LBREHdr *newhdr{nullptr};
     newhdr = reinterpret_cast<LBREHdr*>(hdrbuf);
+    std::cout << "Decoded LB Header Preamble: " << reinterpret_cast<char*>(newhdr)[0] << reinterpret_cast<char*>(newhdr)[1] << std::endl;
     std::cout << "Decoded LB Header Version: " << static_cast<int>(newhdr->lbu.lb2.get_version()) << std::endl;
     std::cout << "Decoded LB Fields: " << 
         static_cast<int>(newhdr->lbu.lb3.get_slotSelect()) << " " << 
