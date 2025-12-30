@@ -720,6 +720,10 @@ namespace e2sar
         if (ticksAsREEventNum)
             eventNum = lbEventNum;
 
+        // new random entropy generated for each event, unless user specified it
+        if (entropy == 0)
+            entropy = randDist(ranlux);
+            
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
         {
@@ -728,15 +732,12 @@ namespace e2sar
             // fill out LB and RE headers
             void *hdrspace = malloc(sizeof(LBREHdr));
             // placement-new to construct the headers
-            auto hdr = new (hdrspace) LBREHdr();
+            auto hdr = new (hdrspace) LBREHdr(seg.lbHdrVersion);
             // allocate iov (this returns two entries)
             auto iov = static_cast<struct iovec*>(malloc(2*sizeof(struct iovec)));
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
-            // new random entropy generated for each segment, unless user specified it
-            if (entropy == 0)
-                entropy = randDist(ranlux);
             switch(seg.lbHdrVersion) {
                 default:
                     // default to 2

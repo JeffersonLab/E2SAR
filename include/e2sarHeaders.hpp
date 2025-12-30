@@ -20,7 +20,7 @@ namespace e2sar
     */
     struct REHdr
     {
-        u_int8_t preamble[2] {rehdrVersionNibble, 0}; // 4 bit version + reserved
+        const u_int8_t preamble[2] {rehdrVersionNibble, 0}; // 4 bit version + reserved
         u_int16_t dataId{0};   // source identifier
         u_int32_t bufferOffset{0};
         u_int32_t bufferLength{0}; // this is event length, not the length of the buffer being sent
@@ -110,7 +110,7 @@ namespace e2sar
     */
     struct LBHdrV2
     {
-        char preamble[2] {'L', 'B'};
+        const char preamble[2] {'L', 'B'};
         u_int8_t version{lbhdrVersion2};
         u_int8_t nextProto{rehdrVersion};
         u_int16_t rsvd{0};
@@ -190,7 +190,7 @@ namespace e2sar
     */
     struct LBHdrV3
     {
-        char preamble[2] {'L', 'B'};
+        const char preamble[2] {'L', 'B'};
         u_int8_t version{lbhdrVersion3};
         u_int8_t nextProto{rehdrVersion};
         u_int16_t slotSelect{0};
@@ -220,7 +220,7 @@ namespace e2sar
          */
         inline bool check_version() const
         {
-            return version == lbhdrVersion2;
+            return version == lbhdrVersion3;
         }
 
         /**
@@ -283,12 +283,36 @@ namespace e2sar
         {
             memset(this, 0, sizeof(LBHdrU));
         }
-    };
+        // c-tor that builds a specific header version
+        LBHdrU(u_int8_t ver)
+        {
+            switch(ver) {
+                default:
+                case 2:
+                    new (this) LBHdrV2();
+                    break;
+                case 3:
+                    new (this) LBHdrV3();
+                    break;
+            }
+        }
+    } __attribute__((__packed__));
 
     // for memory allocation purposes we need them concatenated
     struct LBREHdr {
         union LBHdrU lbu;
         struct REHdr re;
+        LBREHdr()
+        {
+            new (this) LBHdrU();
+            // taking advantage of C++ pointer arithmetic
+            new (this + 1) REHdr();
+        }
+        LBREHdr(u_int8_t ver)
+        {
+            new (this) LBHdrU(ver);
+            new (this + 1) REHdr();
+        }
     } __attribute__((__packed__));
 
     constexpr u_int8_t synchdrVersion2 = 2;
@@ -299,7 +323,7 @@ namespace e2sar
     */
     struct SyncHdr
     {
-        char preamble[2] {'L', 'C'};
+        const char preamble[2] {'L', 'C'};
         u_int8_t version{synchdrVersion2};
         u_int8_t rsvd{0};
         u_int32_t eventSrcId{0};

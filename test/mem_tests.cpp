@@ -66,7 +66,7 @@ void useNew()
 {
     for(size_t i = 0; i < numBuffers; i++)
     {
-        hdrs[i] = new LBREHdr;
+        hdrs[i] = new LBREHdr();
         iovecs[i] = new struct iovec[2];
     }
 
@@ -90,6 +90,16 @@ int main(int argc, char **argv)
     size_t numIters = 10000;
 
     u_int64_t start, end; 
+
+    // allocation test
+    void *hdrspace = malloc(sizeof(LBREHdr));
+    // placement-new to construct the headers
+    auto hdr = new (hdrspace) LBREHdr(lbhdrVersion3);
+
+    std::cout << "LB Header Version2 Check: " << hdr->lbu.lb2.check_version() << std::endl;
+    std::cout << "LB Header Version3 Check: " << hdr->lbu.lb3.check_version() << std::endl;
+    std::cout << "LB Header Version: " << static_cast<int>(hdr->lbu.lb2.get_version()) << std::endl;
+    std::cout << "RE Header Version: " << static_cast<int>(hdr->re.get_HeaderVersion()) << std::endl;
     
     start = getMicros();
     doIters(useNew, numIters);
