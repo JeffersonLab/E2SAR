@@ -200,11 +200,11 @@ namespace e2sar
         /**
          * Set all fields to network/big-endian byte order values
          */
-        inline void set(u_int16_t slt, u_int16_t prt, EventNum_t _tick) 
+        inline void set(u_int16_t slt, u_int16_t prt, EventNum_t tk) 
         {
             slotSelect = htobe16(slt);
             portSelect = htobe16(prt);
-            tick = htobe64(tick);
+            tick = htobe64(tk);
         }
 
         /**
@@ -281,7 +281,7 @@ namespace e2sar
         // explicit c-tor because it's a union
         LBHdrU()
         {
-            memset(this, 0, sizeof(LBHdrU));
+            ;
         }
         // c-tor that builds a specific header version
         LBHdrU(u_int8_t ver)
