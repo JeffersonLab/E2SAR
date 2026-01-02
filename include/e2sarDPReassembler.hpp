@@ -618,7 +618,7 @@ namespace e2sar
             /**
              * Get the number of threads this Reassembler is using
              */
-            inline const size_t get_numRecvThreads() const noexcept
+            inline size_t get_numRecvThreads() const noexcept
             {
                 return numRecvThreads;
             }
@@ -635,7 +635,7 @@ namespace e2sar
              * Get the port range that will be communicated to CP (this is either specified explicitly
              * as part of ReassemblerFlags or computed from the number of cores or threads requested)
              */
-            inline const int get_portRange() const noexcept
+            inline int get_portRange() const noexcept
             {
                 return portRange;
             }

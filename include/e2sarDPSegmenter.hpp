@@ -512,7 +512,7 @@ namespace e2sar
             /**
              * Get the MTU currently in use by segmenter
              */
-            inline const u_int16_t getMTU() const noexcept
+            inline u_int16_t getMTU() const noexcept
             {
                 return sendThreadState.mtu;
             }
@@ -520,7 +520,7 @@ namespace e2sar
             /**
              * get the maximum payload length used by the segmenter
              */
-            inline const size_t getMaxPldLen() const noexcept
+            inline size_t getMaxPldLen() const noexcept
             {
                 return sendThreadState.maxPldLen;
             }
@@ -528,7 +528,7 @@ namespace e2sar
             /**
              * Check if segmenter is using IPv6 for dataplane
              */
-            inline const bool isUsingIPv6() const noexcept
+            inline bool isUsingIPv6() const noexcept
             {
                 return sendThreadState.useV6;
             }
