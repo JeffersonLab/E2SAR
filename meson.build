@@ -119,8 +119,19 @@ subdir('bin')
 subdir('scripts')
 
 pkg_mod = import('pkgconfig')
-pkg_mod.generate(libraries : libe2sar,
-                 version : meson.project_version(),
-                 name : 'libe2sar',
-                 filebase : 'e2sar',
-                 description : 'E2SAR: EJ-FAT Event Segmentation And Reassembly library')
+pkg_mod.generate(
+    libraries : libe2sar,
+    version : meson.project_version(),
+    name : 'libe2sar',
+    filebase : 'e2sar',
+    description : 'E2SAR: EJ-FAT Event Segmentation And Reassembly library',
+    requires : ['grpc++', 'protobuf'],
+    libraries_private : [
+        '-lboost_log',
+        '-lboost_log_setup',
+        '-lboost_thread',
+        '-lboost_filesystem',
+        '-lboost_program_options',
+        '-lboost_url',
+        '-lboost_chrono'
+    ] + linker_flags)
