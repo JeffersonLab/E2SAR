@@ -1,5 +1,8 @@
 project('E2SAR', 'cpp', 
-        version: files('VERSION.txt'), default_options : ['cpp_std=c++17'])
+        version: files('VERSION.txt'), 
+        default_options : [
+                'buildtype=debugoptimized',
+                'cpp_std=c++17'])
 
 compiler = meson.get_compiler('cpp')
 
@@ -135,3 +138,12 @@ pkg_mod.generate(
         '-lboost_url',
         '-lboost_chrono'
     ] + linker_flags)
+
+summary({
+  'prefix': get_option('prefix'),
+}, section: 'Directories')
+
+summary({
+  'Build type': get_option('buildtype'),
+  'C++ standard': get_option('cpp_std'),
+}, section: 'Configuration')
