@@ -119,7 +119,7 @@ jobs:
       - name: List checked out code
         run: |
           cat E2SAR/VERSION.txt
-          ls -l E2SAR/udplbd/
+          ls -l E2SAR/udplbd2/
           ls -l E2SAR/docs/
           ls -l E2SAR/wiki/
 
