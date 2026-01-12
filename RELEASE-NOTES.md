@@ -4,10 +4,19 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 ## v0.3.0
 
+- Fixed IPv6 header calculation bug that affected the MTU 
 - Changed the order of evaluation of INI file vs. command line - command line overrides anything specified in the INI file
 - Added tilde expansion to INI file path specifier
 - Added support for Boost::log
 - Added a new SegmenterFlags flag - data-plane.ticksAsREEventNum - when set the RE header event number is overwritten with the corresponding LB event number - primarily to support debugging and defaults to false
+- Added new reported stats - totalPackets and totalBytes that are received from getStats() call on Reassembler (can be queried any time). These are in addition to per-FD stats gathered (which can only be queried at the end). 
+- Added full support for latest gRPC. See issue #132 for details. 
+  - Includes support for retrieving timeseries stats data
+  - Includes support for new style token management
+- Fixed a bug where send queue in Segmenter was in fact infinite, potentially blowing up memory, now set to fixed size 2048 entries
+- Added a trivial UDP relay program (bin/e2sar_udp_relay) to help relaying SYNC packets. Listens on a given port and retransmits to a new host/port. No source header rewriting or any other magic, the SYNC packets look like they came from the relay host. Supports IPv4 and IPv6 (and can relay between the two stacks).
+- Added RE header version validation (see #146) and a badHeaderDiscards stats field in reassembler receive stats to report the number of packet discards due to version check fail
+- Added support for LB Header Version 3. Version can be selected via segmenter.ini file or in e2sar_perf via command line (--lbhdrversion). Defaults to 2.
 
 ## v0.2.2
 
