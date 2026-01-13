@@ -449,7 +449,7 @@ result<int> timeseries(LBManager &lbman, const std::string& lbpath, const std::s
     }
 
     // write out two columns per series: /lb/path(unit),ts,
-    for(int col=0; col<rsres.td.size(); col++)
+    for(auto col=0; col<rsres.td.size(); col++)
     {
         csvFile << rsres.td[col].path;
         if (not rsres.td[col].unit.empty())
@@ -461,12 +461,12 @@ result<int> timeseries(LBManager &lbman, const std::string& lbpath, const std::s
     csvFile << std::endl;
     csvFile.flush();
 
-    int tdIdx{0};
+    size_t tdIdx{0};
     while(true)
     {
         // timeseries can be of different lengths
         bool finished{true};
-        for(int col=0; col<rsres.td.size(); col++)
+        for(auto col=0; col<rsres.td.size(); col++)
         {
             std::visit(Overload {
                 [&csvFile, &finished, tdIdx](const std::vector<FloatSample>& samples) {
