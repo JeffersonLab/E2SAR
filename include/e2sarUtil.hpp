@@ -62,6 +62,16 @@ namespace e2sar
         {
             return static_cast<size_t>(tt);
         }
+        inline static const std::string toString(TokenType tt)
+        {
+            switch(tt) {
+                case TokenType::all: return "ALL"s;
+                case TokenType::admin: return "ADMIN/LOAD_BALANCER"s;
+                case TokenType::instance: return "INSTANCE/RESERVATION"s;
+                case TokenType::session: return "SESSION"s;
+                default: "UNKNOWN"s;
+            }
+        }
         static const size_t tokenTypeCardinality = static_cast<size_t>(TokenType::END);
 
 
@@ -69,6 +79,16 @@ namespace e2sar
             // 'register' is a keyword in C++, so adding '_' to names
             _read_only_, _register_, _reserve_, _update_, END
         };
+        inline static const std::string toString(TokenPermission tt)
+        {
+            switch(tt) {
+                case TokenPermission::_read_only_: return "READ"s;
+                case TokenPermission::_register_: return "REGISTER"s;
+                case TokenPermission::_reserve_: return "RESERVE"s;
+                case TokenPermission::_update_: return "UPDATE"s;
+                default: "UNKNOWN"s;
+            }
+        }
         static const size_t tokenPermissionCardinality = static_cast<size_t>(TokenPermission::END);
 
     private:

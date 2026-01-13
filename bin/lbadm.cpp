@@ -670,9 +670,9 @@ result<int> listTokenPermissions(LBManager &lbman,
 
             for (const auto& perm : details.permissions)
             {
-                std::cout << "    [ resourceType=" << static_cast<u_int16_t>(perm.resourceType)
+                std::cout << "    [ resourceType=" << EjfatURI::toString(perm.resourceType)
                           << ", resourceId=" << (perm.resourceId.empty() ? "(none)"s : perm.resourceId)
-                          << ", permission=" << static_cast<u_int16_t>(perm.permission) << " ]" << std::endl;
+                          << ", permission=" << EjfatURI::toString(perm.permission) << " ]" << std::endl;
             }
         }
         else
