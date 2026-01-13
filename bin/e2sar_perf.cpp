@@ -657,8 +657,10 @@ int main(int argc, char **argv)
                 rflags = rflagsRes.value();
                 // deal with command-line overrides
                 if (vm.count("withcp"))
+                {
                     rflags.useCP = withCP;
                     rflags.withLBHeader = not withCP;
+                }
                 if (vm.count("bufsize")) 
                     rflags.rcvSocketBufSize = sockBufSize;
                 if (vm.count("ipv6") || vm.count("ipv4"))
