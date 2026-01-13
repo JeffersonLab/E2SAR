@@ -509,17 +509,17 @@ parsePermissions(const std::vector<std::string>& permStrings)
 
     // Maps for string to enum conversion
     std::map<std::string, EjfatURI::TokenType> resourceTypeMap = {
-        {"ALL", EjfatURI::TokenType::all},
-        {"LOAD_BALANCER", EjfatURI::TokenType::load_balancer},
-        {"RESERVATION", EjfatURI::TokenType::reservation},
-        {"SESSION", EjfatURI::TokenType::session}
+        {EjfatURI::toString(EjfatURI::TokenType::all), EjfatURI::TokenType::all},
+        {EjfatURI::toString(EjfatURI::TokenType::load_balancer), EjfatURI::TokenType::load_balancer},
+        {EjfatURI::toString(EjfatURI::TokenType::reservation), EjfatURI::TokenType::reservation},
+        {EjfatURI::toString(EjfatURI::TokenType::session), EjfatURI::TokenType::session}
     };
 
     std::map<std::string, EjfatURI::TokenPermission> permissionTypeMap = {
-        {"READ_ONLY", EjfatURI::TokenPermission::_read_only_},
-        {"REGISTER", EjfatURI::TokenPermission::_register_},
-        {"RESERVE", EjfatURI::TokenPermission::_reserve_},
-        {"UPDATE", EjfatURI::TokenPermission::_update_}
+        {EjfatURI::toString(EjfatURI::TokenPermission::_read_only_), EjfatURI::TokenPermission::_read_only_},
+        {EjfatURI::toString(EjfatURI::TokenPermission::_register_), EjfatURI::TokenPermission::_register_},
+        {EjfatURI::toString(EjfatURI::TokenPermission::_reserve_), EjfatURI::TokenPermission::_reserve_},
+        {EjfatURI::toString(EjfatURI::TokenPermission::_update_), EjfatURI::TokenPermission::_update_}
     };
 
     for (const auto& perm_str : permStrings)
@@ -670,9 +670,9 @@ result<int> listTokenPermissions(LBManager &lbman,
 
             for (const auto& perm : details.permissions)
             {
-                std::cout << "    [ resourceType=" << EjfatURI::toString(perm.resourceType)
-                          << ", resourceId=" << (perm.resourceId.empty() ? "(none)"s : perm.resourceId)
-                          << ", permission=" << EjfatURI::toString(perm.permission) << " ]" << std::endl;
+                std::cout << EjfatURI::toString(perm.resourceType) << ":"
+                          << (perm.resourceId.empty() ? "":"lb"s + perm.resourceId) << ":"
+                          << EjfatURI::toString(perm.permission) << std::endl;
             }
         }
         else
