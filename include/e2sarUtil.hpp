@@ -69,7 +69,7 @@ namespace e2sar
                 case TokenType::admin: return "ADMIN/LOAD_BALANCER"s;
                 case TokenType::instance: return "INSTANCE/RESERVATION"s;
                 case TokenType::session: return "SESSION"s;
-                default: "UNKNOWN"s;
+                default: return "UNKNOWN"s;
             }
         }
         static const size_t tokenTypeCardinality = static_cast<size_t>(TokenType::END);
@@ -86,7 +86,7 @@ namespace e2sar
                 case TokenPermission::_register_: return "REGISTER"s;
                 case TokenPermission::_reserve_: return "RESERVE"s;
                 case TokenPermission::_update_: return "UPDATE"s;
-                default: "UNKNOWN"s;
+                default: return "UNKNOWN"s;
             }
         }
         static const size_t tokenPermissionCardinality = static_cast<size_t>(TokenPermission::END);
