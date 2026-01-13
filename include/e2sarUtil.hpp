@@ -66,8 +66,8 @@ namespace e2sar
         {
             switch(tt) {
                 case TokenType::all: return "ALL"s;
-                case TokenType::admin: return "ADMIN/LOAD_BALANCER"s;
-                case TokenType::instance: return "INSTANCE/RESERVATION"s;
+                case TokenType::admin: return "LOAD_BALANCER"s;
+                case TokenType::instance: return "RESERVATION"s;
                 case TokenType::session: return "SESSION"s;
                 default: return "UNKNOWN"s;
             }
