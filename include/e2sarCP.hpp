@@ -71,7 +71,7 @@ namespace e2sar
         
         WorkerStats(): total_events_recv{0}, total_events_reassembled{0}, total_events_reassembly_err{0},
             total_events_dequeued{0}, total_event_enqueue_err{0}, total_bytes_recv{0}, total_packets_recv{0} {
-            std::cout << "ZEROING OUT" << std::endl;
+                ;
         }
     };
 
