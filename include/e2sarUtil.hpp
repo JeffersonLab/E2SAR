@@ -34,15 +34,16 @@ using namespace boost::log;
 #define BOOST_LOG_INFO() BOOST_LOG_SEV(lg, trivial::info)
 #define BOOST_LOG_WARN() BOOST_LOG_SEV(lg, trivial::warning)
 #define BOOST_LOG_ERR() BOOST_LOG_SEV(lg, trivial::error)
-typedef sinks::asynchronous_sink<sinks::text_ostream_backend> text_sink;
-static boost::shared_ptr<text_sink> sink;
-static sources::severity_logger_mt<trivial::severity_level> lg;
 
 /***
  * Supporting classes for E2SAR
  */
 namespace e2sar
 {
+    typedef sinks::asynchronous_sink<sinks::text_ostream_backend> text_sink;
+    extern boost::shared_ptr<text_sink> sink;
+    extern sources::severity_logger_mt<trivial::severity_level> lg;
+
     const u_int16_t DATAPLANE_PORT = 19522;
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). 

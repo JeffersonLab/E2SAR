@@ -831,21 +831,21 @@ int main(int argc, char **argv)
     opts("tokenid", po::value<std::string>(), "token ID (numeric) or token string to target");
 
     // commands
-    opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
-    opts("free", "free a load balancer. Uses instance or admin token.");
-    opts("version", "report the version of the LB. Uses admin or instance token.");
-    opts("register", "register a worker (-n, -p, -w, -c required; either use -a to specify receive address, or auto-detection will register incoming interface address), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
-    opts("deregister", "deregister worker. Uses instance or session token.");
-    opts("status", "get and print LB status. Uses admin or instance token.");
-    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses session token.");
-    opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
-    opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
-    opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
-    opts("timeseries", "return requested timeseries based on a path (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled')");
-    opts("createtoken", "create a new delegated token (--tokenname, --permission required). Uses admin token.");
-    opts("listtokenpermissions", "list all permissions for a token (--tokenid required). Uses admin token.");
-    opts("listchildtokens", "list all child tokens of a parent (--tokenid required). Uses admin token.");
-    opts("revoketoken", "revoke a token and all its children (--tokenid required). Uses admin token.");
+    opts("reserve", "reserve a load balancer (-l, -a, -d required). Requires LOAD_BALANCER or ALL resource token.");
+    opts("free", "free a load balancer. Requires RESERVATION, LOAD_BALANCER or ALL token.");
+    opts("version", "report the version of the LB. Uses any token.");
+    opts("register", "register a worker (-n, -p, -w, -c required; either use -a to specify receive address, or auto-detection will register incoming interface address), note you must use 'state' within 10 seconds or worker is deregistered. Requires ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("deregister", "deregister worker. Requires RESERVATION or SESSION token.");
+    opts("status", "get and print LB status. Requires ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses SESSION token.");
+    opts("overview","return metadata and status information on all registered load balancers. Uses ALL or LOAD_BALANCER token.");
+    opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("timeseries", "return requested timeseries based on a path (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled'). Saved into a specified CSV file. Required token is based on the path.");
+    opts("createtoken", "create a new delegated token (--tokenname, --permission required). Requires token of the same resource type or higher.");
+    opts("listtokenpermissions", "list all permissions for a token (--tokenid required). Requires parent token or one with higher resource type.");
+    opts("listchildtokens", "list all child tokens of a parent (--tokenid required). Requires parent token or one with higher resource type.");
+    opts("revoketoken", "revoke a token and all its children (--tokenid required). Requires parent token or one with higher resource type.");
 
     std::vector<std::string> commands{"reserve", "free", "version", "register",
         "deregister", "status", "state", "overview", "addsenders", "removesenders",
@@ -876,6 +876,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
         option_dependency(vm, "timeseries", "lbpath");
+        option_dependency(vm, "timeseries", "csv");
         option_dependency(vm, "createtoken", "tokenname");
         option_dependency(vm, "createtoken", "permission");
         option_dependency(vm, "listtokenpermissions", "tokenid");
