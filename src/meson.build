@@ -8,6 +8,7 @@ libe2sar_t = static_library('e2sar_t',
                         e2sar_sources,
                         include_directories : inc,
                         dependencies : [grpc_dep, boost_dep, protobuf_dep],
+                        link_with : liblbgrpc,  
                         install : true)
 
 # build one library from the E2SAR and gRPC library pieces
