@@ -7,6 +7,9 @@ np.set_printoptions(formatter={'int':lambda x: f'{x:2}'},linewidth = 1000)
 
 #GF = galois.GF(8,irreducible_poly=[1,0,1,1])
 GF = galois.GF(16,irreducible_poly=[1,0,0,1,1])
+#GF = galois.GF(32,irreducible_poly=[1,0,0,1,0,1])
+#GF = galois.GF(64,irreducible_poly=[1,0,0,0,0,1,1])
+#GF = galois.GF(256,irreducible_poly=[1,0,0,0,1,1,0,1,1])
 
 print(GF.properties)
 print(GF.repr_table())
@@ -14,8 +17,17 @@ print(GF.repr_table())
 #--------------------------------------------------------------------------------------
 # Galois Field Functions from scratch
 #--------------------------------------------------------------------------------------
+alpha = GF.primitive_element
+#gf_mul_seq =  [1,2,4,8,3,6,12,11,5,10,7,14,15,13,9,0]
+gf_mul_seq = []
+for i in range(GF.order):
+   if i < GF.order-1: gf_mul_seq.append(int(alpha**i))
+   else             : gf_mul_seq.append(int(0))
 
-gf_mul_seq =  [1,2,4,8,3,6,12,11,5,10,7,14,15,13,9,0]
+print("------   GF elements (ordered by power)  -------")
+print(gf_mul_seq)
+print("-------------------------------------------")
+
 gf_log_seq = {}
 gf_exp_seq = {}
 
@@ -34,7 +46,7 @@ def gf_mul(a,b):
   
   exp_a = gf_exp_seq[a]
   exp_b = gf_exp_seq[b]
-  sum = (exp_a+exp_b) % 15
+  sum = (exp_a+exp_b) % (GF.order-1)
   return(gf_log_seq[sum])
 
 def gf_div(a,b):
@@ -44,13 +56,12 @@ def gf_div(a,b):
   exp_a = gf_exp_seq[a]
   exp_b = gf_exp_seq[b]
   sum = (exp_a-exp_b)
-  if (sum < 0): sum = sum + 15
-  sum = sum % 15
+  if (sum < 0): sum = sum + (GF.order-1)
+  sum = sum % (GF.order-1)
   return(gf_log_seq[sum])
 
 def gf_sum(a,b):
    return a^b
-
 
 #--------------------------------------------------------------------------------------
 # Polynomial Functions
@@ -304,6 +315,45 @@ if (True) :
    print(f'{x}/{y} = {x/y}')
    print(f'{x}%{y} = {x%y}')
 
+   print(f'--- testing GF multipy table with python standard library ---')
+   gf_mul_lut=[]
+   for i in range(GF.order):
+       row=[]
+       for j in range(GF.order):
+           x = GF([i])
+           y = GF([j])
+           z = x*y
+           row.append(int(z.item()))
+       print(row)
+       gf_mul_lut.append(row)
+
+   print(f'--- testing GF division table with python standard library ---')
+   gf_div_lut=[]
+   for i in range(GF.order):
+       row=[]
+       for j in range(GF.order):
+           x = GF([i])
+           y = GF([j])
+           if y != 0: z = x/y
+           else:      z = GF([0])
+           #z = gf_div(x,y)
+           row.append(int(z.item()))
+           #row.append(int(z))
+       print(row)
+       gf_div_lut.append(row)
+
+   print(f'--- testing GF addition table with python standard library ---')
+   gf_add_lut=[]
+   for i in range(GF.order):
+       row=[]
+       for j in range(GF.order):
+           x = GF([i])
+           y = GF([j])
+           z = x+y
+           row.append(int(z.item()))
+       print(row)
+       gf_add_lut.append(row)
+
    print(f'--- testing GF arithmetic with custom library  ---')
    x = 2
    y = 7
@@ -392,7 +442,7 @@ if (True) :
    try : d
    except :
      n = 8   # number of data symbols. n SHOULD be >= 3 for fast determinant calculation
-     d = [random.randrange(0, 16, 1) for i in range(n)]
+     d = [random.randrange(0, GF.order, 1) for i in range(n)]
    else :
      n = len(d)
       
@@ -418,7 +468,9 @@ if (True) :
    print("#-- Test to see if all possible G* -> H matrices are invertable --")
    
    print("testing for matrix invertability")
-   for errors in itertools.combinations(list(range(0,len(c_matrix)-1)),2*t) :
+   H_LUT = []
+   ERR_LOC_LUT = []
+   for errors in itertools.combinations(list(range(0,len(c_matrix))),2*t) :
       e_bits = list(errors)
 
       c_rx = c_matrix.copy()
@@ -431,13 +483,18 @@ if (True) :
    
       try :
          H = gf_poly_matrix_invert(G_error)
+         H_LUT.append(H)
+         ERR_LOC = [1 if i in e_bits else 0 for i in range(len(c_matrix))]
+         ERR_LOC_LUT.append(ERR_LOC)
+         #print("Iteration:", e_bits)
       except :
          print(f" ----  UNABLE TO INVERT G* ------ ")
          print(f"m_rx = {m_rx}")      
          print(f" Error locations .. {e_bits}")
    
-#   e_bits = random.sample(range(0, len(m)+2*t), 2*t)    # errors in m,p bits
-   e_bits = random.sample(range(0,len(c_matrix)-1),2*t)  # errors in m bits
+   e_bits = random.sample(range(0, len(c_matrix)), 2*t)    # errors in m,p bits
+#   e_bits = random.sample(range(0,len(c_matrix)-2*t),2*t)  # errors in m bits
+   print(f" Error locations .. {e_bits}")
 
    print()
    print("#-- build the G* matrix by deleting errored rows ------- ")
@@ -503,7 +560,6 @@ if (True) :
    print(f"c_tx   = {np.array(c_matrix)}")
    print(f"c_rx   = {np.array(c_rx)}")
 
-
    # ---------------------  Write the C Model for the RS encoder and decoder -----------
 
 if (True) :
@@ -537,5 +593,80 @@ f'''
    file = C_Model_File)
    
 
+   # ---------------------  Write the verilog include file for the fec lookup tables ----------------------
 
+if (True) :
+   svh_file = open("fec_luts.svh","w")
 
+   print(f"localparam GF_ORDER = {GF.order};", file = svh_file);
+   print(f"localparam SYM_SIZE = $clog2(GF_ORDER);\n", file = svh_file);
+
+   print(f'''localparam logic [SYM_SIZE-1:0] GF_LOG_LUT [GF_ORDER] =
+    '{{ {",".join(map(str,list(gf_log_seq.values())))} }};\n''', file = svh_file);
+
+   gf_exp_seq_sorted = dict(sorted(gf_exp_seq.items()))
+   print(f'''localparam logic [SYM_SIZE-1:0] GF_EXP_LUT [GF_ORDER] =
+    '{{ {",".join(map(str,list(gf_exp_seq_sorted.values())))} }};\n''', file = svh_file);
+
+   print(f'''localparam logic [SYM_SIZE-1:0] GF_MUL_LUT [GF_ORDER][GF_ORDER] = '{{''', file = svh_file);
+   for row in range(len(gf_mul_lut)):
+      if row < len(gf_mul_lut)-1:
+          print(f'''    '{{ {",".join(map(str,gf_mul_lut[row]))} }},''', file = svh_file);
+      else: # last row, no comma.
+          print(f'''    '{{ {",".join(map(str,gf_mul_lut[row]))} }}''', file = svh_file);
+   print(f'''}};\n''', file = svh_file);
+
+   print(f'''localparam logic [SYM_SIZE-1:0] GF_DIV_LUT [GF_ORDER][GF_ORDER] = '{{''', file = svh_file);
+   for row in range(len(gf_div_lut)):
+      if row < len(gf_div_lut)-1:
+          print(f'''    '{{ {",".join(map(str,gf_div_lut[row]))} }},''', file = svh_file);
+      else: # last row, no comma.
+          print(f'''    '{{ {",".join(map(str,gf_div_lut[row]))} }}''', file = svh_file);
+   print(f'''}};\n''', file = svh_file);
+
+   print(f'''localparam logic [SYM_SIZE-1:0] GF_ADD_LUT [GF_ORDER][GF_ORDER] = '{{''', file = svh_file);
+   for row in range(len(gf_add_lut)):
+      if row < len(gf_add_lut)-1:
+          print(f'''    '{{ {",".join(map(str,gf_add_lut[row]))} }},''', file = svh_file);
+      else: # last row, no comma.
+          print(f'''    '{{ {",".join(map(str,gf_add_lut[row]))} }}''', file = svh_file);
+   print(f'''}};\n''', file = svh_file);
+
+   print(f"localparam RS_N  = {len(d)+2*t};", file = svh_file);
+   print(f"localparam RS_K  = {len(d)};", file = svh_file);
+   print(f"localparam RS_2T = {2*t};\n", file = svh_file);
+
+   print(f'''localparam logic [RS_2T:0][SYM_SIZE-1:0] RS_G_POLY = '{{ {",".join(map(str,Gpoly[::-1]))} }};\n''',
+         file = svh_file);
+
+   print(f'''localparam logic [SYM_SIZE-1:0] RS_G_LUT [RS_K][RS_N] = '{{''', file = svh_file);
+   for row in range(len(G)):
+      if row < len(G)-1:
+          print(f'''    '{{ {",".join(map(str,G[row]))} }},''', file = svh_file);
+      else: # last row, no comma.
+          print(f'''    '{{ {",".join(map(str,G[row]))} }}''', file = svh_file);
+   print(f'''}};\n''', file = svh_file);
+
+   print(f'''localparam NUM_H = {len(H_LUT)};\n''', file = svh_file);
+
+   print(f'''localparam logic [0:NUM_H-1][0:RS_K-1][0:RS_K-1][SYM_SIZE-1:0] RS_H_LUT = '{{''', file = svh_file);
+   print(f'''    '{{''', file = svh_file);
+   for item in range(len(H_LUT)):
+      for row in range(len(H_LUT[item])):
+         if row < len(H_LUT[item])-1:
+             print(f'''        '{{ {",".join(map(str,H_LUT[item][row]))} }},''', file = svh_file);
+         else: # last row, no comma.
+             print(f'''        '{{ {",".join(map(str,H_LUT[item][row]))} }}''', file = svh_file);
+      if item < len(H_LUT)-1: print(f'''    }}, '{{''', file = svh_file);
+      else:        print(f'''    }}''',      file = svh_file);  # last row, no comma.
+   print(f'''}};\n''', file = svh_file);
+
+   print(f'''localparam logic [0:NUM_H-1][0:RS_N-1] RS_ERR_LOC_LUT = '{{''', file = svh_file);
+   for item in range(len(ERR_LOC_LUT)):
+      if item < len(ERR_LOC_LUT)-1:
+          print(f'''        '{{ {",".join(map(str,ERR_LOC_LUT[item]))} }},''', file = svh_file);
+      else:
+          print(f'''        '{{ {",".join(map(str,ERR_LOC_LUT[item]))} }}''', file = svh_file);
+   print(f'''}};''', file = svh_file);
+
+   svh_file.close()
