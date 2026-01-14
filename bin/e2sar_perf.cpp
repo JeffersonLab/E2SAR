@@ -348,7 +348,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP, validate, quiet;
+    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -385,6 +385,7 @@ int main(int argc, char **argv)
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
+    opts("dpv6", po::bool_switch()->default_value(false), "use IPv6 in the dataplane when initializing segmenter [s]. Assumes EJFAT_URI contains an IPv6 'data' address");
     opts("novalidate,v", po::bool_switch()->default_value(false), "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
@@ -434,6 +435,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "cores", "threads");
         conflicting_options(vm, "cores", "sockets");
         conflicting_options(vm, "recv", "lbhdrversion");
+        conflicting_options(vm, "recv", "dpv6");
     }
     catch (const std::logic_error &le)
     {
@@ -487,6 +489,7 @@ int main(int argc, char **argv)
     smooth = vm["smooth"].as<bool>();
     validate = not vm["novalidate"].as<bool>();
     quiet = vm["quiet"].as<bool>();
+    dpv6 = vm["dpv6"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -554,6 +557,8 @@ int main(int argc, char **argv)
                     sflags.smooth = smooth;
                 if (vm.count("lbhdrversion"))
                     sflags.lbHdrVersion = lbHdrVer;
+                if (vm.count("dpv6"))
+                    sflags.dpV6 = dpv6;
             } else {   
                 sflags.useCP = withCP; 
                 sflags.mtu = mtu;
@@ -563,6 +568,7 @@ int main(int argc, char **argv)
                 sflags.multiPort = multiPort;
                 sflags.smooth = smooth;
                 sflags.lbHdrVersion = lbHdrVer;
+                sflags.dpV6 = dpv6;
             }
 
             // if using control plane
