@@ -62,7 +62,7 @@ void ctrlCHandler(int sig)
                     std::cerr << "Unable to remove auto-detected sender from list on exit: " << rmres.error().message() << std::endl;
             }
         }
-        segPtr->stopThreads();
+        // d-tor will stop the threads
         delete segPtr;
     }
     if (reasPtr != nullptr)

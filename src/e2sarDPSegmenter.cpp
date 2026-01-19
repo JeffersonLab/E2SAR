@@ -35,15 +35,15 @@ namespace e2sar
         smooth{sflags.smooth},
         multiPort{sflags.multiPort},
         lbHdrVersion{sflags.lbHdrVersion},
+#ifdef LIBURING_AVAILABLE
+        rings(sflags.numSendSockets),
+        ringMtxs(sflags.numSendSockets),
+#endif
         eventStatsBuffer{sflags.syncPeriods},
         syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
         // set thread index to 0 for a single send thread
         sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.ticksAsREEventNum, sflags.connectedSocket),
         cpuCoreList{cpuCoreList},
-#ifdef LIBURING_AVAILABLE
-        rings(sflags.numSendSockets),
-        ringMtxs(sflags.numSendSockets),
-#endif
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
         addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
@@ -376,7 +376,7 @@ namespace e2sar
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
 
         // create a thread pool for sending events 
-        thread_local boost::asio::thread_pool threadPool(seg.numSendSockets);
+        boost::asio::thread_pool threadPool(seg.numSendSockets);
         boost::chrono::high_resolution_clock::time_point nowTE;
         int64_t interEventSleepUsec{0};
         // per thread rate and inter-frame sleep if needed
@@ -449,9 +449,7 @@ namespace e2sar
                 }
             }
         }
-        // wait for all threads to complete
-        threadPool.join();
-
+        // not doing .join or stop for threadpool as it's d-tor will do it
 #ifdef LIBURING_AVAILABLE
         // reap the remaining CQEs
         while(seg.outstandingSends > 0) 
@@ -746,7 +744,7 @@ namespace e2sar
                     break;
                 case 3:
                     // slot select - 16 lsbs of tick (same for all segments)
-                    // port select - uniform 16 bit (new for each segment)
+                    // port select - uniform 16 bit (new for each event)
                     hdr->lbu.lb3.set(lbEventNum&0xFFFF, entropy, lbEventNum);
                     break;
             }

@@ -17,6 +17,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Added a trivial UDP relay program (bin/e2sar_udp_relay) to help relaying SYNC packets. Listens on a given port and retransmits to a new host/port. No source header rewriting or any other magic, the SYNC packets look like they came from the relay host. Supports IPv4 and IPv6 (and can relay between the two stacks).
 - Added RE header version validation (see #146) and a badHeaderDiscards stats field in reassembler receive stats to report the number of packet discards due to version check fail
 - Added support for LB Header Version 3. Version can be selected via segmenter.ini file or in e2sar_perf via command line (--lbhdrversion). Defaults to 2.
+- Fixed a bug improperly reporting outgoing interface when Segmenter uses IPv6 (#140)
 
 ## v0.2.2
 
