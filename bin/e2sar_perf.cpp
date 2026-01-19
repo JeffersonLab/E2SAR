@@ -38,14 +38,11 @@ void ctrlCHandler(int sig)
 {
     std::cout << "Stopping threads" << std::endl;
     threadsRunning = false;
-    boost::chrono::milliseconds duration(1000);
-    boost::this_thread::sleep_for(duration);
 }
 
 void shutDown()
 {
-    std::cout << "Stopping threads" << std::endl;
-    threadsRunning = false;
+    ctrlCHandler(0);
     boost::chrono::milliseconds duration(1000);
     boost::this_thread::sleep_for(duration);
     if (segPtr != nullptr) {
