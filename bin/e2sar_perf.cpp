@@ -699,7 +699,7 @@ int main(int argc, char **argv)
                         reasPtr = new Reassembler(uri, ip, recvStartPort, coreList, rflags);
                     }
                     else
-                        reasPtr = new Reassembler(uri, recvStartPort, coreList, rflags);
+                        reasPtr = new Reassembler(uri, recvStartPort, coreList, rflags, dpv6);
                 } else
                 {
                     if (not autoIP)
@@ -708,7 +708,7 @@ int main(int argc, char **argv)
                         reasPtr = new Reassembler(uri, ip, recvStartPort, numThreads, rflags);
                     }
                     else
-                        reasPtr = new Reassembler(uri, recvStartPort, numThreads, rflags);
+                        reasPtr = new Reassembler(uri, recvStartPort, numThreads, rflags, dpv6);
                 }
 
                 std::cout << "Using IP address:              " << reasPtr->get_dataIP() << std::endl;
