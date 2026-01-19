@@ -33,12 +33,17 @@ Reassembler *reasPtr{nullptr};
 Segmenter *segPtr{nullptr};
 LBManager *lbmPtr{nullptr};
 std::vector<std::string> senders;
-std::atomic<bool> handlerTriggered{false};
 
-void ctrlCHandler(int sig) 
+void ctrlCHandler(int sig)
 {
-    if (handlerTriggered.exchange(true))
-        return;
+    std::cout << "Stopping threads" << std::endl;
+    threadsRunning = false;
+    boost::chrono::milliseconds duration(1000);
+    boost::this_thread::sleep_for(duration);
+}
+
+void shutDown()
+{
     std::cout << "Stopping threads" << std::endl;
     threadsRunning = false;
     boost::chrono::milliseconds duration(1000);
@@ -88,9 +93,6 @@ void ctrlCHandler(int sig)
         std::cout << "Total: " << totalFragments << std::endl;
         delete reasPtr;
     }
-
-    // instead of join
-    boost::this_thread::sleep_for(duration);
     exit(0);
 }
 
@@ -647,7 +649,7 @@ int main(int argc, char **argv)
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create segmenter: " << static_cast<std::string>(e) << std::endl;
             }
-            ctrlCHandler(0);
+            shutDown();
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 
@@ -724,7 +726,7 @@ int main(int argc, char **argv)
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
-                    ctrlCHandler(0);
+                    shutDown();
                     exit(-1);
                 }
                 // start dequeue read threads
@@ -737,10 +739,10 @@ int main(int argc, char **argv)
                 // join the last one
                 lastThread.join();
                 // unregister/stop threads as needed
-                ctrlCHandler(0);
+                shutDown();
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create reassembler: " << static_cast<std::string>(e) << std::endl;
-                ctrlCHandler(0);
+                shutDown();
                 exit(-1);
             }
         }
