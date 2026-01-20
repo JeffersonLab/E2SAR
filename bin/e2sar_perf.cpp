@@ -434,7 +434,6 @@ int main(int argc, char **argv)
         conflicting_options(vm, "cores", "threads");
         conflicting_options(vm, "cores", "sockets");
         conflicting_options(vm, "recv", "lbhdrversion");
-        conflicting_options(vm, "recv", "dpv6");
     }
     catch (const std::logic_error &le)
     {
