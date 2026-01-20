@@ -287,6 +287,10 @@ void recvStatsThread(Reassembler *r)
 {
     std::vector<boost::tuple<EventNum_t, u_int16_t, size_t>> lostEvents;
 
+    // wait to start reporting
+    boost::chrono::milliseconds duration(1000);
+    boost::this_thread::sleep_for(duration);
+
     while(threadsRunning)
     {
         auto nowT = boost::chrono::high_resolution_clock::now();
@@ -539,23 +543,23 @@ int main(int argc, char **argv)
                 }
                 sflags = sflagsRes.value();
                 // deal with command-line overrides
-                if (vm.count("withcp"))
+                if (not vm["withcp"].defaulted())
                     sflags.useCP = withCP;
-                if (vm.count("mtu"))
+                if (not vm["mtu"].defaulted())
                     sflags.mtu = mtu;
-                if (vm.count("bufsize"))
+                if (not vm["bufsize"].defaulted())
                     sflags.sndSocketBufSize = sockBufSize;
-                if (vm.count("sockets"))
+                if (not vm["sockets"].defaulted())
                     sflags.numSendSockets = numSockets;
-                if (vm.count("rate"))
+                if (not vm["rate"].defaulted())
                     sflags.rateGbps = rateGbps;
-                if (vm.count("multiport"))
+                if (not vm["multiport"].defaulted())
                     sflags.multiPort = multiPort;
-                if (vm.count("smooth"))
+                if (not vm["smooth"].defaulted())
                     sflags.smooth = smooth;
-                if (vm.count("lbhdrversion"))
+                if (not vm["lbhdrversion"].defaulted())
                     sflags.lbHdrVersion = lbHdrVer;
-                if (vm.count("dpv6"))
+                if (not vm["dpv6"].defaulted())
                     sflags.dpV6 = dpv6;
             } else {   
                 sflags.useCP = withCP; 
@@ -660,18 +664,18 @@ int main(int argc, char **argv)
                 }
                 rflags = rflagsRes.value();
                 // deal with command-line overrides
-                if (vm.count("withcp"))
+                if (not vm["withcp"].defaulted())
                 {
                     rflags.useCP = withCP;
                     rflags.withLBHeader = not withCP;
                 }
-                if (vm.count("bufsize")) 
+                if (not vm["bufsize"].defaulted()) 
                     rflags.rcvSocketBufSize = sockBufSize;
-                if (vm.count("ipv6") || vm.count("ipv4"))
+                if (not vm["ipv6"].defaulted() || not vm["ipv4"].defaulted())
                     rflags.useHostAddress = preferHostAddr;
-                if (vm.count("novalidate"))
+                if (not vm["novalidate"].defaulted())
                     rflags.validateCert = validate;
-                if (vm.count("timeout"))
+                if (not vm["timeout"].defaulted())
                     rflags.eventTimeout_ms = eventTimeoutMS;
             } else 
             {
