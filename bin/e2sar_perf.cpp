@@ -121,7 +121,7 @@ void freeBuffer(boost::any a)
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
-    size_t eventBufSize, bool realmalloc) {
+    size_t eventBufSize, u_int8_t* oneEventBuffer=nullptr) {
 
     // to help print large integers
     std::cout.imbue(std::locale(""));
@@ -144,10 +144,10 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     size_t evt = 0;
 
     u_int8_t* eventBuffer{nullptr}, *callbackPtr{nullptr};
-    // allocate event once and don't delete it
-    if (not realmalloc)
+    // there's ever one event buffer, given to us externally
+    if (oneEventBuffer != nullptr)
     {
-        eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
+        eventBuffer = oneEventBuffer;
         // fill in the first part of the buffer with something meaningful and also the end
         memcpy(eventBuffer, eventPldStart.c_str(), eventPldStart.size());
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
@@ -158,7 +158,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         // send the event
 
         // do malloc for each event
-        if (realmalloc)
+        if (oneEventBuffer == nullptr)
         {
             eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
             // fill in the first part of the buffer with something meaningful and also the end
@@ -170,7 +170,7 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         // put on queue with a callback to free this buffer
         while(threadsRunning)
         {
-            // callbackPtr will be null by default and set to eventBuffer if realmalloc is used
+            // callbackPtr will be null by default and set to eventBuffer if oneEventBuffer wasn't passed in externally
             auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
                 &freeBuffer, callbackPtr);
             if (sendRes.has_error()) 
@@ -227,9 +227,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Estimated goodput (Gbps): " <<
         (evt * eventBufSize * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
-    // note in the case of default (not realmalloc) behavior we are never freeing the single allocated event buffer
-    // that's because sending threads may still be running when this exits and they may be using it. This is a 
-    // deliberate minor memory leak. A real application would need to wait for segmenter to be destroyed to do it.
     return 0;
 }
 
@@ -659,13 +656,17 @@ int main(int argc, char **argv)
             std::cout << (sflags.useCP ? "*** Make sure the LB has been reserved and the URI reflects the reserved instance information." :
                 "*** Make sure the URI reflects proper data address, other parts are ignored.") << std::endl;
 
+            // allocate one event buffer if needed (default), otherwise senEvents will do malloc per-event
+            u_int8_t* oneEventBuffer{nullptr};
+            if (not realmalloc)
+                oneEventBuffer = static_cast<u_int8_t*>(malloc(eventBufferSize));
             try {
                 if (vm.count("cores"))
                     segPtr = new Segmenter(uri, dataId, eventSourceId, coreList, sflags);
                 else
                     segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
 
-                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, realmalloc);
+                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, oneEventBuffer);
 
                 if (res.has_error()) {
                     std::cerr << "Segmenter encountered an error: " << res.error().message() << std::endl;
@@ -674,6 +675,9 @@ int main(int argc, char **argv)
                 std::cerr << "Unable to create segmenter: " << static_cast<std::string>(e) << std::endl;
             }
             shutDown();
+            // safe to free the one event buffer if used
+            if (not realmalloc)
+                free(oneEventBuffer);
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 
