@@ -188,9 +188,6 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
         }
     }
 
-    if (not realmalloc)
-        free(eventBuffer);
-
     // measure this right after we exit the send loop
     while(threadsRunning)
     {
@@ -229,6 +226,11 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     std::cout << "Estimated goodput (Gbps): " <<
         (evt * eventBufSize * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
+
+    // free after everything is done to make sure the buffer isn't floating
+    // around in liburing or sendmmsg code paths
+    if (not realmalloc)
+        free(eventBuffer);
 
     return 0;
 }
