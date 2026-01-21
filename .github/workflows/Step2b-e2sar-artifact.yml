@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         #container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "rockylinux/rockylinux:9.6", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04","debian:bullseye", "debian:bookworm"]
-        container: ["ubuntu:22.04"]
+        container: ["ubuntu:22.04", "ubuntu:24.04"]
     container:
       image: ${{ matrix.container }}
     steps:
