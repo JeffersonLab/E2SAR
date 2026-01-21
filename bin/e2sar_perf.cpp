@@ -227,11 +227,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
     std::cout << "Estimated goodput (Gbps): " <<
         (evt * eventBufSize * 8.0) / (elapsedUsec.count() * 1000) << std::endl;
 
-    // free after everything is done to make sure the buffer isn't floating
-    // around in liburing or sendmmsg code paths
-    if (not realmalloc)
-        free(eventBuffer);
-
+    // note in the case of default (not realmalloc) behavior we are never freeing the single allocated event buffer
+    // that's because sending threads may still be running when this exits and they may be using it. This is a 
+    // deliberate minor memory leak. A real application would need to wait for segmenter to be destroyed to do it.
     return 0;
 }
 
