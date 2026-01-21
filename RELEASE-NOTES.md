@@ -19,6 +19,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Added support for LB Header Version 3. Version can be selected via segmenter.ini file or in e2sar_perf via command line (--lbhdrversion). Defaults to 2.
 - Fixed a bug improperly reporting outgoing interface when Segmenter uses IPv6 (#140)
 - To properly support IPv6 testing e2sar_iperf now takes `--dpv6` flag for either send or receive side to indicate that the dataplane should be using IPv6
+- To address #145, made per-event mallocs optional and off-by-default in e2sar_perf to improve send performance
 
 ## v0.2.2
 

@@ -116,11 +116,12 @@ void option_dependency(const po::variables_map &vm,
 void freeBuffer(boost::any a) 
 {
     auto p = boost::any_cast<u_int8_t*>(a);
-    free(p);
+    if (p != nullptr)
+        free(p);
 }
 
 result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents, 
-    size_t eventBufSize) {
+    size_t eventBufSize, bool realmalloc) {
 
     // to help print large integers
     std::cout.imbue(std::locale(""));
@@ -141,19 +142,37 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
 
     auto sendStartTime = boost::chrono::high_resolution_clock::now();
     size_t evt = 0;
-    for(; (evt < numEvents) && threadsRunning; evt++)
+
+    u_int8_t* eventBuffer{nullptr}, *callbackPtr{nullptr};
+    // allocate event once and don't delete it
+    if (not realmalloc)
     {
-        // send the event
-        auto eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
+        eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
         // fill in the first part of the buffer with something meaningful and also the end
         memcpy(eventBuffer, eventPldStart.c_str(), eventPldStart.size());
         memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
+    }
+
+    for(; (evt < numEvents) && threadsRunning; evt++)
+    {
+        // send the event
+
+        // do malloc for each event
+        if (realmalloc)
+        {
+            eventBuffer = static_cast<u_int8_t*>(malloc(eventBufSize));
+            // fill in the first part of the buffer with something meaningful and also the end
+            memcpy(eventBuffer, eventPldStart.c_str(), eventPldStart.size());
+            memcpy(eventBuffer + eventBufSize - eventPldEnd.size(), eventPldEnd.c_str(), eventPldEnd.size());
+            callbackPtr = eventBuffer;
+        }
 
         // put on queue with a callback to free this buffer
         while(threadsRunning)
         {
+            // callbackPtr will be null by default and set to eventBuffer if realmalloc is used
             auto sendRes = s.addToSendQueue(eventBuffer, eventBufSize, evt, 0, 0,
-                &freeBuffer, eventBuffer);
+                &freeBuffer, callbackPtr);
             if (sendRes.has_error()) 
             {
                 if (sendRes.error().code() == E2SARErrorc::MemoryError)
@@ -168,6 +187,9 @@ result<int> sendEvents(Segmenter &s, EventNum_t startEventNum, size_t numEvents,
                 break;
         }
     }
+
+    if (not realmalloc)
+        free(eventBuffer);
 
     // measure this right after we exit the send loop
     while(threadsRunning)
@@ -351,7 +373,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6;
+    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6, realmalloc;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -399,6 +421,7 @@ int main(int argc, char **argv)
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
     opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
+    opts("realmalloc", po::bool_switch()->default_value(false), "use real mallocs to allocate event buffers, rather than reusing a buffer [s]");
 
 
     po::variables_map vm;
@@ -492,6 +515,7 @@ int main(int argc, char **argv)
     validate = not vm["novalidate"].as<bool>();
     quiet = vm["quiet"].as<bool>();
     dpv6 = vm["dpv6"].as<bool>();
+    realmalloc = vm["realmalloc"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -641,7 +665,7 @@ int main(int argc, char **argv)
                 else
                     segPtr = new Segmenter(uri, dataId, eventSourceId, sflags);
 
-                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize);
+                auto res = sendEvents(*segPtr, startingEventNum, numEvents, eventBufferSize, realmalloc);
 
                 if (res.has_error()) {
                     std::cerr << "Segmenter encountered an error: " << res.error().message() << std::endl;
