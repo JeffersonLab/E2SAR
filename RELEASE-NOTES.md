@@ -4,6 +4,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 ## v0.3.0
 
+- Dependencies change - Boost 1.89.0 and gRPC 1.74.1 
 - Fixed IPv6 header calculation bug that affected the MTU 
 - Changed the order of evaluation of INI file vs. command line - command line overrides anything specified in the INI file
 - Added tilde expansion to INI file path specifier
