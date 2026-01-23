@@ -31,7 +31,7 @@ py_install.extension_module(pybind11_module_name,
     sources: pybind11_src,
     include_directories: [inc, pybind11_inc],
     dependencies: [py_install.dependency(),
-        boost_dep, grpc_dep, protobuf_dep, thread_dep],
+        boost_dep, grpc_dep, protobuf_dep, thread_dep] + absl_deps,
     link_language: 'cpp',
     override_options: [
         'cpp_rtti=true'
