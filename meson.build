@@ -78,12 +78,6 @@ endif
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
-# Ensure all shared libraries are linked even if --as-needed is default
-# This fixes Debian linking issues with Abseil/Protobuf transitive dependencies
-if host_machine.system() == 'linux'
-    add_project_link_arguments('-Wl,--no-as-needed', language: 'cpp')
-endif
-
 # -Wall
 warning_level=1
 #add_project_arguments('-Wall -Wno-deprecated-declarations', language: ['cpp'])
