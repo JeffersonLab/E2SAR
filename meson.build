@@ -102,19 +102,6 @@ stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 # On many platforms, gRPC C++ has to be manually installed and found.
 grpc_dep = dependency('grpc++', version: '>=1.74.1')
 
-# Explicitly declare Abseil dependencies to ensure the versions from the
-# dependency package are used, not system packages. This is critical on Debian
-# where system Abseil may have a different ABI version than the one bundled
-# with grpc/protobuf in the dependency package.
-absl_deps = []
-foreach absl_mod : ['absl_base', 'absl_strings', 'absl_cord', 'absl_log',
-                    'absl_status', 'absl_cord_internal', 'absl_log_internal_message']
-    dep = dependency(absl_mod, required: false)
-    if dep.found()
-        absl_deps += dep
-    endif
-endforeach
-
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
 # and meson can ONLY find it via BOOST_ROOT env variable

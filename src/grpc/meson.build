@@ -19,9 +19,8 @@ lb_pb_ch = custom_target(
 )
 
 # build a static library from the stubs
-# Include abseil dependencies explicitly to avoid ABI conflicts with system abseil
-liblbgrpc = static_library('lbgrpc', [lb_grpc_ch, lb_pb_ch],
-                           dependencies: [grpc_dep, protobuf_dep] + absl_deps,
+liblbgrpc = static_library('lbgrpc', [lb_grpc_ch, lb_pb_ch], 
+                           dependencies: [grpc_dep, protobuf_dep],
 			   install : true)
 
 # install generated headers

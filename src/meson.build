@@ -11,7 +11,7 @@ grpc_generated_headers = [lb_grpc_ch[0], lb_pb_ch[0]]
 libe2sar_t = static_library('e2sar_t',
                         e2sar_sources + grpc_generated_headers,
                         include_directories : inc,
-                        dependencies : [grpc_dep, boost_dep, protobuf_dep] + absl_deps,
+                        dependencies : [grpc_dep, boost_dep, protobuf_dep],
                         install : true)
 
 # build one library from the E2SAR and gRPC library pieces
