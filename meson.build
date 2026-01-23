@@ -1,8 +1,9 @@
-project('E2SAR', 'cpp', 
-        version: files('VERSION.txt'), 
+project('E2SAR', 'cpp',
+        version: files('VERSION.txt'),
         default_options : [
                 'buildtype=debugoptimized',
-                'cpp_std=c++17'])
+                'cpp_std=c++17',
+                'b_asneeded=false'])
 
 compiler = meson.get_compiler('cpp')
 
@@ -78,8 +79,11 @@ endif
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
-# Ensure all shared libraries are linked even if --as-needed is default
+# Ensure all shared libraries are linked - b_asneeded=false in project options
+# disables meson's automatic --as-needed, and this explicit flag is a fallback.
 # This fixes Debian linking issues with Abseil/Protobuf transitive dependencies
+# where template instantiations in gRPC/Protobuf headers need symbols from
+# abseil libraries that would otherwise be dropped by the linker.
 if host_machine.system() == 'linux'
     add_project_link_arguments('-Wl,--no-as-needed', language: 'cpp')
 endif
