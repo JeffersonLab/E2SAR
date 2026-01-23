@@ -86,9 +86,6 @@ add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', lang
 # abseil libraries that would otherwise be dropped by the linker.
 if host_machine.system() == 'linux'
     add_project_link_arguments('-Wl,--no-as-needed', language: 'cpp')
-    # Help with template visibility issues - don't hide inlined functions
-    add_project_arguments('-fno-visibility-inlines-hidden', language: 'cpp')
-    add_project_arguments('-fvisibility=default', language: 'cpp')
 endif
 
 # -Wall
@@ -97,23 +94,22 @@ warning_level=1
 
 # Dependencies that can be installed by package tools such as brew, apt, dnf etc.
 glib_dep = dependency('glib-2.0')
+protobuf_dep = dependency('protobuf')
 thread_dep = dependency('threads')
 # only needed for older compilers
 stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
-# On many platforms, gRPC C++ and protobuf have to be manually installed.
-# Use static linking to avoid symbol visibility issues with shared libraries.
-# The dependency package's shared libs may have been built with -fvisibility=hidden
-# which doesn't export template instantiations needed by generated .pb.cc code.
-grpc_dep = dependency('grpc++', version: '>=1.74.1', static: true)
-protobuf_dep = dependency('protobuf', static: true)
+# On many platforms, gRPC C++ has to be manually installed and found.
+grpc_dep = dependency('grpc++', version: '>=1.74.1')
 
 # Explicitly declare Abseil dependencies to ensure the versions from the
-# dependency package are used, not system packages. Use static linking.
+# dependency package are used, not system packages. This is critical on Debian
+# where system Abseil may have a different ABI version than the one bundled
+# with grpc/protobuf in the dependency package.
 absl_deps = []
 foreach absl_mod : ['absl_base', 'absl_strings', 'absl_cord', 'absl_log',
                     'absl_status', 'absl_cord_internal', 'absl_log_internal_message']
-    dep = dependency(absl_mod, required: false, static: true)
+    dep = dependency(absl_mod, required: false)
     if dep.found()
         absl_deps += dep
     endif
