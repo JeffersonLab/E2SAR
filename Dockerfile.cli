@@ -20,10 +20,12 @@ ENV E2SAR_DEPS_DEB=E2SAR-${DEPS_VER}-main-ubuntu-24.04/e2sar-deps_${DEPS_VER}_am
 ENV E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
 
 # build system
-RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb wget
+RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb wget &&\
+    apt-get clean
 
 # add various network utilities for debugging
-RUN apt-get -yq install netcat-traditional net-tools bc ethtool iproute2 iputils-ping nano
+RUN apt-get -yq install netcat-traditional net-tools bc ethtool iproute2 iputils-ping nano &&\
+    apt-get clean
 
 RUN pip3 install --break-system-packages pybind11 scapy meson
 
