@@ -21,6 +21,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Fixed a bug improperly reporting outgoing interface when Segmenter uses IPv6 (#140)
 - To properly support IPv6 testing e2sar_iperf now takes `--dpv6` flag for either send or receive side to indicate that the dataplane should be using IPv6
 - To address #145, made per-event mallocs optional and off-by-default in e2sar_perf to improve send performance
+- Reserving an LB for indefinite period of time using `lbadm` should work using `-d '00:00:00'`, which also is now the default
 
 ## v0.2.2
 
