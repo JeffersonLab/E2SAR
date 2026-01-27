@@ -20,6 +20,7 @@
 
 #include "e2sarUtil.hpp"
 #include "e2sarError.hpp"
+#include "e2sarHeaders.hpp"
 #include "e2sar.hpp"
 
 namespace po = boost::program_options;
@@ -32,6 +33,7 @@ std::atomic<uint64_t> packetsReceived{0};
 std::atomic<uint64_t> bytesReceived{0};
 std::atomic<uint64_t> packetsSent{0};
 std::atomic<uint64_t> sendErrors{0};
+std::atomic<uint64_t> packetsDiscarded{0};
 
 // Control flags
 std::atomic<bool> keepRunning{true};
@@ -51,6 +53,7 @@ void printStats()
     std::cout << "  Packets received: " << packetsReceived << std::endl;
     std::cout << "  Bytes received:   " << bytesReceived << std::endl;
     std::cout << "  Packets sent:     " << packetsSent << std::endl;
+    std::cout << "  Packets discarded:" << packetsDiscarded << std::endl;
     std::cout << "  Send errors:      " << sendErrors << std::endl;
 }
 
@@ -245,6 +248,49 @@ result<int> createSendSocket(ip::address dest, u_int16_t port, int bufSize)
 }
 
 /**
+ * Validate that a received packet conforms to SyncHdr structure
+ *
+ * @param buffer Pointer to received data
+ * @param len Length of received data
+ * @return true if valid SyncHdr packet, false otherwise
+ */
+bool validateSyncPacket(const uint8_t* buffer, ssize_t len)
+{
+    // Check length matches SyncHdr size
+    if (static_cast<size_t>(len) != sizeof(SyncHdr)) {
+        std::cerr << "WARNING: Invalid packet length " << len
+                  << " (expected " << sizeof(SyncHdr) << ")" << std::endl;
+        return false;
+    }
+
+    // Cast buffer to SyncHdr for field inspection
+    const SyncHdr* syncHdr = reinterpret_cast<const SyncHdr*>(buffer);
+
+    // Check preamble is 'L', 'C'
+    if (syncHdr->preamble[0] != 'L' || syncHdr->preamble[1] != 'C') {
+        std::cerr << "WARNING: Invalid preamble (expected 'LC', got '"
+                  << syncHdr->preamble[0] << syncHdr->preamble[1] << "')" << std::endl;
+        return false;
+    }
+
+    // Check version matches synchdrVersion2
+    if (!syncHdr->check_version()) {
+        std::cerr << "WARNING: Invalid version " << static_cast<int>(syncHdr->version)
+                  << " (expected " << static_cast<int>(synchdrVersion2) << ")" << std::endl;
+        return false;
+    }
+
+    // Check reserved field is 0
+    if (syncHdr->rsvd != 0) {
+        std::cerr << "WARNING: Reserved field is non-zero ("
+                  << static_cast<int>(syncHdr->rsvd) << ")" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Main relay loop - receives packets and forwards them
  *
  * @param rxSock Receive socket file descriptor
@@ -275,6 +321,12 @@ void relayLoop(int rxSock, int txSock)
         // Update receive statistics
         packetsReceived++;
         bytesReceived += recvLen;
+
+        // Validate packet structure before forwarding
+        if (!validateSyncPacket(buffer, recvLen)) {
+            packetsDiscarded++;
+            continue;
+        }
 
         // Forward packet
         ssize_t sentLen = send(txSock, buffer, recvLen, 0);

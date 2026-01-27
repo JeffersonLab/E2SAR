@@ -81,8 +81,10 @@ namespace e2sar
         _cpuri.set_lbName(lb_name);
         req.set_name(lb_name);
 
-        // Timestamp type is weird. 'Nuf said.
-        req.mutable_until()->CopyFrom(until);
+        // this should cover the 0-duration i.e. infinite reservation case
+        if ((until.seconds() != 0) || (until.nanos() != 0))
+            // Timestamp type is weird. 'Nuf said.
+            req.mutable_until()->CopyFrom(until);
 
         // set single or dual stack LB
         req.set_ipfamily(static_cast<loadbalancer::IpFamily>(ip_family));

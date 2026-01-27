@@ -92,12 +92,22 @@ namespace e2sar
         req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
         req.nlh.nlmsg_flags = NLM_F_REQUEST;
         req.nlh.nlmsg_type = RTM_GETROUTE;
-        req.rt.rtm_family = AF_INET;
 
         struct rtattr *rta = (struct rtattr *)(((char *)&req) + NLMSG_ALIGN(req.nlh.nlmsg_len));
         rta->rta_type = RTA_DST;
-        rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
-        inet_pton(AF_INET, addr.to_string().c_str(), RTA_DATA(rta));
+        if (addr.is_v6())
+        {
+            req.rt.rtm_family = AF_INET6;
+            rta->rta_len = RTA_LENGTH(sizeof(struct in6_addr));
+            inet_pton(AF_INET6, addr.to_string().c_str(), RTA_DATA(rta));
+        }
+        else
+        {
+            req.rt.rtm_family = AF_INET;
+            rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
+            inet_pton(AF_INET, addr.to_string().c_str(), RTA_DATA(rta));
+        }
+
         req.nlh.nlmsg_len = NLMSG_ALIGN(req.nlh.nlmsg_len) + rta->rta_len;
 
         sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
@@ -118,7 +128,10 @@ namespace e2sar
                 break;
 
             if (nlh->nlmsg_type == NLMSG_ERROR) 
-                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+            {
+                int err = *reinterpret_cast<int*>(NLMSG_DATA(nlh));
+                return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(-err)};
+            }
 
             struct rtmsg *rtm = reinterpret_cast<struct rtmsg*>(NLMSG_DATA(nlh));
             struct rtattr *rta = RTM_RTA(rtm);

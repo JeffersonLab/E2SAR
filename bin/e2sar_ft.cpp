@@ -31,15 +31,15 @@ std::vector<std::string> senders;
 // app-level stats
 std::atomic<u_int64_t> receivedWithError{0};
 
-// avoid handler executing multiple times
-std::atomic<bool> handlerTriggered{false};
-
-void ctrlCHandler(int sig) 
+void ctrlCHandler(int sig)
 {
-    if (handlerTriggered.exchange(true))
-        return;
     std::cout << "Stopping threads" << std::endl;
-    threadsRunning = false;
+    threadsRunning = false; 
+}
+
+void shutDown() 
+{
+    ctrlCHandler(0);
     boost::chrono::milliseconds duration(1000);
     boost::this_thread::sleep_for(duration);
     if (segPtr != nullptr) {
@@ -721,10 +721,10 @@ int main(int argc, char **argv)
                 }
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create segmenter: " << static_cast<std::string>(e) << std::endl;
-                ctrlCHandler(0);
+                shutDown();
                 exit(-1);
             }
-            ctrlCHandler(0);
+            shutDown();
         } else if (vm.count("recv")) {
             Reassembler::ReassemblerFlags rflags;
 
@@ -795,7 +795,7 @@ int main(int argc, char **argv)
 
                 if (res.has_error()) {
                     std::cerr << "Reassembler encountered an error: " << res.error().message() << std::endl;
-                    ctrlCHandler(0);
+                    shutDown();
                     exit(-1);
                 }
                 // start dequeue read threads
@@ -808,10 +808,10 @@ int main(int argc, char **argv)
                 // join the last one
                 lastThread.join();
                 // unregister/stop threads as needed
-                ctrlCHandler(0);
+                shutDown();
             } catch (E2SARException &e) {
                 std::cerr << "Unable to create reassembler: " << static_cast<std::string>(e) << std::endl;
-                ctrlCHandler(0);
+                shutDown();
                 exit(-1);
             }
         }

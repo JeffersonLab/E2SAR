@@ -449,7 +449,7 @@ result<int> timeseries(LBManager &lbman, const std::string& lbpath, const std::s
     }
 
     // write out two columns per series: /lb/path(unit),ts,
-    for(int col=0; col<rsres.td.size(); col++)
+    for(size_t col=0; col<rsres.td.size(); col++)
     {
         csvFile << rsres.td[col].path;
         if (not rsres.td[col].unit.empty())
@@ -461,12 +461,12 @@ result<int> timeseries(LBManager &lbman, const std::string& lbpath, const std::s
     csvFile << std::endl;
     csvFile.flush();
 
-    int tdIdx{0};
+    size_t tdIdx{0};
     while(true)
     {
         // timeseries can be of different lengths
         bool finished{true};
-        for(int col=0; col<rsres.td.size(); col++)
+        for(size_t col=0; col<rsres.td.size(); col++)
         {
             std::visit(Overload {
                 [&csvFile, &finished, tdIdx](const std::vector<FloatSample>& samples) {
@@ -509,17 +509,17 @@ parsePermissions(const std::vector<std::string>& permStrings)
 
     // Maps for string to enum conversion
     std::map<std::string, EjfatURI::TokenType> resourceTypeMap = {
-        {"ALL", EjfatURI::TokenType::all},
-        {"LOAD_BALANCER", EjfatURI::TokenType::load_balancer},
-        {"RESERVATION", EjfatURI::TokenType::reservation},
-        {"SESSION", EjfatURI::TokenType::session}
+        {EjfatURI::toString(EjfatURI::TokenType::all), EjfatURI::TokenType::all},
+        {EjfatURI::toString(EjfatURI::TokenType::load_balancer), EjfatURI::TokenType::load_balancer},
+        {EjfatURI::toString(EjfatURI::TokenType::reservation), EjfatURI::TokenType::reservation},
+        {EjfatURI::toString(EjfatURI::TokenType::session), EjfatURI::TokenType::session}
     };
 
     std::map<std::string, EjfatURI::TokenPermission> permissionTypeMap = {
-        {"READ_ONLY", EjfatURI::TokenPermission::_read_only_},
-        {"REGISTER", EjfatURI::TokenPermission::_register_},
-        {"RESERVE", EjfatURI::TokenPermission::_reserve_},
-        {"UPDATE", EjfatURI::TokenPermission::_update_}
+        {EjfatURI::toString(EjfatURI::TokenPermission::_read_only_), EjfatURI::TokenPermission::_read_only_},
+        {EjfatURI::toString(EjfatURI::TokenPermission::_register_), EjfatURI::TokenPermission::_register_},
+        {EjfatURI::toString(EjfatURI::TokenPermission::_reserve_), EjfatURI::TokenPermission::_reserve_},
+        {EjfatURI::toString(EjfatURI::TokenPermission::_update_), EjfatURI::TokenPermission::_update_}
     };
 
     for (const auto& perm_str : permStrings)
@@ -670,9 +670,9 @@ result<int> listTokenPermissions(LBManager &lbman,
 
             for (const auto& perm : details.permissions)
             {
-                std::cout << "    [ resourceType=" << static_cast<u_int16_t>(perm.resourceType)
-                          << ", resourceId=" << (perm.resourceId.empty() ? "(none)"s : perm.resourceId)
-                          << ", permission=" << static_cast<u_int16_t>(perm.permission) << " ]" << std::endl;
+                std::cout << EjfatURI::toString(perm.resourceType) << ":"
+                          << (perm.resourceId.empty() ? "":perm.resourceId) << ":"
+                          << EjfatURI::toString(perm.permission) << std::endl;
             }
         }
         else
@@ -792,7 +792,7 @@ int main(int argc, char **argv)
     opts("lbname,l", po::value<std::string>(), "specify name of the load balancer");
     opts("lbid,i", po::value<std::string>(), "override/provide id of the loadbalancer");
     opts("address,a", po::value<std::vector<std::string>>()->multitoken(), "node IPv4/IPv6 address, can be used multiple times for 'reserve' call");
-    opts("duration,d", po::value<std::string>(&duration)->default_value("02:00:00"), "specify duration as '[hh[:mm[:ss]]]'");
+    opts("duration,d", po::value<std::string>(&duration)->default_value("00:00:00"), "specify duration as '[hh[:mm[:ss]]]'");
     opts("uri,u", po::value<std::string>(), "specify EJFAT_URI on the command-line instead of the environment variable");
     opts("name,n", po::value<std::string>(), "specify node name for registration");
     opts("port,p", po::value<u_int16_t>(), "node starting listening port number");
@@ -831,21 +831,21 @@ int main(int argc, char **argv)
     opts("tokenid", po::value<std::string>(), "token ID (numeric) or token string to target");
 
     // commands
-    opts("reserve", "reserve a load balancer (-l, -a, -d required). Uses admin token.");
-    opts("free", "free a load balancer. Uses instance or admin token.");
-    opts("version", "report the version of the LB. Uses admin or instance token.");
-    opts("register", "register a worker (-n, -p, -w, -c required; either use -a to specify receive address, or auto-detection will register incoming interface address), note you must use 'state' within 10 seconds or worker is deregistered. Uses instance or admin token.");
-    opts("deregister", "deregister worker. Uses instance or session token.");
-    opts("status", "get and print LB status. Uses admin or instance token.");
-    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses session token.");
-    opts("overview","return metadata and status information on all registered load balancers. Uses admin token.");
-    opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
-    opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses instance token.");
-    opts("timeseries", "return requested timeseries based on a path (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled')");
-    opts("createtoken", "create a new delegated token (--tokenname, --permission required). Uses admin token.");
-    opts("listtokenpermissions", "list all permissions for a token (--tokenid required). Uses admin token.");
-    opts("listchildtokens", "list all child tokens of a parent (--tokenid required). Uses admin token.");
-    opts("revoketoken", "revoke a token and all its children (--tokenid required). Uses admin token.");
+    opts("reserve", "reserve a load balancer (-l, -a, -d required). Requires LOAD_BALANCER or ALL resource token.");
+    opts("free", "free a load balancer. Requires RESERVATION, LOAD_BALANCER or ALL token.");
+    opts("version", "report the version of the LB. Uses any token.");
+    opts("register", "register a worker (-n, -p, -w, -c required; either use -a to specify receive address, or auto-detection will register incoming interface address), note you must use 'state' within 10 seconds or worker is deregistered. Requires ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("deregister", "deregister worker. Requires RESERVATION or SESSION token.");
+    opts("status", "get and print LB status. Requires ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("state", "send worker state update (must be done within 10 sec of registration) (-q, -c, -r required). Uses SESSION token.");
+    opts("overview","return metadata and status information on all registered load balancers. Uses ALL or LOAD_BALANCER token.");
+    opts("addsenders","add 'safe' sender IP addresses to CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("removesenders","remove 'safe' sender IP addresses from CP (use one or more -a to specify addresses, if none are specified auto-detection is used to determine outgoing interface address). Uses ALL, LOAD_BALANCER or RESERVATION token.");
+    opts("timeseries", "return requested timeseries based on a path (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled'). Saved into a specified CSV file. Required token is based on the path.");
+    opts("createtoken", "create a new delegated token (--tokenname, --permission required). Requires token of the same resource type or higher.");
+    opts("listtokenpermissions", "list all permissions for a token (--tokenid required). Requires parent token or one with higher resource type.");
+    opts("listchildtokens", "list all child tokens of a parent (--tokenid required). Requires parent token or one with higher resource type.");
+    opts("revoketoken", "revoke a token and all its children (--tokenid required). Requires parent token or one with higher resource type.");
 
     std::vector<std::string> commands{"reserve", "free", "version", "register",
         "deregister", "status", "state", "overview", "addsenders", "removesenders",
@@ -876,6 +876,7 @@ int main(int argc, char **argv)
         option_dependency(vm, "state", "ctrl");   
         option_dependency(vm, "state", "ready");
         option_dependency(vm, "timeseries", "lbpath");
+        option_dependency(vm, "timeseries", "csv");
         option_dependency(vm, "createtoken", "tokenname");
         option_dependency(vm, "createtoken", "permission");
         option_dependency(vm, "listtokenpermissions", "tokenid");

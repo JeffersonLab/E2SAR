@@ -34,15 +34,16 @@ using namespace boost::log;
 #define BOOST_LOG_INFO() BOOST_LOG_SEV(lg, trivial::info)
 #define BOOST_LOG_WARN() BOOST_LOG_SEV(lg, trivial::warning)
 #define BOOST_LOG_ERR() BOOST_LOG_SEV(lg, trivial::error)
-typedef sinks::asynchronous_sink<sinks::text_ostream_backend> text_sink;
-static boost::shared_ptr<text_sink> sink;
-static sources::severity_logger_mt<trivial::severity_level> lg;
 
 /***
  * Supporting classes for E2SAR
  */
 namespace e2sar
 {
+    typedef sinks::asynchronous_sink<sinks::text_ostream_backend> text_sink;
+    extern boost::shared_ptr<text_sink> sink;
+    extern sources::severity_logger_mt<trivial::severity_level> lg;
+
     const u_int16_t DATAPLANE_PORT = 19522;
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). 
@@ -62,6 +63,16 @@ namespace e2sar
         {
             return static_cast<size_t>(tt);
         }
+        inline static const std::string toString(TokenType tt)
+        {
+            switch(tt) {
+                case TokenType::all: return "ALL"s;
+                case TokenType::admin: return "LOAD_BALANCER"s;
+                case TokenType::instance: return "RESERVATION"s;
+                case TokenType::session: return "SESSION"s;
+                default: return "UNKNOWN"s;
+            }
+        }
         static const size_t tokenTypeCardinality = static_cast<size_t>(TokenType::END);
 
 
@@ -69,6 +80,16 @@ namespace e2sar
             // 'register' is a keyword in C++, so adding '_' to names
             _read_only_, _register_, _reserve_, _update_, END
         };
+        inline static const std::string toString(TokenPermission tt)
+        {
+            switch(tt) {
+                case TokenPermission::_read_only_: return "READ"s;
+                case TokenPermission::_register_: return "REGISTER"s;
+                case TokenPermission::_reserve_: return "RESERVE"s;
+                case TokenPermission::_update_: return "UPDATE"s;
+                default: return "UNKNOWN"s;
+            }
+        }
         static const size_t tokenPermissionCardinality = static_cast<size_t>(TokenPermission::END);
 
     private:

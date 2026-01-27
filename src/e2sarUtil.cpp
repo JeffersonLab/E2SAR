@@ -439,6 +439,11 @@ namespace e2sar
 
     void defineClogLogger()
     {
+        if (!sink) {
+            // This should never happen with extern linkage, but add defensive check
+            throw E2SARException("Logger sink not initialized");
+        }
+
         boost::shared_ptr<std::ostream> stream{&std::clog,
             boost::null_deleter{}};
         sink->locked_backend()->add_stream(stream);
