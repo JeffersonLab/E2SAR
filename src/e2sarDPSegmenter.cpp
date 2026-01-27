@@ -437,8 +437,8 @@ namespace e2sar
                                 item->callback(item->cbArg);
                         }
                         
-                        // free item here
-                        free(item);
+                        // delete item here to properly call destructor
+                        delete item;
                 });
 
                 // busy wait if needed for inter-event period 
@@ -923,8 +923,8 @@ namespace e2sar
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
 
-        // have to zero out or else destructor is called in the assignment of cbArg below
-        EventQueueItem *item = reinterpret_cast<EventQueueItem*>(calloc(1, sizeof(EventQueueItem)));
+        // use new to properly construct boost::any member
+        EventQueueItem *item = new EventQueueItem();
         item->bytes = bytes;
         item->event = event;
         item->entropy = entropy;
