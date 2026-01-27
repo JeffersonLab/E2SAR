@@ -336,7 +336,7 @@ void recvStatsThread(Reassembler *r)
         BOOST_MLL_LOG(stat) << "\tData Errors: " << stats.dataErrCnt << std::endl;
         if (stats.dataErrCnt > 0)
             BOOST_MLL_LOG(stat) << "\tLast Data Error: " << strerror(stats.lastErrno) << std::endl;
-        std::cout << "\tgRPC Errors: " << stats.grpcErrCnt << std::endl;
+        BOOST_MLL_LOG(stat) << "\tgRPC Errors: " << stats.grpcErrCnt << std::endl;
         if (stats.lastE2SARError != E2SARErrorc::NoError)
             BOOST_MLL_LOG(stat) << "\tLast E2SARError code: " << make_error_code(stats.lastE2SARError).message() << std::endl;
 
