@@ -55,7 +55,8 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
-        useCP{rflags.useCP}
+        useCP{rflags.useCP},
+        reportStats{rflags.reportStats}
     {
         sanityChecks();
         auto afres = Affinity::setProcess(cpuCoreList);
@@ -88,7 +89,8 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
-        useCP{rflags.useCP}
+        useCP{rflags.useCP},
+        reportStats{rflags.reportStats}
     {
         sanityChecks();
         // note if the user chooses to override portRange in rflags, 
@@ -118,7 +120,8 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
-        useCP{rflags.useCP}
+        useCP{rflags.useCP},
+        reportStats{rflags.reportStats}
     {
         auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
         if (dpRes.has_error())
@@ -158,7 +161,8 @@ namespace e2sar
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
-        useCP{rflags.useCP}
+        useCP{rflags.useCP},
+        reportStats{rflags.reportStats}
     {
         auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
         if (dpRes.has_error())
@@ -314,6 +318,8 @@ namespace e2sar
                 }
                 // count fragment received by socket
                 reas.recvStats.fragmentsPerFd[fd]++;
+                reas.recvStats.totalPacketsReceived++;
+                reas.recvStats.totalBytesReceived += nbytes;
 
                 // start a new event if offset 0 (check for event number collisions)
                 // or attach to existing event
@@ -322,13 +328,21 @@ namespace e2sar
                 // subtracted
                 if (reas.withLBHeader)
                 {
-                    rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdr));
-                    nbytes -= sizeof(LBHdr) + sizeof(REHdr);
+                    rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdrU));
+                    nbytes -= sizeof(LBHdrU) + sizeof(REHdr);
                 }
                 else
                 {
                     rehdr = reinterpret_cast<REHdr*>(recvBuffer);
                     nbytes -= sizeof(REHdr);
+                }
+
+                if (not rehdr->validate())
+                {
+                    // discard invalid frames, increment counter
+                    reas.recvStats.badHeaderDiscards++;
+                    free(recvBuffer);
+                    continue;
                 }
 
                 std::shared_ptr<EventQueueItem> item;
@@ -550,14 +564,24 @@ namespace e2sar
             reas.pidSampleBuffer.push_back(newSample);
 
             // send update to CP
-            auto res = reas.lbman.sendState(fillPercent, PIDTuple.get<0>(), true);
+            // gather the stats
+            WorkerStats stats;
+            if (reas.reportStats)
+            {
+                stats.total_events_reassembly_err = reas.recvStats.reassemblyLoss;
+                stats.total_events_reassembled = reas.recvStats.eventSuccess;
+                stats.total_event_enqueue_err = reas.recvStats.enqueueLoss;
+                stats.total_bytes_recv = reas.recvStats.totalBytesReceived;
+                stats.total_packets_recv = reas.recvStats.totalPacketsReceived;
+            }
+
+            auto res = reas.lbman.sendState(fillPercent, PIDTuple.get<0>(), true, stats);
             if (res.has_error())
             {
                 // update error counts
                 reas.recvStats.grpcErrCnt++;
                 reas.recvStats.lastE2SARError = res.error().code();
             }
-
 
             // sleep approximately so we wake up every ~100ms
             auto until = nowT + boost::chrono::milliseconds(period_ms);
@@ -645,8 +669,11 @@ namespace e2sar
         boost::property_tree::ptree paramTree;
         Reassembler::ReassemblerFlags rFlags;
 
+        // Expand tilde in file path
+        std::string expandedPath = expandTilde(iniFile);
+
         try {
-            boost::property_tree::ini_parser::read_ini(iniFile, paramTree);
+            boost::property_tree::ini_parser::read_ini(expandedPath, paramTree);
         } catch(boost::property_tree::ini_parser_error &ie) {
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, 
                 "Unable to parse the reassembler flags configuration file "s + iniFile};
@@ -658,6 +685,7 @@ namespace e2sar
         // control plane
         rFlags.useHostAddress = paramTree.get<bool>("control-plane.useHostAddress", rFlags.useHostAddress);
         rFlags.validateCert = paramTree.get<bool>("control-plane.validateCert", rFlags.validateCert);
+        rFlags.reportStats = paramTree.get<bool>("control-plane.reportStats", rFlags.reportStats);
 
         // data plane
         rFlags.portRange = paramTree.get<int>("data-plane.portRange", rFlags.portRange);

@@ -75,26 +75,17 @@ void init_e2sarCP(py::module_ &m) {
     });
 
     /**
-     * Bindings for struct "LBWorkerStatus"
+     * Bindings for optional worker stats
      */
-    py::class_<LBWorkerStatus>(e2sarCP, "LBWorkerStatus")
-        .def(py::init<const std::string&, float, float, int, const google::protobuf::Timestamp&>(),
-            py::arg("name"),
-            py::arg("fill_percent"),
-            py::arg("control_signal"),
-            py::arg("slots_assigned"),
-            py::arg("last_updated")
-        )
-        // For params return from the LB, bind them as _readonly instead of _readwrite 
-        .def_readonly("name", &LBWorkerStatus::name)
-        .def_readonly("fill_percent", &LBWorkerStatus::fillPercent)
-        .def_readonly("control_signal", &LBWorkerStatus::controlSignal)
-        .def_readonly("slots_assigned", &LBWorkerStatus::slotsAssigned)
-        .def_property_readonly("last_updated",
-            [](const LBWorkerStatus &self) {
-                return google::protobuf::util::TimeUtil::ToString(self.lastUpdated); // Access the member directly
-            }
-        );
+    py::class_<WorkerStats>(e2sarCP, "WorkerStats")
+        .def(py::init<>())
+        .def_readwrite("total_events_recv", &WorkerStats::total_events_recv)
+        .def_readwrite("total_events_reassembled", &WorkerStats::total_events_reassembled)
+        .def_readwrite("total_events_reassembly_err", &WorkerStats::total_events_reassembly_err)
+        .def_readwrite("total_events_dequeued", &WorkerStats::total_events_dequeued)
+        .def_readwrite("total_event_enqueue_err", &WorkerStats::total_event_enqueue_err)
+        .def_readwrite("total_bytes_recv", &WorkerStats::total_bytes_recv)
+        .def_readwrite("total_packets_recv", &WorkerStats::total_packets_recv);
 
     /**
      * Bindings for struct "LBStatus"
@@ -139,11 +130,111 @@ void init_e2sarCP(py::module_ &m) {
         
         .def_readonly("name", &OverviewEntry::name)
         .def_readonly("lb_id", &OverviewEntry::lbid)
-        .def_readonly("syncAddressAndPort", &OverviewEntry::syncAddressAndPort)
+        .def_readonly("syncIPv4AndPort", &OverviewEntry::syncIPv4AndPort)
+        .def_readonly("syncIPv6AndPort", &OverviewEntry::syncIPv6AndPort)        
         .def_readonly("data_ip_v4", &OverviewEntry::dataIPv4)
         .def_readonly("data_ip_v6", &OverviewEntry::dataIPv6)
         .def_readonly("fpga_lb_id", &OverviewEntry::fpgaLBId)
+        .def_readonly("data_min_port", &OverviewEntry::dataMinPort)
+        .def_readonly("data_max_port", &OverviewEntry::dataMaxPort)
         .def_readonly("lb_status", &OverviewEntry::status);
+
+    /**
+     * Bindings for timeseries structs
+     */
+    py::class_<FloatSample>(e2sarCP, "FloatSample")
+        .def(py::init<>(),
+            "Default constructor")
+        .def(py::init<int64_t, float>(),
+            py::arg("timestamp_ms"), py::arg("value"),
+            "Create a float sample with timestamp and value")
+        .def_readwrite("timestamp_ms", &FloatSample::timestamp_ms,
+            "Timestamp in milliseconds since epoch")
+        .def_readwrite("value", &FloatSample::value,
+            "Float sample value");
+
+    py::class_<IntegerSample>(e2sarCP, "IntegerSample")
+        .def(py::init<>(),
+            "Default constructor")
+        .def(py::init<int64_t, int64_t>(),
+            py::arg("timestamp_ms"), py::arg("value"),
+            "Create an integer sample with timestamp and value")
+        .def_readwrite("timestamp_ms", &IntegerSample::timestamp_ms,
+            "Timestamp in milliseconds since epoch")
+        .def_readwrite("value", &IntegerSample::value,
+            "Integer sample value");
+
+    py::class_<TimeseriesData>(e2sarCP, "TimeseriesData")
+        .def_readonly("path", &TimeseriesData::path,
+            "Timeseries path identifier")
+        .def_readonly("unit", &TimeseriesData::unit,
+            "Unit of measurement for samples")
+
+        // Helper method to check which type is held
+        .def("is_float", [](const TimeseriesData &self) {
+            return std::holds_alternative<std::vector<FloatSample>>(self.timeseries);
+        }, "Check if timeseries contains float samples")
+
+        .def("is_integer", [](const TimeseriesData &self) {
+            return std::holds_alternative<std::vector<IntegerSample>>(self.timeseries);
+        }, "Check if timeseries contains integer samples")
+
+        // Methods to get the samples
+        .def("get_float_samples", [](const TimeseriesData &self) -> py::list {
+            if (!std::holds_alternative<std::vector<FloatSample>>(self.timeseries)) {
+                throw std::runtime_error("Timeseries does not contain float samples");
+            }
+            py::list result;
+            for (const auto& sample : std::get<std::vector<FloatSample>>(self.timeseries)) {
+                result.append(sample);
+            }
+            return result;
+        }, "Get list of FloatSample objects (raises error if not float type)")
+
+        .def("get_integer_samples", [](const TimeseriesData &self) -> py::list {
+            if (!std::holds_alternative<std::vector<IntegerSample>>(self.timeseries)) {
+                throw std::runtime_error("Timeseries does not contain integer samples");
+            }
+            py::list result;
+            for (const auto& sample : std::get<std::vector<IntegerSample>>(self.timeseries)) {
+                result.append(sample);
+            }
+            return result;
+        }, "Get list of IntegerSample objects (raises error if not integer type)");
+
+    py::class_<TimeseriesResult>(e2sarCP, "TimeseriesResult")
+        .def_readonly("since_ms", &TimeseriesResult::since_ms,
+            "Timestamp in milliseconds since epoch for start of timeseries")
+        .def_readonly("td", &TimeseriesResult::td,
+            "List of TimeseriesData objects");
+
+    /**
+     * Bindings for token management structs
+     */
+    py::class_<e2sar::TokenPermission>(e2sarCP, "TokenPermission")
+        .def(py::init<>(),
+            "Default constructor")
+        .def(py::init<EjfatURI::TokenType, const std::string&, EjfatURI::TokenPermission>(),
+            py::arg("resource_type"), py::arg("resource_id"), py::arg("permission"),
+            "Create token permission with resource type, ID, and permission level")
+        .def_readwrite("resourceType", &e2sar::TokenPermission::resourceType,
+            "Type of resource (admin, instance, session, all)")
+        .def_readwrite("resourceId", &e2sar::TokenPermission::resourceId,
+            "Resource identifier (can be empty string for wildcards)")
+        .def_readwrite("permission", &e2sar::TokenPermission::permission,
+            "Permission level (read_only, register, reserve, update)");
+
+    py::class_<e2sar::TokenDetails>(e2sarCP, "TokenDetails")
+        .def(py::init<>(),
+            "Default constructor")
+        .def_readonly("name", &e2sar::TokenDetails::name,
+            "Human-readable token name")
+        .def_readonly("permissions", &e2sar::TokenDetails::permissions,
+            "List of TokenPermission objects")
+        .def_readonly("created_at", &e2sar::TokenDetails::created_at,
+            "Creation timestamp as string")
+        .def_readonly("id", &e2sar::TokenDetails::id,
+            "Numeric token ID");
 
     /**
      * Bind the `e2sar::LBManager` class as "LBManager" in the submodule "ControlPlane".
@@ -184,9 +275,10 @@ void init_e2sarCP(py::module_ &m) {
         static_cast<result<u_int32_t> (LBManager::*)(
             const std::string &,
             const double &,
-            const std::vector<std::string> &
+            const std::vector<std::string> &,
+            int ip_family
             )>(&LBManager::reserveLB),
-        py::arg("lb_id"), py::arg("seconds"), py::arg("senders")
+        py::arg("lb_id"), py::arg("seconds"), py::arg("senders"), py::arg("ip_family")
     );
 
     /// NOTE: Bindings for overloaded methods.
@@ -241,9 +333,10 @@ void init_e2sarCP(py::module_ &m) {
 
     lb_manager.def(
         "send_state",
-        static_cast<result<int> (LBManager::*)(float, float, bool)>(&LBManager::sendState),
+        static_cast<result<int> (LBManager::*)(float, float, bool, const WorkerStats&)>(&LBManager::sendState),
         "Send worker state update using session ID and session token from register call.",
-        py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready")
+        py::arg("fill_percent"), py::arg("control_signal"), py::arg("is_ready"),
+        py::arg("stats")
     );
     /// TODO: type cast between C++ google::protobuf::Timestamp between Python datetime package
     // lb_manager.def(
@@ -299,6 +392,114 @@ void init_e2sarCP(py::module_ &m) {
 
     // Return connect string.
     lb_manager.def("get_addr_string", &LBManager::get_AddrString);
+
+    /**
+     * Token management methods
+     */
+    lb_manager.def(
+        "create_token",
+        &LBManager::createToken,
+        py::arg("name"), py::arg("permissions"),
+        "Create a new delegated token with specific permissions.\n\n"
+        "Args:\n"
+        "    name (str): Human-readable token name\n"
+        "    permissions (List[TokenPermission]): List of token permissions\n\n"
+        "Returns:\n"
+        "    result<str>: The created token string on success"
+    );
+
+    lb_manager.def(
+        "list_token_permissions_by_id",
+        [](LBManager& self, uint32_t id) {
+            return self.listTokenPermissions(id);
+        },
+        py::arg("token_id"),
+        "List all permissions for a token by numeric ID.\n\n"
+        "Args:\n"
+        "    token_id (int): Numeric token ID\n\n"
+        "Returns:\n"
+        "    result<TokenDetails>: Token details with permissions"
+    );
+
+    lb_manager.def(
+        "list_token_permissions_by_string",
+        [](LBManager& self, const std::string& token) {
+            return self.listTokenPermissions(token);
+        },
+        py::arg("token"),
+        "List all permissions for a token by token string.\n\n"
+        "Args:\n"
+        "    token (str): Token string\n\n"
+        "Returns:\n"
+        "    result<TokenDetails>: Token details with permissions"
+    );
+
+    lb_manager.def(
+        "list_child_tokens_by_id",
+        [](LBManager& self, uint32_t id) {
+            return self.listChildTokens(id);
+        },
+        py::arg("parent_token_id"),
+        "List all child tokens created by a parent token (by ID).\n\n"
+        "Args:\n"
+        "    parent_token_id (int): Numeric parent token ID\n\n"
+        "Returns:\n"
+        "    result<List[TokenDetails]>: List of child token details"
+    );
+
+    lb_manager.def(
+        "list_child_tokens_by_string",
+        [](LBManager& self, const std::string& token) {
+            return self.listChildTokens(token);
+        },
+        py::arg("parent_token"),
+        "List all child tokens created by a parent token (by string).\n\n"
+        "Args:\n"
+        "    parent_token (str): Parent token string\n\n"
+        "Returns:\n"
+        "    result<List[TokenDetails]>: List of child token details"
+    );
+
+    lb_manager.def(
+        "revoke_token_by_id",
+        [](LBManager& self, uint32_t id) {
+            return self.revokeToken(id);
+        },
+        py::arg("token_id"),
+        "Revoke a token and all its children by numeric ID.\n\n"
+        "Args:\n"
+        "    token_id (int): Numeric token ID\n\n"
+        "Returns:\n"
+        "    result<int>: 0 on success"
+    );
+
+    lb_manager.def(
+        "revoke_token_by_string",
+        [](LBManager& self, const std::string& token) {
+            return self.revokeToken(token);
+        },
+        py::arg("token"),
+        "Revoke a token and all its children by token string.\n\n"
+        "Args:\n"
+        "    token (str): Token string\n\n"
+        "Returns:\n"
+        "    result<int>: 0 on success"
+    );
+
+    /**
+     * Timeseries method
+     */
+    lb_manager.def(
+        "timeseries",
+        &LBManager::timeseries,
+        py::arg("path"), py::arg("since"),
+        "Retrieve timeseries data for a specific metric path.\n\n"
+        "Args:\n"
+        "    path (str): Timeseries path selector (e.g., '/lb/1/*', '/lb/1/session/2/totalEventsReassembled')\n"
+        "    since (Timestamp): Timestamp to retrieve data from\n\n"
+        "Returns:\n"
+        "    result<TimeseriesResult>: TimeseriesResult containing samples"
+    );
 
     /// NOTE: donot need to bind LBManager::makeSslOptionsFromFiles
 }
