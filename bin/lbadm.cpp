@@ -334,7 +334,6 @@ result<int> removeSenders(LBManager &lbman, const std::vector<std::string>& send
             return 0;
         }
     };
-    auto res = lbman.removeSenders(senders);   
 
     if (senders.size() > 0)
     {
