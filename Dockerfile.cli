@@ -101,6 +101,7 @@ RUN apt-get -yq update && \
         ethtool \
         iproute2 \
         iputils-ping \
+	gdb \
         nano && \
     wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && \
     dpkg -i ./boost_grpc.deb && \

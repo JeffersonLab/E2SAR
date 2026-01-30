@@ -397,6 +397,7 @@ int main(int argc, char **argv)
     opts("threads", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
     opts("sockets", po::value<size_t>(&numSockets)->default_value(4), "number of send sockets (defaults to 4) [r]");
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0, negative value means no limit)");
+    opts("rateGbps", po::value<float>(&rateGbps), "send rate in Gbps (alias for --rate)");
     opts("period,p", po::value<u_int16_t>(&reportThreadSleepMs)->default_value(1000), "receive side reporting thread sleep period in ms (defaults to 1000) [r]");
     opts("bufsize,b", po::value<int>(&sockBufSize)->default_value(1024*1024*3), "send or receive socket buffer size (default to 3MB)");
     opts("duration,d", po::value<int>(&durationSec)->default_value(0), "duration for receiver to run for (defaults to 0 - until Ctrl-C is pressed)[s]");
@@ -451,6 +452,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "recv", "multiport");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
+        conflicting_options(vm, "rate", "rateGbps");
         // these are optional
         conflicting_options(vm, "send", "duration");
         conflicting_options(vm, "send", "port");
