@@ -2,6 +2,28 @@
 
 API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
 
+## v0.3.0
+
+- Dependencies change - Boost 1.89.0 and gRPC 1.74.1 
+- Fixed IPv6 header calculation bug that affected the MTU 
+- Changed the order of evaluation of INI file vs. command line - command line overrides anything specified in the INI file
+- Added tilde expansion to INI file path specifier
+- Added support for Boost::log
+- Added a new SegmenterFlags flag - data-plane.ticksAsREEventNum - when set the RE header event number is overwritten with the corresponding LB event number - primarily to support debugging and defaults to false
+- Added new reported stats - totalPackets and totalBytes that are received from getStats() call on Reassembler (can be queried any time). These are in addition to per-FD stats gathered (which can only be queried at the end). 
+- Added full support for latest gRPC. See issue #132 for details. 
+  - Includes support for retrieving timeseries stats data
+  - Includes support for new style token management
+- Fixed a bug where send queue in Segmenter was in fact infinite, potentially blowing up memory, now set to fixed size 2048 entries
+- Added a trivial UDP relay program (bin/e2sar_udp_relay) to help relaying SYNC packets. Listens on a given port and retransmits to a new host/port. No source header rewriting or any other magic, the SYNC packets look like they came from the relay host. Supports IPv4 and IPv6 (and can relay between the two stacks).
+- Added RE header version validation (see #146) and a badHeaderDiscards stats field in reassembler receive stats to report the number of packet discards due to version check fail
+- Added support for LB Header Version 3. Version can be selected via segmenter.ini file or in e2sar_perf via command line (--lbhdrversion). Defaults to 2.
+- Fixed a bug improperly reporting outgoing interface when Segmenter uses IPv6 (#140)
+- To properly support IPv6 testing e2sar_iperf now takes `--dpv6` flag for either send or receive side to indicate that the dataplane should be using IPv6
+- To address #145, made per-event mallocs optional and off-by-default in e2sar_perf to improve send performance
+- Reserving an LB for indefinite period of time using `lbadm` should work using `-d '00:00:00'`, which also is now the default
+- Added '--rateGbps' option to e2sar_perf which is an alias to the previous '--rate', however since the SegmenterFlags field is rateGbps, it makes it consistent
+
 ## v0.2.2
 
 - Added a new tool specifically for sending file: `e2sar_ft`. It has many common invocation parameters with `e2sar_perf`. It can scan a list of provided directories filtering files by optionally provided extension. On receive side it names the files according to the provided prefix and extension using event id and data id to name individual files. Both send and receive use mmap for efficiency. Multiple paths/files can be specified either with `--path` option or simply as a space-separated list at the end of the command. Globbing is also supported.

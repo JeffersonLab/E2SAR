@@ -9,7 +9,7 @@
 
 namespace e2sar
 {
-    static const std::string E2SARVersion;
+    extern const std::string E2SARVersion;
 
     const std::string& get_Version();
 }

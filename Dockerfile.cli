@@ -2,67 +2,119 @@
 
 # Control plane CLI tools for EJFAT
 #
-# This is a two-stage build, with compile and deploy stages
+# This is a multi-stage build optimized for minimal image size
+
+# Global build arguments (available to all stages)
+ARG DEPS_VER=0.3.0a1
+ARG E2SAR_DEPS_DEB=E2SAR-${DEPS_VER}-main-ubuntu-24.04/e2sar-deps_${DEPS_VER}_amd64.deb
+ARG E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
+ARG E2SARINSTALL=/e2sar-install
 
 #
-# Stage 'base': image with dependencies
+# Stage 'build-base': image with build dependencies only
 #
-FROM ubuntu:22.04 AS base
+FROM ubuntu:24.04 AS build-base
 
-ENV DISTRO=ubuntu22
+# Import global ARGs into this stage
+ARG E2SAR_DEPS_DEB_URL
+ARG E2SARINSTALL
+
+ENV DISTRO=ubuntu24
 ENV HOME=/home/ubuntu
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 ENV PATH=/usr/local/bin:$PATH
-ENV E2SARINSTALL=/e2sar-install
-ENV DEPS_VER=0.2.1
-ENV E2SAR_DEPS_DEB=E2SAR-${DEPS_VER}-main-ubuntu-22.04/e2sar-deps_${DEPS_VER}_amd64.deb
-ENV E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
+ENV E2SARINSTALL=${E2SARINSTALL}
 
-# build system
-RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb wget
-
-# add various network utilities for debugging
-RUN apt-get -yq install netcat net-tools bc ethtool iproute2 iputils-ping nano
-
-RUN pip3 install pybind11 scapy meson
-
-RUN wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && dpkg -i ./boost_grpc.deb
+# Install all build dependencies in a single layer
+RUN apt-get -yq update && \
+    apt-get -yq install --no-install-recommends \
+        python3 \
+        python3-pip \
+        python3-dev \
+        build-essential \
+        autoconf \
+        cmake \
+        libtool \
+        pkg-config \
+        libglib2.0-dev \
+        ninja-build \
+        openssl \
+        libssl-dev \
+        libsystemd-dev \
+        protobuf-compiler \
+        libre2-dev \
+        wget \
+        ca-certificates && \
+    pip3 install --break-system-packages pybind11 meson && \
+    wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && \
+    dpkg -i ./boost_grpc.deb && \
+    rm -f ./boost_grpc.deb && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 #
 # Stage 'compile'
 #
-FROM base AS compile
+FROM build-base AS compile
+
+ARG E2SARINSTALL
 
 WORKDIR /src
 
 COPY . /src/
 
-# blow away build/ if it got copied by accident
-RUN rm -rf build/
-
-# create a build configuration
-RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY_PATH=${LD_LIBRARY_PATH} meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix  ${E2SARINSTALL} build && sed -i 's/-std=c++11//g' build/build.ninja
-RUN BOOST_ROOT=/usr/local meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix ${E2SARINSTALL} build
-
-# compile
-RUN meson compile -C build -j 2
-
-# install
-RUN meson install -C build
+# create a build configuration and compile
+RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY_PATH=${LD_LIBRARY_PATH} \
+    meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix ${E2SARINSTALL} build && \
+    sed -i 's/-std=c++11//g' build/build.ninja && \
+    meson compile -C build -j 2 && \
+    meson install -C build
 
 #
-# Stage 'deploy'
+# Stage 'deploy': minimal runtime image
 #
-FROM base AS deploy
+FROM ubuntu:24.04 AS deploy
+
+# Import global ARGs into this stage
+ARG E2SAR_DEPS_DEB_URL
+ARG E2SARINSTALL
+
+ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV E2SARINSTALL=${E2SARINSTALL}
+ENV PATH=${E2SARINSTALL}/bin:/usr/local/bin:$PATH
+
+# Install only runtime dependencies
+RUN apt-get -yq update && \
+    apt-get -yq install --no-install-recommends \
+        ca-certificates \
+        wget \
+        libglib2.0-0 \
+        openssl \
+        libssl3 \
+        libsystemd0 \
+        libre2-10 \
+        libprotobuf32 \
+        netcat-traditional \
+        net-tools \
+        bc \
+        ethtool \
+        iproute2 \
+        iputils-ping \
+	gdb \
+        nano && \
+    wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && \
+    dpkg -i ./boost_grpc.deb && \
+    rm -f ./boost_grpc.deb && \
+    apt-get purge -y wget && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR ${E2SARINSTALL}
-ENV PATH=${E2SARINSTALL}/bin:$PATH
 
-COPY --from=compile $E2SARINSTALL $E2SARINSTALL
-COPY --from=compile $HOME $HOME
-
-# Remove include files and gRPC stub
-RUN rm -rf ${E2SARINSTALL}/include/
+COPY --from=compile $E2SARINSTALL/bin $E2SARINSTALL/bin
+COPY --from=compile $E2SARINSTALL/lib $E2SARINSTALL/lib
+COPY --from=compile $E2SARINSTALL/include $E2SARINSTALL/include
 
 CMD ["lbadm"]

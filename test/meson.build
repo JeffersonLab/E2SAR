@@ -8,6 +8,10 @@ boosttest = executable('boost_test', 'boost_test.cpp',
                        include_directories: inc,
                        dependencies: [boost_dep, thread_dep, protobuf_dep])
 
+boostlogtest = executable('boost_log_test', 'test_boost_log.cpp',
+                       include_directories: inc,
+                       dependencies: [boost_dep, thread_dep, protobuf_dep])
+
 memtest = executable('memtest', 'mem_tests.cpp',
                         include_directories: inc,
                         dependencies: [boost_dep])

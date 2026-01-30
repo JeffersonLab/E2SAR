@@ -1,5 +1,8 @@
 project('E2SAR', 'cpp', 
-        version: files('VERSION.txt'), default_options : ['cpp_std=c++17'])
+        version: files('VERSION.txt'), 
+        default_options : [
+                'buildtype=debugoptimized',
+                'cpp_std=c++17'])
 
 compiler = meson.get_compiler('cpp')
 
@@ -77,6 +80,7 @@ add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', lang
 
 # -Wall
 warning_level=1
+#add_project_arguments('-Wall -Wno-deprecated-declarations', language: ['cpp'])
 
 # Dependencies that can be installed by package tools such as brew, apt, dnf etc.
 glib_dep = dependency('glib-2.0')
@@ -86,14 +90,14 @@ thread_dep = dependency('threads')
 stdcppfs_dep = compiler.find_library('stdc++fs', required: false)
 
 # On many platforms, gRPC C++ has to be manually installed and found.
-grpc_dep = dependency('grpc++', version: '>=1.51.1')
+grpc_dep = dependency('grpc++', version: '>=1.74.1')
 
 # boost also tends to lag so a source-based installation is preferred
 # it also doesn't produce a .pc file - only cmake-based configuration is possible
 # and meson can ONLY find it via BOOST_ROOT env variable
 # (i.e. setting cmake_prefix_path doesn't work)
-boost_dep = dependency('boost', modules: ['system', 'url', 'program_options', 'chrono', 'thread', 'filesystem'], method: 'cmake', 
-        version: ['>=1.83.0', '<=1.86.0'])
+boost_dep = dependency('boost', modules: ['url', 'program_options', 'chrono', 'thread', 'filesystem', 'log'], method: 'cmake', 
+        version: ['>=1.89.0', '<=1.89.0'])
 
 # we include 'src' because auto-generated headers for gRPC stubs go there 
 inc = include_directories('include', 'src')
@@ -107,7 +111,7 @@ protoc_cmd = find_program('protoc', required: true, version : '>=3.21.12')
 grpc_cpp_plugin_cmd = find_program('grpc_cpp_plugin', required: true)
 
 # gRPC definitions
-lb_proto_dir = '../udplbd/pkg/pb'
+lb_proto_dir = '../udplbd2/proto/loadbalancer'
 lb_proto = lb_proto_dir + '/loadbalancer.proto'
 
 # subdirectories
@@ -118,8 +122,28 @@ subdir('bin')
 subdir('scripts')
 
 pkg_mod = import('pkgconfig')
-pkg_mod.generate(libraries : libe2sar,
-                 version : meson.project_version(),
-                 name : 'libe2sar',
-                 filebase : 'e2sar',
-                 description : 'E2SAR: EJ-FAT Event Segmentation And Reassembly library')
+pkg_mod.generate(
+    libraries : libe2sar,
+    version : meson.project_version(),
+    name : 'libe2sar',
+    filebase : 'e2sar',
+    description : 'E2SAR: EJ-FAT Event Segmentation And Reassembly library',
+    requires : ['grpc++', 'protobuf'],
+    libraries_private : [
+        '-lboost_log',
+        '-lboost_log_setup',
+        '-lboost_thread',
+        '-lboost_filesystem',
+        '-lboost_program_options',
+        '-lboost_url',
+        '-lboost_chrono'
+    ] + linker_flags)
+
+summary({
+  'prefix': get_option('prefix'),
+}, section: 'Directories')
+
+summary({
+  'Build type': get_option('buildtype'),
+  'C++ standard': get_option('cpp_std'),
+}, section: 'Configuration')
