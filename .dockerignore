@@ -1,0 +1,20 @@
+# Ignore Docker-specific files themselves
+Dockerfile*
+.dockerignore
+
+# Ignore editor-specific files
+.vscode/
+.idea/
+*.swp
+
+# Ignore the version control system
+.git
+.gitignore
+
+# Ignore data 
+dalitz_toy_data_*
+
+# Ignore build/
+build
+
+.claude

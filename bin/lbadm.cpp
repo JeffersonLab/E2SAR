@@ -802,7 +802,7 @@ int main(int argc, char **argv)
     opts("ctrl,t", po::value<float>(&ctrl)->default_value(0.0), "control signal value");
     opts("ready,r", po::value<bool>(&ready)->default_value(true), "worker ready state (1 or 0)");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
-    opts("novalidate,v", po::value<bool>(&novalidate)->default_value(false), "don't validate server certificate (conflicts with 'root') [false]");
+    opts("novalidate,v", po::bool_switch()->default_value(false), "don't validate server certificate (conflicts with 'root') [false]");
     opts("minfactor", po::value<float>(&minfactor)->default_value(0.5), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
     opts("maxfactor", po::value<float>(&maxfactor)->default_value(2.0), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation)");
@@ -934,6 +934,8 @@ int main(int argc, char **argv)
     {
         preferV6 = true;
     }
+
+    novalidate = not vm["novalidate"].as<bool>();
 
     // if ipv4 or ipv6 requested explicitly
     bool preferHostAddr = false;

@@ -23,18 +23,21 @@ requirements:
     - python
     - meson
     - ninja
-    - boost-cpp ==1.89.0
+    - libboost-devel ==1.89.0
+    - libboost ==1.89.0
+    - libgrpc >=1.74.1
     - grpc-cpp >=1.74.1
+    - libprotobuf
     - protobuf
     - pybind11
-    - libstdcxx-ng [linux64]
-    - glib [linux64]
+    - libstdcxx-ng  # [linux64]
+    - glib  # [linux64]
   run:
     - {{ pin_compatible('python', max_pin='x.x') }}
-    - {{ pin_compatible('grpc-cpp', max_pin='x.x') }}
-    - {{ pin_compatible('protobuf', max_pin='x.x') }}
-    - {{ pin_compatible('libstdcxx-ng', max_pin='x') }} [linux64]
-    - {{ pin_compatible('boost-cpp', max_pin='x.x') }}
+    - {{ pin_compatible('libgrpc', max_pin='x.x') }}
+    - {{ pin_compatible('libprotobuf', max_pin='x.x') }}
+    - {{ pin_compatible('libstdcxx-ng', max_pin='x') }}  # [linux64]
+    - {{ pin_compatible('libboost', max_pin='x.x') }}
     - numpy
 
 about:
