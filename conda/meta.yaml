@@ -26,7 +26,6 @@ requirements:
     - libboost-devel ==1.89.0
     - libboost ==1.89.0
     - libgrpc >=1.74.1
-    - grpc-cpp >=1.74.1
     - libprotobuf
     - protobuf
     - pybind11
