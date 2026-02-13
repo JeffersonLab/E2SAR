@@ -4,3 +4,6 @@ python:
   - 3.11
   - 3.12
   - 3.13
+
+c_stdlib_version:          # [linux]
+  - "2.28"                 # [linux]
