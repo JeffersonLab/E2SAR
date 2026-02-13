@@ -13,6 +13,7 @@ build:
   script:
     - export BOOST_ROOT=$PREFIX
     - export CXXFLAGS="-std=c++17 -Wno-c++26-extensions"
+    - export PATH=$PREFIX/bin:$PATH
     - meson setup --prefix $PREFIX -Dpkg_config_path=$PREFIX/lib/pkgconfig build --wipe
     - meson compile -C build -j 2
     - meson install -C build
