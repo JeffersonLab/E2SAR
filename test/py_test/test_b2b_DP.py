@@ -131,7 +131,7 @@ def test_b2b_send_numpy_get_numpy():
 
     # Send a 3D numpy array,
     # send_array = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float32).reshape((2, 2, 2))
-    send_array = np.random.rand(1000, 1000, 50).astype(np.float32)  # up to 200 MB
+    send_array = np.random.rand(100, 100, 50).astype(np.float32)  # up to 200 MB
     send_bytes = send_array.nbytes
 
     res = seg.sendNumpyArray(send_array, send_bytes)

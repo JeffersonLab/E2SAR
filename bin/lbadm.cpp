@@ -782,7 +782,7 @@ int main(int argc, char **argv)
     float weight;
     u_int16_t count;
     float queue, ctrl, minfactor, maxfactor;
-    bool ready, keeplbhdr;
+    bool ready, keeplbhdr, novalidate;
     int ipfam;
     // all the sendState stats
     WorkerStats stats;
@@ -802,7 +802,7 @@ int main(int argc, char **argv)
     opts("ctrl,t", po::value<float>(&ctrl)->default_value(0.0), "control signal value");
     opts("ready,r", po::value<bool>(&ready)->default_value(true), "worker ready state (1 or 0)");
     opts("root,o", po::value<std::string>(), "root cert for SSL communications");
-    opts("novalidate,v", "don't validate server certificate (conflicts with 'root')");
+    opts("novalidate,v", po::bool_switch()->default_value(false), "don't validate server certificate (conflicts with 'root') [false]");
     opts("minfactor", po::value<float>(&minfactor)->default_value(0.5), "node min factor, multiplied with the number of slots that would be assigned evenly to determine min number of slots for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots");
     opts("maxfactor", po::value<float>(&maxfactor)->default_value(2.0), "multiplied with the number of slots that would be assigned evenly to determine max number of slots for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation)");
@@ -935,6 +935,8 @@ int main(int argc, char **argv)
         preferV6 = true;
     }
 
+    novalidate = not vm["novalidate"].as<bool>();
+
     // if ipv4 or ipv6 requested explicitly
     bool preferHostAddr = false;
     if (vm.count("ipv6") || vm.count("ipv4"))
@@ -958,203 +960,201 @@ int main(int argc, char **argv)
     if (vm.count("lbid")) 
         uri.set_lbId(vm["lbid"].as<std::string>());
 
-    auto lbman = LBManager(uri, true, preferHostAddr);
+    // use lambda to make a needed LBManager once
+    auto makeLBManager = [&]() -> LBManager {                                                                                           
+        if (vm.count("root")) {                                                                                                         
+            auto opts_res = LBManager::makeSslOptionsFromFiles(vm["root"].as<std::string>());                                           
+            if (opts_res.has_error())                                                                                                   
+                throw std::runtime_error("Unable to read server root certificate file");                                                
+            return LBManager(uri, true, preferHostAddr, opts_res.value());                                                              
+        }                                                                                                                             
+                                                                                                                                        
+        if (novalidate)                                                                                                
+            std::cerr << "Skipping server certificate validation" << std::endl;
 
-    if (vm.count("root") && !uri.get_useTls())
-    {
-        std::cerr << "Root certificate passed in, but URL doesn't require TLS/SSL, ignoring "s;
-    }
-    else 
-    {
-        if (vm.count("root")) 
+        return LBManager(uri, !novalidate, preferHostAddr);                                                                                    
+    };  
+
+    try {
+        auto lbman = makeLBManager();
+
+        // Reserve
+        if (vm.count("reserve"))
         {
-            result<grpc::SslCredentialsOptions> opts_res = LBManager::makeSslOptionsFromFiles(vm["root"].as<std::string>());
-            if (opts_res.has_error()) 
+            // execute command
+            auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
+                                (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()),
+                                duration, ipfam, suppress);
+            if (uri_r.has_error())
             {
-                std::cerr << "Unable to read server root certificate file "s;
+                std::cerr << "There was an error reserving LB: " << uri_r.error().message() << std::endl;
                 return -1;
             }
-            lbman = LBManager(uri, true, preferHostAddr, opts_res.value());
-        } 
-        else
+        }
+        else if (vm.count("free"))
         {
-            if (vm.count("novalidate"))
+            std::string lbid;
+            if (vm.count("lbid"))
+                lbid = vm["lbid"].as<std::string>();
+            auto int_r = freeLB(lbman, lbid);
+            if (int_r.has_error())
             {
-                std::cerr << "Skipping server certificate validation" << std::endl;
-                lbman = LBManager(uri, false, preferHostAddr);
+                std::cerr << "There was an error freeing LB: " << int_r.error().message() << std::endl;
+                return -1;
             }
         }
+        else if (vm.count("version"))
+        {
+            auto int_r = version(lbman);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error getting LB version: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("register"))
+        {
+            auto int_r = registerWorker(lbman,
+                                        vm["name"].as<std::string>(),
+                                        (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>()[0]: ""s),
+                                        vm["port"].as<u_int16_t>(),
+                                        weight,
+                                        count,
+                                        minfactor,
+                                        maxfactor,
+                                        keeplbhdr,
+                                        suppress
+                                        );
+
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error registering worker: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("deregister"))
+        {
+            auto int_r = deregisterWorker(lbman);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error deregistering worker: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("status"))
+        {
+            std::string lbid;
+            if (vm.count("lbid"))
+                lbid = vm["lbid"].as<std::string>();
+
+            auto int_r = getLBStatus(lbman, lbid);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error getting LB status: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("state"))
+        {
+            auto int_r = sendState(lbman, queue, ctrl, ready, stats);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("overview"))
+        {
+            auto int_r = overview(lbman);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error getting overview: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("addsenders"))
+        {
+            auto int_r = addSenders(lbman, 
+                (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()));
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error adding senders: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("removesenders"))
+        {
+            auto int_r = removeSenders(lbman, 
+                (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()));
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error removing senders: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("timeseries"))
+        {
+            auto int_r = timeseries(lbman, lbpath, since, csvsaveto);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error querying for timeseries: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("createtoken"))
+        {
+            // Parse permissions from command line strings
+            auto perms_r = parsePermissions(vm["permission"].as<std::vector<std::string>>());
+            if (perms_r.has_error())
+            {
+                std::cerr << "Error parsing permissions: " << perms_r.error().message() << std::endl;
+                return -1;
+            }
+
+            auto int_r = createToken(lbman, vm["tokenname"].as<std::string>(),
+                                    perms_r.value(), suppress);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error creating token: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("listtokenpermissions"))
+        {
+            auto int_r = listTokenPermissions(lbman, vm["tokenid"].as<std::string>(), suppress);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error listing token permissions: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("listchildtokens"))
+        {
+            auto int_r = listChildTokens(lbman, vm["tokenid"].as<std::string>(), suppress);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error listing child tokens: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else if (vm.count("revoketoken"))
+        {
+            auto int_r = revokeToken(lbman, vm["tokenid"].as<std::string>(), suppress);
+            if (int_r.has_error())
+            {
+                std::cerr << "There was an error revoking token: " << int_r.error().message() << std::endl;
+                return -1;
+            }
+        }
+        else
+            // print help
+            std::cout << od << std::endl;
+    } catch (const std::runtime_error& e) {                                                                                             
+        std::cerr << "ERROR: " << e.what() << std::endl;                                                                                             
+        return -1;
     }
 
-    // Reserve
-    if (vm.count("reserve"))
-    {
-        // execute command
-        auto uri_r = reserveLB(lbman, vm["lbname"].as<std::string>(),
-                               (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()),
-                               duration, ipfam, suppress);
-        if (uri_r.has_error())
-        {
-            std::cerr << "There was an error reserving LB: " << uri_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("free"))
-    {
-        std::string lbid;
-        if (vm.count("lbid"))
-            lbid = vm["lbid"].as<std::string>();
-        auto int_r = freeLB(lbman, lbid);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error freeing LB: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("version"))
-    {
-        auto int_r = version(lbman);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error getting LB version: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("register"))
-    {
-        auto int_r = registerWorker(lbman,
-                                    vm["name"].as<std::string>(),
-                                    (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>()[0]: ""s),
-                                    vm["port"].as<u_int16_t>(),
-                                    weight,
-                                    count,
-                                    minfactor,
-                                    maxfactor,
-                                    keeplbhdr,
-                                    suppress
-                                    );
-
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error registering worker: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("deregister"))
-    {
-        auto int_r = deregisterWorker(lbman);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error deregistering worker: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("status"))
-    {
-        std::string lbid;
-        if (vm.count("lbid"))
-            lbid = vm["lbid"].as<std::string>();
-
-        auto int_r = getLBStatus(lbman, lbid);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error getting LB status: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("state"))
-    {
-        auto int_r = sendState(lbman, queue, ctrl, ready, stats);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error getting sending worker state update: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("overview"))
-    {
-        auto int_r = overview(lbman);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error getting overview: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("addsenders"))
-    {
-        auto int_r = addSenders(lbman, 
-            (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()));
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error adding senders: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("removesenders"))
-    {
-        auto int_r = removeSenders(lbman, 
-            (vm.count("address") > 0 ? vm["address"].as<std::vector<std::string>>(): std::vector<std::string>()));
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error removing senders: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("timeseries"))
-    {
-        auto int_r = timeseries(lbman, lbpath, since, csvsaveto);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error querying for timeseries: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("createtoken"))
-    {
-        // Parse permissions from command line strings
-        auto perms_r = parsePermissions(vm["permission"].as<std::vector<std::string>>());
-        if (perms_r.has_error())
-        {
-            std::cerr << "Error parsing permissions: " << perms_r.error().message() << std::endl;
-            return -1;
-        }
-
-        auto int_r = createToken(lbman, vm["tokenname"].as<std::string>(),
-                                perms_r.value(), suppress);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error creating token: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("listtokenpermissions"))
-    {
-        auto int_r = listTokenPermissions(lbman, vm["tokenid"].as<std::string>(), suppress);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error listing token permissions: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("listchildtokens"))
-    {
-        auto int_r = listChildTokens(lbman, vm["tokenid"].as<std::string>(), suppress);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error listing child tokens: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else if (vm.count("revoketoken"))
-    {
-        auto int_r = revokeToken(lbman, vm["tokenid"].as<std::string>(), suppress);
-        if (int_r.has_error())
-        {
-            std::cerr << "There was an error revoking token: " << int_r.error().message() << std::endl;
-            return -1;
-        }
-    }
-    else
-        // print help
-        std::cout << od << std::endl;
+    // Give gRPC time to clean up (ugly but sometimes necessary)                                                                        
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));                                                                        
+    return 0;   
 }
