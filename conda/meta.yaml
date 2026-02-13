@@ -21,7 +21,7 @@ build:
 requirements:
   build:
     - {{ compiler('cxx') }}
-    - {{ stdlib('c') }}
+    - sysroot_linux-64 >=2.28,<2.29  # [linux64]
     - meson
     - ninja
     - pkg-config
