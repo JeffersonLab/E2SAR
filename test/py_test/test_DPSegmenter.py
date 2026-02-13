@@ -53,7 +53,7 @@ def test_sflags_getFromINI():
     # print(res.has_error(), res.error() if res.has_error() else None)
     assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
-    assert flags.mtu == 1500
+    assert flags.mtu == 9000
 
 
 @pytest.mark.unit
@@ -90,7 +90,7 @@ def test_seg_constructor_simple():
 def test_seg_constructor_from_cpucorelist():
     """Test segmenter constructor with CPU core list."""
     flags = sflags.getFromINI(SFLAGS_INIT_FILE).value()
-    assert flags.mtu == 1500
+    assert flags.mtu == 9000
     seg_uri = e2sar_py.EjfatURI(uri=SEG_URI, tt=e2sar_py.EjfatURI.TokenType.instance)
     assert isinstance(seg_uri, e2sar_py.EjfatURI)
     cpu_core_list = [0]     # Only one core allowed now?
