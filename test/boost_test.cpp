@@ -79,15 +79,13 @@ int main()
     std::cout << "IPv6 " << ipv6 << ' ' << ipv6.is_v6() << '\n';
 
     // Test name resolution
-    boost::asio::io_service io_service;
+    boost::asio::io_context io_context;
 
-    ip::udp::resolver resolver(io_service);
-    ip::udp::resolver::query query("www.renci.org", "445");
-    ip::udp::resolver::iterator iter = resolver.resolve(query);
-    ip::udp::resolver::iterator end; // End marker.
-    while (iter != end)
+    ip::udp::resolver resolver(io_context);
+    ip::udp::resolver::results_type resres = resolver.resolve("www.renci.org", "445");
+    for(auto i = resres.begin(); i != resres.end(); ++i)
     {
-        ip::udp::endpoint endpoint = *iter++;
+        ip::udp::endpoint endpoint = *i;
         ip::address address = endpoint.address();
         std::cout << address << ' ' << address.is_v4() << ' ' << std::endl;
     }
@@ -176,7 +174,7 @@ int main()
         std::cout << "  Empty scope executes once" << std::endl;
     }
 
-    std::cout << "  LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdr) << std::endl;
+    std::cout << "  LB Hdr size (expecting 16) = " << sizeof(e2sar::LBHdrV2) << std::endl;
     std::cout << "  RE Hdr size (expecting 20) = " << sizeof(e2sar::REHdr) << std::endl;
     std::cout << "  LB+RE Hdr size (expecting 36) = " << sizeof(e2sar::LBREHdr) << std::endl;
 
@@ -339,7 +337,7 @@ int main()
 
     std::cout << "Test allocate deallocate" << std::endl;
 
-    boost::lockfree::queue<std::pair<int, u_int16_t>*> lostEventsQueue{20};
+    boost::lockfree::queue<std::pair<int, u_int16_t>*, boost::lockfree::fixed_sized<true>> lostEventsQueue{10};
 
     for(int i=0; i<5; i++)
     {
@@ -353,6 +351,16 @@ int main()
         std::cout << "Retrieved " << ret.first << ":" << ret.second << std::endl;
         delete res;
     }
+
+    std::cout << "Test lockfree queue size limit" << std::endl;
+
+    int i = 25;
+    bool pushres = true;
+    while ((i-- > 0) && pushres)
+    {
+        pushres = lostEventsQueue.push(new std::pair<int, u_int16_t>(1, 2));
+    }
+    std::cout << "This is i=" << i << " and result=" << pushres << std::endl;
 
     std::cout << "Clock tests" << std::endl;
 

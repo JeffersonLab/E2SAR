@@ -57,10 +57,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     m.attr("_iphdr_len") = py::int_(IP_HDRLEN);
     m.attr("_udphdr_len") = py::int_(UDP_HDRLEN);
     m.attr("_total_hdr_len") = py::int_(TOTAL_HDR_LEN);
-    m.attr("_rehdr_version") = py::int_(rehdrVersion);
     m.attr("_rehdr_version_nibble") = py::int_(rehdrVersionNibble);
-    m.attr("_lbhdr_version") = py::int_(lbhdrVersion);
-    m.attr("_synchdr_version") = py::int_(synchdrVersion);
 
     // Bind the get_Version method
     m.def("get_version", &get_Version);
@@ -99,7 +96,7 @@ PYBIND11_MODULE(e2sar_py, m) {
     py::class_<boost::asio::ip::address>(m, "IPAddress")
         .def(py::init<>())
         .def_static("from_string", static_cast<boost::asio::ip::address(*)(const std::string&)>(
-            &boost::asio::ip::address::from_string))
+            &boost::asio::ip::make_address))
         .def("is_v4", &boost::asio::ip::address::is_v4)
         .def("is_v6", &boost::asio::ip::address::is_v6)
         .def("__str__", [](const boost::asio::ip::address &addr) {

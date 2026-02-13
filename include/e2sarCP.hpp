@@ -12,6 +12,7 @@
 #include <grpcpp/security/credentials.h>
 
 #include <google/protobuf/util/time_util.h>
+
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "grpc/loadbalancer.grpc.pb.h"
@@ -36,13 +37,6 @@ using google::protobuf::Timestamp;
 // default reservation duration for a load balancer in hours
 #define DEFAULT_LB_RESERVE_DURATION 24
 
-// change to '1' to test older versions of UDPLBd where token
-// was sent as a parameter in the body. The new way is to send
-// it in the authorization header as bearer token
-#ifndef TOKEN_IN_BODY
-#define TOKEN_IN_BODY 0
-#endif
-
 /***
  * Control Plane definitions for E2SAR
  */
@@ -62,17 +56,23 @@ namespace e2sar
     using TimeUntil = google::protobuf::Timestamp;
 
     /**
-     * Status of individual worker (part of getLBStatus return)
+     * Optional stats sent by individual workers in sendState and received in worker status from lbstatus about their performance
+     * int64 totalEventsRecv - how many event ids the receiver has seen
+     * int64 totalEventsReassembled - how many events has the receiver reassembled
+     * int64 totalEventsReassemblyErr - how many events has the receiver dropped before reassembly
+     * int64 totalEventsDequeued - how many events popped off the queue
+     * int64 totalEventEnqueueErr - how many events has the receiver failed to put on the queue because it's full
+     * int64 totalBytesRecv - total bytes received
+     * int64 totalPacketsRecv - total packets received
      */
-    struct LBWorkerStatus
-    {
-        std::string name;
-        float fillPercent;
-        float controlSignal;
-        u_int32_t slotsAssigned;
-        google::protobuf::Timestamp lastUpdated;
-
-        LBWorkerStatus(const std::string &n, float fp, float cs, u_int32_t sa, google::protobuf::Timestamp lu) : name{n}, fillPercent{fp}, controlSignal{cs}, slotsAssigned{sa}, lastUpdated{lu} {}
+    struct WorkerStats {
+        int64_t total_events_recv, total_events_reassembled, total_events_reassembly_err, total_events_dequeued,
+            total_event_enqueue_err, total_bytes_recv, total_packets_recv;
+        
+        WorkerStats(): total_events_recv{0}, total_events_reassembled{0}, total_events_reassembly_err{0},
+            total_events_dequeued{0}, total_event_enqueue_err{0}, total_bytes_recv{0}, total_packets_recv{0} {
+                ;
+        }
     };
 
     /**
@@ -106,15 +106,101 @@ namespace e2sar
     {
         std::string name; // name passed in reserveLB
         std::string lbid; // load balancer id
-        std::pair<ip::address, u_int16_t> syncAddressAndPort;
+        std::pair<ip::address, u_int16_t> syncIPv4AndPort;
+        std::pair<ip::address, u_int16_t> syncIPv6AndPort;
         ip::address dataIPv4;
         ip::address dataIPv6; 
         u_int32_t fpgaLBId; 
+        u_int32_t dataMinPort;
+        u_int32_t dataMaxPort;
         LBStatus status; // same as in lbstatus call
 
         OverviewEntry() {}
     };
     using OverviewMessage = std::vector<OverviewEntry>;
+
+    /**
+     * Timeseries sample with timestamp and value for float data
+     */
+    struct FloatSample {
+        int64_t timestamp_ms;  // milliseconds since epoch
+        float value;
+
+        FloatSample(int64_t ts, float v) : timestamp_ms{ts}, value{v} {}
+        FloatSample() : timestamp_ms{0}, value{0.0f} {}
+    };
+
+    /**
+     * Timeseries sample with timestamp and value for integer data
+     */
+    struct IntegerSample {
+        int64_t timestamp_ms;  // milliseconds since epoch
+        int64_t value;
+
+        IntegerSample(int64_t ts, int64_t v) : timestamp_ms{ts}, value{v} {}
+        IntegerSample() : timestamp_ms{0}, value{0} {}
+    };
+
+    /**
+     * Timeseries data - either float or integer samples with path and units
+     */
+    struct TimeseriesData {
+        std::string path;
+        std::string unit;
+        std::variant<std::vector<FloatSample>, std::vector<IntegerSample>> timeseries;
+
+        TimeseriesData(const std::string& p, const std::string &u, std::vector<FloatSample>& fs):
+            path{p}, unit{u}, timeseries{std::move(fs)} {}
+        TimeseriesData(const std::string& p, const std::string &u, std::vector<IntegerSample>& is):
+            path{p}, unit{u}, timeseries{std::move(is)} {}
+    };
+
+    // a collection of timeseries with a common since timestamp
+    struct TimeseriesResult {
+        int64_t since_ms;
+        std::vector<TimeseriesData> td; // possibly multiple vectors of timeseries data returned by the query
+
+        TimeseriesResult(int64_t _ts, std::vector<TimeseriesData> &_td): since_ms{_ts}, td{std::move(_td)} {}
+
+        // be careful this is not a true copy constructor as it uses move to move the timeseries
+        TimeseriesResult(TimeseriesResult&& _tsr): since_ms{_tsr.since_ms}, td{std::move(_tsr.td)} {}
+    };
+
+    /**
+     * Token permission - defines access rights for a token
+     * Mirrors loadbalancer::TokenPermission protobuf without exposing it
+     */
+    struct TokenPermission {
+        EjfatURI::TokenType resourceType;
+        std::string resourceId;  // optional, can be empty
+        EjfatURI::TokenPermission permission;
+
+        TokenPermission():
+            resourceType{EjfatURI::TokenType::all},
+            resourceId{""},
+            permission{EjfatURI::TokenPermission::_read_only_} {}
+        TokenPermission(EjfatURI::TokenType rt, const std::string& rid, EjfatURI::TokenPermission pt):
+            resourceType{rt}, resourceId{rid}, permission{pt} {}
+    };
+
+    /**
+     * Token details - information about a token including permissions
+     * Mirrors loadbalancer::TokenDetails protobuf without exposing it
+     */
+    struct TokenDetails {
+        std::string name;
+        std::vector<TokenPermission> permissions;
+        std::string created_at;
+        uint32_t id;
+
+        TokenDetails(): name{""}, created_at{""}, id{0} {}
+    };
+
+    /**
+     * Token selector - select a token by ID or token string
+     * Uses std::variant instead of loadbalancer::TokenSelector protobuf
+     */
+    using TokenSelector = std::variant<uint32_t, std::string>;
 
     class LBManager
     {
@@ -197,12 +283,14 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param until time until it's needed as google protobuf timestamp pointer.
          * @param senders list of sender IP addresses
+         * @param ip_family whether the load balancer should be IPv4 only, IPv6 only or dual stack (default)
          *
          * @return - FPGA LB ID, for use in correlating logs/metrics
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const TimeUntil &until,
-                              const std::vector<std::string> &senders) noexcept;
+                              const std::vector<std::string> &senders,
+                              int ip_family=loadbalancer::IpFamily::DUAL_STACK) noexcept;
 
         /**
          * Reserve a new load balancer with this name until specified time. It sets the intstance
@@ -212,12 +300,14 @@ namespace e2sar
          * @param duration for how long it is needed as boost::posix_time::time_duration. You can use
          * boost::posix_time::duration_from_string from string like "23:59:59.000"s
          * @param senders list of sender IP addresses
+         * @param ip_family whether the load balancer should be IPv4 only, IPv6 only or dual stack (default)
          *
          * @return - FPGA LB ID, for use in correlating logs/metrics
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const boost::posix_time::time_duration &duration,
-                              const std::vector<std::string> &senders) noexcept;
+                              const std::vector<std::string> &senders,
+                              int ip_family=loadbalancer::IpFamily::DUAL_STACK) noexcept;
 
         /**
          * Reserve a new load balancer with this name of duration in seconds
@@ -225,12 +315,14 @@ namespace e2sar
          * @param lb_name LB name internal to you
          * @param durationSeconds for how long it is needed in seconds
          * @param senders list of sender IP addresses
+         * @param ip_family whether the load balancer should be IPv4 only, IPv6 only or dual stack (default)
          *
          * @return - 0 on success or error code with message on failure
          */
         result<u_int32_t> reserveLB(const std::string &lb_name,
                               const double &durationSeconds,
-                              const std::vector<std::string> &senders) noexcept;
+                              const std::vector<std::string> &senders,
+                              int ip_family=loadbalancer::IpFamily::DUAL_STACK) noexcept;
 
         /**
          * Get load balancer info - it updates the info inside the EjfatURI object just like reserveLB.
@@ -304,6 +396,55 @@ namespace e2sar
          * @param - use IPv6 dataplane (default false)
          */
         result<int> removeSenderSelf(bool v6=false) noexcept;
+
+        /**
+         * Create a new delegated token with specific permissions
+         *
+         * @param name - Human-readable token name
+         * @param permissions - Vector of TokenPermission specifying access rights
+         *
+         * @return The created token string
+         */
+        result<std::string> createToken(
+            const std::string &name,
+            const std::vector<TokenPermission> &permissions) noexcept;
+
+        /**
+         * List all permissions for a specific token
+         *
+         * @param target - Token selector (by ID or token string)
+         *
+         * @return TokenDetails with permissions and metadata
+         */
+        result<TokenDetails> listTokenPermissions(const TokenSelector &target) noexcept;
+
+        /**
+         * List all child tokens created by a parent token
+         *
+         * @param target - Token selector for parent token
+         *
+         * @return Vector of TokenDetails for all children
+         */
+        result<std::vector<TokenDetails>> listChildTokens(const TokenSelector &target) noexcept;
+
+        /**
+         * Revoke a token and all its children
+         *
+         * @param target - Token selector to revoke
+         *
+         * @return 0 on success or error code
+         */
+        result<int> revokeToken(const TokenSelector &target) noexcept;
+
+        /**
+         * Retrieve timeseries data for a specific metric path
+         *
+         * @param path - Timeseries path selector (e.g., "/lb/1/<asterisk>", "/lb/1/session/2/totalEventsReassembled")
+         * @param since - Timestamp to retrieve data from
+         *
+         * @return TimeseriesResult containing the "since" timestamp and multiple vectors of samples (float or integer)
+         */
+        result<TimeseriesResult> timeseries(const std::string &path, const Timestamp &since) noexcept;
 
         /** Helper function copies worker records into a vector
          * It takes a unique_ptr from getLBStatus() call and helps parse it. Relies on move semantics.
@@ -409,11 +550,15 @@ namespace e2sar
             {
                 om[j].name = i->name();
                 om[j].lbid = i->reservation().lbid();
-                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipaddress());
-                om[j].syncAddressAndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv4AndPort.first = ip::make_address(i->reservation().syncipv4address());
+                om[j].syncIPv4AndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv6AndPort.first = ip::make_address(i->reservation().syncipv6address());
+                om[j].syncIPv6AndPort.second = i->reservation().syncudpport();
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
+                om[j].dataMinPort = i->reservation().dataminport();
+                om[j].dataMaxPort = i->reservation().datamaxport();
                 om[j].status = asLBStatus(i->status());
             }
             return om;
@@ -428,11 +573,15 @@ namespace e2sar
             {
                 om[j].name = i->name();
                 om[j].lbid = i->reservation().lbid();
-                om[j].syncAddressAndPort.first = ip::make_address(i->reservation().syncipaddress());
-                om[j].syncAddressAndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv4AndPort.first = ip::make_address(i->reservation().syncipv4address());
+                om[j].syncIPv4AndPort.second = i->reservation().syncudpport();
+                om[j].syncIPv6AndPort.first = ip::make_address(i->reservation().syncipv6address());
+                om[j].syncIPv6AndPort.second = i->reservation().syncudpport();
                 om[j].dataIPv4 = ip::make_address(i->reservation().dataipv4address());
                 om[j].dataIPv6 = ip::make_address(i->reservation().dataipv6address());
                 om[j].fpgaLBId = i->reservation().fpgalbid();
+                om[j].dataMinPort = i->reservation().dataminport();
+                om[j].dataMaxPort = i->reservation().datamaxport();
                 om[j].status = asLBStatus(i->status());
             }
             return om;
@@ -466,9 +615,11 @@ namespace e2sar
          * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
          * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
          * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
+         * @param keep_lb_header - don't strip the LB header when processing for this worker (to support hierarchical LBs; defaults to false)
          * @return - 0 on success or an error condition
          */
-        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, float min_factor, float max_factor) noexcept;
+        result<int> registerWorker(const std::string &node_name, std::pair<ip::address, u_int16_t> node_ip_port, float weight, u_int16_t source_count, 
+            float min_factor, float max_factor, bool keep_lb_header=false) noexcept;
 
         /**
          * Register the calling worker workernode/backend with an allocated loadbalancer. 
@@ -486,9 +637,11 @@ namespace e2sar
          * @param max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
          * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
          * @param v6 - use IPv6 dataplane (defaults to false)
+         * @param keep_lb_header - don't strip the LB header when processing for this worker (to support hierarchical LBs; defaults to false)
          * @return - 0 on success or an error condition
          */
-        result<int> registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, bool v6=false) noexcept;
+        result<int> registerWorkerSelf(const std::string &node_name, u_int16_t node_port, float weight, u_int16_t source_count, float min_factor, float max_factor, 
+                bool v6=false, bool keep_lb_header=false) noexcept;
 
         /**
          * Deregister worker using session ID and session token from the register call
@@ -496,6 +649,33 @@ namespace e2sar
          * @return - 0 on success or an error condition
          */
         result<int> deregisterWorker() noexcept;
+
+        /**
+         * Send worker state update using session ID and session token from register call. Automatically
+         * uses localtime to set the timestamp. Workers are expected to send state every 100ms or so. Allows
+         * to set worker stats.
+         *
+         * @param fill_percent - [0:1] percentage filled of the queue
+         * @param control_signal - change to data rate
+         * @param is_ready - if true, worker ready to accept more data, else not ready
+         * @param stats - a struct of additional optional worker stats (WorkerStats)
+         */
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready,
+                       const WorkerStats &stats) noexcept;
+
+        /**
+         * Send worker state update using session ID and session token from register call. Allows to explicitly
+         * set the timestamp and set worker stats
+         *
+         * @param fill_percent - [0:1] percentage filled of the queue
+         * @param control_signal - change to data rate
+         * @param is_ready - if true, worker ready to accept more data, else not ready
+         * @param ts - google::protobuf::Timestamp timestamp for this message (if you want to explicitly not
+         * use localtime)
+         * @param stats - a struct of additional optional worker stats (WorkerStats)
+         */
+        result<int> sendState(float fill_percent, float control_signal, bool is_ready, const Timestamp &ts,
+                       const WorkerStats &stats) noexcept;
 
         /**
          * Send worker state update using session ID and session token from register call. Automatically
@@ -579,6 +759,7 @@ namespace e2sar
         inline std::string get_AddrString() {
             return addr_string;
         }
+
     };
 
     /**

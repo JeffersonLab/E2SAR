@@ -8,17 +8,42 @@
 #include <boost/asio.hpp>
 #include <boost/chrono.hpp>
 #include <boost/thread.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/common.hpp>
+#include <boost/log/sinks.hpp>
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/attributes.hpp>
+#include <boost/log/support/date_time.hpp>
+#include <boost/core/null_deleter.hpp>
+#include <boost/shared_ptr.hpp>
+
+#include "grpc/loadbalancer.grpc.pb.h"
 
 #include "e2sarError.hpp"
 
 using namespace boost::asio;
 using namespace std::string_literals;
+using namespace boost::log;
+
+#define BOOST_LOG_FLUSH() sink->flush()
+#define BOOST_MLL_START(PREF) { std::ostringstream PREF_ostr;
+#define BOOST_MLL_LOG(PREF) PREF_ostr 
+#define BOOST_MLL_STOP(PREF) BOOST_LOG_SEV(lg, trivial::info) << PREF_ostr.str(); } BOOST_LOG_FLUSH(); 
+
+#define BOOST_LOG_INFO() BOOST_LOG_SEV(lg, trivial::info)
+#define BOOST_LOG_WARN() BOOST_LOG_SEV(lg, trivial::warning)
+#define BOOST_LOG_ERR() BOOST_LOG_SEV(lg, trivial::error)
 
 /***
  * Supporting classes for E2SAR
  */
 namespace e2sar
 {
+    typedef sinks::asynchronous_sink<sinks::text_ostream_backend> text_sink;
+    extern boost::shared_ptr<text_sink> sink;
+    extern sources::severity_logger_mt<trivial::severity_level> lg;
+
     const u_int16_t DATAPLANE_PORT = 19522;
 
     /** Structure to hold info parsed from an ejfat URI (and a little extra). 
@@ -30,9 +55,42 @@ namespace e2sar
     class EjfatURI
     {
     public:
-        enum class TokenType {
-            admin, instance, session
+        enum class TokenType: u_int16_t {
+            // contains overloaded names according to old and new token type hierarchy
+            all=0, admin=1, load_balancer=admin, instance=2, reservation=instance, session=3, END
         };
+        inline static constexpr size_t ttAsIdx(TokenType tt) 
+        {
+            return static_cast<size_t>(tt);
+        }
+        inline static const std::string toString(TokenType tt)
+        {
+            switch(tt) {
+                case TokenType::all: return "ALL"s;
+                case TokenType::admin: return "LOAD_BALANCER"s;
+                case TokenType::instance: return "RESERVATION"s;
+                case TokenType::session: return "SESSION"s;
+                default: return "UNKNOWN"s;
+            }
+        }
+        static const size_t tokenTypeCardinality = static_cast<size_t>(TokenType::END);
+
+
+        enum class TokenPermission: u_int16_t {
+            // 'register' is a keyword in C++, so adding '_' to names
+            _read_only_, _register_, _reserve_, _update_, END
+        };
+        inline static const std::string toString(TokenPermission tt)
+        {
+            switch(tt) {
+                case TokenPermission::_read_only_: return "READ"s;
+                case TokenPermission::_register_: return "REGISTER"s;
+                case TokenPermission::_reserve_: return "RESERVE"s;
+                case TokenPermission::_update_: return "UPDATE"s;
+                default: return "UNKNOWN"s;
+            }
+        }
+        static const size_t tokenPermissionCardinality = static_cast<size_t>(TokenPermission::END);
 
     private:
         std::string rawURI;
@@ -50,19 +108,15 @@ namespace e2sar
         u_int16_t syncPort;
         /** TCP port for grpc communications with CP. */
         u_int16_t cpPort;
-        /** Dataplane port (normally defaults to DATAPLANE_POR) */
+        /** Dataplane port (normally defaults to DATAPLANE_PORT) */
         u_int16_t dataPort;
 
         /** String given by user, during registration, to label an LB instance. */
         std::string lbName;
         /** String identifier of an LB instance, set by the CP on an LB reservation. */
         std::string lbId;
-        /** Admin token for the CP being used. Set from URI string*/
-        std::string adminToken;
         /** Instance token set by the CP on an LB reservation. */
-        std::string instanceToken;
-        /** Session token used by the worker  */
-        std::string sessionToken;
+        std::array<std::string, tokenTypeCardinality> tokensByType;
         /** Session ID issued via register call */
         std::string sessionId;
 
@@ -78,7 +132,7 @@ namespace e2sar
     public:
         /** base constructor, sets instance token from string
          * @param uri - the URI string
-         * @param tt - convert to this token type (admin, instance, session)
+         * @param tt - convert to this token type (all, admin/load_balancer, instance/reservation, session)
          * @param preferV6 - when connecting to the control plane, prefer IPv6 address
          * if the name resolves to both (defaults to v4)
          */
@@ -100,23 +154,30 @@ namespace e2sar
             return useTls;
         }
 
+        /** set the token and token type */
+        inline void set_Token(const std::string &t, TokenType tt)
+        {
+            tokensByType[ttAsIdx(tt)] = t;
+        }
+
         /** set instance token based on gRPC return */
         inline void set_InstanceToken(const std::string &t)
         {
-            instanceToken = t;
+            tokensByType[ttAsIdx(TokenType::instance)] = t;
         }
 
         /** set session token based on gRPC return */
         inline void set_SessionToken(const std::string &t)
         {
-            sessionToken = t;
+            tokensByType[ttAsIdx(TokenType::session)] = t;
         }
 
         /** get instance token */
         inline const result<std::string> get_InstanceToken() const
         {
-            if (!instanceToken.empty())
-                return instanceToken;
+            auto idx = ttAsIdx(TokenType::instance);
+            if (!tokensByType[idx].empty())
+                return tokensByType[idx];
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Instance token not available"s};
         }
@@ -124,8 +185,9 @@ namespace e2sar
         /** get session token */
         inline const result<std::string> get_SessionToken() const
         {
-            if (!sessionToken.empty())
-                return sessionToken;
+            auto idx = ttAsIdx(TokenType::session);
+            if (!tokensByType[idx].empty())
+                return tokensByType[idx];
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Session token not available"s};
         }
@@ -133,8 +195,9 @@ namespace e2sar
         /** return the admin token */
         inline const result<std::string> get_AdminToken() const
         {
-            if (!adminToken.empty())
-                return adminToken;
+            auto idx = ttAsIdx(TokenType::admin);
+            if (!tokensByType[idx].empty())
+                return tokensByType[idx];
             else
                 return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Admin token not available"s};
         }
@@ -438,18 +501,16 @@ namespace e2sar
     {
 
         std::vector<ip::address> addresses;
-        boost::asio::io_service io_service;
+        boost::asio::io_context io_context;
 
         try
         {
-            ip::udp::resolver resolver(io_service);
-            ip::udp::resolver::query query(host_name, "443");
-            ip::udp::resolver::iterator iter = resolver.resolve(query);
-            ip::udp::resolver::iterator end; // End marker.
+            ip::udp::resolver resolver(io_context);
+            ip::udp::resolver::results_type results = resolver.resolve(host_name, "443");
 
-            while (iter != end)
+            for(auto i = results.begin(); i != results.end(); ++i)
             {
-                ip::udp::endpoint endpoint = *iter++;
+                ip::udp::endpoint endpoint = *i;
                 addresses.push_back(endpoint.address());
             }
             return addresses;
@@ -645,5 +706,17 @@ namespace e2sar
                 return instance;
             }
     };
+
+    /**
+     * Expand tilde (~) in file paths to home directory.
+     * Only supports ~/path format (not ~username/path).
+     * Falls back to original path if HOME environment variable is not set.
+     */
+    std::string expandTilde(const std::string& path);
+
+    /**
+     * Define a std::clog-based logger
+     */
+    void defineClogLogger();
 };
 #endif

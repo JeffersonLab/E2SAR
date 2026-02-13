@@ -471,7 +471,10 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         .def_readonly("lastErrno", &Reassembler::ReportedStats::lastErrno)
         .def_readonly("grpcErrCnt", &Reassembler::ReportedStats::grpcErrCnt)
         .def_readonly("dataErrCnt", &Reassembler::ReportedStats::dataErrCnt)
-        .def_readonly("lastE2SARError", &Reassembler::ReportedStats::lastE2SARError);
+        .def_readonly("lastE2SARError", &Reassembler::ReportedStats::lastE2SARError)
+        .def_readonly("totalPackets", &Reassembler::ReportedStats::totalPackets)
+        .def_readonly("totalBytes", &Reassembler::ReportedStats::totalBytes)
+        .def_readonly("badHeaderDiscards", &Reassembler::ReportedStats::badHeaderDiscards);
     reas.def("getStats", &Reassembler::getStats);
 
     // Return type: ip::address - convert to string for Python

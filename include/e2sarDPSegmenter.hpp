@@ -74,6 +74,8 @@ namespace e2sar
             const bool smooth;
             // use multiple destination ports (for back-to-back testing only)
             const bool multiPort;
+            // which LB header version are we using
+            const u_int8_t lbHdrVersion;
 
             // Max size of internal queue holding events to be sent. 
             static constexpr size_t QSIZE{2047};
@@ -96,7 +98,7 @@ namespace e2sar
             };
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
-            boost::lockfree::queue<EventQueueItem*> eventQueue{QSIZE};
+            boost::lockfree::queue<EventQueueItem*, boost::lockfree::fixed_sized<true>> eventQueue{QSIZE};
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
@@ -211,6 +213,7 @@ namespace e2sar
 
                 // flags
                 const bool useV6;
+                const bool ticksAsREEventNum;
 
                 // transmit parameters
                 size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
@@ -233,10 +236,11 @@ namespace e2sar
                 // to get random port numbers we skip low numbered privileged ports
                 boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
 
-                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool cnct=true): 
-                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, mtu{mtu}, 
-                    maxPldLen{mtu - TOTAL_HDR_LEN}, socketFd4(s.numSendSockets), 
-                    socketFd6(s.numSendSockets), ranlux{static_cast<u_int32_t>(std::time(0))} 
+                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool tasreenum, bool cnct=true): 
+                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, ticksAsREEventNum{tasreenum}, mtu{mtu}, 
+                    maxPldLen{mtu - getTotalHeaderLength(v6)}, socketFd4(s.numSendSockets), 
+                    socketFd6(s.numSendSockets),
+                    ranlux{static_cast<u_int32_t>(std::time(0))} 
                 {
                     // this way every segmenter send thread has a unique PRNG sequence
                     auto nowT = boost::chrono::system_clock::now();
@@ -309,7 +313,7 @@ namespace e2sar
                 if (not dpuri.has_dataAddr())
                     throw E2SARException("Data address is not present in the URI");
 
-                if (sendThreadState.mtu <= TOTAL_HDR_LEN)
+                if (sendThreadState.mtu <= getTotalHeaderLength(sendThreadState.useV6))
                     throw E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
             }
 
@@ -358,8 +362,10 @@ namespace e2sar
              * - smooth - shape on a per sendmsg() call rather than after every event, doesn't work for
              * send optimizations and only works at low speeds (~<3Gbps) {false}
              * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
-             * rather than a single port; source ports are still randomized (incompatible with a load balancer, 
-             * only useful in back-to-back testing) {false}
+             * rather than a single port; source ports are still randomized  {false}
+             * - ticksAsREEventNum - override the RE event number field with the same event number as LB event number
+             * which is a tick, primarily good for debugging {false}
+             * - lbHdrVersion - version of the LB header to be used (2 or 3 are valid) {2}
              */
             struct SegmenterFlags 
             {
@@ -374,12 +380,14 @@ namespace e2sar
                 int sndSocketBufSize;
                 float rateGbps;
                 bool smooth;
-                bool multiPort; 
+                bool multiPort;
+                bool ticksAsREEventNum;
+                u_int8_t lbHdrVersion; 
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
-                    multiPort{false} {}
+                    multiPort{false}, ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
@@ -504,7 +512,7 @@ namespace e2sar
             /**
              * Get the MTU currently in use by segmenter
              */
-            inline const u_int16_t getMTU() const noexcept
+            inline u_int16_t getMTU() const noexcept
             {
                 return sendThreadState.mtu;
             }
@@ -512,9 +520,17 @@ namespace e2sar
             /**
              * get the maximum payload length used by the segmenter
              */
-            inline const size_t getMaxPldLen() const noexcept
+            inline size_t getMaxPldLen() const noexcept
             {
                 return sendThreadState.maxPldLen;
+            }
+
+            /**
+             * Check if segmenter is using IPv6 for dataplane
+             */
+            inline bool isUsingIPv6() const noexcept
+            {
+                return sendThreadState.useV6;
             }
             /*
             * Tell threads to stop

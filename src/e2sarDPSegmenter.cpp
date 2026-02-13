@@ -34,19 +34,23 @@ namespace e2sar
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
         smooth{sflags.smooth},
         multiPort{sflags.multiPort},
-        eventStatsBuffer{sflags.syncPeriods},
-        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
-        // set thread index to 0 for a single send thread
-        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.connectedSocket),
-        cpuCoreList{cpuCoreList},
+        lbHdrVersion{sflags.lbHdrVersion},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
         ringMtxs(sflags.numSendSockets),
 #endif
+        eventStatsBuffer{sflags.syncPeriods},
+        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
+        // set thread index to 0 for a single send thread
+        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.ticksAsREEventNum, sflags.connectedSocket),
+        cpuCoreList{cpuCoreList},
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
         addEntropy{(clockEntropyTest() > MIN_CLOCK_ENTROPY ? false : true)}
     {
+        if ((lbHdrVersion < 2) || (lbHdrVersion > 3))
+            throw E2SARException("Only allowed LB header version numbers are 2 or 3"s);
+
         size_t mtu = 0;
 #if NETLINK_CAPABLE
         // determine the outgoing interface and its MTU based on URI data address 
@@ -105,7 +109,7 @@ namespace e2sar
 #endif
         // override the values set in constructor
         sendThreadState.mtu = mtu;
-        sendThreadState.maxPldLen = mtu - TOTAL_HDR_LEN;
+        sendThreadState.maxPldLen = mtu - getTotalHeaderLength(sendThreadState.useV6);
         
 #ifdef LIBURING_AVAILABLE
         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
@@ -372,7 +376,7 @@ namespace e2sar
         boost::unique_lock<boost::mutex> condLock(seg.sendThreadMtx);
 
         // create a thread pool for sending events 
-        thread_local boost::asio::thread_pool threadPool(seg.numSendSockets);
+        boost::asio::thread_pool threadPool(seg.numSendSockets);
         boost::chrono::high_resolution_clock::time_point nowTE;
         int64_t interEventSleepUsec{0};
         // per thread rate and inter-frame sleep if needed
@@ -433,8 +437,8 @@ namespace e2sar
                                 item->callback(item->cbArg);
                         }
                         
-                        // free item here
-                        free(item);
+                        // delete item here to properly call destructor
+                        delete item;
                 });
 
                 // busy wait if needed for inter-event period 
@@ -445,9 +449,7 @@ namespace e2sar
                 }
             }
         }
-        // wait for all threads to complete
-        threadPool.join();
-
+        // not doing .join or stop for threadpool as it's d-tor will do it
 #ifdef LIBURING_AVAILABLE
         // reap the remaining CQEs
         while(seg.outstandingSends > 0) 
@@ -673,10 +675,6 @@ namespace e2sar
             mmsgvec = static_cast<struct mmsghdr*>(malloc(numBuffers*sizeof(struct mmsghdr)));
 #endif
 
-        // new random entropy generated for each event buffer, unless user specified it
-        if (entropy == 0)
-            entropy = randDist(ranlux);
-
         // randomize source port using round robin
         sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
         // prepare msghdr
@@ -715,6 +713,15 @@ namespace e2sar
         else
             lbEventNum = now;
 
+        // overwrite EventNum outside the while loop to save time
+        // if the user requests LB and RE event numbers to match
+        if (ticksAsREEventNum)
+            eventNum = lbEventNum;
+
+        // new random entropy generated for each event, unless user specified it
+        if (entropy == 0)
+            entropy = randDist(ranlux);
+            
         // break up event into a series of datagrams prepended with LB+RE header
         while (curOffset < eventEnd)
         {
@@ -723,13 +730,25 @@ namespace e2sar
             // fill out LB and RE headers
             void *hdrspace = malloc(sizeof(LBREHdr));
             // placement-new to construct the headers
-            auto hdr = new (hdrspace) LBREHdr();
+            auto hdr = new (hdrspace) LBREHdr(seg.lbHdrVersion);
             // allocate iov (this returns two entries)
             auto iov = static_cast<struct iovec*>(malloc(2*sizeof(struct iovec)));
 
             // note that buffer length is in fact event length, hence 3rd parameter is 'bytes'
             hdr->re.set(dataId, curOffset - event, bytes, eventNum);
-            hdr->lb.set(entropy, lbEventNum);
+            switch(seg.lbHdrVersion) {
+                default:
+                    // default to 2
+                case 2: 
+                    hdr->lbu.lb2.set(entropy, lbEventNum);
+                    break;
+                case 3:
+                    // slot select - 16 lsbs of tick (same for all segments)
+                    // port select - uniform 16 bit (new for each event)
+                    hdr->lbu.lb3.set(lbEventNum&0xFFFF, entropy, lbEventNum);
+                    break;
+            }
+            
 
             // fill in iov and attach to msghdr
             // LB+RE header
@@ -904,8 +923,8 @@ namespace e2sar
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
 
-        // have to zero out or else destructor is called in the assignment of cbArg below
-        EventQueueItem *item = reinterpret_cast<EventQueueItem*>(calloc(1, sizeof(EventQueueItem)));
+        // use new to properly construct boost::any member
+        EventQueueItem *item = new EventQueueItem();
         item->bytes = bytes;
         item->event = event;
         item->entropy = entropy;
@@ -928,8 +947,11 @@ namespace e2sar
         boost::property_tree::ptree paramTree;
         Segmenter::SegmenterFlags sFlags;
 
+        // Expand tilde in file path
+        std::string expandedPath = expandTilde(iniFile);
+
         try {
-            boost::property_tree::ini_parser::read_ini(iniFile, paramTree);
+            boost::property_tree::ini_parser::read_ini(expandedPath, paramTree);
         } catch(boost::property_tree::ini_parser_error &ie) {
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, 
                 "Unable to parse the segmenter flags configuration file "s + iniFile};
@@ -949,6 +971,8 @@ namespace e2sar
         sFlags.dpV6 = paramTree.get<bool>("data-plane.dpV6", sFlags.dpV6);
         sFlags.connectedSocket = paramTree.get<bool>("data-plane.connectedSocket", 
             sFlags.connectedSocket);
+        sFlags.ticksAsREEventNum = paramTree.get<bool>("data-plane.ticksAsREEventNum",
+            sFlags.ticksAsREEventNum);
         sFlags.mtu = paramTree.get<u_int16_t>("data-plane.mtu", sFlags.mtu);
         sFlags.numSendSockets = paramTree.get<size_t>("data-plane.numSendSockets", 
             sFlags.numSendSockets);
@@ -960,6 +984,8 @@ namespace e2sar
             sFlags.smooth);
         sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
             sFlags.multiPort);
+        sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion", 
+            sFlags.lbHdrVersion);
 
         return sFlags;
     }

@@ -17,6 +17,16 @@ void init_e2sarUtil(py::module_ &m) {
         .value("admin", EjfatURI::TokenType::admin)
         .value("instance", EjfatURI::TokenType::instance)
         .value("session", EjfatURI::TokenType::session)
+        .value("all", EjfatURI::TokenType::all)
+        .value("load_balancer", EjfatURI::TokenType::load_balancer)
+        .value("reservation", EjfatURI::TokenType::reservation)
+        .export_values();
+
+    py::enum_<EjfatURI::TokenPermission>(ejfat_uri, "TokenPermission")
+        .value("_read_only_", EjfatURI::TokenPermission::_read_only_)
+        .value("_register_", EjfatURI::TokenPermission::_register_)
+        .value("_reserve_", EjfatURI::TokenPermission::_reserve_)
+        .value("_update_", EjfatURI::TokenPermission::_update_)
         .export_values();
 
     // Constructor
