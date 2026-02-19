@@ -665,6 +665,19 @@ namespace e2sar
                     for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
                         i->threadObj.join();
 
+                    // drain event queue
+                    EventQueueItem* item{nullptr};
+                    bool a{false};
+                    do {
+                        a = eventQueue.pop(item);
+                        if (a) 
+                        {
+                            if (item->event != nullptr)
+                                delete[] item->event;
+                            delete item;
+                        }
+                    } while (a);
+
                     gcThreadState.threadObj.join();
                 }
             }

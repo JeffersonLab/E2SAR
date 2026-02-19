@@ -937,8 +937,10 @@ namespace e2sar
         //sendThreadCond.notify_one();
         if (res)
             return 0;
-        else
+        else {
+            delete item;
             return E2SARErrorInfo{E2SARErrorc::MemoryError, "Send queue is temporarily full, try again later"};
+        }
     }
 
     result<Segmenter::SegmenterFlags> Segmenter::SegmenterFlags::getFromINI(const std::string &iniFile) noexcept
