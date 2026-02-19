@@ -5,6 +5,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 ## v0.3.1
 
 - Reversed the order of removing senders and shutting down send threads in e2sar_perf to ensure no losses occur due to premature de-listing of the sender IP in LB
+- Fixed multiple memory leaks in segmenter and reassembler
 
 ## v0.3.0
 
