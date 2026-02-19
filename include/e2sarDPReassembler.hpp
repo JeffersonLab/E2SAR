@@ -679,6 +679,12 @@ namespace e2sar
                     } while (a);
 
                     gcThreadState.threadObj.join();
+
+                    // drain lost events queue - tuples are heap-allocated in logLostEvent
+                    // and only freed by get_LostEvent(); if the caller never calls it they leak
+                    boost::tuple<EventNum_t, u_int16_t, size_t>* evtPtr{nullptr};
+                    while (recvStats.lostEventsQueue.pop(evtPtr))
+                        delete evtPtr;
                 }
             }
         protected:
