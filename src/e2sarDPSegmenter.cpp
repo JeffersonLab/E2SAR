@@ -451,6 +451,10 @@ namespace e2sar
             }
         }
         // not doing .join or stop for threadpool as it's d-tor will do it
+        
+        // drain all pending lambdas before the destructor calls stop() which
+        // would abandon queued-but-not-started handlers and leak their items
+        threadPool.join();
 #ifdef LIBURING_AVAILABLE
         // reap the remaining CQEs
         while(seg.outstandingSends > 0) 
