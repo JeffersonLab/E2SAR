@@ -74,7 +74,7 @@ e2sar_opt_test =  executable('e2sar_opt_test', 'e2sar_opt_test.cpp',
                             include_directories: inc,
                             link_with: libe2sar,
 		            link_args: linker_flags,
-                            dependencies: [boost_dep])    
+                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
 
 # these tests have conditional compilation and may be NOOPs on non-linux platforms
 e2sar_netutil_test = executable('e2sar_netutil_test', 'e2sar_netutil_test.cpp',

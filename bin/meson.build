@@ -30,4 +30,4 @@ executable('e2sar_udp_relay', 'e2sar_udp_relay.cpp',
             link_with: libe2sar,
             install: true,
             link_args: linker_flags,
-            dependencies: [boost_dep, thread_dep])
+            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep])
