@@ -52,6 +52,7 @@ namespace e2sar
         static result<boost::tuple<std::string, u_int16_t>> getInterfaceAndMTU(const ip::address &addr);
 
 #endif
+        static result<int> getSocketOutstandingBytes(int sockfd) noexcept;
     };
 }
 #endif

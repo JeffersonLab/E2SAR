@@ -2,6 +2,10 @@
 
 API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
 
+## v0.3.1
+
+- Reversed the order of removing senders and shutting down send threads in e2sar_perf to ensure no losses occur due to premature de-listing of the sender IP in LB
+
 ## v0.3.0
 
 - Dependencies change - Boost 1.89.0 and gRPC 1.74.1 

@@ -76,6 +76,26 @@ if compiler.compiles(mmsgcode, name: 'sendmmsg check')
         add_project_arguments('-DSENDMMSG_AVAILABLE', language: ['cpp'])
 endif
 
+outqcode = '''
+#include <sys/ioctl.h>
+void f() {
+      ioctl(0, TIOCOUTQ, nullptr);
+}
+'''
+if compiler.compiles(outqcode, name: 'ioctl TIOCOUTQ check')
+        add_project_arguments('-DSIOCOUTQ_AVAILABLE', language: ['cpp'])
+endif
+
+sockoptnwritecode = '''
+#include <sys/socket.h>
+void f() {
+      getsockopt(0, SOL_SOCKET, SO_NWRITE, nullptr, nullptr);
+}
+'''
+if compiler.compiles(sockoptnwritecode, name: 'setsockopt SO_NWRITE check')
+        add_project_arguments('-DSO_NWRITE_AVAILABLE', language: ['cpp'])
+endif
+
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
 # -Wall

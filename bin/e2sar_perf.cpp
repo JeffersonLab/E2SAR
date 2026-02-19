@@ -46,6 +46,9 @@ void shutDown()
     boost::chrono::milliseconds duration(1000);
     boost::this_thread::sleep_for(duration);
     if (segPtr != nullptr) {
+        // d-tor will stop the threads - it is important to do that before removing sender
+        // to make sure outstanding data is sent out
+        delete segPtr;
         if (lbmPtr != nullptr) {
             std::cout << "Removing senders: ";
             if (senders.size() > 0)
@@ -64,8 +67,6 @@ void shutDown()
                     std::cerr << "Unable to remove auto-detected sender from list on exit: " << rmres.error().message() << std::endl;
             }
         }
-        // d-tor will stop the threads
-        delete segPtr;
     }
     if (reasPtr != nullptr)
     {

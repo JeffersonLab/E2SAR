@@ -11,6 +11,7 @@
 
 #include "e2sarDPSegmenter.hpp"
 #include "e2sarUtil.hpp"
+#include "e2sarNetUtil.hpp"
 #include "e2sarAffinity.hpp"
 
 
@@ -869,14 +870,12 @@ namespace e2sar
     // otherwise just close
     result<int> Segmenter::SendThreadState::_waitAndCloseFd(int fd)
     {
-        int outq = 0;
         bool stop{false};
         // busy wait while the socket has outstanding data
         while(!stop)
         {
-            if (ioctl(fd, TIOCOUTQ, &outq) == 0)
-                stop = (outq == 0);
-            else
+            auto res = NetUtil::getSocketOutstandingBytes(fd);
+            if (res.has_error() || ((not res.has_error()) && (res.value() == 0)))
                 stop = true;
         }
         close(fd);
