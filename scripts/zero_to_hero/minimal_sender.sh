@@ -274,7 +274,7 @@ trap 'write_end_time' EXIT INT TERM
 {
     echo "START_TIME (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
     echo ""
-} | tee minimal_sender.log
+} | tee minimal_sender.log || true
 
 # Start memory monitoring if enabled
 if [[ "$ENABLE_MONITOR" == "true" ]]; then
@@ -285,10 +285,10 @@ if [[ "$ENABLE_MONITOR" == "true" ]]; then
 fi
 
 # Run the container and append output
-"${CMD[@]}" 2>&1 | tee -a minimal_sender.log
-
-# Capture exit code
-CONTAINER_EXIT_CODE=$?
+# Use || true to prevent pipefail from failing on SIGPIPE in tee
+# Use PIPESTATUS[0] to capture container's exit code (not tee's)
+"${CMD[@]}" 2>&1 | tee -a minimal_sender.log || true
+CONTAINER_EXIT_CODE=${PIPESTATUS[0]}
 
 # Write end time and exit code (trap will also write, but this ensures it's in the tee'd output)
 {
@@ -301,7 +301,7 @@ CONTAINER_EXIT_CODE=$?
         echo ""
         echo "Memory monitoring log: minimal_sender_memory.log"
     fi
-} | tee -a minimal_sender.log
+} | tee -a minimal_sender.log || true
 
 # Exit with container's exit code
 exit $CONTAINER_EXIT_CODE

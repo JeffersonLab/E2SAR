@@ -185,20 +185,20 @@ trap 'write_end_time' EXIT INT TERM
 {
     echo "START_TIME (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
     echo ""
-} | tee minimal_receiver.log
+} | tee minimal_receiver.log || true
 
 # Run the container and append output
-"${CMD[@]}" 2>&1 | tee -a minimal_receiver.log
-
-# Capture exit code
-CONTAINER_EXIT_CODE=$?
+# Use || true to prevent pipefail from failing on SIGPIPE in tee
+# Use PIPESTATUS[0] to capture container's exit code (not tee's)
+"${CMD[@]}" 2>&1 | tee -a minimal_receiver.log || true
+CONTAINER_EXIT_CODE=${PIPESTATUS[0]}
 
 # Write end time and exit code (trap will also write, but this ensures it's in the tee'd output)
 {
     echo ""
     echo "END_TIME (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
     echo "EXIT_CODE: $CONTAINER_EXIT_CODE"
-} | tee -a minimal_receiver.log
+} | tee -a minimal_receiver.log || true
 
 # Exit with container's exit code
 exit $CONTAINER_EXIT_CODE
