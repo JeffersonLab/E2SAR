@@ -35,8 +35,8 @@
 #SBATCH -q debug
 #SBATCH -t 00:30:00
 #SBATCH -J ejfat_minimal
-#SBATCH -o slurm-%j.out
-#SBATCH -e slurm-%j.err
+#SBATCH -o ./slurm-%j.out
+#SBATCH -e ./slurm-%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=$USER@nersc.gov
 
@@ -124,10 +124,11 @@ echo "Job ID: $SLURM_JOB_ID"
 echo ""
 
 # Get script directory (where minimal_*.sh scripts are located)
-# SLURM copies the script to a temp dir, so we need to find the actual scripts location
-# Use SLURM_SUBMIT_DIR which is where sbatch was called from
-if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
-    SCRIPT_DIR="${SLURM_SUBMIT_DIR}"
+# SLURM copies the script to a temp dir, but we can find the original location
+# Use the original script's directory, not the submit directory
+if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+    # In SLURM environment - find the actual script directory
+    SCRIPT_DIR="/global/homes/y/yak/E2SAR/scripts/zero_to_hero"
 else
     # Fallback for local testing
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
