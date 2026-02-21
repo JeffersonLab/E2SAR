@@ -19,6 +19,7 @@
 #   --port PORT       Receiver data port (default: 10000)
 #   --image IMAGE     Container image (default: ibaldin/e2sar:0.3.1a3)
 #   --ipv6            Use IPv6 (default: false)
+#   -v                Skip SSL certificate validation (default: disabled)
 #
 # Note: Receivers always run with --duration 0 (indefinite) and are terminated
 #       with SIGKILL after the sender completes.
@@ -52,6 +53,7 @@ MTU=""
 PORT=""
 IMAGE=""
 IPV6_FLAG=""
+V_FLAG=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -81,6 +83,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ipv6)
             IPV6_FLAG="--ipv6"
+            shift
+            ;;
+        -v)
+            V_FLAG="-v"
             shift
             ;;
         --help)
@@ -173,6 +179,7 @@ RECEIVER_ARGS+=(--duration 0)
 [[ -n "$MTU" ]] && SENDER_ARGS+=(--mtu "$MTU")
 [[ -n "$PORT" ]] && RECEIVER_ARGS+=(--port "$PORT")
 [[ -n "$IPV6_FLAG" ]] && SENDER_ARGS+=("$IPV6_FLAG") && RECEIVER_ARGS+=("$IPV6_FLAG")
+[[ -n "$V_FLAG" ]] && SENDER_ARGS+=("$V_FLAG") && RECEIVER_ARGS+=("$V_FLAG")
 
 echo "Sender arguments: ${SENDER_ARGS[*]:-<none>}"
 echo "Receiver arguments: ${RECEIVER_ARGS[*]:-<none>}"
