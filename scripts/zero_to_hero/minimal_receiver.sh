@@ -12,6 +12,7 @@
 #   --port PORT       Data port (default: 10000)
 #   --duration SEC    Run duration in seconds (default: 0 = indefinite)
 #   --ipv6            Use IPv6 (default: false)
+#   -v                Skip SSL certificate validation (default: disabled)
 #   --threads NUM     Number of receive threads (default: 8)
 #   --deq NUM         Number of dequeue threads (default: 4)
 #   --bufsize SIZE    Socket buffer size in bytes (default: 134217728)
@@ -19,12 +20,18 @@
 
 set -euo pipefail
 
+# Script location (for finding sibling scripts if needed)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Artifacts are created in the current working directory (not script directory)
+
 # Default values
 EJFAT_URI="${EJFAT_URI:-}"
 E2SAR_IMAGE="${E2SAR_IMAGE:-ibaldin/e2sar:0.3.1a3}"
 DATA_PORT="10000"
 DURATION="0"
 USE_IPV6="false"
+SKIP_SSL_VERIFY="false"
 RECV_THREADS="16"
 DEQUEUE_THREADS="16"
 BUFFER_SIZE="134217728"
@@ -46,6 +53,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ipv6)
             USE_IPV6="true"
+            shift
+            ;;
+        -v)
+            SKIP_SSL_VERIFY="true"
             shift
             ;;
         --threads)
@@ -148,6 +159,11 @@ CMD=(
     --deq="$DEQUEUE_THREADS"
     --bufsize="$BUFFER_SIZE"
 )
+
+# Add -v flag if SSL verification should be skipped
+if [[ "$SKIP_SSL_VERIFY" == "true" ]]; then
+    CMD+=(-v)
+fi
 
 echo ""
 echo "Running: ${CMD[*]}"

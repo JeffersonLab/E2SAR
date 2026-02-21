@@ -14,10 +14,16 @@
 #   --num COUNT       Number of events to send (default: 100)
 #   --mtu MTU         MTU size in bytes (default: 9000)
 #   --ipv6            Use IPv6 (default: false)
+#   -v                Skip SSL certificate validation (default: disabled)
 #   --no-monitor      Disable memory monitoring (default: enabled)
 #   --help            Show this help message
 
 set -euo pipefail
+
+# Script location (for finding sibling scripts if needed)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Artifacts are created in the current working directory (not script directory)
 
 # Memory monitoring process ID
 MEMORY_MONITOR_PID=""
@@ -30,6 +36,7 @@ LENGTH="1048576"
 NUM="100"
 MTU="9000"
 USE_IPV6="false"
+SKIP_SSL_VERIFY="false"
 ENABLE_MONITOR="true"
 
 # Parse command line arguments
@@ -57,6 +64,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ipv6)
             USE_IPV6="true"
+            shift
+            ;;
+        -v)
+            SKIP_SSL_VERIFY="true"
             shift
             ;;
         --no-monitor)
@@ -231,6 +242,11 @@ CMD=(
     --mtu="$MTU"
     --bufsize=134217728
 )
+
+# Add -v flag if SSL verification should be skipped
+if [[ "$SKIP_SSL_VERIFY" == "true" ]]; then
+    CMD+=(-v)
+fi
 
 echo ""
 echo "Running: ${CMD[*]}"
