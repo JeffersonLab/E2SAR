@@ -24,6 +24,33 @@ Before starting, make sure you have:
 3. **Network access**: Connectivity to the EJFAT load balancer
 4. **The minimal scripts**: All scripts should be in the same directory
 
+### Optional: Setup for Easy Access
+
+You can add the scripts to your PATH for convenient access from any directory:
+
+```bash
+# Option 1: Temporary setup (current shell only)
+source /path/to/zero_to_hero/setup_env.sh
+
+# Option 2: Permanent setup (add to ~/.bashrc or ~/.zshrc)
+echo 'source /path/to/zero_to_hero/setup_env.sh' >> ~/.bashrc
+# Then start a new shell or: source ~/.bashrc
+```
+
+**After setup:**
+- Run scripts from any directory without full paths
+- All artifacts (INSTANCE_URI, logs) are created in your current directory
+- Example:
+  ```bash
+  mkdir -p ~/e2sar_tests && cd ~/e2sar_tests
+  minimal_reserve.sh  # Works! Artifacts created here
+  ```
+
+**Without setup:**
+- Use full paths: `/path/to/minimal_sender.sh`
+- Or run from the script directory: `cd /path/to/zero_to_hero && ./minimal_sender.sh`
+- Artifacts are still created in your current working directory
+
 ### Quick Overview of the Workflow
 
 The E2SAR testing workflow follows a simple four-step pattern:
@@ -206,6 +233,9 @@ The sender script transmits network events through the load balancer to register
 | `--length LENGTH` | Event buffer size in bytes | 1048576 (1 MB) |
 | `--num COUNT` | Number of events to send | 100 |
 | `--mtu MTU` | MTU size in bytes | 9000 |
+| `--ipv6` | Use IPv6 instead of IPv4 | false |
+| `-v` | Skip SSL certificate validation | disabled |
+| `--no-monitor` | Disable memory monitoring | false (monitoring enabled) |
 | `--image IMAGE` | Container image override | ibaldin/e2sar:0.3.1a3 |
 | `--help` | Show help message | - |
 
@@ -224,6 +254,14 @@ This sends 1000 events at 10 Gbps with 2 MB buffers (total: ~2 GB of data).
 ```
 
 Uses 9000-byte MTU (jumbo frames) for improved efficiency on networks that support it.
+
+**Example: Skip SSL certificate validation (testing/dev)**
+
+```bash
+./minimal_sender.sh -v --rate 5
+```
+
+Skips SSL certificate validation - useful for testing environments with self-signed certificates.
 
 **What the sender does:**
 
@@ -256,6 +294,8 @@ The receiver script waits for and processes incoming network events.
 | `--threads NUM` | Number of receive threads | 16 |
 | `--deq NUM` | Number of dequeue threads | 16 |
 | `--bufsize SIZE` | Socket buffer size in bytes | 134217728 |
+| `--ipv6` | Use IPv6 instead of IPv4 | false |
+| `-v` | Skip SSL certificate validation | disabled |
 | `--image IMAGE` | Container image override | ibaldin/e2sar:0.3.1a3 |
 | `--help` | Show help message | - |
 
@@ -282,6 +322,14 @@ This uses a custom data port for receiving.
 ```
 
 Doubles the thread count and socket buffer size for maximum throughput.
+
+**Example: Skip SSL certificate validation (testing/dev)**
+
+```bash
+./minimal_receiver.sh -v --duration 60
+```
+
+Skips SSL certificate validation - useful for testing environments with self-signed certificates.
 
 **Understanding receiver behavior:**
 

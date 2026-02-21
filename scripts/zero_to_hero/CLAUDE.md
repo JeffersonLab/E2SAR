@@ -39,6 +39,50 @@ All operations use the `ibaldin/e2sar:0.3.1a3` container image via `podman-hpc`.
 
 The reservation creates an `INSTANCE_URI` file that contains the `EJFAT_URI` needed by sender and receiver scripts.
 
+## Setup and Environment Configuration
+
+### Directory-Independent Operation
+
+The scripts can be run from any directory. All artifacts (INSTANCE_URI, log files) are created in the current working directory, not the script directory.
+
+### One-Time Setup (Optional)
+
+Add the scripts to your PATH for easy access:
+
+```bash
+# Option 1: Source directly (temporary, current shell only)
+source /path/to/zero_to_hero/setup_env.sh
+
+# Option 2: Add to shell config (permanent)
+echo 'source /path/to/zero_to_hero/setup_env.sh' >> ~/.bashrc  # or ~/.zshrc
+```
+
+After sourcing the setup script:
+
+```bash
+# Create your working directory
+mkdir -p ~/my_tests && cd ~/my_tests
+
+# Scripts are now in your PATH - run from anywhere
+minimal_reserve.sh
+minimal_sender.sh --rate 5
+minimal_receiver.sh --duration 60
+
+# All artifacts are created in the current directory
+ls  # Shows: INSTANCE_URI, minimal_sender.log, minimal_receiver.log, etc.
+```
+
+### Running Without Setup Script
+
+You can also invoke scripts with full paths:
+
+```bash
+cd /tmp/my_test
+EJFAT_URI="..." /path/to/zero_to_hero/minimal_reserve.sh
+/path/to/zero_to_hero/minimal_sender.sh --rate 5
+# Artifacts are still created in /tmp/my_test
+```
+
 ## Common Commands
 
 ### Reservation Management
@@ -70,6 +114,9 @@ podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1
 
 # Disable memory monitoring (for pure performance benchmarking)
 ./minimal_sender.sh --no-monitor --rate 10
+
+# Skip SSL certificate validation (for testing/dev environments)
+./minimal_sender.sh -v --rate 5
 ```
 
 ### Receiver Operations
@@ -88,6 +135,9 @@ podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1
 
 # High-throughput receiver (more threads and buffer)
 ./minimal_receiver.sh --threads 32 --deq 32 --bufsize 268435456
+
+# Skip SSL certificate validation (for testing/dev environments)
+./minimal_receiver.sh -v --duration 60
 ```
 
 ## Configuration System
@@ -117,6 +167,7 @@ The system automatically detects appropriate IP addresses by:
 - `--num`: Number of events to send (default: 100)
 - `--mtu`: MTU size in bytes (default: 9000)
 - `--ipv6`: Use IPv6 instead of IPv4
+- `-v`: Skip SSL certificate validation (default: disabled)
 - `--no-monitor`: Disable automatic memory monitoring
 - `--image`: Override container image
 
@@ -127,6 +178,7 @@ The system automatically detects appropriate IP addresses by:
 - `--deq`: Number of dequeue threads (default: 16)
 - `--bufsize`: Socket buffer size in bytes (default: 134217728 = 128MB)
 - `--ipv6`: Use IPv6 instead of IPv4
+- `-v`: Skip SSL certificate validation (default: disabled)
 - `--image`: Override container image
 
 ### Container Optimizations
@@ -222,6 +274,9 @@ EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh --rate 10 --num 
 
 # Override SLURM parameters
 sbatch -A <project> -q regular -t 01:00:00 perlmutter_slurm.sh --rate 20 --mtu 9000
+
+# Skip SSL certificate validation
+EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh -v --rate 10
 ```
 
 **Key features:**

@@ -2,6 +2,20 @@
 
 This repository contains a containerized E2SAR (Enhanced End-to-End Send And Receive) framework for high-performance network testing in HPC environments.
 
+## Optional: Setup for Easy Access
+
+Add scripts to your PATH to run them from any directory:
+
+```bash
+# Temporary (current shell)
+source /path/to/zero_to_hero/setup_env.sh
+
+# Permanent (add to ~/.bashrc or ~/.zshrc)
+echo 'source /path/to/zero_to_hero/setup_env.sh' >> ~/.bashrc
+```
+
+After setup, create working directories and run scripts from anywhere - all artifacts are created in your current directory.
+
 ## Quick Start
 
 ### 1. Create Reservation
