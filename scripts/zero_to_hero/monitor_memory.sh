@@ -10,6 +10,11 @@
 
 set -euo pipefail
 
+# Script location (for finding sibling scripts if needed)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Artifacts are created in the current working directory (not script directory)
+
 INTERVAL="${1:-1}"
 LOG_FILE="memory_monitor.log"
 

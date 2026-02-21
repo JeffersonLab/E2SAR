@@ -8,6 +8,11 @@
 
 set -euo pipefail
 
+# Script location (for finding sibling scripts if needed)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Artifacts are created in the current working directory (not script directory)
+
 INSTANCE_URI_FILE="INSTANCE_URI"
 
 # Validate EJFAT_URI
