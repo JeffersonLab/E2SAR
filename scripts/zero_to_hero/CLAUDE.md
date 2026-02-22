@@ -21,23 +21,29 @@ All operations use the `ibaldin/e2sar:0.3.1a3` container image via `podman-hpc`.
 
 **Always follow this sequence:**
 
-1. **Reserve resources first:**
+1. **Reserve resources first** (requires admin `EJFAT_URI` in environment; no `-v` flag):
    ```bash
    EJFAT_URI="ejfat://token@host:port/lb/1?sync=..." ./minimal_reserve.sh
    ```
 
 2. **Run sender and/or receiver** (can run simultaneously):
    ```bash
-   ./minimal_sender.sh [OPTIONS]
-   ./minimal_receiver.sh [OPTIONS]
+   ./minimal_sender.sh [OPTIONS]   # pass -v if SSL cert is expired
+   ./minimal_receiver.sh [OPTIONS] # pass -v if SSL cert is expired
    ```
 
-3. **Free resources when done:**
+3. **Free resources when done** (pass `-v` if SSL cert is expired):
    ```bash
-   ./minimal_free.sh
+   ./minimal_free.sh [-v]
    ```
 
-The reservation creates an `INSTANCE_URI` file that contains the `EJFAT_URI` needed by sender and receiver scripts.
+The reservation creates an `INSTANCE_URI` file that contains the session `EJFAT_URI` needed
+by sender and receiver scripts.
+
+**Note on `-v` (skip SSL cert validation):** Pass `-v` to `minimal_sender.sh`,
+`minimal_receiver.sh`, and `minimal_free.sh` when the LB control plane SSL certificate has
+expired. Do NOT pass `-v` to `minimal_reserve.sh` — reserve uses the admin token which skips
+cert validation unconditionally, and passing `--novalidate` to lbadm reserve causes failures.
 
 ## Setup and Environment Configuration
 
@@ -250,6 +256,39 @@ podman-hpc run --rm --network host ibaldin/e2sar:0.3.1a3 e2sar_perf --help
 2. **Invalid reservation**: Re-run `minimal_reserve.sh` to create new reservation
 3. **Network detection failure**: Check connectivity to load balancer hostname
 4. **Container issues**: Verify `podman-hpc` and image availability
+5. **SSL certificate expired**: The LB control plane certificate may expire. Pass `-v` to
+   sender/receiver and `minimal_free.sh` scripts to skip validation. Note that `-v` is NOT
+   accepted by `minimal_reserve.sh` — reserve uses the admin token which skips cert validation
+   unconditionally; passing `--novalidate` to lbadm reserve breaks this and causes failures.
+   If `minimal_free.sh -v` still fails (lbadm's `--novalidate` does not fully bypass gRPC-level
+   SSL), use the admin token method below to free reservations directly.
+
+### Freeing Reservations with the Admin Token
+
+When `minimal_free.sh` fails due to an expired SSL certificate, use the admin `EJFAT_URI`
+(set in your environment) with `lbadm --free --lbid` to free reservations directly. The admin
+token code path in `lbadm` skips certificate validation unconditionally.
+
+```bash
+# View all active reservations and their LB IDs
+podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 \
+    lbadm --overview
+
+# Free a specific reservation by LB ID (replace 302 with the actual ID)
+podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 \
+    lbadm --free --lbid 302
+
+# Free multiple orphaned reservations at once
+for lbid in 301 302 303; do
+    podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 \
+        lbadm --free --lbid $lbid
+done
+```
+
+The LB ID for a specific job's reservation can be found in:
+- The `INSTANCE_URI` file: the number after `/lb/` in the URI
+- The SLURM job output (`slurm-<JOBID>.out`): logged during Phase 1 reservation
+- `lbadm --overview` output: lists all active reservations with their IDs
 
 ### Cleanup and Reset
 ```bash
@@ -263,58 +302,60 @@ EJFAT_URI="..." ./minimal_reserve.sh
 
 ## SLURM Batch Processing (Perlmutter)
 
-The `perlmutter_slurm.sh` script orchestrates distributed tests on Perlmutter HPC system:
+The `perlmutter_slurm.sh` script orchestrates distributed tests on Perlmutter HPC system.
+Each job creates its own fresh LB reservation on startup and frees it on completion.
 
 ```bash
-# Basic SLURM submission
-EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh
+# Basic SLURM submission (EJFAT_URI must be the admin URI set in your environment)
+sbatch -A <project> perlmutter_slurm.sh
 
 # With custom test parameters
-EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh --rate 10 --num 5000 --length 2097152
+sbatch -A <project> perlmutter_slurm.sh --rate 10 --num 5000 --length 2097152
 
 # Override SLURM parameters
-sbatch -A <project> -q regular -t 01:00:00 perlmutter_slurm.sh --rate 20 --mtu 9000
+sbatch -A <project> -q debug -t 00:30:00 perlmutter_slurm.sh --rate 20 --mtu 9000
 
-# Skip SSL certificate validation
-EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh -v --rate 10
+# Skip SSL certificate validation for sender/receiver/free (not needed for reserve)
+sbatch -A <project> perlmutter_slurm.sh -v --rate 10
 ```
+
+**Important:** `EJFAT_URI` must be the admin URI already set in your shell environment.
+Do NOT source an `INSTANCE_URI` file before submitting — that would overwrite the admin
+`EJFAT_URI` with a session token, which cannot create new reservations.
 
 **Key features:**
 - Designed specifically for Perlmutter at NERSC
 - Uses exactly 2 nodes (Node 0: receiver, Node 1: sender)
-- Creates isolated working directory: `runs/slurm_job_<JOBID>/`
+- Creates a fresh LB reservation per job in an isolated working directory: `runs/slurm_job_<JOBID>/`
 - Handles reservation, execution, and cleanup automatically
-- Collects all logs in job-specific directory
-
-**Pre-create reservation (recommended):**
-```bash
-# On login node before submitting job
-EJFAT_URI="ejfat://..." ./minimal_reserve.sh
-
-# Then submit (avoids waiting for allocation to discover reservation issues)
-EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh
-```
+- Collects all logs in the job-specific directory
 
 ### Multi-Instance SLURM Testing (Perlmutter)
 
-The `perlmutter_multi_slurm.sh` script enables testing with multiple concurrent senders and receivers. Senders and receivers share the same node pool and can be co-located on the same nodes.
+The `perlmutter_multi_slurm.sh` script enables testing with multiple concurrent senders and
+receivers. Senders and receivers share the same node pool and can be co-located on the same
+nodes. Like `perlmutter_slurm.sh`, each job creates its own fresh LB reservation.
 
 ```bash
 # 4 receivers + 4 senders co-located on 2 nodes (2 of each per node)
-EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
     --receivers 4 --receivers-per-node 2 \
     --senders 4 --senders-per-node 2 \
     --rate 1 --num 10000
 
 # Single node running all instances
-EJFAT_URI="ejfat://..." sbatch -N 1 -A <project> perlmutter_multi_slurm.sh \
+sbatch -N 1 -A <project> perlmutter_multi_slurm.sh \
     --receivers 2 --receivers-per-node 2 \
     --senders 2 --senders-per-node 2 \
     --rate 1 --num 1000
 
-# 2 receivers + 2 senders, one per node (no co-location)
-EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+# 2 receivers + 2 senders, one per node (co-located: 1 sender + 1 receiver per node)
+sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
     --receivers 2 --senders 2 --rate 1 --num 10000
+
+# Skip SSL certificate validation
+sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 2 --senders 2 --rate 10 --num 1000 -v
 ```
 
 **Multi-instance options:**
