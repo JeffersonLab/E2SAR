@@ -641,8 +641,6 @@ Memory monitoring helps you:
 - Compare different optimization modes (sendmsg vs sendmmsg vs liburing)
 - Validate memory usage stays within system limits
 
-For detailed analysis of memory behavior with different configurations, see [E2SAR_MEMORY_ANALYSIS.md](E2SAR_MEMORY_ANALYSIS.md).
-
 ---
 
 ### Performance Tuning Tips

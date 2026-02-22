@@ -28,4 +28,4 @@ fi
 export E2SAR_SCRIPTS_DIR
 
 echo "E2SAR Zero to Hero scripts available at: $E2SAR_SCRIPTS_DIR"
-echo "Available commands: minimal_reserve.sh, minimal_sender.sh, minimal_receiver.sh, minimal_free.sh, perlmutter_slurm.sh, monitor_memory.sh"
+echo "Available commands: minimal_reserve.sh, minimal_sender.sh, minimal_receiver.sh, minimal_free.sh, perlmutter_slurm.sh, perlmutter_multi_slurm.sh, monitor_memory.sh"

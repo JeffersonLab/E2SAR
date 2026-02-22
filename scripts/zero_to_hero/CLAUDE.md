@@ -152,6 +152,16 @@ podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1
 - `EJFAT_URI`: The primary configuration URI containing authentication token and load balancer details
 - `E2SAR_IMAGE`: Container image override (default: `ibaldin/e2sar:0.3.1a3`)
 
+### Container Pre-Installation (Perlmutter)
+
+Pre-install the container image to avoid re-downloading on each compute node:
+
+```bash
+podman-hpc pull ibaldin/e2sar:latest
+```
+
+See QuickStartMinimalScripts.md for details.
+
 ### State Management
 - `INSTANCE_URI`: File containing reservation details shared between scripts
 - `minimal_sender.log`: Detailed sender execution log with timestamps and exit codes
@@ -172,6 +182,7 @@ The system automatically detects appropriate IP addresses by:
 - `--length`: Event buffer size in bytes (default: 1048576 = 1MB)
 - `--num`: Number of events to send (default: 100)
 - `--mtu`: MTU size in bytes (default: 9000)
+- `--optimize`: Optimization mode (sendmsg, sendmmsg, liburing_send). Default: sendmmsg. Affects memory usage and performance.
 - `--ipv6`: Use IPv6 instead of IPv4
 - `-v`: Skip SSL certificate validation (default: disabled)
 - `--no-monitor`: Disable automatic memory monitoring
@@ -191,7 +202,7 @@ The system automatically detects appropriate IP addresses by:
 Both scripts use these optimizations:
 - `--network host`: Direct host networking for performance
 - `MALLOC_ARENA_MAX=32`: Memory allocation tuning
-- `--mtu=8500`: Jumbo frame support
+- `--mtu=9000`: Jumbo frame support
 - `--bufsize=134217728`: 128MB buffer size
 - `--optimize=sendmmsg`: Sender-side syscall optimization
 
