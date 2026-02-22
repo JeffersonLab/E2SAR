@@ -478,7 +478,7 @@ echo "========================================="
 echo "Phase 6: Free Load Balancer"
 echo "========================================="
 
-if ! "$SCRIPT_DIR/minimal_free.sh"; then
+if ! "$SCRIPT_DIR/minimal_free.sh" ${V_FLAG:+"$V_FLAG"}; then
     echo "WARNING: Failed to free load balancer reservation"
 fi
 

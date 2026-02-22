@@ -2,7 +2,10 @@
 # Minimal E2SAR load balancer free script
 #
 # Usage:
-#   ./minimal_free.sh
+#   ./minimal_free.sh [-v]
+#
+# Options:
+#   -v    Skip SSL certificate validation
 #
 # Frees the load balancer reservation using INSTANCE_URI file
 
@@ -12,6 +15,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Artifacts are created in the current working directory (not script directory)
+
+SKIP_SSL_VERIFY="false"
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -v)
+            SKIP_SSL_VERIFY="true"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
 
 INSTANCE_URI_FILE="INSTANCE_URI"
 
@@ -37,7 +55,11 @@ echo "Freeing load balancer reservation..."
 echo "EJFAT_URI: $EJFAT_URI"
 
 # Run lbadm --free
-if podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --free; then
+LBADM_CMD=(lbadm)
+[[ "$SKIP_SSL_VERIFY" == "true" ]] && LBADM_CMD+=(--novalidate)
+LBADM_CMD+=(--free)
+
+if podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 "${LBADM_CMD[@]}"; then
     echo "Reservation freed successfully"
 
     # Remove the INSTANCE_URI file
