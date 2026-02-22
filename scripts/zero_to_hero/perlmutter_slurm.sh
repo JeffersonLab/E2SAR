@@ -29,6 +29,9 @@
 #
 # Example:
 #   EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh --rate 2 --num 1000
+#
+# Note: A fresh LB reservation is created for each job and freed on completion.
+#       EJFAT_URI must be the admin URI (not an INSTANCE_URI).
 
 #SBATCH -N 2
 #SBATCH -C cpu
@@ -187,7 +190,7 @@ echo "Receiver arguments: ${RECEIVER_ARGS[*]:-<none>}"
 echo ""
 
 #=============================================================================
-# Phase 1: Reserve Load Balancer (or use existing)
+# Phase 1: Reserve Load Balancer (fresh reservation per job)
 #=============================================================================
 
 echo "========================================="
@@ -196,25 +199,16 @@ echo "========================================="
 
 export EJFAT_URI
 
-# Check if INSTANCE_URI exists in submit directory (pre-created reservation)
-if [[ -f "${SLURM_SUBMIT_DIR}/INSTANCE_URI" ]]; then
-    echo "Found existing INSTANCE_URI in submit directory, copying to job directory..."
-    cp "${SLURM_SUBMIT_DIR}/INSTANCE_URI" "$JOB_DIR/INSTANCE_URI"
-    echo "Using existing reservation:"
-    cat "$JOB_DIR/INSTANCE_URI"
-else
-    echo "No existing INSTANCE_URI found, attempting to create new reservation..."
-    if ! "$SCRIPT_DIR/minimal_reserve.sh"; then
-        echo "ERROR: Failed to reserve load balancer"
-        echo "RECOMMENDATION: Create INSTANCE_URI on login node before submitting job."
-        echo "                This avoids wasting queue time if reservation fails."
-        exit 1
-    fi
+# Create a fresh reservation for this job
+echo "Creating new LB reservation for job $SLURM_JOB_ID..."
+if ! "$SCRIPT_DIR/minimal_reserve.sh"; then
+    echo "ERROR: Failed to reserve load balancer"
+    exit 1
 fi
 
 # Verify INSTANCE_URI file exists
 if [[ ! -f "INSTANCE_URI" ]]; then
-    echo "ERROR: INSTANCE_URI file not found"
+    echo "ERROR: INSTANCE_URI file not found after reservation"
     exit 1
 fi
 

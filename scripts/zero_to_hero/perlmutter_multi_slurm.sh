@@ -15,14 +15,20 @@
 #   --receivers N           Total number of receiver instances (default: 1)
 #   --senders M             Number of sender instances (default: 1)
 #   --receivers-per-node K  Receivers per node (default: 1)
+#   --senders-per-node K    Senders per node (default: 1)
 #   --base-port PORT        Starting port for receivers (default: 10000)
 #   --receiver-delay SEC    Delay in seconds after receivers start (default: 10)
+#
+# Senders and receivers share the same node pool and may be co-located.
+# Required nodes = max(ceil(receivers/receivers-per-node), ceil(senders/senders-per-node))
 #
 # Test Options (passed to minimal_sender.sh/minimal_receiver.sh):
 #   --rate RATE       Sending rate in Gbps (default: 1)
 #   --length LENGTH   Event buffer length in bytes (default: 1048576)
 #   --num COUNT       Number of events to send (default: 100)
 #   --mtu MTU         MTU size in bytes (default: 9000)
+#   --threads N       Receive threads per receiver instance (default: 16)
+#                     Also determines port stride: each receiver occupies N consecutive ports
 #   --image IMAGE     Container image (default: ibaldin/e2sar:0.3.1a3)
 #   --ipv6            Use IPv6 (default: false)
 #   -v                Skip SSL certificate validation (default: disabled)
@@ -31,16 +37,23 @@
 #       with SIGTERM/SIGKILL after all senders complete.
 #
 # Environment Variables:
-#   EJFAT_URI         Required: EJFAT load balancer URI
+#   EJFAT_URI         Required: EJFAT admin URI (not an INSTANCE_URI)
 #
-# Example (4 receivers on 2 nodes, 2 senders):
-#   EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
-#       --receivers 4 --receivers-per-node 2 --senders 2 --rate 1 --num 100
+# Note: A fresh LB reservation is created for each job and freed on completion.
+#
+# Example (4 receivers and 4 senders co-located on 2 nodes):
+#   EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+#       --receivers 4 --receivers-per-node 2 --senders 4 --senders-per-node 2 --rate 1 --num 100
+#
+# Example (single node running everything):
+#   EJFAT_URI="ejfat://..." sbatch -N 1 -A <project> perlmutter_multi_slurm.sh \
+#       --receivers 2 --receivers-per-node 2 --senders 2 --senders-per-node 2 --rate 1 --num 100
 #
 
 #SBATCH -C cpu
 #SBATCH -q debug
 #SBATCH -t 00:30:00
+#SBATCH --ntasks-per-node=128
 #SBATCH -J ejfat_multi
 #SBATCH -o ./slurm-%j.out
 #SBATCH -e ./slurm-%j.err
@@ -57,6 +70,7 @@ set -euo pipefail
 NUM_RECEIVERS=1
 NUM_SENDERS=1
 RECEIVERS_PER_NODE=1
+SENDERS_PER_NODE=1
 BASE_PORT=10000
 RECEIVER_DELAY=10
 
@@ -65,6 +79,7 @@ RATE=""
 LENGTH=""
 NUM=""
 MTU=""
+RECV_THREADS=16
 IMAGE=""
 IPV6_FLAG=""
 V_FLAG=""
@@ -81,6 +96,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --receivers-per-node)
             RECEIVERS_PER_NODE="$2"
+            shift 2
+            ;;
+        --senders-per-node)
+            SENDERS_PER_NODE="$2"
             shift 2
             ;;
         --base-port)
@@ -105,6 +124,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --mtu)
             MTU="$2"
+            shift 2
+            ;;
+        --threads)
+            RECV_THREADS="$2"
             shift 2
             ;;
         --image)
@@ -178,59 +201,64 @@ echo ""
 # Parse node list
 NODE_ARRAY=($(scontrol show hostname $SLURM_JOB_NODELIST))
 
+# Port stride matches receive thread count: each receiver binds RECV_THREADS consecutive ports
+PORT_STRIDE=$RECV_THREADS
+
 echo "Configuration:"
 echo "  Receivers: $NUM_RECEIVERS ($RECEIVERS_PER_NODE per node)"
-echo "  Senders: $NUM_SENDERS"
-echo "  Base port: $BASE_PORT"
+echo "  Senders:   $NUM_SENDERS ($SENDERS_PER_NODE per node)"
+echo "  Base port: $BASE_PORT (stride: $PORT_STRIDE)"
 echo ""
 
-# Calculate required nodes
+# Calculate required nodes: senders and receivers share the same node pool
 NUM_RECEIVER_NODES=$(( (NUM_RECEIVERS + RECEIVERS_PER_NODE - 1) / RECEIVERS_PER_NODE ))
-REQUIRED_NODES=$((NUM_RECEIVER_NODES + NUM_SENDERS))
+NUM_SENDER_NODES=$(( (NUM_SENDERS + SENDERS_PER_NODE - 1) / SENDERS_PER_NODE ))
+REQUIRED_NODES=$(( NUM_RECEIVER_NODES > NUM_SENDER_NODES ? NUM_RECEIVER_NODES : NUM_SENDER_NODES ))
 
 echo "Node allocation:"
 echo "  Receiver nodes needed: $NUM_RECEIVER_NODES"
-echo "  Sender nodes needed: $NUM_SENDERS"
-echo "  Total nodes required: $REQUIRED_NODES"
-echo "  Nodes allocated: ${#NODE_ARRAY[@]}"
+echo "  Sender nodes needed:   $NUM_SENDER_NODES"
+echo "  Total nodes required:  $REQUIRED_NODES"
+echo "  Nodes allocated:       ${#NODE_ARRAY[@]}"
 echo ""
 
 # Validate node count
 if [[ ${#NODE_ARRAY[@]} -lt $REQUIRED_NODES ]]; then
     echo "ERROR: Insufficient nodes allocated"
-    echo "  Need $REQUIRED_NODES nodes ($NUM_RECEIVER_NODES for receivers, $NUM_SENDERS for senders)"
+    echo "  Need $REQUIRED_NODES nodes (max of $NUM_RECEIVER_NODES receiver nodes, $NUM_SENDER_NODES sender nodes)"
     echo "  Got ${#NODE_ARRAY[@]} nodes"
-    echo "  Use: sbatch -N $REQUIRED_NODES -A <project> $0 --receivers $NUM_RECEIVERS --senders $NUM_SENDERS"
+    echo "  Use: sbatch -N $REQUIRED_NODES -A <project> $0 --receivers $NUM_RECEIVERS --receivers-per-node $RECEIVERS_PER_NODE --senders $NUM_SENDERS --senders-per-node $SENDERS_PER_NODE"
     exit 1
 fi
 
-# Display node assignments
+# Display node assignments (combined per-node view)
 echo "Node assignments:"
-RECV_INDEX=0
-for ((node_idx=0; node_idx<NUM_RECEIVER_NODES; node_idx++)); do
-    RECV_NODE="${NODE_ARRAY[$node_idx]}"
-    RECEIVERS_ON_NODE=$RECEIVERS_PER_NODE
-    if [[ $((RECV_INDEX + RECEIVERS_ON_NODE)) -gt $NUM_RECEIVERS ]]; then
-        RECEIVERS_ON_NODE=$((NUM_RECEIVERS - RECV_INDEX))
+for ((node_idx=0; node_idx<REQUIRED_NODES; node_idx++)); do
+    NODE="${NODE_ARRAY[$node_idx]}"
+    LINE="  Node $node_idx ($NODE):"
+
+    # Receivers on this node
+    RECV_START=$((node_idx * RECEIVERS_PER_NODE))
+    RECV_END=$(( (node_idx + 1) * RECEIVERS_PER_NODE - 1 ))
+    if [[ $RECV_START -lt $NUM_RECEIVERS ]]; then
+        [[ $RECV_END -ge $NUM_RECEIVERS ]] && RECV_END=$((NUM_RECEIVERS - 1))
+        PORTS=""
+        for ((r=RECV_START; r<=RECV_END; r++)); do
+            [[ -n "$PORTS" ]] && PORTS="$PORTS, "
+            PORTS="${PORTS}$((BASE_PORT + r * PORT_STRIDE))"
+        done
+        LINE="$LINE receivers $RECV_START-$RECV_END (ports: $PORTS)"
     fi
 
-    PORTS=""
-    for ((j=0; j<RECEIVERS_ON_NODE; j++)); do
-        PORT=$((BASE_PORT + RECV_INDEX + j))
-        if [[ -n "$PORTS" ]]; then
-            PORTS="$PORTS, $PORT"
-        else
-            PORTS="$PORT"
-        fi
-    done
+    # Senders on this node
+    SEND_START=$((node_idx * SENDERS_PER_NODE))
+    SEND_END=$(( (node_idx + 1) * SENDERS_PER_NODE - 1 ))
+    if [[ $SEND_START -lt $NUM_SENDERS ]]; then
+        [[ $SEND_END -ge $NUM_SENDERS ]] && SEND_END=$((NUM_SENDERS - 1))
+        LINE="$LINE senders $SEND_START-$SEND_END"
+    fi
 
-    echo "  Node $node_idx ($RECV_NODE): Receivers $RECV_INDEX-$((RECV_INDEX + RECEIVERS_ON_NODE - 1)) (ports: $PORTS)"
-    RECV_INDEX=$((RECV_INDEX + RECEIVERS_ON_NODE))
-done
-
-for ((i=0; i<NUM_SENDERS; i++)); do
-    SEND_NODE="${NODE_ARRAY[$((NUM_RECEIVER_NODES + i))]}"
-    echo "  Node $((NUM_RECEIVER_NODES + i)) ($SEND_NODE): Sender $i"
+    echo "$LINE"
 done
 echo ""
 
@@ -244,6 +272,7 @@ RECEIVER_ARGS=()
 # Force receiver to run indefinitely (duration 0) - will be terminated after senders complete
 RECEIVER_ARGS+=(--duration 0)
 
+RECEIVER_ARGS+=(--threads "$RECV_THREADS")
 [[ -n "$IMAGE" ]] && SENDER_ARGS+=(--image "$IMAGE") && RECEIVER_ARGS+=(--image "$IMAGE")
 [[ -n "$RATE" ]] && SENDER_ARGS+=(--rate "$RATE")
 [[ -n "$LENGTH" ]] && SENDER_ARGS+=(--length "$LENGTH")
@@ -257,7 +286,7 @@ echo "Receiver arguments (per instance): ${RECEIVER_ARGS[*]:-<none>}"
 echo ""
 
 #=============================================================================
-# Phase 1: Reserve Load Balancer (or use existing)
+# Phase 1: Reserve Load Balancer (fresh reservation per job)
 #=============================================================================
 
 echo "========================================="
@@ -266,25 +295,17 @@ echo "========================================="
 
 export EJFAT_URI
 
-# Check if INSTANCE_URI exists in submit directory (pre-created reservation)
-if [[ -f "${SLURM_SUBMIT_DIR}/INSTANCE_URI" ]]; then
-    echo "Found existing INSTANCE_URI in submit directory, copying to job directory..."
-    cp "${SLURM_SUBMIT_DIR}/INSTANCE_URI" "$JOB_DIR/INSTANCE_URI"
-    echo "Using existing reservation:"
-    cat "$JOB_DIR/INSTANCE_URI"
-else
-    echo "No existing INSTANCE_URI found, attempting to create new reservation..."
-    if ! "$SCRIPT_DIR/minimal_reserve.sh"; then
-        echo "ERROR: Failed to reserve load balancer"
-        echo "RECOMMENDATION: Create INSTANCE_URI on login node before submitting job."
-        echo "                This avoids wasting queue time if reservation fails."
-        exit 1
-    fi
+# Always create a fresh reservation in the job directory so each job
+# has its own isolated INSTANCE_URI and LB reservation.
+echo "Creating new LB reservation for job $SLURM_JOB_ID..."
+if ! "$SCRIPT_DIR/minimal_reserve.sh"; then
+    echo "ERROR: Failed to reserve load balancer"
+    exit 1
 fi
 
 # Verify INSTANCE_URI file exists
 if [[ ! -f "INSTANCE_URI" ]]; then
-    echo "ERROR: INSTANCE_URI file not found"
+    echo "ERROR: INSTANCE_URI file not found after reservation"
     exit 1
 fi
 
@@ -313,7 +334,7 @@ for ((node_idx=0; node_idx<NUM_RECEIVER_NODES; node_idx++)); do
 
     for ((j=0; j<RECEIVERS_PER_NODE && RECV_INDEX<NUM_RECEIVERS; j++)); do
         RECV_DIR="$JOB_DIR/receiver_$RECV_INDEX"
-        RECV_PORT=$((BASE_PORT + RECV_INDEX))
+        RECV_PORT=$((BASE_PORT + RECV_INDEX * PORT_STRIDE))
 
         mkdir -p "$RECV_DIR"
         # Copy INSTANCE_URI to receiver directory
@@ -324,7 +345,7 @@ for ((node_idx=0; node_idx<NUM_RECEIVER_NODES; node_idx++)); do
         # Build receiver command with port
         RECV_ARGS_WITH_PORT=("${RECEIVER_ARGS[@]}" --port "$RECV_PORT")
 
-        srun --nodes=1 --ntasks=1 --nodelist="$RECV_NODE" \
+        srun --nodes=1 --ntasks=1 --exact --nodelist="$RECV_NODE" \
             bash -c "cd '$RECV_DIR' && '$SCRIPT_DIR/minimal_receiver.sh' ${RECV_ARGS_WITH_PORT[*]}" \
             > "$RECV_DIR/receiver_srun.log" 2>&1 &
 
@@ -364,8 +385,7 @@ declare -a SENDER_EXIT_CODES=()
 # Start all senders in parallel
 for ((i=0; i<NUM_SENDERS; i++)); do
     SEND_DIR="$JOB_DIR/sender_$i"
-    # Sender nodes start after receiver nodes
-    SEND_NODE="${NODE_ARRAY[$((NUM_RECEIVER_NODES + i))]}"
+    SEND_NODE="${NODE_ARRAY[$((i / SENDERS_PER_NODE))]}"
 
     mkdir -p "$SEND_DIR"
     # Copy INSTANCE_URI to sender directory
@@ -373,7 +393,7 @@ for ((i=0; i<NUM_SENDERS; i++)); do
 
     echo "Starting sender $i on $SEND_NODE..."
 
-    srun --nodes=1 --ntasks=1 --nodelist="$SEND_NODE" \
+    srun --nodes=1 --ntasks=1 --exact --nodelist="$SEND_NODE" \
         bash -c "cd '$SEND_DIR' && '$SCRIPT_DIR/minimal_sender.sh' ${SENDER_ARGS[*]:-}" \
         > "$SEND_DIR/sender_srun.log" 2>&1 &
 
@@ -473,8 +493,8 @@ echo "Multi-Instance Test Summary"
 echo "========================================="
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job directory: $JOB_DIR"
-echo "Configuration: $NUM_RECEIVERS receivers ($RECEIVERS_PER_NODE per node), $NUM_SENDERS senders"
-echo "Nodes used: ${#NODE_ARRAY[@]} ($NUM_RECEIVER_NODES receiver nodes + $NUM_SENDERS sender nodes)"
+echo "Configuration: $NUM_RECEIVERS receivers ($RECEIVERS_PER_NODE per node), $NUM_SENDERS senders ($SENDERS_PER_NODE per node)"
+echo "Nodes used: $REQUIRED_NODES"
 echo ""
 
 echo "Sender Results:"
