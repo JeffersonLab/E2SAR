@@ -160,14 +160,14 @@ grep -E "Performance|rate|throughput" minimal_sender.log minimal_receiver.log
 
 ## Multi-Instance Testing with `perlmutter_multi_slurm.sh`
 
-The `perlmutter_multi_slurm.sh` script extends the single sender/receiver model to support multiple concurrent senders and receivers across many nodes. This is useful for testing load balancer distribution, scaling behavior, and aggregate throughput.
+The `perlmutter_multi_slurm.sh` script extends the single sender/receiver model to support multiple concurrent senders and receivers. Senders and receivers share the same node pool and may be **co-located** on the same nodes, enabling flexible configurations from a single node running everything to many nodes each running multiple instances.
 
 ### How It Works
 
-1. Reserves load balancer resources (or uses pre-created reservation)
-2. Starts all receiver instances in parallel across receiver nodes
+1. Reserves a fresh load balancer instance for the job
+2. Starts all receiver instances in parallel (co-located on shared nodes)
 3. Waits a configurable delay for receivers to register with the LB
-4. Starts all sender instances in parallel on separate nodes
+4. Starts all sender instances in parallel (co-located on the same shared nodes)
 5. Waits for all senders to complete
 6. Gracefully terminates all receivers (SIGTERM, then SIGKILL after 5s)
 7. Frees load balancer reservation
@@ -178,43 +178,75 @@ The `perlmutter_multi_slurm.sh` script extends the single sender/receiver model 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--receivers N` | Total number of receiver instances | 1 |
-| `--senders M` | Number of sender instances (one per node) | 1 |
-| `--receivers-per-node K` | Receivers per node (for density testing) | 1 |
-| `--base-port PORT` | Starting port for receivers (increments per instance) | 10000 |
-| `--receiver-delay SEC` | Seconds to wait after starting receivers before starting senders | 10 |
+| `--senders M` | Total number of sender instances | 1 |
+| `--receivers-per-node K` | Receiver instances per node | 1 |
+| `--senders-per-node K` | Sender instances per node | 1 |
+| `--threads N` | Receive threads per receiver (also sets port stride) | 16 |
+| `--base-port PORT` | Starting port for receiver 0 | 10000 |
+| `--receiver-delay SEC` | Seconds to wait after starting receivers | 10 |
 
-All test options from the single-instance script (`--rate`, `--length`, `--num`, `--mtu`, `--image`, `--ipv6`, `-v`) are also supported and passed through to the underlying sender/receiver scripts.
+All test options (`--rate`, `--length`, `--num`, `--mtu`, `--image`, `--ipv6`, `-v`) are supported and passed through to the underlying scripts.
 
 ### Node Calculation Formula
 
-The script requires a specific number of nodes based on your configuration:
+Senders and receivers share the same pool of nodes. The script requires:
 
 ```
 Receiver nodes = ceil(receivers / receivers-per-node)
-Sender nodes   = senders  (one sender per node)
-Total nodes    = Receiver nodes + Sender nodes
+Sender nodes   = ceil(senders  / senders-per-node)
+Total nodes    = max(Receiver nodes, Sender nodes)
 ```
 
-You must request at least this many nodes via `sbatch -N <total>`.
+Request exactly this many nodes via `sbatch -N <total>`.
+
+### Port Assignment
+
+Each receiver instance uses `--threads` consecutive ports (default: 16). Receiver ports are assigned as:
+
+```
+Receiver 0: base_port + 0 * threads  →  base_port to base_port + threads - 1
+Receiver 1: base_port + 1 * threads  →  ...
+Receiver i: base_port + i * threads
+```
+
+With the defaults (`--base-port 10000 --threads 16`):
+- Receiver 0: ports 10000–10015
+- Receiver 1: ports 10016–10031
+- Receiver 2: ports 10032–10047
+
+If you change `--threads`, the port stride updates automatically to match.
 
 ### Example Submissions
 
-**2 receivers + 2 senders (4 nodes):**
+**4 receivers and 4 senders co-located on 2 nodes (2 of each per node):**
 ```bash
-EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
-    --receivers 2 --senders 2 --rate 1 --num 100
+EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 4 --receivers-per-node 2 \
+    --senders 4 --senders-per-node 2 \
+    --rate 1 --num 10000
 ```
 
-**4 receivers on 2 nodes + 2 senders (4 nodes total):**
+**Single node running all instances:**
 ```bash
-EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
-    --receivers 4 --receivers-per-node 2 --senders 2 --rate 10 --num 5000
+EJFAT_URI="ejfat://..." sbatch -N 1 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 2 --receivers-per-node 2 \
+    --senders 2 --senders-per-node 2 \
+    --rate 1 --num 1000
 ```
 
-**Custom port base:**
+**2 receivers + 2 senders, one per node (no co-location):**
 ```bash
-EJFAT_URI="ejfat://..." sbatch -N 6 -A <project> perlmutter_multi_slurm.sh \
-    --receivers 3 --senders 3 --base-port 20000 --rate 5 --num 1000
+EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 2 --senders 2 --rate 1 --num 10000
+```
+
+**Custom thread count (port stride updates automatically):**
+```bash
+EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 4 --receivers-per-node 2 \
+    --senders 4 --senders-per-node 2 \
+    --threads 8 --rate 1 --num 5000
+# Receiver ports: 10000-10007, 10008-10015, 10016-10023, 10024-10031
 ```
 
 ### Output Directory Structure
@@ -244,7 +276,7 @@ runs/slurm_job_<JOBID>/
     └── sender_srun.log
 ```
 
-Each receiver gets a unique port: `base_port`, `base_port+1`, `base_port+2`, etc. Receivers that are terminated by the script (after senders complete) will show exit codes 137 (SIGKILL) or 143 (SIGTERM), which are expected.
+Receivers terminated by the script (after senders complete) will show exit codes 137 (SIGKILL) or 143 (SIGTERM) in the SLURM accounting — both are expected and reported as such in the summary.
 
 ---
 

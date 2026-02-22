@@ -297,41 +297,54 @@ EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh
 
 ### Multi-Instance SLURM Testing (Perlmutter)
 
-The `perlmutter_multi_slurm.sh` script enables testing with multiple concurrent senders and receivers:
+The `perlmutter_multi_slurm.sh` script enables testing with multiple concurrent senders and receivers. Senders and receivers share the same node pool and can be co-located on the same nodes.
 
 ```bash
-# Basic multi-instance test (2 receivers, 2 senders, 4 nodes total)
-EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
-    --receivers 2 --senders 2 --rate 1 --num 100
+# 4 receivers + 4 senders co-located on 2 nodes (2 of each per node)
+EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 4 --receivers-per-node 2 \
+    --senders 4 --senders-per-node 2 \
+    --rate 1 --num 10000
 
-# High-density test (4 receivers on 2 nodes, 2 senders, 4 nodes total)
-EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
-    --receivers 4 --receivers-per-node 2 --senders 2 --rate 10 --num 5000
+# Single node running all instances
+EJFAT_URI="ejfat://..." sbatch -N 1 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 2 --receivers-per-node 2 \
+    --senders 2 --senders-per-node 2 \
+    --rate 1 --num 1000
 
-# Custom port base for receivers
-sbatch -N 6 -A <project> perlmutter_multi_slurm.sh \
-    --receivers 3 --senders 3 --base-port 20000 --rate 5
+# 2 receivers + 2 senders, one per node (no co-location)
+EJFAT_URI="ejfat://..." sbatch -N 2 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 2 --senders 2 --rate 1 --num 10000
 ```
 
 **Multi-instance options:**
 - `--receivers N`: Total number of receiver instances (default: 1)
-- `--senders M`: Number of sender instances (default: 1)
-- `--receivers-per-node K`: Receivers per node for density testing (default: 1)
-- `--base-port PORT`: Starting port for receivers, increments per receiver (default: 10000)
+- `--senders M`: Total number of sender instances (default: 1)
+- `--receivers-per-node K`: Receiver instances per node (default: 1)
+- `--senders-per-node K`: Sender instances per node (default: 1)
+- `--threads N`: Receive threads per receiver instance; also sets port stride (default: 16)
+- `--base-port PORT`: Starting port for receiver 0 (default: 10000)
 - `--receiver-delay SEC`: Wait time after starting receivers (default: 10)
 
 **Node allocation formula:**
 ```
 Receiver nodes = ceil(receivers / receivers-per-node)
-Sender nodes = senders (one per node)
-Total nodes = Receiver nodes + Sender nodes
+Sender nodes   = ceil(senders  / senders-per-node)
+Total nodes    = max(Receiver nodes, Sender nodes)
 ```
 
+**Port assignment:**
+
+Each receiver uses `--threads` consecutive ports. Receiver `i` gets ports `base_port + i * threads` through `base_port + i * threads + threads - 1`. With defaults (`--base-port 10000 --threads 16`):
+- Receiver 0: 10000–10015
+- Receiver 1: 10016–10031
+- Receiver 2: 10032–10047
+
 **Key features:**
-- Each sender and receiver runs in isolated subdirectory with its own logs
-- All senders start simultaneously (parallel execution)
-- Script waits for all senders to complete before shutdown
-- Receivers get unique ports: base_port, base_port+1, base_port+2, etc.
+- Senders and receivers share the same node pool (co-location supported)
+- Each instance runs in an isolated subdirectory with its own logs
+- All senders and receivers start in parallel
+- Script waits for all senders to complete before shutting down receivers
 - Graceful receiver shutdown with SIGTERM then SIGKILL
 - Comprehensive summary report with all exit codes
 

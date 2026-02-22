@@ -374,14 +374,16 @@ The cleanup script releases your load balancer reservation.
 
 You can run multiple receivers simultaneously to test load distribution.
 
-**Terminal 1 - Receiver A:**
+Each receiver uses `--threads` consecutive ports (default: 16). When running multiple receivers, their base ports must be separated by at least the thread count to avoid conflicts.
+
+**Terminal 1 - Receiver A (ports 10000–10015):**
 ```bash
 ./minimal_receiver.sh --port 10000 --duration 120
 ```
 
-**Terminal 2 - Receiver B:**
+**Terminal 2 - Receiver B (ports 10016–10031):**
 ```bash
-./minimal_receiver.sh --port 10001 --duration 120
+./minimal_receiver.sh --port 10016 --duration 120
 ```
 
 **Terminal 3 - Sender:**
@@ -390,6 +392,8 @@ You can run multiple receivers simultaneously to test load distribution.
 ```
 
 The load balancer will distribute events across both receivers. Check the logs to see the distribution!
+
+If you change `--threads`, adjust the port spacing accordingly. For example, with `--threads 8`, use ports 10000 and 10008.
 
 ### 3.2 Sequential Testing
 
