@@ -5,6 +5,7 @@
 #   EJFAT_URI="ejfat://token@host:port/lb/1?sync=..." ./minimal_reserve.sh
 #
 # Creates/updates INSTANCE_URI file with reservation details
+# Note: lbadm --reserve skips SSL cert validation internally; no -v flag needed.
 
 set -euo pipefail
 
@@ -40,6 +41,8 @@ fi
 echo "Creating new reservation..."
 
 # Run lbadm --reserve and save output to INSTANCE_URI
+# Note: lbadm --reserve skips SSL cert validation internally regardless of --novalidate;
+# passing --novalidate interferes with this and causes failures, so it is intentionally omitted.
 podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --reserve --lbname "yk_test" --export > "$INSTANCE_URI_FILE"
 
 echo "Reservation created and saved to $INSTANCE_URI_FILE"
