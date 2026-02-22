@@ -332,7 +332,7 @@ for ((node_idx=0; node_idx<NUM_RECEIVER_NODES; node_idx++)); do
         RECEIVER_NODES+=("$RECV_NODE")
         RECEIVER_PORTS+=($RECV_PORT)
 
-        ((RECV_INDEX++))
+        RECV_INDEX=$((RECV_INDEX + 1))
     done
 done
 

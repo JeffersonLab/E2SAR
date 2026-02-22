@@ -538,6 +538,14 @@ EJFAT_URI="ejfat://..." ./minimal_reserve.sh
 
 ---
 
+#### Problem: Exit code 141 (SIGPIPE) in sender or receiver logs
+
+**Cause:** This was a known issue in earlier versions of the scripts. The `tee` pipeline could receive a SIGPIPE signal when the container process exited before all output was flushed, causing the script to report exit code 141 instead of the container's actual exit code.
+
+**Status:** Fixed. The current scripts use `|| true` guards on pipe commands and capture the container's real exit code via `PIPESTATUS[0]`. If you encounter exit code 141, update to the latest version of the scripts.
+
+---
+
 #### Problem: SLURM job fails with reservation error
 
 **Cause:** Load balancer reservation failed after job started, wasting queue time.

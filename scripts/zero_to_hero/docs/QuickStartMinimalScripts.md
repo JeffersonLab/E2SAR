@@ -56,7 +56,8 @@ EJFAT_URI="ejfat://token@host:port/lb/1?sync=..." ./minimal_reserve.sh
 |--------|---------|
 | `minimal_sender.sh` | Sender with flexible options and memory monitoring |
 | `minimal_receiver.sh` | Receiver with configurable duration |
-| `perlmutter_slurm.sh` | SLURM batch job template |
+| `perlmutter_slurm.sh` | SLURM batch job template (single sender/receiver) |
+| `perlmutter_multi_slurm.sh` | SLURM batch job for multiple concurrent senders/receivers |
 
 ### Monitoring
 | Script | Purpose |
@@ -144,6 +145,10 @@ tail -f slurm-*.out
 ### Network Detection Issues
 **Problem:** Cannot determine source IP
 - **Solution:** Check connectivity to LB hostname: `ping <LB_HOST>`
+
+### Exit Code Issues
+**Problem:** Exit code 141 (SIGPIPE) in sender or receiver logs
+- **Note:** This was a known issue caused by the `tee` pipeline receiving SIGPIPE when the container process exited before all output was flushed. It has been fixed in the current scripts using `|| true` guards and `PIPESTATUS[0]` to capture the container's actual exit code. If you see exit code 141 in older script versions, update to the latest scripts.
 
 ## Performance Parameters
 

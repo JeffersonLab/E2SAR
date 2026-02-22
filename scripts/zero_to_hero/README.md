@@ -9,7 +9,7 @@ Please see the documentation in the `docs/` directory:
 - **[docs/ZeroToHeroStart.md](docs/ZeroToHeroStart.md)** - First tutorial: Simple loopback testing on your laptop
 - **[docs/QuickStartMinimalScripts.md](docs/QuickStartMinimalScripts.md)** - Second tutorial: Running traffic on Perlmutter
 - **[docs/RunningMinimalScripts.md](docs/RunningMinimalScripts.md)** - Comprehensive guide with detailed examples
-- **[docs/RunningSlurmOnPerlmutter.md](docs/RunningSlurmOnPerlmutter.md)** - Third tutorial: Running SLURM batch jobs on Perlmutter
+- **[docs/RunningSlurmOnPerlmutter.md](docs/RunningSlurmOnPerlmutter.md)** - Third tutorial: Running SLURM batch jobs on Perlmutter (single and multi-instance)
 
 ## Setup (Optional)
 

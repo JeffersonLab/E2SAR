@@ -13,8 +13,8 @@
 #   --duration SEC    Run duration in seconds (default: 0 = indefinite)
 #   --ipv6            Use IPv6 (default: false)
 #   -v                Skip SSL certificate validation (default: disabled)
-#   --threads NUM     Number of receive threads (default: 8)
-#   --deq NUM         Number of dequeue threads (default: 4)
+#   --threads NUM     Number of receive threads (default: 16)
+#   --deq NUM         Number of dequeue threads (default: 16)
 #   --bufsize SIZE    Socket buffer size in bytes (default: 134217728)
 #   --help            Show this help message
 
