@@ -295,6 +295,66 @@ EJFAT_URI="ejfat://..." ./minimal_reserve.sh
 EJFAT_URI="ejfat://..." sbatch -A <project> perlmutter_slurm.sh
 ```
 
+### Multi-Instance SLURM Testing (Perlmutter)
+
+The `perlmutter_multi_slurm.sh` script enables testing with multiple concurrent senders and receivers:
+
+```bash
+# Basic multi-instance test (2 receivers, 2 senders, 4 nodes total)
+EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 2 --senders 2 --rate 1 --num 100
+
+# High-density test (4 receivers on 2 nodes, 2 senders, 4 nodes total)
+EJFAT_URI="ejfat://..." sbatch -N 4 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 4 --receivers-per-node 2 --senders 2 --rate 10 --num 5000
+
+# Custom port base for receivers
+sbatch -N 6 -A <project> perlmutter_multi_slurm.sh \
+    --receivers 3 --senders 3 --base-port 20000 --rate 5
+```
+
+**Multi-instance options:**
+- `--receivers N`: Total number of receiver instances (default: 1)
+- `--senders M`: Number of sender instances (default: 1)
+- `--receivers-per-node K`: Receivers per node for density testing (default: 1)
+- `--base-port PORT`: Starting port for receivers, increments per receiver (default: 10000)
+- `--receiver-delay SEC`: Wait time after starting receivers (default: 10)
+
+**Node allocation formula:**
+```
+Receiver nodes = ceil(receivers / receivers-per-node)
+Sender nodes = senders (one per node)
+Total nodes = Receiver nodes + Sender nodes
+```
+
+**Key features:**
+- Each sender and receiver runs in isolated subdirectory with its own logs
+- All senders start simultaneously (parallel execution)
+- Script waits for all senders to complete before shutdown
+- Receivers get unique ports: base_port, base_port+1, base_port+2, etc.
+- Graceful receiver shutdown with SIGTERM then SIGKILL
+- Comprehensive summary report with all exit codes
+
+**Log structure:**
+```
+runs/slurm_job_<JOBID>/
+├── receiver_0/
+│   ├── minimal_receiver.log
+│   └── receiver_srun.log
+├── receiver_1/
+│   ├── minimal_receiver.log
+│   └── receiver_srun.log
+├── sender_0/
+│   ├── minimal_sender.log
+│   ├── minimal_sender_memory.log
+│   └── sender_srun.log
+├── sender_1/
+│   ├── minimal_sender.log
+│   ├── minimal_sender_memory.log
+│   └── sender_srun.log
+└── INSTANCE_URI
+```
+
 ## Additional Scripts
 
 ### monitor_memory.sh
