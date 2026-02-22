@@ -171,7 +171,8 @@ if [[ -z "${EJFAT_URI:-}" ]]; then
     exit 1
 fi
 
-echo "EJFAT_URI: $EJFAT_URI"
+EJFAT_URI_REDACTED=$(echo "$EJFAT_URI" | sed -E 's|(://)(.{4})[^@]*(.{4})@|\1\2---\3@|')
+echo "EJFAT_URI: $EJFAT_URI_REDACTED"
 echo "Job nodes: $SLURM_JOB_NODELIST"
 echo "Job ID: $SLURM_JOB_ID"
 echo ""
