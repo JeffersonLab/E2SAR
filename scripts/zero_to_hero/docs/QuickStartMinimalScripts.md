@@ -16,6 +16,67 @@ echo 'source /path/to/zero_to_hero/setup_env.sh' >> ~/.bashrc
 
 After setup, create working directories and run scripts from anywhere - all artifacts are created in your current directory.
 
+```bash
+# Example: Create a custom directory for your test runs
+mkdir -p ~/my_runs_dir
+cd ~/my_runs_dir
+
+# Run scripts - all logs and INSTANCE_URI will be created here
+minimal_reserve.sh
+minimal_sender.sh --rate 5
+minimal_receiver.sh --duration 60
+
+# For runs on login nodes: all artifacts are in your current directory
+ls  # Shows: INSTANCE_URI, minimal_sender.log, minimal_receiver.log, minimal_sender_memory.log
+
+# For SLURM jobs: artifacts are organized in runs/slurm_job_<JOBID>/
+# - Single instance: runs/slurm_job_12345/{INSTANCE_URI, minimal_sender.log, minimal_receiver.log, ...}
+# - Multi-instance: runs/slurm_job_12345/{INSTANCE_URI, sender_0/, sender_1/, receiver_0/, receiver_1/, ...}
+```
+
+## Optional: Pre-Installing Containers on Perlmutter
+
+On Perlmutter, you can pre-install container images to avoid re-downloading them on each compute node. This significantly reduces job startup time and network overhead.
+
+### Pull and cache the container image
+
+```bash
+# On a login node or in an interactive session
+podman-hpc pull ibaldin/e2sar:latest
+```
+
+This downloads the image once and stores it in your `$HOME/.local/share/containers` directory, which is accessible from all compute nodes via the shared filesystem.
+
+### Verify the image is cached
+
+```bash
+podman-hpc images
+```
+
+You should see `ibaldin/e2sar` with tag `latest` in the list.
+
+### Benefits
+
+- **Faster job startup**: No download time when jobs start on compute nodes
+- **Reduced network traffic**: Image downloaded once instead of per-node
+- **Consistent image version**: All jobs use the same cached image
+
+### Using custom or updated images
+
+If you need to use a different image version:
+
+```bash
+# Pull the new image
+podman-hpc pull ibaldin/e2sar:0.3.2
+
+# Override in scripts with --image flag
+./minimal_sender.sh --image ibaldin/e2sar:0.3.2 --rate 5
+
+# Or set environment variable
+export E2SAR_IMAGE=ibaldin/e2sar:0.3.2
+./minimal_sender.sh --rate 5
+```
+
 ## Quick Start
 
 ### 1. Create Reservation
@@ -150,6 +211,38 @@ tail -f slurm-*.out
 **Problem:** Exit code 141 (SIGPIPE) in sender or receiver logs
 - **Note:** This was a known issue caused by the `tee` pipeline receiving SIGPIPE when the container process exited before all output was flushed. It has been fixed in the current scripts using `|| true` guards and `PIPESTATUS[0]` to capture the container's actual exit code. If you see exit code 141 in older script versions, update to the latest scripts.
 
+### SSL Certificate Validation Issues
+**Problem:** SSL certificate validation errors when connecting to the load balancer
+
+**Solution:** Use the `-v` flag to skip SSL certificate validation:
+
+```bash
+# Skip validation for sender and receiver
+./minimal_sender.sh -v --rate 5
+./minimal_receiver.sh -v --duration 60
+
+# Skip validation when freeing reservation
+./minimal_free.sh -v
+```
+
+**Important notes:**
+- **Do NOT** pass `-v` to `minimal_reserve.sh` — the reserve operation uses the admin token which skips certificate validation unconditionally
+- The `-v` flag is particularly useful when the LB control plane SSL certificate has expired
+- For SLURM jobs, pass `-v` to the SLURM script and it will propagate to sender/receiver/free operations:
+  ```bash
+  sbatch -A <project> perlmutter_slurm.sh -v --rate 10
+  ```
+
+**If `minimal_free.sh -v` still fails:** Use the admin `EJFAT_URI` to free reservations directly:
+
+```bash
+# View active reservations
+podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --overview
+
+# Free specific reservation by LB ID (replace 302 with actual ID)
+podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --free --lbid 302
+```
+
 ## Performance Parameters
 
 ### Sender Key Options
@@ -179,16 +272,8 @@ tail -f slurm-*.out
 **Optimizations:**
 - `--network host` - Direct host networking
 - `MALLOC_ARENA_MAX=32` - Memory allocation tuning
-- `--mtu=8500` - Jumbo frame support
+- `--mtu=9000` - Jumbo frame support
 - `--bufsize=134217728` - 128MB buffer size
-
-## Contributing
-
-When modifying scripts or adding features, please:
-1. Test with `monitor_memory.sh` to verify memory behavior
-2. Update relevant documentation (CLAUDE.md, this README, or memory docs)
-3. Use `set -euo pipefail` for strict error handling
-4. Follow existing logging conventions
 
 ## Additional Resources
 
