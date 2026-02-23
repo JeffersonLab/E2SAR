@@ -104,7 +104,8 @@ if [[ -z "$EJFAT_URI" ]]; then
 fi
 
 echo "Starting E2SAR sender..."
-echo "EJFAT_URI: $EJFAT_URI"
+EJFAT_URI_REDACTED=$(echo "$EJFAT_URI" | sed -E 's|(://)(.{4})[^@]*(.{4})@|\1\2---\3@|')
+echo "EJFAT_URI: $EJFAT_URI_REDACTED"
 echo "Container Image: $E2SAR_IMAGE"
 
 # Auto-detect sender IP
@@ -290,18 +291,5 @@ fi
 "${CMD[@]}" 2>&1 | tee -a minimal_sender.log || true
 CONTAINER_EXIT_CODE=${PIPESTATUS[0]}
 
-# Write end time and exit code (trap will also write, but this ensures it's in the tee'd output)
-{
-    echo ""
-    echo "END_TIME (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
-    echo "EXIT_CODE: $CONTAINER_EXIT_CODE"
-
-    # Show memory summary if monitoring was enabled
-    if [[ "$ENABLE_MONITOR" == "true" ]] && [[ -f "minimal_sender_memory.log" ]]; then
-        echo ""
-        echo "Memory monitoring log: minimal_sender_memory.log"
-    fi
-} | tee -a minimal_sender.log || true
-
-# Exit with container's exit code
+# Exit with container's exit code (trap will handle END_TIME/EXIT_CODE logging)
 exit $CONTAINER_EXIT_CODE

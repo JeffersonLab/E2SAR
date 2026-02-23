@@ -177,14 +177,14 @@ echo "Job nodes: $SLURM_JOB_NODELIST"
 echo "Job ID: $SLURM_JOB_ID"
 echo ""
 
-# Get script directory
-if [[ -n "${SLURM_JOB_ID:-}" ]]; then
-    # In SLURM environment - find the actual script directory
-    SCRIPT_DIR="/global/homes/y/yak/E2SAR/scripts/zero_to_hero"
-else
-    # Fallback for local testing
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get script directory (where minimal_*.sh scripts are located)
+# Require E2SAR_SCRIPTS_DIR to be set to avoid hardcoded paths
+if [[ -z "${E2SAR_SCRIPTS_DIR:-}" ]]; then
+    echo "ERROR: E2SAR_SCRIPTS_DIR must be set to the zero_to_hero directory"
+    echo "  export E2SAR_SCRIPTS_DIR=/path/to/E2SAR/scripts/zero_to_hero"
+    exit 1
 fi
+SCRIPT_DIR="$E2SAR_SCRIPTS_DIR"
 echo "Script directory: $SCRIPT_DIR"
 
 # Create runs directory if it doesn't exist

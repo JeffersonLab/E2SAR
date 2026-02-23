@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Artifacts are created in the current working directory (not script directory)
 
 SKIP_SSL_VERIFY="false"
+E2SAR_IMAGE="${E2SAR_IMAGE:-ibaldin/e2sar:0.3.1a3}"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -52,14 +53,15 @@ if [[ -z "${EJFAT_URI:-}" ]]; then
 fi
 
 echo "Freeing load balancer reservation..."
-echo "EJFAT_URI: $EJFAT_URI"
+EJFAT_URI_REDACTED=$(echo "$EJFAT_URI" | sed -E 's|(://)(.{4})[^@]*(.{4})@|\1\2---\3@|')
+echo "EJFAT_URI: $EJFAT_URI_REDACTED"
 
 # Run lbadm --free
 LBADM_CMD=(lbadm)
 [[ "$SKIP_SSL_VERIFY" == "true" ]] && LBADM_CMD+=(--novalidate)
 LBADM_CMD+=(--free)
 
-if podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 "${LBADM_CMD[@]}"; then
+if podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host "$E2SAR_IMAGE" "${LBADM_CMD[@]}"; then
     echo "Reservation freed successfully"
 
     # Remove the INSTANCE_URI file

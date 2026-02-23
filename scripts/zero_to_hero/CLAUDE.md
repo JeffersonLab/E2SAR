@@ -96,6 +96,9 @@ EJFAT_URI="..." /path/to/zero_to_hero/minimal_reserve.sh
 # Create reservation (required first step)
 EJFAT_URI="ejfat://..." ./minimal_reserve.sh
 
+# Create reservation with custom name
+EJFAT_URI="ejfat://..." ./minimal_reserve.sh --lbname my_test
+
 # Check reservation status
 podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --overview
 
@@ -151,6 +154,8 @@ podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1
 ### Environment Variables
 - `EJFAT_URI`: The primary configuration URI containing authentication token and load balancer details
 - `E2SAR_IMAGE`: Container image override (default: `ibaldin/e2sar:0.3.1a3`)
+- `LB_NAME`: Load balancer reservation name (default: `e2sar_test`). Can also be set via `--lbname` option in `minimal_reserve.sh`
+- `E2SAR_SCRIPTS_DIR`: Required for SLURM scripts (`perlmutter_slurm.sh`, `perlmutter_multi_slurm.sh`). Must point to the `zero_to_hero` directory. Example: `export E2SAR_SCRIPTS_DIR=/path/to/E2SAR/scripts/zero_to_hero`
 
 ### Container Pre-Installation (Perlmutter)
 
@@ -316,8 +321,12 @@ EJFAT_URI="..." ./minimal_reserve.sh
 The `perlmutter_slurm.sh` script orchestrates distributed tests on Perlmutter HPC system.
 Each job creates its own fresh LB reservation on startup and frees it on completion.
 
+**Prerequisites:**
+- `E2SAR_SCRIPTS_DIR` must be set: `export E2SAR_SCRIPTS_DIR=/path/to/E2SAR/scripts/zero_to_hero`
+- `EJFAT_URI` must be set to the admin URI (not a session token from INSTANCE_URI)
+
 ```bash
-# Basic SLURM submission (EJFAT_URI must be the admin URI set in your environment)
+# Basic SLURM submission
 sbatch -A <project> perlmutter_slurm.sh
 
 # With custom test parameters
@@ -346,6 +355,8 @@ Do NOT source an `INSTANCE_URI` file before submitting — that would overwrite 
 The `perlmutter_multi_slurm.sh` script enables testing with multiple concurrent senders and
 receivers. Senders and receivers share the same node pool and can be co-located on the same
 nodes. Like `perlmutter_slurm.sh`, each job creates its own fresh LB reservation.
+
+**Prerequisites:** Same as `perlmutter_slurm.sh` - requires `E2SAR_SCRIPTS_DIR` and admin `EJFAT_URI`.
 
 ```bash
 # 4 receivers + 4 senders co-located on 2 nodes (2 of each per node)

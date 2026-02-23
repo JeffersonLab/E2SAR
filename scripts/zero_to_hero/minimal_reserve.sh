@@ -16,6 +16,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 INSTANCE_URI_FILE="INSTANCE_URI"
 
+# Default configuration
+LB_NAME="${LB_NAME:-e2sar_test}"
+E2SAR_IMAGE="${E2SAR_IMAGE:-ibaldin/e2sar:0.3.1a3}"
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --lbname)
+            LB_NAME="$2"
+            shift 2
+            ;;
+        --image)
+            E2SAR_IMAGE="$2"
+            shift 2
+            ;;
+        *)
+            echo "ERROR: Unknown argument: $1"
+            echo "Usage: $0 [--lbname NAME] [--image IMAGE]"
+            exit 1
+            ;;
+    esac
+done
+
 # Validate EJFAT_URI
 if [[ -z "${EJFAT_URI:-}" ]]; then
     echo "ERROR: EJFAT_URI is required"
@@ -29,8 +52,9 @@ echo "Checking for existing reservation..."
 if [[ -f "$INSTANCE_URI_FILE" ]]; then
     echo "Found $INSTANCE_URI_FILE, validating..."
 
-    # Try to run lbadm --overview to check if the reservation is valid
-    if podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --overview &>/dev/null; then
+    # Use the instance URI (not the admin URI) to check session validity
+    INSTANCE_EJFAT_URI=$(. "$INSTANCE_URI_FILE" && echo "$EJFAT_URI")
+    if podman-hpc run -e EJFAT_URI="$INSTANCE_EJFAT_URI" --rm --network host "${E2SAR_IMAGE:-ibaldin/e2sar:0.3.1a3}" lbadm --overview &>/dev/null; then
         echo "Existing reservation is valid, skipping reserve"
         exit 0
     else
@@ -43,7 +67,7 @@ echo "Creating new reservation..."
 # Run lbadm --reserve and save output to INSTANCE_URI
 # Note: lbadm --reserve skips SSL cert validation internally regardless of --novalidate;
 # passing --novalidate interferes with this and causes failures, so it is intentionally omitted.
-podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host ibaldin/e2sar:0.3.1a3 lbadm --reserve --lbname "yk_test" --export > "$INSTANCE_URI_FILE"
+podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host "$E2SAR_IMAGE" lbadm --reserve --lbname "$LB_NAME" --export > "$INSTANCE_URI_FILE"
 
 echo "Reservation created and saved to $INSTANCE_URI_FILE"
 cat "$INSTANCE_URI_FILE"
