@@ -3,6 +3,13 @@ name: Automated PR Review
 on:
   pull_request:
     types: [opened]   # fires exactly once — when the PR is first opened
+  workflow_dispatch:
+    inputs:
+      grpc_ver:
+        description: 'PR Number'
+        default: '1'
+        type: string
+        required: true
 
 jobs:
   review:
