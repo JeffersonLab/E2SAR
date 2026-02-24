@@ -16,6 +16,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write  # needed so Claude can post inline + summary comments
+      id-token: write
     steps:
       - name: Resolve PR number                                                                                                                    
         id: resolve_pr                                                                                                                             
