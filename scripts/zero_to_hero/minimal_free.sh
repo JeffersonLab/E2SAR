@@ -61,7 +61,8 @@ LBADM_CMD=(lbadm)
 [[ "$SKIP_SSL_VERIFY" == "true" ]] && LBADM_CMD+=(--novalidate)
 LBADM_CMD+=(--free)
 
-if podman-hpc run -e EJFAT_URI="$EJFAT_URI" --rm --network host "$E2SAR_IMAGE" "${LBADM_CMD[@]}"; then
+export EJFAT_URI
+if podman-hpc run --env EJFAT_URI --rm --network host "$E2SAR_IMAGE" "${LBADM_CMD[@]}"; then
     echo "Reservation freed successfully"
 
     # Remove the INSTANCE_URI file
