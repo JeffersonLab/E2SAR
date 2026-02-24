@@ -935,7 +935,7 @@ int main(int argc, char **argv)
         preferV6 = true;
     }
 
-    novalidate = not vm["novalidate"].as<bool>();
+    novalidate = vm["novalidate"].as<bool>();
 
     // if ipv4 or ipv6 requested explicitly
     bool preferHostAddr = false;
@@ -968,11 +968,11 @@ int main(int argc, char **argv)
                 throw std::runtime_error("Unable to read server root certificate file");                                                
             return LBManager(uri, true, preferHostAddr, opts_res.value());                                                              
         }                                                                                                                             
-                                                                                                                                        
+        
         if (novalidate)                                                                                                
             std::cerr << "Skipping server certificate validation" << std::endl;
 
-        return LBManager(uri, !novalidate, preferHostAddr);                                                                                    
+        return LBManager(uri, !novalidate, preferHostAddr);
     };  
 
     try {
