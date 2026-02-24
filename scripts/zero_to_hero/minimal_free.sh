@@ -43,8 +43,8 @@ fi
 
 echo "Found $INSTANCE_URI_FILE"
 
-# Source the INSTANCE_URI file to get the EJFAT_URI
-source "$INSTANCE_URI_FILE"
+# Extract EJFAT_URI safely without sourcing the entire file
+EJFAT_URI=$(grep -E '^export EJFAT_URI=' "$INSTANCE_URI_FILE" | head -1 | sed "s/^export EJFAT_URI=//; s/^['\"]//; s/['\"]$//")
 
 # Validate EJFAT_URI was set
 if [[ -z "${EJFAT_URI:-}" ]]; then

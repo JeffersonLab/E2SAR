@@ -95,7 +95,8 @@ if [[ ! -f "$INSTANCE_URI_FILE" ]]; then
 fi
 
 echo "Loading EJFAT_URI from $INSTANCE_URI_FILE..."
-source "$INSTANCE_URI_FILE"
+# Extract EJFAT_URI safely without sourcing the entire file
+EJFAT_URI=$(grep -E '^export EJFAT_URI=' "$INSTANCE_URI_FILE" | head -1 | sed "s/^export EJFAT_URI=//; s/^['\"]//; s/['\"]$//")
 
 # Validate EJFAT_URI was loaded
 if [[ -z "$EJFAT_URI" ]]; then
@@ -223,12 +224,16 @@ stop_memory_monitor() {
 #=============================================================================
 # Build podman-hpc command
 #=============================================================================
+
+# Export EJFAT_URI so it can be passed to container without exposing in process list
+export EJFAT_URI
+
 CMD=(
     podman-hpc
     run
     --rm
     --network host
-    -e "EJFAT_URI=$EJFAT_URI"
+    --env EJFAT_URI
     -e "MALLOC_ARENA_MAX=32"
     "$E2SAR_IMAGE"
     e2sar_perf

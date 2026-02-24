@@ -189,6 +189,27 @@ echo "Receiver arguments: ${RECEIVER_ARGS[*]:-<none>}"
 echo ""
 
 #=============================================================================
+# Install cleanup trap to free reservation on early exit or job cancellation
+#=============================================================================
+
+CLEANUP_DONE=false
+
+cleanup() {
+    # Only run cleanup once, and only if INSTANCE_URI exists
+    if [[ "$CLEANUP_DONE" == "false" && -f "$JOB_DIR/INSTANCE_URI" ]]; then
+        CLEANUP_DONE=true
+        echo ""
+        echo "========================================="
+        echo "Cleanup: Freeing Load Balancer"
+        echo "========================================="
+        cd "$JOB_DIR" || return
+        "$SCRIPT_DIR/minimal_free.sh" ${V_FLAG:+"$V_FLAG"} 2>/dev/null || echo "WARNING: Failed to free load balancer reservation"
+    fi
+}
+
+trap cleanup EXIT
+
+#=============================================================================
 # Phase 1: Reserve Load Balancer (fresh reservation per job)
 #=============================================================================
 
@@ -295,6 +316,8 @@ echo "========================================="
 echo "Phase 5: Free Load Balancer"
 echo "========================================="
 
+# Mark cleanup as done and run it explicitly
+CLEANUP_DONE=true
 if ! "$SCRIPT_DIR/minimal_free.sh" ${V_FLAG:+"$V_FLAG"}; then
     echo "WARNING: Failed to free load balancer reservation"
 fi
