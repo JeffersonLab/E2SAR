@@ -277,6 +277,17 @@ namespace e2sar
             auto until = nowT + boost::chrono::milliseconds(eventTimeout_ms);
             boost::this_thread::sleep_until(until);
         }
+        // drain in progress queues in threads
+        for(auto i = reas.recvThreadState.begin(); i != reas.recvThreadState.end(); ++i) 
+        {
+            for (auto it = i->eventsInProgress.begin(); it != i->eventsInProgress.end(); ) {
+                if (it->second->event != nullptr) {
+                    delete[] it->second->event;
+                    it->second.reset();
+                }
+                it = i->eventsInProgress.erase(it); 
+            }
+        }
     }
 
     void Reassembler::RecvThreadState::_threadBody()

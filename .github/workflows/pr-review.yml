@@ -1,0 +1,39 @@
+name: Automated PR Review
+
+on:
+  pull_request:
+    types: [opened]   # fires exactly once — when the PR is first opened
+  workflow_dispatch:
+    inputs:
+      prnum_in:
+        description: 'PR Number'
+        type: string
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # needed so Claude can post inline + summary comments
+      id-token: write
+    steps:
+      - name: Resolve PR number                                                                                                                    
+        id: resolve_pr                                                                                                                             
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then                                                                            
+            echo "PR_NUMBER=${{ inputs.prnum_in }}" >> $GITHUB_ENV                                                                             
+          else                                                                                                                                     
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          fi
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run /review-pr skill
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: "/review-pr ${{ env.PR_NUMBER }}"
+        env:
+          GH_TOKEN: ${{ secrets.CLASSIC_REPO_PAT }}  # authenticates gh CLI calls inside the skill

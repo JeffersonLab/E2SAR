@@ -154,4 +154,22 @@ namespace e2sar
         return E2SARErrorInfo{E2SARErrorc::SocketError, "Unrecoverable NETLINK error"};
     }
 #endif
+    result<int> NetUtil::getSocketOutstandingBytes(int sockfd) noexcept {
+        int outstanding = 0;
+        int res = 0;
+    #if defined(SIOCOUTQ_AVAILABLE)
+        res = ioctl(sockfd, TIOCOUTQ, &outstanding);
+        if (res < 0)
+            return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+    #elif defined(SO_NWRITE_AVAILABLE)
+        socklen_t len = sizeof(outstanding);
+        res = getsockopt(sockfd, SOL_SOCKET, SO_NWRITE, &outstanding, &len);
+        if (res < 0)
+            return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+    #else
+        #warning "No send buffer query support on this platform"
+        outstanding = -1;  // unsupported
+    #endif
+        return outstanding;
+  }
 }

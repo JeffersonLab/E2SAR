@@ -11,6 +11,7 @@
 
 #include "e2sarDPSegmenter.hpp"
 #include "e2sarUtil.hpp"
+#include "e2sarNetUtil.hpp"
 #include "e2sarAffinity.hpp"
 
 
@@ -450,6 +451,10 @@ namespace e2sar
             }
         }
         // not doing .join or stop for threadpool as it's d-tor will do it
+        
+        // drain all pending lambdas before the destructor calls stop() which
+        // would abandon queued-but-not-started handlers and leak their items
+        threadPool.join();
 #ifdef LIBURING_AVAILABLE
         // reap the remaining CQEs
         while(seg.outstandingSends > 0) 
@@ -869,14 +874,12 @@ namespace e2sar
     // otherwise just close
     result<int> Segmenter::SendThreadState::_waitAndCloseFd(int fd)
     {
-        int outq = 0;
         bool stop{false};
         // busy wait while the socket has outstanding data
         while(!stop)
         {
-            if (ioctl(fd, TIOCOUTQ, &outq) == 0)
-                stop = (outq == 0);
-            else
+            auto res = NetUtil::getSocketOutstandingBytes(fd);
+            if (res.has_error() || ((not res.has_error()) && (res.value() == 0)))
                 stop = true;
         }
         close(fd);
@@ -938,8 +941,10 @@ namespace e2sar
         //sendThreadCond.notify_one();
         if (res)
             return 0;
-        else
+        else {
+            delete item;
             return E2SARErrorInfo{E2SARErrorc::MemoryError, "Send queue is temporarily full, try again later"};
+        }
     }
 
     result<Segmenter::SegmenterFlags> Segmenter::SegmenterFlags::getFromINI(const std::string &iniFile) noexcept

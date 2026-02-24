@@ -267,6 +267,8 @@ E2SAR code comes with a set of tests under [test/](test/) folder. It relies on B
 
 There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which runs all the tests on FABRIC testbed.
 
+For checking for memory leaks use [scripts/perf-valgrind-loopback.sh](scripts/perf-valgrind-loopback.sh) (run it from scripts/ and give parameters `./perf-valgrind-loopback.sh build /tmp/valgrind-report/` where build is the meson build directory and /tmp/valgrind-report is the directory where the script will place all the logs). Then you can run the XML report parser to get a more concise report `scripts/parse-valgrind-xml.py /tmp/valgrind-reports`. 
+
 ### Python
 
 The code can be tested using pytest
