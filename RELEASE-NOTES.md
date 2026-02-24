@@ -6,6 +6,8 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 - Reversed the order of removing senders and shutting down send threads in e2sar_perf to ensure no losses occur due to premature de-listing of the sender IP in LB
 - Fixed multiple memory leaks in segmenter and reassembler
+- Fixed proper handling of `-v/--novalidate` flag in lbadm
+- Added 'Zero-to-Hero' scripts that show how to do performance testing on Perlmutter (located in scripts/zero_to_hero). The scripts exercise the wide variety of E2SAR tools and show how they can be integrated into Slurm workflows.
 
 ## v0.3.0
 

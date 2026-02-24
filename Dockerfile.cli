@@ -5,7 +5,7 @@
 # This is a multi-stage build optimized for minimal image size
 
 # Global build arguments (available to all stages)
-ARG DEPS_VER=0.3.0a1
+ARG DEPS_VER=0.3.1
 ARG E2SAR_DEPS_DEB=E2SAR-${DEPS_VER}-main-ubuntu-24.04/e2sar-deps_${DEPS_VER}_amd64.deb
 ARG E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
 ARG E2SARINSTALL=/e2sar-install
