@@ -1,0 +1,22 @@
+name: Automated PR Review
+
+on:
+  pull_request:
+    types: [opened]   # fires exactly once — when the PR is first opened
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # needed so Claude can post inline + summary comments
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run /review-pr skill
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: "/review-pr ${{ github.event.pull_request.number }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # authenticates gh CLI calls inside the skill
