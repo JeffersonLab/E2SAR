@@ -200,6 +200,12 @@ int main() {
             fec::interleave_neon(cpu_src[blk], cpu_dst[blk], p);
     }, ITERS);
 
+    // ---- CPU: NEON tiled interleave loop ----
+    double ms_neon_tiled_il = bench_ms([&] {
+        for (int blk = 0; blk < N_BLOCKS; ++blk)
+            fec::interleave_neon_tiled(cpu_src[blk], cpu_dst[blk], p);
+    }, ITERS);
+
     // ---- CPU: NEON deinterleave loop ----
     double ms_neon_dil = bench_ms([&] {
         for (int blk = 0; blk < N_BLOCKS; ++blk)
@@ -229,6 +235,14 @@ int main() {
     double ms_combined_neon = bench_ms([&] {
         for (int blk = 0; blk < N_BLOCKS; ++blk) {
             fec::interleave_neon(cpu_src[blk], cpu_dst[blk], p);
+            fec::rs_encode_neon(cpu_dst[blk], p);
+        }
+    }, ITERS);
+
+    // ---- CPU: combined NEON tiled pipeline loop ----
+    double ms_combined_neon_tiled = bench_ms([&] {
+        for (int blk = 0; blk < N_BLOCKS; ++blk) {
+            fec::interleave_neon_tiled(cpu_src[blk], cpu_dst[blk], p);
             fec::rs_encode_neon(cpu_dst[blk], p);
         }
     }, ITERS);
@@ -288,6 +302,10 @@ int main() {
     std::printf("  %-34s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
                 lbl, ms_neon_il, mibs(ms_neon_il), gbits(ms_neon_il),
                 ms_scalar / ms_neon_il);
+    std::snprintf(lbl, sizeof(lbl), "interleave NEON tiled (\xc3\x97%d)", N_BLOCKS);
+    std::printf("  %-34s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx NEON)\n",
+                lbl, ms_neon_tiled_il, mibs(ms_neon_tiled_il), gbits(ms_neon_tiled_il),
+                ms_scalar / ms_neon_tiled_il, ms_neon_il / ms_neon_tiled_il);
     std::snprintf(lbl, sizeof(lbl), "deinterleave NEON (\xc3\x97%d)", N_BLOCKS);
     std::printf("  %-34s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
                 lbl, ms_neon_dil, mibs(ms_neon_dil), gbits(ms_neon_dil),
@@ -352,6 +370,12 @@ int main() {
     std::printf("  %-34s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
                 lbl, ms_combined_neon, mibs(ms_combined_neon),
                 gbits(ms_combined_neon), ms_combined_scalar / ms_combined_neon);
+    std::snprintf(lbl, sizeof(lbl), "neon_tiled+neon   (\xc3\x97%d)", N_BLOCKS);
+    std::printf("  %-34s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx NEON)\n",
+                lbl, ms_combined_neon_tiled, mibs(ms_combined_neon_tiled),
+                gbits(ms_combined_neon_tiled),
+                ms_combined_scalar / ms_combined_neon_tiled,
+                ms_combined_neon / ms_combined_neon_tiled);
 #endif
 
 #if defined(__APPLE__)

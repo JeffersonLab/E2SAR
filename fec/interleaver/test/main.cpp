@@ -251,6 +251,62 @@ static void test_neon_correctness() {
 #endif // __ARM_NEON
 
 // ---------------------------------------------------------------------------
+// Test 5b — NEON tiled correctness: interleave_neon_tiled must match scalar
+// ---------------------------------------------------------------------------
+#if defined(__ARM_NEON)
+static void test_neon_tiled_correctness() {
+    section("NEON tiled correctness vs scalar");
+
+    // Exercise tile-aligned, tile+tail, and sub-tile col_heights.
+    const uint32_t test_heights[] = {1, 15, 16, 17, 32, 64, 8192, 8936};
+
+    for (uint32_t height : test_heights) {
+        fec::FecBlockParams p;
+        p.col_height = height;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        // Scalar reference
+        std::vector<uint8_t> cw_scalar(p.codeword_buf_size(), 0u);
+        fec::interleave(src, cw_scalar, p);
+
+        // NEON tiled (pre-fill with garbage to catch partial writes)
+        std::vector<uint8_t> cw_tiled(p.codeword_buf_size(), 0xBBu);
+        fec::interleave_neon_tiled(src, cw_tiled, p);
+
+        char label[80];
+        std::snprintf(label, sizeof(label),
+                      "interleave_neon_tiled matches scalar (ch=%u)", height);
+        EXPECT(cw_tiled == cw_scalar, label);
+
+        // Round-trip via scalar deinterleave
+        std::vector<uint8_t> dst(p.segment_buf_size(), 0u);
+        fec::deinterleave(cw_tiled, dst, p);
+        std::snprintf(label, sizeof(label),
+                      "deinterleave(interleave_neon_tiled(x)) == x (ch=%u)", height);
+        EXPECT(dst == src, label);
+    }
+
+    // Cross-validate against interleave_neon at a larger size
+    {
+        fec::FecBlockParams p;
+        p.col_height = 8192;
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        std::vector<uint8_t> cw_neon(p.codeword_buf_size(), 0u);
+        std::vector<uint8_t> cw_tiled(p.codeword_buf_size(), 0u);
+        fec::interleave_neon(src, cw_neon, p);
+        fec::interleave_neon_tiled(src, cw_tiled, p);
+        EXPECT(cw_tiled == cw_neon, "interleave_neon_tiled matches interleave_neon bit-for-bit");
+    }
+}
+#endif // __ARM_NEON
+
+// ---------------------------------------------------------------------------
 // Test 5c — Metal correctness: interleave_metal output must match scalar
 // ---------------------------------------------------------------------------
 #if defined(__APPLE__)
@@ -582,6 +638,24 @@ static void test_pipeline_combined() {
                           "scalar+neon: matches scalar ref (ch=%u)", p.col_height);
             EXPECT(cw == cw_ref, label);
         }
+        // ---- NEON tiled interleave + NEON encode ----
+        {
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave_neon_tiled(src, cw, p);
+            fec::rs_encode_neon(cw, p);
+            std::snprintf(label, sizeof(label),
+                          "neon_tiled+neon: matches scalar ref (ch=%u)", p.col_height);
+            EXPECT(cw == cw_ref, label);
+        }
+        // ---- NEON tiled interleave + scalar encode ----
+        {
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave_neon_tiled(src, cw, p);
+            fec::rs_encode(cw, p);
+            std::snprintf(label, sizeof(label),
+                          "neon_tiled+scalar: matches scalar ref (ch=%u)", p.col_height);
+            EXPECT(cw == cw_ref, label);
+        }
 #endif // __ARM_NEON
 
 #if defined(__APPLE__)
@@ -765,9 +839,14 @@ static void test_performance() {
     double ms_il_n  = bench_ms([&]{ fec::interleave_neon(src, cw, p); },   ITERS);
     double ms_dil_n = bench_ms([&]{ fec::deinterleave_neon(cw, dst, p); }, ITERS);
 
+    double ms_il_nt = bench_ms([&]{ fec::interleave_neon_tiled(src, cw, p); }, ITERS);
+
     std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx magic)\n",
                 "interleave (NEON)", ms_il_n, mibs(ms_il_n), gbits(ms_il_n),
                 ms_il / ms_il_n, ms_il_mm / ms_il_n);
+    std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx NEON)\n",
+                "interleave (NEON tiled)", ms_il_nt, mibs(ms_il_nt), gbits(ms_il_nt),
+                ms_il / ms_il_nt, ms_il_n / ms_il_nt);
     std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
                 "deinterleave (NEON)", ms_dil_n, mibs(ms_dil_n), gbits(ms_dil_n),
                 ms_dil / ms_dil_n);
@@ -847,10 +926,19 @@ static void test_performance() {
         fec::interleave_neon(src, cw, p);
         fec::rs_encode_neon(cw, p);
     }, ITERS);
+    double ms_combined_neon_tiled = bench_ms([&]{
+        fec::interleave_neon_tiled(src, cw, p);
+        fec::rs_encode_neon(cw, p);
+    }, ITERS);
     std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
                 "neon+neon", ms_combined_neon,
                 mibs(ms_combined_neon), gbits(ms_combined_neon),
                 ms_combined_scalar / ms_combined_neon);
+    std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx NEON)\n",
+                "neon_tiled+neon", ms_combined_neon_tiled,
+                mibs(ms_combined_neon_tiled), gbits(ms_combined_neon_tiled),
+                ms_combined_scalar / ms_combined_neon_tiled,
+                ms_combined_neon / ms_combined_neon_tiled);
 #endif // __ARM_NEON
 
 #if defined(__APPLE__)
@@ -885,6 +973,12 @@ static void test_performance() {
     fec::interleave_neon(src, cw, p);
     fec::deinterleave_neon(cw, dst, p);
     EXPECT(src == dst, "Full-size NEON round-trip: src == dst");
+
+    std::fill(cw.begin(),  cw.end(),  0u);
+    std::fill(dst.begin(), dst.end(), 0u);
+    fec::interleave_neon_tiled(src, cw, p);
+    fec::deinterleave_neon(cw, dst, p);
+    EXPECT(src == dst, "Full-size NEON tiled round-trip: src == dst");
 #endif
 
 #if defined(__APPLE__)
@@ -909,6 +1003,7 @@ int main() {
     test_pipeline();
 #if defined(__ARM_NEON)
     test_neon_correctness();
+    test_neon_tiled_correctness();
 #endif
 #if defined(__APPLE__)
     test_metal_correctness();

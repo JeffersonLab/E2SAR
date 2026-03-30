@@ -236,6 +236,212 @@ void interleave_neon(
     }
 }
 
+// ---------------------------------------------------------------------------
+// interleave_neon_tiled
+//
+// Outer loop: byte_idx_base in steps of 16 (tile width T=16).
+// Per tile:
+//   Pass A (segs 0-15):
+//     1. 16 x vld1q_u8 from segments[s * ch + byte_idx_base], s=0..15
+//     2. 4-stage 16x16 byte transpose in-register (vtrn butterfly)
+//     3. Spill 16 transposed Q-regs to spill_A[256] (aligned on stack)
+//   Pass B (segs 16-31): identical, spill to spill_B[256].
+//   Inner loop (j=0..15):
+//     g_lo = vld1q_u8(spill_A + j*16)   byte (byte_idx_base+j) from segs 0-15
+//     g_hi = vld1q_u8(spill_B + j*16)   byte (byte_idx_base+j) from segs 16-31
+//     run existing IL_BIT pipeline → 8 codewords
+// Tail: remaining col_height % 16 positions handled by scalar gather.
+//
+// 4-stage transpose pairs (starting from r0..r15):
+//   Stage 1 vtrnq_u8:  (r0,r1)  (r2,r3)  (r4,r5)  (r6,r7)
+//                      (r8,r9)  (r10,r11)(r12,r13)(r14,r15)
+//   Stage 2 vtrnq_u16: (r0,r2)  (r1,r3)  (r4,r6)  (r5,r7)
+//                      (r8,r10) (r9,r11) (r12,r14)(r13,r15)
+//   Stage 3 vtrnq_u32: (r0,r4)  (r1,r5)  (r2,r6)  (r3,r7)
+//                      (r8,r12) (r9,r13) (r10,r14)(r11,r15)
+//   Stage 4 swap64:    (r0,r8)  (r1,r9)  (r2,r10) (r3,r11)
+//                      (r4,r12) (r5,r13) (r6,r14) (r7,r15)
+// After: register j holds byte (byte_idx_base+j) from all 16 input rows.
+// ---------------------------------------------------------------------------
+
+// Transpose helper macros — scoped to this function, undefined below.
+#define TRN16(A, B) do {                                                      \
+    auto _t = vtrnq_u16(vreinterpretq_u16_u8(A), vreinterpretq_u16_u8(B));   \
+    (A) = vreinterpretq_u8_u16(_t.val[0]);                                    \
+    (B) = vreinterpretq_u8_u16(_t.val[1]);                                    \
+} while (0)
+
+#define TRN32(A, B) do {                                                      \
+    auto _t = vtrnq_u32(vreinterpretq_u32_u8(A), vreinterpretq_u32_u8(B));   \
+    (A) = vreinterpretq_u8_u32(_t.val[0]);                                    \
+    (B) = vreinterpretq_u8_u32(_t.val[1]);                                    \
+} while (0)
+
+// Swap the 64-bit halves of A and B between each other.
+// After: A = [lo(A_orig) | lo(B_orig)], B = [hi(A_orig) | hi(B_orig)]
+#define SWAP64(A, B) do {                                                     \
+    uint8x16_t _a = (A), _b = (B);                                            \
+    (A) = vcombine_u8(vget_low_u8(_a),  vget_low_u8(_b));                    \
+    (B) = vcombine_u8(vget_high_u8(_a), vget_high_u8(_b));                   \
+} while (0)
+
+// Transpose a set of 16 uint8x16_t registers in-place via the 4-stage butterfly.
+// Uses a block macro to keep the tiled function body readable.
+#define TRANSPOSE_16x16(r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15) \
+    do {                                                                           \
+        /* Stage 1: vtrnq_u8 — interleave bytes within adjacent pairs */           \
+        { auto _t = vtrnq_u8(r0,  r1);  r0  = _t.val[0]; r1  = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r2,  r3);  r2  = _t.val[0]; r3  = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r4,  r5);  r4  = _t.val[0]; r5  = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r6,  r7);  r6  = _t.val[0]; r7  = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r8,  r9);  r8  = _t.val[0]; r9  = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r10, r11); r10 = _t.val[0]; r11 = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r12, r13); r12 = _t.val[0]; r13 = _t.val[1]; }      \
+        { auto _t = vtrnq_u8(r14, r15); r14 = _t.val[0]; r15 = _t.val[1]; }      \
+        /* Stage 2: vtrnq_u16 — interleave 16-bit pairs */                        \
+        TRN16(r0, r2);  TRN16(r1, r3);                                            \
+        TRN16(r4, r6);  TRN16(r5, r7);                                            \
+        TRN16(r8, r10); TRN16(r9, r11);                                           \
+        TRN16(r12,r14); TRN16(r13,r15);                                           \
+        /* Stage 3: vtrnq_u32 — interleave 32-bit pairs */                        \
+        TRN32(r0, r4);  TRN32(r1, r5);  TRN32(r2, r6);  TRN32(r3, r7);           \
+        TRN32(r8, r12); TRN32(r9, r13); TRN32(r10,r14); TRN32(r11,r15);          \
+        /* Stage 4: swap 64-bit halves across stride-8 pairs */                   \
+        SWAP64(r0, r8);  SWAP64(r1, r9);  SWAP64(r2, r10); SWAP64(r3, r11);      \
+        SWAP64(r4, r12); SWAP64(r5, r13); SWAP64(r6, r14); SWAP64(r7, r15);      \
+    } while (0)
+
+void interleave_neon_tiled(
+    std::span<const uint8_t> segments,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    p)
+{
+    assert(segments.size()  == p.segment_buf_size());
+    assert(codewords.size() == p.codeword_buf_size());
+
+    const uint32_t ch = p.col_height;
+
+    // Constant NEON vectors (same as interleave_neon).
+    const uint8x16_t wt  = {8,4,2,1, 8,4,2,1, 8,4,2,1, 8,4,2,1};
+    const uint8x8_t  pk  = {16,1, 16,1, 16,1, 16,1};
+    const uint8x16_t one = vdupq_n_u8(1u);
+
+    const uint8_t* seg_base = segments.data();
+
+    const uint32_t full_tiles = ch / 16u;
+    const uint32_t tail_start = full_tiles * 16u;
+
+    // Stack spill buffers: 256 bytes each, 16-byte aligned.
+    // 512 bytes total = 8 cache lines, trivially L1-resident throughout the tile.
+    alignas(16) uint8_t spill_A[256];
+    alignas(16) uint8_t spill_B[256];
+
+    // ---- Tiled outer loop: 16 byte positions per iteration ----
+    for (uint32_t tile = 0; tile < full_tiles; ++tile) {
+        const uint32_t bi = tile * 16u;   // byte_idx_base
+
+        // === Pass A: load and transpose segments 0-15 ===
+        uint8x16_t r0  = vld1q_u8(seg_base +  0u * ch + bi);
+        uint8x16_t r1  = vld1q_u8(seg_base +  1u * ch + bi);
+        uint8x16_t r2  = vld1q_u8(seg_base +  2u * ch + bi);
+        uint8x16_t r3  = vld1q_u8(seg_base +  3u * ch + bi);
+        uint8x16_t r4  = vld1q_u8(seg_base +  4u * ch + bi);
+        uint8x16_t r5  = vld1q_u8(seg_base +  5u * ch + bi);
+        uint8x16_t r6  = vld1q_u8(seg_base +  6u * ch + bi);
+        uint8x16_t r7  = vld1q_u8(seg_base +  7u * ch + bi);
+        uint8x16_t r8  = vld1q_u8(seg_base +  8u * ch + bi);
+        uint8x16_t r9  = vld1q_u8(seg_base +  9u * ch + bi);
+        uint8x16_t r10 = vld1q_u8(seg_base + 10u * ch + bi);
+        uint8x16_t r11 = vld1q_u8(seg_base + 11u * ch + bi);
+        uint8x16_t r12 = vld1q_u8(seg_base + 12u * ch + bi);
+        uint8x16_t r13 = vld1q_u8(seg_base + 13u * ch + bi);
+        uint8x16_t r14 = vld1q_u8(seg_base + 14u * ch + bi);
+        uint8x16_t r15 = vld1q_u8(seg_base + 15u * ch + bi);
+
+        TRANSPOSE_16x16(r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15);
+
+        // Spill: after transpose, register j holds byte (bi+j) from segs 0-15.
+        vst1q_u8(spill_A +   0, r0);  vst1q_u8(spill_A +  16, r1);
+        vst1q_u8(spill_A +  32, r2);  vst1q_u8(spill_A +  48, r3);
+        vst1q_u8(spill_A +  64, r4);  vst1q_u8(spill_A +  80, r5);
+        vst1q_u8(spill_A +  96, r6);  vst1q_u8(spill_A + 112, r7);
+        vst1q_u8(spill_A + 128, r8);  vst1q_u8(spill_A + 144, r9);
+        vst1q_u8(spill_A + 160, r10); vst1q_u8(spill_A + 176, r11);
+        vst1q_u8(spill_A + 192, r12); vst1q_u8(spill_A + 208, r13);
+        vst1q_u8(spill_A + 224, r14); vst1q_u8(spill_A + 240, r15);
+
+        // === Pass B: load and transpose segments 16-31 ===
+        r0  = vld1q_u8(seg_base + 16u * ch + bi);
+        r1  = vld1q_u8(seg_base + 17u * ch + bi);
+        r2  = vld1q_u8(seg_base + 18u * ch + bi);
+        r3  = vld1q_u8(seg_base + 19u * ch + bi);
+        r4  = vld1q_u8(seg_base + 20u * ch + bi);
+        r5  = vld1q_u8(seg_base + 21u * ch + bi);
+        r6  = vld1q_u8(seg_base + 22u * ch + bi);
+        r7  = vld1q_u8(seg_base + 23u * ch + bi);
+        r8  = vld1q_u8(seg_base + 24u * ch + bi);
+        r9  = vld1q_u8(seg_base + 25u * ch + bi);
+        r10 = vld1q_u8(seg_base + 26u * ch + bi);
+        r11 = vld1q_u8(seg_base + 27u * ch + bi);
+        r12 = vld1q_u8(seg_base + 28u * ch + bi);
+        r13 = vld1q_u8(seg_base + 29u * ch + bi);
+        r14 = vld1q_u8(seg_base + 30u * ch + bi);
+        r15 = vld1q_u8(seg_base + 31u * ch + bi);
+
+        TRANSPOSE_16x16(r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15);
+
+        // Spill: register j holds byte (bi+j) from segs 16-31.
+        vst1q_u8(spill_B +   0, r0);  vst1q_u8(spill_B +  16, r1);
+        vst1q_u8(spill_B +  32, r2);  vst1q_u8(spill_B +  48, r3);
+        vst1q_u8(spill_B +  64, r4);  vst1q_u8(spill_B +  80, r5);
+        vst1q_u8(spill_B +  96, r6);  vst1q_u8(spill_B + 112, r7);
+        vst1q_u8(spill_B + 128, r8);  vst1q_u8(spill_B + 144, r9);
+        vst1q_u8(spill_B + 160, r10); vst1q_u8(spill_B + 176, r11);
+        vst1q_u8(spill_B + 192, r12); vst1q_u8(spill_B + 208, r13);
+        vst1q_u8(spill_B + 224, r14); vst1q_u8(spill_B + 240, r15);
+
+        // === Bit-extract: 16 byte positions, using spill buffers as g_lo/g_hi ===
+        for (uint32_t j = 0; j < 16u; ++j) {
+            const uint8x16_t g_lo = vld1q_u8(spill_A + j * 16u);
+            const uint8x16_t g_hi = vld1q_u8(spill_B + j * 16u);
+            uint8_t* cw = codewords.data() + size_t{bi + j} * 40u;
+
+            IL_BIT (7,  0);
+            IL_BIT (6,  5);
+            IL_BIT (5, 10);
+            IL_BIT (4, 15);
+            IL_BIT (3, 20);
+            IL_BIT (2, 25);
+            IL_BIT (1, 30);
+            IL_BIT0(   35);
+        }
+    }
+
+    // ---- Tail loop: remaining col_height % 16 positions ----
+    for (uint32_t byte_idx = tail_start; byte_idx < ch; ++byte_idx) {
+        uint8_t gathered[32];
+        for (uint32_t s = 0; s < 32u; ++s)
+            gathered[s] = seg_base[s * ch + byte_idx];
+        const uint8x16_t g_lo = vld1q_u8(gathered);
+        const uint8x16_t g_hi = vld1q_u8(gathered + 16);
+        uint8_t* cw = codewords.data() + size_t{byte_idx} * 40u;
+
+        IL_BIT (7,  0);
+        IL_BIT (6,  5);
+        IL_BIT (5, 10);
+        IL_BIT (4, 15);
+        IL_BIT (3, 20);
+        IL_BIT (2, 25);
+        IL_BIT (1, 30);
+        IL_BIT0(   35);
+    }
+}
+
+#undef TRANSPOSE_16x16
+#undef SWAP64
+#undef TRN32
+#undef TRN16
+
 #undef IL_BIT_BODY
 #undef IL_BIT
 #undef IL_BIT0

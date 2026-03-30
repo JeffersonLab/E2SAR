@@ -59,6 +59,21 @@ void interleave_neon(
     std::span<uint8_t>       codewords,
     const FecBlockParams&    params);
 
+// interleave_neon_tiled() — ARM NEON tiled interleave with in-register transpose.
+// Same semantics and preconditions as interleave().
+//
+// Processes byte positions in tiles of 16.  For each tile, loads 16 bytes from
+// each of the 32 segments via vld1q_u8 (amortising the strided loads over 16
+// byte positions), transposes two 16x16 sub-matrices in-register using a 4-stage
+// vtrn butterfly, spills the results to a pair of 256-byte stack buffers, then
+// runs the existing IL_BIT bit-extraction pipeline for each of the 16 columns.
+// The scalar gather loop and its store-forwarding penalty are eliminated entirely.
+// Falls back to the scalar gather for the final col_height % 16 positions.
+void interleave_neon_tiled(
+    std::span<const uint8_t> segments,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    params);
+
 #endif // __ARM_NEON
 
 #if defined(__APPLE__)
