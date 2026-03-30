@@ -38,6 +38,14 @@ void rs_encode_metal(std::span<uint8_t> codewords, const FecBlockParams& params)
 double rs_encode_metal_gpu_us(std::span<uint8_t> codewords, const FecBlockParams& params);
 #endif // __APPLE__
 
+#if defined(__AVX2__)
+// rs_encode_avx2() — AVX2 SIMD implementation of rs_encode().
+// Processes 32 codewords per iteration (4 groups of 8) using
+// _mm256_shuffle_epi8 as a 16-entry GF(16) lookup table for exp/log.
+// Same semantics and preconditions as rs_encode().
+void rs_encode_avx2(std::span<uint8_t> codewords, const FecBlockParams& params);
+#endif // __AVX2__
+
 #if defined(__ARM_NEON)
 // rs_encode_neon() — ARM NEON SIMD implementation of rs_encode().
 // Processes 8 codewords per iteration (one per NEON lane).

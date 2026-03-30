@@ -84,6 +84,190 @@ void rs_encode(std::span<uint8_t> codewords, const FecBlockParams& params)
 } // namespace fec
 
 // =============================================================================
+// AVX2 implementation
+// =============================================================================
+#if defined(__AVX2__)
+#include <immintrin.h>
+#include <cstring>
+
+namespace fec {
+
+// ---------------------------------------------------------------------------
+// rs_encode_avx2
+//
+// Processes 32 codewords per iteration (4 groups of 8, i.e. 4 consecutive
+// byte_idx values).  Each codeword is 5 bytes at stride 5 within the buffer,
+// and groups are 40 bytes apart — so codeword i (0..31) byte j is at
+// base[i*5 + j], giving a uniform stride.
+//
+// GF(16) arithmetic via _mm256_shuffle_epi8:
+//   Since GF(16) has exactly 16 elements, the exp and log tables each fit
+//   in the 16-byte lane of a YMM register.  _mm256_shuffle_epi8(table, idx)
+//   performs a parallel 16-entry LUT lookup for all 32 bytes simultaneously.
+//
+// GF multiply pipeline (per coefficient):
+//   1. exp lookup:    data_exp  = shuffle(exp_tbl, symbol)
+//   2. add exponents: sum       = add(data_exp, coeff_exp)
+//   3. mod 15:        sum       = sub(sum, and(15, cmpgt(sum, 14)))
+//   4. log lookup:    product   = shuffle(log_tbl, sum)
+//   5. zero mask:     product   = andnot(cmpeq(symbol, 0), product)
+//   6. accumulate:    acc       = xor(acc, product)
+//
+// Total: 8 symbols × 2 parities × 6 ops = 96 ALU ops for 32 codewords.
+// ---------------------------------------------------------------------------
+
+// GF(16) multiply helper: returns gf_mul(symbol, alpha^coeff_exp) for 32 lanes.
+// data_exp = shuffle(exp_tbl, symbol)  [pre-computed, shared across parities]
+// zm       = cmpeq(symbol, 0)          [pre-computed, shared across parities]
+// coeff_exp = scalar coefficient exponent (broadcast internally)
+static inline __m256i gf_mul_avx2(const __m256i& log_tbl,
+                                   __m256i data_exp, __m256i zm,
+                                   uint8_t coeff_exp,
+                                   __m256i fifteen)
+{
+    const __m256i coeff    = _mm256_set1_epi8(static_cast<int8_t>(coeff_exp));
+    const __m256i fourteen = _mm256_set1_epi8(14);
+    const __m256i sum  = _mm256_add_epi8(data_exp, coeff);
+    const __m256i ge15 = _mm256_cmpgt_epi8(sum, fourteen);
+    const __m256i mod  = _mm256_sub_epi8(sum, _mm256_and_si256(ge15, fifteen));
+    const __m256i prod = _mm256_shuffle_epi8(log_tbl, mod);
+    return _mm256_andnot_si256(zm, prod);
+}
+
+void rs_encode_avx2(std::span<uint8_t> codewords, const FecBlockParams& params)
+{
+    assert(codewords.size() == params.codeword_buf_size());
+
+    const uint32_t ch = params.col_height;
+    uint8_t* buf = codewords.data();
+
+    // Broadcast 16-byte GF(16) tables to both 128-bit lanes.
+    const __m256i exp_tbl = _mm256_broadcastsi128_si256(
+        _mm_loadu_si128(reinterpret_cast<const __m128i*>(gf_exp)));
+    const __m256i log_tbl = _mm256_broadcastsi128_si256(
+        _mm_loadu_si128(reinterpret_cast<const __m128i*>(gf_log)));
+
+    const __m256i zero    = _mm256_setzero_si256();
+    const __m256i nib     = _mm256_set1_epi8(0x0F);
+    const __m256i fifteen = _mm256_set1_epi8(15);
+
+    uint32_t byte_idx = 0;
+
+    // ---- Main loop: 4 groups (32 codewords) per iteration ----
+    for (; byte_idx + 3 < ch; byte_idx += 4) {
+        uint8_t* base = buf + size_t{byte_idx} * 40u;
+
+        // Gather data bytes 0-3 from 32 codewords (stride 5).
+        alignas(32) uint8_t g0[32], g1[32], g2[32], g3[32];
+        for (int i = 0; i < 32; ++i) {
+            const int off = i * 5;
+            g0[i] = base[off];
+            g1[i] = base[off + 1];
+            g2[i] = base[off + 2];
+            g3[i] = base[off + 3];
+        }
+
+        const __m256i d0 = _mm256_load_si256(reinterpret_cast<const __m256i*>(g0));
+        const __m256i d1 = _mm256_load_si256(reinterpret_cast<const __m256i*>(g1));
+        const __m256i d2 = _mm256_load_si256(reinterpret_cast<const __m256i*>(g2));
+        const __m256i d3 = _mm256_load_si256(reinterpret_cast<const __m256i*>(g3));
+
+        // Split into high/low nibbles (8 symbol streams).
+        // h0=sym0, l0=sym1, h1=sym2, l1=sym3, h2=sym4, l2=sym5, h3=sym6, l3=sym7
+        const __m256i h0 = _mm256_and_si256(_mm256_srli_epi16(d0, 4), nib);
+        const __m256i l0 = _mm256_and_si256(d0, nib);
+        const __m256i h1 = _mm256_and_si256(_mm256_srli_epi16(d1, 4), nib);
+        const __m256i l1 = _mm256_and_si256(d1, nib);
+        const __m256i h2 = _mm256_and_si256(_mm256_srli_epi16(d2, 4), nib);
+        const __m256i l2 = _mm256_and_si256(d2, nib);
+        const __m256i h3 = _mm256_and_si256(_mm256_srli_epi16(d3, 4), nib);
+        const __m256i l3 = _mm256_and_si256(d3, nib);
+
+        // Pre-compute exp lookups and zero masks (shared by both parities).
+        const __m256i eh0 = _mm256_shuffle_epi8(exp_tbl, h0);
+        const __m256i el0 = _mm256_shuffle_epi8(exp_tbl, l0);
+        const __m256i eh1 = _mm256_shuffle_epi8(exp_tbl, h1);
+        const __m256i el1 = _mm256_shuffle_epi8(exp_tbl, l1);
+        const __m256i eh2 = _mm256_shuffle_epi8(exp_tbl, h2);
+        const __m256i el2 = _mm256_shuffle_epi8(exp_tbl, l2);
+        const __m256i eh3 = _mm256_shuffle_epi8(exp_tbl, h3);
+        const __m256i el3 = _mm256_shuffle_epi8(exp_tbl, l3);
+
+        const __m256i zmh0 = _mm256_cmpeq_epi8(h0, zero);
+        const __m256i zml0 = _mm256_cmpeq_epi8(l0, zero);
+        const __m256i zmh1 = _mm256_cmpeq_epi8(h1, zero);
+        const __m256i zml1 = _mm256_cmpeq_epi8(l1, zero);
+        const __m256i zmh2 = _mm256_cmpeq_epi8(h2, zero);
+        const __m256i zml2 = _mm256_cmpeq_epi8(l2, zero);
+        const __m256i zmh3 = _mm256_cmpeq_epi8(h3, zero);
+        const __m256i zml3 = _mm256_cmpeq_epi8(l3, zero);
+
+        // Parity 0: coeff0_exp = {11, 5, 11, 14, 10, 0, 12, 5}
+        //   for symbols:          {h0, l0, h1,  l1, h2, l2, h3, l3}
+        __m256i acc0 = gf_mul_avx2(log_tbl, eh0, zmh0, coeff0_exp[0], fifteen);
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, el0, zml0, coeff0_exp[1], fifteen));
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, eh1, zmh1, coeff0_exp[2], fifteen));
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, el1, zml1, coeff0_exp[3], fifteen));
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, eh2, zmh2, coeff0_exp[4], fifteen));
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, el2, zml2, coeff0_exp[5], fifteen));
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, eh3, zmh3, coeff0_exp[6], fifteen));
+        acc0 = _mm256_xor_si256(acc0, gf_mul_avx2(log_tbl, el3, zml3, coeff0_exp[7], fifteen));
+
+        // Parity 1: coeff1_exp = {8, 14, 2, 13, 3, 0, 8, 3}
+        __m256i acc1 = gf_mul_avx2(log_tbl, eh0, zmh0, coeff1_exp[0], fifteen);
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, el0, zml0, coeff1_exp[1], fifteen));
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, eh1, zmh1, coeff1_exp[2], fifteen));
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, el1, zml1, coeff1_exp[3], fifteen));
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, eh2, zmh2, coeff1_exp[4], fifteen));
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, el2, zml2, coeff1_exp[5], fifteen));
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, eh3, zmh3, coeff1_exp[6], fifteen));
+        acc1 = _mm256_xor_si256(acc1, gf_mul_avx2(log_tbl, el3, zml3, coeff1_exp[7], fifteen));
+
+        // Pack: parity_byte = (acc0 << 4) | acc1
+        const __m256i par = _mm256_or_si256(
+            _mm256_slli_epi16(_mm256_and_si256(acc0, nib), 4),
+            _mm256_and_si256(acc1, nib));
+
+        // Scatter parity bytes back to byte 4 of each codeword (stride 5).
+        alignas(32) uint8_t parity[32];
+        _mm256_store_si256(reinterpret_cast<__m256i*>(parity), par);
+        for (int i = 0; i < 32; ++i) {
+            base[i * 5 + 4] = parity[i];
+        }
+    }
+
+    // ---- Tail: remaining groups processed with scalar encoder ----
+    for (; byte_idx < ch; ++byte_idx) {
+        uint8_t* cw = buf + size_t{byte_idx} * 40u;
+        for (uint32_t w = 0; w < 8u; ++w, cw += FecBlockParams::CODEWORD_BYTES) {
+            const uint8_t sym[8] = {
+                static_cast<uint8_t>((cw[0] >> 4) & 0xFu),
+                static_cast<uint8_t>( cw[0]       & 0xFu),
+                static_cast<uint8_t>((cw[1] >> 4) & 0xFu),
+                static_cast<uint8_t>( cw[1]       & 0xFu),
+                static_cast<uint8_t>((cw[2] >> 4) & 0xFu),
+                static_cast<uint8_t>( cw[2]       & 0xFu),
+                static_cast<uint8_t>((cw[3] >> 4) & 0xFu),
+                static_cast<uint8_t>( cw[3]       & 0xFu),
+            };
+            uint8_t p0 = 0u, p1 = 0u;
+            for (int j = 0; j < 8; ++j) {
+                if (sym[j] != 0u) {
+                    const uint8_t es = gf_exp[sym[j]];
+                    p0 ^= gf_log[static_cast<uint8_t>((es + coeff0_exp[j]) % 15u)];
+                    p1 ^= gf_log[static_cast<uint8_t>((es + coeff1_exp[j]) % 15u)];
+                }
+            }
+            cw[4] = static_cast<uint8_t>((p0 << 4u) | p1);
+        }
+    }
+}
+
+} // namespace fec
+
+#endif // __AVX2__
+
+// =============================================================================
 // ARM NEON implementation
 // =============================================================================
 #if defined(__ARM_NEON)
