@@ -76,6 +76,38 @@ void interleave_neon_tiled(
 
 #endif // __ARM_NEON
 
+#if defined(__AVX2__)
+// interleave_avx2() — AVX2 accelerated interleave using movemask bit-transpose.
+// Same semantics and preconditions as interleave().
+//
+// Uses _mm256_movemask_epi8 to extract one bit-plane from all 32 segment bytes
+// in a single instruction, replacing the 4-multiply magic-multiply approach.
+// The 32 gathered bytes are loaded into one YMM register and reordered via
+// _mm256_shuffle_epi8 (reversing bytes within each 4-byte column group) so that
+// movemask produces nibbles in natural bit-weight order.  A scalar nibble-swap
+// then packs symbol pairs into codeword bytes.
+//
+// Per 8 codewords: 1 load + 1 shuffle + 8×(slli + movemask + nibble-swap + store).
+void interleave_avx2(
+    std::span<const uint8_t> segments,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    params);
+
+// interleave_rs_encode_avx2() — fused interleave + RS encode in a single pass.
+//
+// Equivalent to calling interleave_avx2() followed by rs_encode_avx2(), but
+// processes 32 codewords (4 consecutive byte_idx groups, 160 bytes) per outer
+// iteration so that the codeword data written by the interleave phase is read
+// back by the RS encode phase from L1 cache rather than L3.
+//
+// On return, codewords[word*5+4] holds the RS parity byte for every word
+// (i.e. the buffer is fully encoded, as if interleave + rs_encode had been called).
+void interleave_rs_encode_avx2(
+    std::span<const uint8_t> segments,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    params);
+#endif // __AVX2__
+
 #if defined(__APPLE__)
 // interleave_metal() — Metal GPU implementation of the interleave operation.
 // Same semantics and preconditions as interleave().

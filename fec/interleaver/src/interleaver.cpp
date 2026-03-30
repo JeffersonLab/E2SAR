@@ -166,6 +166,411 @@ void interleave_magic(
 } // namespace fec
 
 // =============================================================================
+// AVX2 implementation
+// =============================================================================
+#if defined(__AVX2__)
+#include <immintrin.h>
+
+namespace fec {
+
+// ---------------------------------------------------------------------------
+// interleave_avx2
+//
+// Byte-major outer loop (same structure as magic-multiply and NEON):
+// each byte_idx covers 8 consecutive codewords.
+//
+// Core primitive — _mm256_movemask_epi8:
+//   Extracts the MSB (bit 7) of all 32 bytes in a YMM register into one
+//   uint32_t.  Combined with _mm256_slli_epi16(data, n), which shifts each
+//   16-bit element left by n, movemask extracts bit (7-n) of every byte.
+//   (The 16-bit shift can leak bits across byte boundaries within each pair,
+//   but movemask only samples bit 7 of each byte, which is always correct.)
+//
+// Gather reordering: bytes are loaded in natural segment order (0-31), then
+// reordered in-register via _mm256_shuffle_epi8 with a reverse-within-4
+// permutation.  This is equivalent to the XOR-3 index trick used by
+// interleave_magic: within each column group of 4 bytes, the bit-position
+// order is reversed so that movemask produces nibbles with natural bit
+// weights (bit 3 = MSB at the highest-numbered position in each group).
+//
+// Post-processing: identical nibble-swap as interleave_magic.
+// ---------------------------------------------------------------------------
+void interleave_avx2(
+    std::span<const uint8_t> segments,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    p)
+{
+    assert(segments.size()  == p.segment_buf_size());
+    assert(codewords.size() == p.codeword_buf_size());
+
+    const uint32_t ch = p.col_height;
+
+    // Reverse bytes within each 4-byte group (equivalent to XOR-3 reorder).
+    // Applied per 128-bit lane by _mm256_shuffle_epi8.
+    const __m256i rev4 = _mm256_setr_epi8(
+        3,  2,  1,  0,   7,  6,  5,  4,  11, 10,  9,  8,  15, 14, 13, 12,
+        3,  2,  1,  0,   7,  6,  5,  4,  11, 10,  9,  8,  15, 14, 13, 12);
+
+    uint32_t byte_idx = 0;
+
+    // Helper: emit 8 codewords from a shuffled 256-bit register into cw[0..39].
+    // Avoids duplicating the shift/movemask/nibble-swap block four times.
+    auto emit8 = [](const __m256i& data, uint8_t* cw) {
+        for (uint32_t shift = 0; shift < 8u; ++shift) {
+            const __m256i sh = _mm256_slli_epi16(data, static_cast<int>(shift));
+            const uint32_t plane  = static_cast<uint32_t>(_mm256_movemask_epi8(sh));
+            const uint32_t packed = ((plane & 0x0F0F0F0Fu) << 4)
+                                  | ((plane >> 4)           & 0x0F0F0F0Fu);
+            const uint32_t off = shift * 5u;
+            std::memcpy(cw + off, &packed, 4);
+            cw[off + 4] = 0u;
+        }
+    };
+
+    // ---- 4× unrolled main loop for ILP (four independent byte_idx values) ----
+    for (; byte_idx + 3 < ch; byte_idx += 4) {
+        alignas(32) uint8_t g0[32], g1[32], g2[32], g3[32];
+        for (uint32_t s = 0; s < 32u; ++s) {
+            const uint32_t off = s * ch + byte_idx;
+            // Prefetch the addresses this segment will need in the next 4-group.
+            _mm_prefetch(reinterpret_cast<const char*>(&segments[off + 4]),
+                         _MM_HINT_T0);
+            g0[s] = segments[off];
+            g1[s] = segments[off + 1];
+            g2[s] = segments[off + 2];
+            g3[s] = segments[off + 3];
+        }
+
+        const __m256i d0 = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(g0)), rev4);
+        const __m256i d1 = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(g1)), rev4);
+        const __m256i d2 = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(g2)), rev4);
+        const __m256i d3 = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(g3)), rev4);
+
+        uint8_t* cw0 = codewords.data() + size_t{byte_idx} * 40u;
+        emit8(d0, cw0);
+        emit8(d1, cw0 + 40u);
+        emit8(d2, cw0 + 80u);
+        emit8(d3, cw0 + 120u);
+    }
+
+    // ---- 2× unrolled tail for remaining pairs ----
+    for (; byte_idx + 1 < ch; byte_idx += 2) {
+        alignas(32) uint8_t g0[32], g1[32];
+        for (uint32_t s = 0; s < 32u; ++s) {
+            const uint32_t off = s * ch + byte_idx;
+            g0[s] = segments[off];
+            g1[s] = segments[off + 1];
+        }
+
+        const __m256i d0 = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(g0)), rev4);
+        const __m256i d1 = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(g1)), rev4);
+
+        uint8_t* cw0 = codewords.data() + size_t{byte_idx} * 40u;
+        emit8(d0, cw0);
+        emit8(d1, cw0 + 40u);
+    }
+
+    // ---- Single-element tail for odd col_height ----
+    for (; byte_idx < ch; ++byte_idx) {
+        alignas(32) uint8_t gathered[32];
+        for (uint32_t s = 0; s < 32u; ++s) {
+            gathered[s] = segments[s * ch + byte_idx];
+        }
+        const __m256i data = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(gathered)), rev4);
+        emit8(data, codewords.data() + size_t{byte_idx} * 40u);
+    }
+}
+
+} // namespace fec
+
+// =============================================================================
+// interleave_rs_encode_avx2 — fused interleave + RS encode
+// =============================================================================
+
+namespace fec {
+
+// GF(16) tables — duplicated here to avoid a link-time dependency on rs_encode.cpp.
+static constexpr uint8_t il_gf_log[16]    = { 1,2,4,8,3,6,12,11,5,10,7,14,15,13,9,0 };
+static constexpr uint8_t il_gf_exp[16]    = { 15,0,1,4,2,8,5,10,3,14,9,7,6,13,11,12 };
+static constexpr uint8_t il_coeff0_exp[8] = { 11, 5, 11, 14, 10, 0, 12, 5 };
+static constexpr uint8_t il_coeff1_exp[8] = {  8,14,  2, 13,  3, 0,  8, 3 };
+
+// GF(16) multiply for 32 lanes: product = gf_mul(symbol, alpha^coeff_exp).
+// data_exp = shuffle(exp_tbl, symbol)  — pre-computed, shared across parities.
+// zm       = cmpeq(symbol, 0)          — pre-computed zero mask.
+static inline __m256i il_gf_mul(__m256i log_tbl,
+                                 __m256i data_exp, __m256i zm,
+                                 uint8_t coeff_exp,
+                                 __m256i fifteen)
+{
+    const __m256i coeff = _mm256_set1_epi8(static_cast<int8_t>(coeff_exp));
+    const __m256i sum   = _mm256_add_epi8(data_exp, coeff);
+    const __m256i ge15  = _mm256_cmpgt_epi8(sum, _mm256_set1_epi8(14));
+    const __m256i mod   = _mm256_sub_epi8(sum, _mm256_and_si256(ge15, fifteen));
+    return _mm256_andnot_si256(zm, _mm256_shuffle_epi8(log_tbl, mod));
+}
+
+// ---------------------------------------------------------------------------
+// interleave_rs_encode_avx2
+//
+// Fused pipeline: per outer iteration (4 consecutive byte_idx → 32 codewords):
+//
+//   1. Gather 32 segment bytes × 4 byte_idx values into g0..g3; shuffle → d0..d3.
+//   2. Inner loop (sh = 0..7):
+//        slli(di, sh) + movemask → plane_i  (uint32_t, 1 bit per segment)
+//        nibble-swap             → pk_i     (4 packed data bytes for one codeword)
+//        memcpy pk_i  → cw_base + i*40 + sh*5          (store data bytes)
+//        byte-extract → rs_b{0..3}[i*8 + sh]           (no stride-5 read-back)
+//   3. Load rs_b{0..3} → YMM; nibble-split; GF multiply-accumulate; pack parity.
+//   4. Scatter parity[i] → cw_base[i*5 + 4]  for i=0..31.
+//
+// Eliminated vs. calling interleave_avx2 + rs_encode_avx2 separately:
+//   - The stride-5 scatter (interleaver writing byte 4 = 0)
+//   - The stride-5 gather  (RS encoder reading bytes 0-3 back from cache)
+// Both replaced by scalar byte-extractions from register values pk_i.
+// ---------------------------------------------------------------------------
+void interleave_rs_encode_avx2(
+    std::span<const uint8_t> segments,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    p)
+{
+    assert(segments.size()  == p.segment_buf_size());
+    assert(codewords.size() == p.codeword_buf_size());
+
+    const uint32_t ch = p.col_height;
+
+    // ---- Interleave constants ----
+    // Reverse bytes within each 4-byte group (XOR-3 reorder for nibble bit-weight).
+    const __m256i rev4 = _mm256_setr_epi8(
+         3,  2,  1,  0,   7,  6,  5,  4,  11, 10,  9,  8,  15, 14, 13, 12,
+         3,  2,  1,  0,   7,  6,  5,  4,  11, 10,  9,  8,  15, 14, 13, 12);
+
+    // ---- RS encode constants ----
+    const __m256i exp_tbl = _mm256_broadcastsi128_si256(
+        _mm_loadu_si128(reinterpret_cast<const __m128i*>(il_gf_exp)));
+    const __m256i log_tbl = _mm256_broadcastsi128_si256(
+        _mm_loadu_si128(reinterpret_cast<const __m128i*>(il_gf_log)));
+    const __m256i zero    = _mm256_setzero_si256();
+    const __m256i nib     = _mm256_set1_epi8(0x0F);
+    const __m256i fifteen = _mm256_set1_epi8(15);
+    // Permutation index for the 4×8 uint32_t → byte-lane transpose in Phase B.
+    // After packus_epi32 + packus_epi16 the 8 result dwords are in order
+    // {a[0..3], b[0..3], c[0..3], d[0..3], a[4..7], b[4..7], c[4..7], d[4..7]};
+    // this permutation interleaves them to {a[0..7], b[0..7], c[0..7], d[0..7]}.
+    const __m256i perm_interleave = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
+    const __m256i mask_lo         = _mm256_set1_epi32(0xFF);
+
+    uint32_t byte_idx = 0;
+
+    // ---- Main loop: 4 groups (32 codewords) per iteration ----
+    for (; byte_idx + 3 < ch; byte_idx += 4) {
+
+        // Step 1: gather + shuffle.
+        alignas(32) uint8_t g0[32], g1[32], g2[32], g3[32];
+        for (uint32_t s = 0; s < 32u; ++s) {
+            const uint32_t off = s * ch + byte_idx;
+            _mm_prefetch(reinterpret_cast<const char*>(&segments[off + 4]), _MM_HINT_T0);
+            g0[s] = segments[off];
+            g1[s] = segments[off + 1];
+            g2[s] = segments[off + 2];
+            g3[s] = segments[off + 3];
+        }
+        const __m256i d0 = _mm256_shuffle_epi8(_mm256_load_si256(reinterpret_cast<const __m256i*>(g0)), rev4);
+        const __m256i d1 = _mm256_shuffle_epi8(_mm256_load_si256(reinterpret_cast<const __m256i*>(g1)), rev4);
+        const __m256i d2 = _mm256_shuffle_epi8(_mm256_load_si256(reinterpret_cast<const __m256i*>(g2)), rev4);
+        const __m256i d3 = _mm256_shuffle_epi8(_mm256_load_si256(reinterpret_cast<const __m256i*>(g3)), rev4);
+
+        // Step 2: movemask → packed data bytes → codeword buffer.
+        // pk_arr[g*8+sh] = one packed uint32_t per codeword (4 data bytes).
+        // Using dword stores avoids the store-to-load forwarding stall that
+        // occurred when the old code did 128 scalar byte-stores to rs_b arrays
+        // and then read them back with 4 aligned 256-bit loads.
+        alignas(32) uint32_t pk_arr[32];
+        uint8_t* const cw_base = codewords.data() + size_t{byte_idx} * 40u;
+
+        for (uint32_t sh = 0; sh < 8u; ++sh) {
+            const int ishift = static_cast<int>(sh);
+            const uint32_t pk0 = [&]{
+                const uint32_t pl = static_cast<uint32_t>(_mm256_movemask_epi8(_mm256_slli_epi16(d0, ishift)));
+                return ((pl & 0x0F0F0F0Fu) << 4) | ((pl >> 4) & 0x0F0F0F0Fu);
+            }();
+            const uint32_t pk1 = [&]{
+                const uint32_t pl = static_cast<uint32_t>(_mm256_movemask_epi8(_mm256_slli_epi16(d1, ishift)));
+                return ((pl & 0x0F0F0F0Fu) << 4) | ((pl >> 4) & 0x0F0F0F0Fu);
+            }();
+            const uint32_t pk2 = [&]{
+                const uint32_t pl = static_cast<uint32_t>(_mm256_movemask_epi8(_mm256_slli_epi16(d2, ishift)));
+                return ((pl & 0x0F0F0F0Fu) << 4) | ((pl >> 4) & 0x0F0F0F0Fu);
+            }();
+            const uint32_t pk3 = [&]{
+                const uint32_t pl = static_cast<uint32_t>(_mm256_movemask_epi8(_mm256_slli_epi16(d3, ishift)));
+                return ((pl & 0x0F0F0F0Fu) << 4) | ((pl >> 4) & 0x0F0F0F0Fu);
+            }();
+
+            // Store 4 data bytes; byte 4 (parity) written after RS computation.
+            const uint32_t cw_off = sh * 5u;
+            std::memcpy(cw_base + 0u * 40u + cw_off, &pk0, 4);
+            std::memcpy(cw_base + 1u * 40u + cw_off, &pk1, 4);
+            std::memcpy(cw_base + 2u * 40u + cw_off, &pk2, 4);
+            std::memcpy(cw_base + 3u * 40u + cw_off, &pk3, 4);
+
+            // Natural-width dword stores (no forwarding stall on the later YMM loads).
+            pk_arr[0u * 8u + sh] = pk0;
+            pk_arr[1u * 8u + sh] = pk1;
+            pk_arr[2u * 8u + sh] = pk2;
+            pk_arr[3u * 8u + sh] = pk3;
+        }
+
+        // Transpose pk_arr (32 × uint32_t) → rb0..rb3 (one 32-byte YMM per byte lane).
+        // Each pk_arr entry = [b0, b1, b2, b3]; we want rb_j[i] = pk_arr[i].b_j.
+        // Strategy per byte lane j:
+        //   1. Shift each dword right by j*8 and AND with 0xFF → dword-wide scalars.
+        //   2. packus_epi32 pairs → 16-bit words (upper byte is 0, no saturation loss).
+        //   3. packus_epi16 pairs → 8-bit bytes packed into two 128-bit halves.
+        //   4. permutevar8x32 to interleave halves into final [a0..a7,b0..b7,c0..c7,d0..d7].
+        const __m256i va = _mm256_load_si256(reinterpret_cast<const __m256i*>(pk_arr));
+        const __m256i vb = _mm256_load_si256(reinterpret_cast<const __m256i*>(pk_arr + 8));
+        const __m256i vc = _mm256_load_si256(reinterpret_cast<const __m256i*>(pk_arr + 16));
+        const __m256i vd = _mm256_load_si256(reinterpret_cast<const __m256i*>(pk_arr + 24));
+
+        auto xpose = [&](__m256i a, __m256i b, __m256i c, __m256i d, int pos) -> __m256i {
+            const int sh32 = pos * 8;
+            a = _mm256_and_si256(_mm256_srli_epi32(a, sh32), mask_lo);
+            b = _mm256_and_si256(_mm256_srli_epi32(b, sh32), mask_lo);
+            c = _mm256_and_si256(_mm256_srli_epi32(c, sh32), mask_lo);
+            d = _mm256_and_si256(_mm256_srli_epi32(d, sh32), mask_lo);
+            const __m256i w01 = _mm256_packus_epi32(a, b);
+            const __m256i w23 = _mm256_packus_epi32(c, d);
+            return _mm256_permutevar8x32_epi32(_mm256_packus_epi16(w01, w23), perm_interleave);
+        };
+
+        const __m256i rb0 = xpose(va, vb, vc, vd, 0);
+        const __m256i rb1 = xpose(va, vb, vc, vd, 1);
+        const __m256i rb2 = xpose(va, vb, vc, vd, 2);
+        const __m256i rb3 = xpose(va, vb, vc, vd, 3);
+
+        // Step 3: RS encode — process one input byte register at a time so that
+        // exp/zm temporaries are consumed before the next batch, keeping peak live
+        // YMM count ≤14 (fits in Zen 3's 16 physical registers without spills).
+        auto gmul = [&](__m256i de, __m256i zm, uint8_t ce) {
+            return il_gf_mul(log_tbl, de, zm, ce, fifteen);
+        };
+
+        // rb0 → sym0 (high nibble, coeff 11/8) + sym1 (low nibble, coeff 5/14)
+        __m256i acc0, acc1;
+        {
+            const __m256i h = _mm256_and_si256(_mm256_srli_epi16(rb0, 4), nib);
+            const __m256i l = _mm256_and_si256(rb0, nib);
+            const __m256i eh = _mm256_shuffle_epi8(exp_tbl, h), zmh = _mm256_cmpeq_epi8(h, zero);
+            const __m256i el = _mm256_shuffle_epi8(exp_tbl, l), zml = _mm256_cmpeq_epi8(l, zero);
+            acc0 =                        gmul(eh, zmh, 11);
+            acc0 = _mm256_xor_si256(acc0, gmul(el, zml,  5));
+            acc1 =                        gmul(eh, zmh,  8);
+            acc1 = _mm256_xor_si256(acc1, gmul(el, zml, 14));
+        }
+        // rb1 → sym2 (high, coeff 11/2) + sym3 (low, coeff 14/13)
+        {
+            const __m256i h = _mm256_and_si256(_mm256_srli_epi16(rb1, 4), nib);
+            const __m256i l = _mm256_and_si256(rb1, nib);
+            const __m256i eh = _mm256_shuffle_epi8(exp_tbl, h), zmh = _mm256_cmpeq_epi8(h, zero);
+            const __m256i el = _mm256_shuffle_epi8(exp_tbl, l), zml = _mm256_cmpeq_epi8(l, zero);
+            acc0 = _mm256_xor_si256(acc0, gmul(eh, zmh, 11));
+            acc0 = _mm256_xor_si256(acc0, gmul(el, zml, 14));
+            acc1 = _mm256_xor_si256(acc1, gmul(eh, zmh,  2));
+            acc1 = _mm256_xor_si256(acc1, gmul(el, zml, 13));
+        }
+        // rb2 → sym4 (high, coeff 10/3) + sym5 (low, coeff 0/0)
+        {
+            const __m256i h = _mm256_and_si256(_mm256_srli_epi16(rb2, 4), nib);
+            const __m256i l = _mm256_and_si256(rb2, nib);
+            const __m256i eh = _mm256_shuffle_epi8(exp_tbl, h), zmh = _mm256_cmpeq_epi8(h, zero);
+            const __m256i el = _mm256_shuffle_epi8(exp_tbl, l), zml = _mm256_cmpeq_epi8(l, zero);
+            acc0 = _mm256_xor_si256(acc0, gmul(eh, zmh, 10));
+            acc0 = _mm256_xor_si256(acc0, gmul(el, zml,  0));
+            acc1 = _mm256_xor_si256(acc1, gmul(eh, zmh,  3));
+            acc1 = _mm256_xor_si256(acc1, gmul(el, zml,  0));
+        }
+        // rb3 → sym6 (high, coeff 12/8) + sym7 (low, coeff 5/3)
+        {
+            const __m256i h = _mm256_and_si256(_mm256_srli_epi16(rb3, 4), nib);
+            const __m256i l = _mm256_and_si256(rb3, nib);
+            const __m256i eh = _mm256_shuffle_epi8(exp_tbl, h), zmh = _mm256_cmpeq_epi8(h, zero);
+            const __m256i el = _mm256_shuffle_epi8(exp_tbl, l), zml = _mm256_cmpeq_epi8(l, zero);
+            acc0 = _mm256_xor_si256(acc0, gmul(eh, zmh, 12));
+            acc0 = _mm256_xor_si256(acc0, gmul(el, zml,  5));
+            acc1 = _mm256_xor_si256(acc1, gmul(eh, zmh,  8));
+            acc1 = _mm256_xor_si256(acc1, gmul(el, zml,  3));
+        }
+
+        // Pack parity nibbles: byte = (p0 << 4) | p1.
+        const __m256i par = _mm256_or_si256(
+            _mm256_slli_epi16(_mm256_and_si256(acc0, nib), 4),
+            _mm256_and_si256(acc1, nib));
+
+        // Step 4: scatter parity to byte 4 of each codeword (stride 5).
+        alignas(32) uint8_t parity[32];
+        _mm256_store_si256(reinterpret_cast<__m256i*>(parity), par);
+        for (int i = 0; i < 32; ++i) {
+            cw_base[i * 5 + 4] = parity[i];
+        }
+    }
+
+    // ---- Tail: scalar interleave + encode for up to 3 remaining byte_idx values ----
+    for (; byte_idx < ch; ++byte_idx) {
+        alignas(32) uint8_t gathered[32];
+        for (uint32_t s = 0; s < 32u; ++s)
+            gathered[s] = segments[s * ch + byte_idx];
+
+        const __m256i data = _mm256_shuffle_epi8(
+            _mm256_load_si256(reinterpret_cast<const __m256i*>(gathered)), rev4);
+
+        uint8_t* cw = codewords.data() + size_t{byte_idx} * 40u;
+
+        for (uint32_t sh = 0; sh < 8u; ++sh) {
+            const uint32_t pl = static_cast<uint32_t>(
+                _mm256_movemask_epi8(_mm256_slli_epi16(data, static_cast<int>(sh))));
+            const uint32_t packed = ((pl & 0x0F0F0F0Fu) << 4) | ((pl >> 4) & 0x0F0F0F0Fu);
+            const uint32_t off = sh * 5u;
+            std::memcpy(cw + off, &packed, 4);
+
+            // Scalar RS encode for this one codeword.
+            // packed byte j = (sym_even << 4) | sym_odd, so:
+            //   sym0 = high nibble of byte 0, sym1 = low nibble of byte 0, etc.
+            const uint8_t s0 = static_cast<uint8_t>((packed >>  4) & 0xFu);
+            const uint8_t s1 = static_cast<uint8_t>( packed        & 0xFu);
+            const uint8_t s2 = static_cast<uint8_t>((packed >> 12) & 0xFu);
+            const uint8_t s3 = static_cast<uint8_t>((packed >>  8) & 0xFu);
+            const uint8_t s4 = static_cast<uint8_t>((packed >> 20) & 0xFu);
+            const uint8_t s5 = static_cast<uint8_t>((packed >> 16) & 0xFu);
+            const uint8_t s6 = static_cast<uint8_t>((packed >> 28) & 0xFu);
+            const uint8_t s7 = static_cast<uint8_t>((packed >> 24) & 0xFu);
+            const uint8_t syms[8] = { s0, s1, s2, s3, s4, s5, s6, s7 };
+
+            uint8_t p0 = 0u, p1 = 0u;
+            for (int j = 0; j < 8; ++j) {
+                if (syms[j] != 0u) {
+                    const uint8_t es = il_gf_exp[syms[j]];
+                    p0 ^= il_gf_log[static_cast<uint8_t>((es + il_coeff0_exp[j]) % 15u)];
+                    p1 ^= il_gf_log[static_cast<uint8_t>((es + il_coeff1_exp[j]) % 15u)];
+                }
+            }
+            cw[off + 4] = static_cast<uint8_t>((p0 << 4u) | p1);
+        }
+    }
+}
+
+} // namespace fec
+
+#endif // __AVX2__
+
+// =============================================================================
 // ARM NEON implementations
 // =============================================================================
 #if defined(__ARM_NEON)
