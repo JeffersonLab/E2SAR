@@ -342,6 +342,46 @@ static void test_metal_correctness() {
 #endif // __APPLE__
 
 // ---------------------------------------------------------------------------
+// Test 5a — AVX2 correctness: outputs must match scalar bit-for-bit
+// ---------------------------------------------------------------------------
+#if defined(__AVX2__)
+static void test_avx2_correctness() {
+    section("AVX2 correctness vs scalar");
+
+    // Test both even and odd col_height (exercises the 2x-unrolled loop + tail).
+    for (uint32_t ch : {64u, 63u}) {
+        fec::FecBlockParams p;
+        p.col_height = ch;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i) {
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+        }
+
+        // Scalar reference
+        std::vector<uint8_t> cw_scalar(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw_scalar, p);
+
+        // AVX2 (pre-fill with garbage to catch partial writes)
+        std::vector<uint8_t> cw_avx2(p.codeword_buf_size(), 0xBBu);
+        fec::interleave_avx2(src, cw_avx2, p);
+
+        char label[80];
+        std::snprintf(label, sizeof(label),
+                      "interleave_avx2 output matches scalar (col_height=%u)", ch);
+        EXPECT(cw_avx2 == cw_scalar, label);
+
+        // Full round-trip via scalar deinterleave
+        std::vector<uint8_t> dst(p.segment_buf_size(), 0);
+        fec::deinterleave(cw_avx2, dst, p);
+        std::snprintf(label, sizeof(label),
+                      "AVX2 round-trip: deinterleave(interleave_avx2(x)) == x (ch=%u)", ch);
+        EXPECT(dst == src, label);
+    }
+}
+#endif // __AVX2__
+
+// ---------------------------------------------------------------------------
 // Test 5b — Magic multiply correctness: interleave_magic must match scalar
 // ---------------------------------------------------------------------------
 static void test_magic_correctness() {
@@ -520,6 +560,43 @@ static void test_rs_encode_metal() {
 #endif // __APPLE__
 
 // ---------------------------------------------------------------------------
+// Test 7a — AVX2 RS encoder correctness: output must match scalar bit-for-bit
+// ---------------------------------------------------------------------------
+#if defined(__AVX2__)
+static void test_rs_encode_avx2() {
+    section("AVX2 RS encoder correctness vs scalar");
+
+    // Test both col_height divisible by 4 and non-divisible (exercises tail).
+    for (uint32_t ch : {64u, 63u, 8192u}) {
+        fec::FecBlockParams p;
+        p.col_height = ch;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        // Scalar reference: interleave then encode.
+        std::vector<uint8_t> cw_ref(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw_ref, p);
+        fec::rs_encode(cw_ref, p);
+
+        // AVX2: interleave then AVX2 encode.
+        std::vector<uint8_t> cw_avx2(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw_avx2, p);
+        // Corrupt parity bytes to confirm AVX2 actually overwrites them.
+        for (uint32_t w = 0; w < p.num_words(); ++w)
+            cw_avx2[w * fec::FecBlockParams::CODEWORD_BYTES + 4] = 0xBBu;
+        fec::rs_encode_avx2(cw_avx2, p);
+
+        char label[80];
+        std::snprintf(label, sizeof(label),
+                      "rs_encode_avx2 matches scalar (col_height=%u)", ch);
+        EXPECT(cw_avx2 == cw_ref, label);
+    }
+}
+#endif // __AVX2__
+
+// ---------------------------------------------------------------------------
 // Test 7b — NEON RS encoder correctness: output must match scalar bit-for-bit
 // ---------------------------------------------------------------------------
 #if defined(__ARM_NEON)
@@ -612,6 +689,58 @@ static void test_pipeline_combined() {
                           "magic+scalar: matches scalar ref (ch=%u)", p.col_height);
             EXPECT(cw == cw_ref, label);
         }
+
+#if defined(__AVX2__)
+        // ---- AVX2 interleave + scalar encode ----
+        {
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave_avx2(src, cw, p);
+            fec::rs_encode(cw, p);
+            std::snprintf(label, sizeof(label),
+                          "avx2+scalar: matches scalar ref (ch=%u)", p.col_height);
+            EXPECT(cw == cw_ref, label);
+        }
+        // ---- AVX2 interleave + AVX2 encode ----
+        {
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave_avx2(src, cw, p);
+            fec::rs_encode_avx2(cw, p);
+            std::snprintf(label, sizeof(label),
+                          "avx2+avx2: matches scalar ref (ch=%u)", p.col_height);
+            EXPECT(cw == cw_ref, label);
+        }
+        // ---- scalar interleave + AVX2 encode ----
+        {
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave(src, cw, p);
+            fec::rs_encode_avx2(cw, p);
+            std::snprintf(label, sizeof(label),
+                          "scalar+avx2: matches scalar ref (ch=%u)", p.col_height);
+            EXPECT(cw == cw_ref, label);
+        }
+        // ---- fused AVX2 interleave + RS encode ----
+        {
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave_rs_encode_avx2(src, cw, p);
+            std::snprintf(label, sizeof(label),
+                          "avx2 fused: matches scalar ref (ch=%u)", p.col_height);
+            EXPECT(cw == cw_ref, label);
+        }
+        // ---- fused AVX2, odd col_height (exercises tail path) ----
+        if (pass == 0) {
+            fec::FecBlockParams p_odd;
+            p_odd.col_height = 63u;
+            std::vector<uint8_t> src_odd(p_odd.segment_buf_size());
+            for (size_t i = 0; i < src_odd.size(); ++i)
+                src_odd[i] = static_cast<uint8_t>(i * 37u + 91u);
+            std::vector<uint8_t> cw_ref_odd(p_odd.codeword_buf_size(), 0);
+            fec::interleave(src_odd, cw_ref_odd, p_odd);
+            fec::rs_encode(cw_ref_odd, p_odd);
+            std::vector<uint8_t> cw_odd(p_odd.codeword_buf_size(), 0);
+            fec::interleave_rs_encode_avx2(src_odd, cw_odd, p_odd);
+            EXPECT(cw_odd == cw_ref_odd, "avx2 fused: matches scalar ref (ch=63, tail path)");
+        }
+#endif // __AVX2__
 
 #if defined(__ARM_NEON)
         // ---- NEON interleave + NEON encode ----
@@ -1212,6 +1341,13 @@ static void test_performance() {
                 "interleave (magic)", ms_il_mm, mibs(ms_il_mm), gbits(ms_il_mm),
                 ms_il / ms_il_mm);
 
+#if defined(__AVX2__)
+    double ms_il_avx2 = bench_ms([&]{ fec::interleave_avx2(src, cw, p); }, ITERS);
+    std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx magic)\n",
+                "interleave (AVX2)", ms_il_avx2, mibs(ms_il_avx2), gbits(ms_il_avx2),
+                ms_il / ms_il_avx2, ms_il_mm / ms_il_avx2);
+#endif // __AVX2__
+
 #if defined(__ARM_NEON)
     double ms_il_n  = bench_ms([&]{ fec::interleave_neon(src, cw, p); },   ITERS);
     double ms_dil_n = bench_ms([&]{ fec::deinterleave_neon(cw, dst, p); }, ITERS);
@@ -1276,6 +1412,17 @@ static void test_performance() {
     std::printf("  %-28s %8.2f %10.1f %9.3f\n",
                 "rs_encode (scalar)", ms_enc, mibs(ms_enc), gbits(ms_enc));
 
+#if defined(__AVX2__)
+    {
+        std::vector<uint8_t> cw_a(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw_a, p);
+        double ms_enc_avx2 = bench_ms([&]{ fec::rs_encode_avx2(cw_a, p); }, ITERS);
+        std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
+                    "rs_encode (AVX2)", ms_enc_avx2, mibs(ms_enc_avx2),
+                    gbits(ms_enc_avx2), ms_enc / ms_enc_avx2);
+    }
+#endif // __AVX2__
+
 #if defined(__ARM_NEON)
     {
         std::vector<uint8_t> cw_n(p.codeword_buf_size(), 0);
@@ -1313,6 +1460,35 @@ static void test_performance() {
     std::printf("  %-28s %8.2f %10.1f %9.3f\n",
                 "scalar+scalar", ms_combined_scalar,
                 mibs(ms_combined_scalar), gbits(ms_combined_scalar));
+
+#if defined(__AVX2__)
+    double ms_combined_avx2_s = bench_ms([&]{
+        fec::interleave_avx2(src, cw, p);
+        fec::rs_encode(cw, p);
+    }, ITERS);
+    std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
+                "avx2+scalar", ms_combined_avx2_s,
+                mibs(ms_combined_avx2_s), gbits(ms_combined_avx2_s),
+                ms_combined_scalar / ms_combined_avx2_s);
+
+    double ms_combined_avx2 = bench_ms([&]{
+        fec::interleave_avx2(src, cw, p);
+        fec::rs_encode_avx2(cw, p);
+    }, ITERS);
+    std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
+                "avx2+avx2", ms_combined_avx2,
+                mibs(ms_combined_avx2), gbits(ms_combined_avx2),
+                ms_combined_scalar / ms_combined_avx2);
+
+    double ms_combined_fused = bench_ms([&]{
+        fec::interleave_rs_encode_avx2(src, cw, p);
+    }, ITERS);
+    std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar, %.1fx avx2+avx2)\n",
+                "avx2 fused", ms_combined_fused,
+                mibs(ms_combined_fused), gbits(ms_combined_fused),
+                ms_combined_scalar / ms_combined_fused,
+                ms_combined_avx2 / ms_combined_fused);
+#endif // __AVX2__
 
 #if defined(__ARM_NEON)
     double ms_combined_neon = bench_ms([&]{
@@ -1360,6 +1536,14 @@ static void test_performance() {
     fec::deinterleave(cw, dst, p);
     EXPECT(src == dst, "Full-size magic round-trip: src == dst");
 
+#if defined(__AVX2__)
+    std::fill(cw.begin(),  cw.end(),  0u);
+    std::fill(dst.begin(), dst.end(), 0u);
+    fec::interleave_avx2(src, cw, p);
+    fec::deinterleave(cw, dst, p);
+    EXPECT(src == dst, "Full-size AVX2 round-trip: src == dst");
+#endif
+
 #if defined(__ARM_NEON)
     std::fill(cw.begin(),  cw.end(),  0u);
     std::fill(dst.begin(), dst.end(), 0u);
@@ -1401,8 +1585,14 @@ int main() {
 #if defined(__APPLE__)
     test_metal_correctness();
 #endif
+#if defined(__AVX2__)
+    test_avx2_correctness();
+#endif
     test_magic_correctness();
     test_rs_encode();
+#if defined(__AVX2__)
+    test_rs_encode_avx2();
+#endif
 #if defined(__ARM_NEON)
     test_rs_encode_neon();
 #endif
