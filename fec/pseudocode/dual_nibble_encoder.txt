@@ -1,0 +1,49 @@
+DUAL NIBBLE REED-SOLOMON ENCODER PSEUDOCODE
+============================================
+
+REFERENCE INFORMATION:
+- Galois Field and RS code theory: prototype/python/genMatrix_simplified.py
+- Pre-computed GF(16) lookup tables: prototype/python/rs_model.h
+- Standalone C implementation: src/common/ejfat_rs.h
+- GF(16) irreducible polynomial: [1,0,0,1,1]
+- Configuration: RS(10,8) - 8 data symbols + 2 parity symbols
+
+INPUT: 8 data bytes
+OUTPUT: 2 parity bytes
+
+OVERVIEW:
+Process 8 bytes as two independent RS(10,8) encoding streams by separating
+upper and lower nibbles, encoding each stream, then recombining the parity
+nibbles into bytes.
+
+PROCESSING STEPS:
+
+1. SPLIT INPUT INTO NIBBLE STREAMS
+   - Extract lower nibbles (bits 0-3) from each of the 8 data bytes
+   - Extract upper nibbles (bits 4-7) from each of the 8 data bytes
+   Result: Two vectors of 8 nibbles each
+
+2. ENCODE EACH NIBBLE STREAM (lower and upper streams independently)
+   For each stream:
+     - Convert each nibble to exponent space using lookup table
+     - Handle zero values specially (zero must stay zero in multiplication)
+
+     For each of the 2 parity symbols:
+       - Multiply each data nibble by its encoding coefficient
+         (in exponent space: add exponents, then mod 15)
+       - Convert products back to normal space using lookup table
+       - XOR all 8 products together to get one parity nibble
+
+   Result: 2 lower parity nibbles, 2 upper parity nibbles
+
+3. COMBINE PARITY NIBBLES INTO BYTES
+   - Parity byte 0 = (upper_parity[0] << 4) | lower_parity[0]
+   - Parity byte 1 = (upper_parity[1] << 4) | lower_parity[1]
+
+   Result: 2 parity bytes
+
+NOTES:
+- Each nibble stream is an independent RS(10,8) code over GF(16)
+- Encoding coefficients are pre-computed from the generator matrix
+- Zero handling ensures 0 * anything = 0 in Galois field arithmetic
+- Final XOR reduction implements addition in GF(16)

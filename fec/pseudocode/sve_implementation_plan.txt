@@ -1,0 +1,112 @@
+SVE IMPLEMENTATION PLAN
+=======================
+
+DIRECTORY STRUCTURE
+-------------------
+src/sve/
+├── ejfat_rs_sve.h           # SVE encoder (mirrors neon/ejfat_rs_neon.h)
+└── ejfat_rs_sve_decoder.h   # SVE decoder (mirrors neon/ejfat_rs_neon_decoder.h)
+
+src/tests/
+└── test_sve.c                # SVE test harness (mirrors test_neon.c)
+
+
+IMPLEMENTATION STEPS
+--------------------
+
+1. CREATE SVE DIRECTORY AND ENCODER HEADER
+   File: src/sve/ejfat_rs_sve.h
+
+   - Include <arm_sve.h> header
+   - Implement init_ejfat_rs_sve() - pre-compute exponent matrix
+   - Implement sve_rs_encode() - single nibble encoder using SVE
+   - Implement sve_rs_encode_dual_nibble() - dual nibble encoder
+
+   Key differences from NEON:
+   - Use svuint8_t instead of uint8x8_t
+   - Use svtbl_u8() for table lookups (supports full 256-entry tables)
+   - Use sveorv_u8() for horizontal XOR (eliminates scalar loop)
+   - Use svcntb() to query vector length at runtime
+
+2. CREATE SVE DECODER HEADER
+   File: src/sve/ejfat_rs_sve_decoder.h
+
+   - Implement sve_rs_decode() - systematic decoder
+   - Implement sve_rs_decode_dual_nibble() - dual nibble decoder
+
+   Leverage systematic property:
+   - Direct passthrough for non-erased data symbols
+   - Dot product computation only for erased positions (max 2)
+   - Use sveorv_u8() for horizontal reduction per erased symbol
+   - Consider predicates for conditional processing
+
+3. CREATE SVE TEST PROGRAM
+   File: src/tests/test_sve.c
+
+   - Mirror structure of test_neon.c
+
+   Test cases:
+   - Basic correctness (single nibble encoding/decoding)
+   - Dual nibble encoding/decoding
+   - Erasure recovery (0, 1, 2 erasures)
+   - Performance benchmarking
+   - Vector length detection and reporting
+
+4. UPDATE MAKEFILE
+   File: src/Makefile
+
+   - Add test_sve target following the pattern of test_neon
+   - Compile with -march=armv9-a+sve flag
+   - Add runtime detection for SVE capability
+   - Graceful fallback if SVE not available
+
+5. ADD PERFORMANCE ANALYSIS
+   File: src/PERFORMANCE_ANALYSIS.md
+
+   - Add SVE encoder/decoder benchmarks
+   - Compare with NEON, AVX2, AVX512 implementations
+   - Document vector length impact on throughput
+
+
+KEY SVE-SPECIFIC CONSIDERATIONS
+--------------------------------
+
+Vector Length Agnostic Code:
+- Use svcntb() to query actual vector length
+- Process data in VL-sized chunks
+- Handle remainder bytes if data not aligned to VL
+
+Table Lookups:
+- SVE svtbl_u8() natively handles 256 entries
+- No need for paired register approach like NEON's vtbl2_u8()
+
+Horizontal Reduction:
+- sveorv_u8(predicate, vector) - single instruction
+- Major performance win over NEON's scalar loop
+
+Predication:
+- Use predicates for zero masking
+- Potential optimization: predicated loads/stores for erasure patterns
+
+Fallback Strategy:
+- Compile-time detection via __ARM_FEATURE_SVE
+- Runtime detection via hwcaps
+- Fallback to NEON if SVE unavailable
+
+
+TESTING STRATEGY
+-----------------
+
+1. Correctness: Verify against existing NEON/common implementations
+2. Scalability: Test with different vector lengths (128, 256, 512-bit)
+3. Performance: Benchmark throughput vs NEON baseline
+4. Compatibility: Ensure works on ARMv9 hardware (Apple M4, AWS Graviton4)
+
+
+REFERENCE FILES
+---------------
+- Existing NEON encoder: src/neon/ejfat_rs_neon.h
+- Existing NEON decoder: src/neon/ejfat_rs_neon_decoder.h
+- NEON test harness: src/tests/test_neon.c
+- AVX2 pattern: src/avx2/ejfat_rs_avx2.h
+- Makefile patterns: src/Makefile (lines 5-7 for NEON, lines 17-25 for AVX)
