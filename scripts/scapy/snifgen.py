@@ -18,6 +18,7 @@ from scapy.all import *
 from scapy.packet import Packet, bind_layers
 from scapy.fields import ShortField, StrLenField
 
+novalidate = False
 
 # Sync header
 class SyncPacket(Packet):
@@ -57,8 +58,10 @@ class TruncatedStrLenField(StrLenField):
     def i2repr(self, pkt, x):
         if x is None:
             return ""
-        # Truncate the string to `self.truncate_to` characters for display
-        return repr(x[:self.trunc].decode("utf-8") + ("..." if len(x) > self.trunc else ""))
+        truncated = x[:self.trunc]
+        hex_str = " ".join(f"{b:02x}" for b in truncated)
+        asc_str = "".join(chr(b) if 32 <= b < 127 else "." for b in truncated)
+        return f"{hex_str}  |{asc_str}|" + (" ..." if len(x) > self.trunc else "")
 
 # RE header itself
 class REPacket(Packet):
@@ -146,6 +149,8 @@ def genREPkt(ip_addr: str, udp_port: int, dataId: int, eventNumber: int, payload
 
 # validate sync packet
 def validate_sync_packet(packet):
+    if novalidate:
+        return True, ""
     if not (packet.preamble == b'LC'):
         return False, f"Preamble must be 'LC' instead of {packet.preamble}"
     if not (packet.version == 2):
@@ -154,6 +159,8 @@ def validate_sync_packet(packet):
 
 # validate LB packet
 def validate_lb_packet(packet):
+    if novalidate:
+        return True, ""
     if not (packet.preamble == b'LB'):
         return False, f"Preamble must be 'LB' instead of {packet.preamble}"
     if not (packet.version == 2):
@@ -164,6 +171,8 @@ def validate_lb_packet(packet):
     
 # validate RE packet
 def validate_re_packet(packet):
+    if novalidate:
+        return True, ""
     if not (packet.version == 1):
         return False, f"Expected version 1, not {packet.version}"
     return True, ""
@@ -219,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--mtu", action="store", type=int, default=1500, help="set the MTU length, so LB+RE and RE packets can be fragmented.")
     parser.add_argument("--pld", action="store", help="payload for LB+RE or RE packets. May be broken up if MTU size insufficient", default="This is a default payload.")
     parser.add_argument("--iface", action="store", default="all", help="which interface should we listen on (defaults to all)")
+    parser.add_argument("--novalidate", action="store_true", default=False, help="ignore header validation rules")
     parser.add_argument("-f", "--file", action="store", help="pcap file name to parse", default="./e2sar.pcap")
     packet_types = parser.add_mutually_exclusive_group(required=True)
     packet_types.add_argument("--sync", action="store_true", help="listen for, parse or generate Sync packets")
@@ -231,6 +241,8 @@ if __name__ == "__main__":
     # equivalent to -n - not to resolve port numbers to service names
     conf.noenum.add(UDP.sport)
     conf.noenum.add(UDP.dport)
+
+    novalidate = args.novalidate
 
     if args.generate:
         if not args.ip:
