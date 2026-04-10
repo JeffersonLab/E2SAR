@@ -34,7 +34,7 @@ requirements:
     - protobuf
     - pybind11
     - zlib
-    - glib  # [linux64]
+    - glib  
   run:
     - {{ pin_compatible('python', max_pin='x.x') }}
     - {{ pin_compatible('libgrpc', max_pin='x.x') }}
