@@ -402,11 +402,86 @@ namespace e2sar
         }
     } __attribute__((__packed__));
 
+    constexpr u_int8_t echdrVersion{1};
+    constexpr u_int8_t ecNextProtoRE{1};
+    constexpr u_int8_t ecNextProtoNone{0};
+
+    struct ECHdr
+    {
+        const u_int8_t magic[2] {'E', 'C'};
+        u_int8_t version{echdrVersion};
+        u_int8_t nextProto{ecNextProtoRE};
+        u_int16_t dataId{0};
+        u_int8_t pFrameNum{0};   // P(1 bit) | EC Frame #(7 bits)
+        u_int8_t rPadFrames{0};  // R(1 bit) | Pad Frames(7 bits)
+        u_int16_t ecSegmentSize{0};
+        u_int16_t padBytes{0};
+        u_int32_t fecBlockNum{0};
+
+        inline void set(u_int16_t data_id, bool parity, u_int8_t ecFrameNum,
+                        u_int8_t padFrames, u_int16_t segSize, u_int16_t pad_bytes,
+                        u_int32_t blockNum)
+        {
+            dataId = htobe16(data_id);
+            pFrameNum = static_cast<u_int8_t>((parity ? 0x80u : 0x00u) | (ecFrameNum & 0x7Fu));
+            rPadFrames = padFrames & 0x7Fu;
+            ecSegmentSize = htobe16(segSize);
+            padBytes = htobe16(pad_bytes);
+            fecBlockNum = htobe32(blockNum);
+        }
+
+        inline bool get_parity() const { return (pFrameNum >> 7u) & 1u; }
+        inline u_int8_t get_ecFrameNum() const { return pFrameNum & 0x7Fu; }
+        inline u_int8_t get_padFrames() const { return rPadFrames & 0x7Fu; }
+        inline u_int16_t get_ecSegmentSize() const { return be16toh(ecSegmentSize); }
+        inline u_int16_t get_padBytes() const { return be16toh(padBytes); }
+        inline u_int32_t get_fecBlockNum() const { return be32toh(fecBlockNum); }
+        inline u_int16_t get_dataId() const { return be16toh(dataId); }
+
+        inline bool validate() const
+        {
+            return (magic[0] == 'E') && (magic[1] == 'C') && (version == echdrVersion);
+        }
+    } __attribute__((__packed__));
+
+    struct LBECHdr {
+        union LBHdrU lbu;
+        struct ECHdr ec;
+        LBECHdr()
+        {
+            new (&lbu) LBHdrU();
+            new (&ec) ECHdr();
+        }
+        LBECHdr(u_int8_t ver)
+        {
+            new (&lbu) LBHdrU(ver);
+            new (&ec) ECHdr();
+        }
+    } __attribute__((__packed__));
+
+    struct LBECREHdr {
+        union LBHdrU lbu;
+        struct ECHdr ec;
+        struct REHdr re;
+        LBECREHdr()
+        {
+            new (&lbu) LBHdrU();
+            new (&ec) ECHdr();
+            new (&re) REHdr();
+        }
+        LBECREHdr(u_int8_t ver)
+        {
+            new (&lbu) LBHdrU(ver);
+            new (&ec) ECHdr();
+            new (&re) REHdr();
+        }
+    } __attribute__((__packed__));
+
     // various useful header lengths
     constexpr size_t IPV4_HDRLEN = 20;
     constexpr size_t IPV6_HDRLEN = 40;
     constexpr size_t UDP_HDRLEN = 8;
-    
+
     // Legacy constant for backward compatibility (IPv4 only)
     constexpr size_t IP_HDRLEN = IPV4_HDRLEN;
     constexpr size_t TOTAL_HDR_LEN{IP_HDRLEN + UDP_HDRLEN + sizeof(LBHdrV2) + sizeof(REHdr)};
@@ -418,6 +493,10 @@ namespace e2sar
 
     inline constexpr size_t getTotalHeaderLength(bool useIPv6) {
         return getIPHeaderLength(useIPv6) + UDP_HDRLEN + sizeof(LBHdrV2) + sizeof(REHdr);
+    }
+
+    inline constexpr size_t getFecTotalHeaderLength(bool useIPv6) {
+        return getIPHeaderLength(useIPv6) + UDP_HDRLEN + sizeof(LBHdrV2) + sizeof(ECHdr) + sizeof(REHdr);
     }
 }
 

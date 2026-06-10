@@ -2,6 +2,8 @@
 # EJFAT Reed-Solomon FEC - Meson Build Configuration
 # ============================================================================
 
+subdir('interleaver')
+
 c_compiler = meson.get_compiler('c')
 
 # Detect architecture for SIMD support

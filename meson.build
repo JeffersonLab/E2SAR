@@ -1,8 +1,9 @@
-project('E2SAR', 'cpp', 
-        version: files('VERSION.txt'), 
+project('E2SAR', ['cpp', 'c'],
+        version: files('VERSION.txt'),
         default_options : [
                 'buildtype=debugoptimized',
-                'cpp_std=c++17'])
+                'cpp_std=c++20',
+                'c_std=c11'])
 
 compiler = meson.get_compiler('cpp')
 
@@ -135,6 +136,7 @@ lb_proto_dir = '../udplbd2/proto/loadbalancer'
 lb_proto = lb_proto_dir + '/loadbalancer.proto'
 
 # subdirectories
+subdir('fec')
 subdir('include')
 subdir('src')
 subdir('test')
@@ -165,5 +167,5 @@ summary({
 
 summary({
   'Build type': get_option('buildtype'),
-  'C++ standard': get_option('cpp_std'),
+  'C++ standard': get_option('cpp_std'),  # c++20 required by FEC interleaver (std::span)
 }, section: 'Configuration')

@@ -11,13 +11,14 @@ grpc_generated_headers = [lb_grpc_ch[0], lb_pb_ch[0]]
 libe2sar_t = static_library('e2sar_t',
                         e2sar_sources + grpc_generated_headers,
                         include_directories : inc,
-                        dependencies : [grpc_dep, boost_dep, protobuf_dep],
+                        dependencies : [grpc_dep, boost_dep, protobuf_dep, fec_interleaver_dep],
                         install : true)
 
 # build one library from the E2SAR and gRPC library pieces
 libe2sar = static_library('e2sar',
                         objects : [libe2sar_t.extract_all_objects(recursive: false),
-                                   liblbgrpc.extract_all_objects(recursive: false)],
+                                   liblbgrpc.extract_all_objects(recursive: false),
+                                   libfec_interleaver.extract_all_objects(recursive: false)],
 			install : true)
 
 # The pybind

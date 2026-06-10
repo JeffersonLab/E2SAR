@@ -878,10 +878,9 @@ static void test_cross_validation() {
     }
 
     // ---- Level 3: full pipeline (interleave + rs_encode + parity extraction) ----
-    // We test the codeword buffer but not parity extraction yet (deinterleave_parity
-    // is planned; when it exists, add that check here).
     {
         bool cw_ok = true;
+        bool par_ok = true;
         char label[128];
         for (std::size_t i = 0; i < kPipelineVectorCount; ++i) {
             const auto& v = kPipelineVectors[i];
@@ -901,17 +900,101 @@ static void test_cross_validation() {
                 EXPECT(false, label);
                 cw_ok = false;
             }
+
+            std::vector<uint8_t> parity(8u * p.col_height, 0u);
+            fec::deinterleave_parity(cw, parity, p);
+
+            if (std::memcmp(parity.data(), v.parity_segs, v.parity_len) != 0) {
+                std::snprintf(label, sizeof(label),
+                    "L3 vector %zu (ch=%u): parity segment mismatch", i, v.col_height);
+                EXPECT(false, label);
+                par_ok = false;
+            }
         }
         if (cw_ok) {
             std::snprintf(label, sizeof(label),
                 "Level 3: all %zu pipeline vectors pass (codewords)", kPipelineVectorCount);
             EXPECT(true, label);
         }
+        if (par_ok) {
+            std::snprintf(label, sizeof(label),
+                "Level 3: all %zu pipeline vectors pass (parity segs)", kPipelineVectorCount);
+            EXPECT(true, label);
+        }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Test 10 — Performance: scalar vs NEON comparison at col_height = 8192
+// Test 10 — deinterleave_parity correctness
+// ---------------------------------------------------------------------------
+static void test_deinterleave_parity() {
+    section("deinterleave_parity correctness");
+
+    fec::FecBlockParams p;
+    p.col_height = 64;
+
+    std::vector<uint8_t> src(p.segment_buf_size());
+    for (size_t i = 0; i < src.size(); ++i)
+        src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+    std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+    fec::interleave(src, cw, p);
+    fec::rs_encode(cw, p);
+
+    std::vector<uint8_t> parity(8u * p.col_height, 0);
+    fec::deinterleave_parity(cw, parity, p);
+
+    // Verify parity segments are non-trivial (not all-zero for non-trivial input).
+    bool non_zero = false;
+    for (auto b : parity) { if (b != 0u) { non_zero = true; break; } }
+    EXPECT(non_zero, "deinterleave_parity produces non-zero output for non-trivial input");
+
+    // Verify all-zero input → all-zero parity.
+    std::vector<uint8_t> zero_src(p.segment_buf_size(), 0);
+    std::vector<uint8_t> zero_cw(p.codeword_buf_size(), 0);
+    fec::interleave(zero_src, zero_cw, p);
+    fec::rs_encode(zero_cw, p);
+    std::vector<uint8_t> zero_par(8u * p.col_height, 0xBBu);
+    fec::deinterleave_parity(zero_cw, zero_par, p);
+    bool all_zero = true;
+    for (auto b : zero_par) { if (b != 0u) { all_zero = false; break; } }
+    EXPECT(all_zero, "deinterleave_parity of all-zero data → all-zero parity");
+}
+
+#if defined(__ARM_NEON)
+static void test_deinterleave_parity_neon() {
+    section("deinterleave_parity NEON vs scalar");
+
+    const uint32_t test_heights[] = {1, 15, 16, 17, 32, 64, 8192};
+
+    for (uint32_t height : test_heights) {
+        fec::FecBlockParams p;
+        p.col_height = height;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw, p);
+        fec::rs_encode(cw, p);
+
+        std::vector<uint8_t> par_scalar(8u * p.col_height, 0);
+        std::vector<uint8_t> par_neon(8u * p.col_height, 0xBBu);
+
+        fec::deinterleave_parity(cw, par_scalar, p);
+        fec::deinterleave_parity_neon(cw, par_neon, p);
+
+        char label[80];
+        std::snprintf(label, sizeof(label),
+                      "deinterleave_parity_neon matches scalar (ch=%u)", height);
+        EXPECT(par_neon == par_scalar, label);
+    }
+}
+#endif // __ARM_NEON
+
+// ---------------------------------------------------------------------------
+// Test 11 — Performance: scalar vs NEON comparison at col_height = 8192
 // ---------------------------------------------------------------------------
 static void test_performance() {
     section("Performance comparison (col_height = 8192)");
@@ -992,6 +1075,22 @@ static void test_performance() {
                 mibs(gpu_us / 1000.0),
                 gbits(gpu_us / 1000.0));
 #endif // __APPLE__
+
+    // ---- deinterleave_parity ----
+    {
+        fec::interleave(src, cw, p);
+        fec::rs_encode(cw, p);
+        std::vector<uint8_t> par(8u * p.col_height, 0);
+        double ms_dip = bench_ms([&]{ fec::deinterleave_parity(cw, par, p); }, ITERS);
+        std::printf("  %-28s %8.2f %10.1f %9.3f\n",
+                    "deinterleave_parity (scalar)", ms_dip, mibs(ms_dip), gbits(ms_dip));
+#if defined(__ARM_NEON)
+        double ms_dip_n = bench_ms([&]{ fec::deinterleave_parity_neon(cw, par, p); }, ITERS);
+        std::printf("  %-28s %8.2f %10.1f %9.3f   (%.1fx scalar)\n",
+                    "deinterleave_parity (NEON)", ms_dip_n, mibs(ms_dip_n), gbits(ms_dip_n),
+                    ms_dip / ms_dip_n);
+#endif
+    }
 
     // ---- RS encoder ----
     // Pre-interleave so the codeword buffer has valid data bytes 0-3.
@@ -1134,6 +1233,10 @@ int main() {
     test_rs_encode_metal();
 #endif
     test_pipeline_combined();
+    test_deinterleave_parity();
+#if defined(__ARM_NEON)
+    test_deinterleave_parity_neon();
+#endif
     test_cross_validation();
     test_performance();
 

@@ -14,6 +14,11 @@
 #include "e2sarNetUtil.hpp"
 #include "e2sarAffinity.hpp"
 
+#include "fec/fec_block.h"
+#include "fec/interleaver.h"
+#include "fec/deinterleaver.h"
+#include "fec/rs_encode.h"
+
 
 namespace e2sar 
 {
@@ -41,9 +46,9 @@ namespace e2sar
         ringMtxs(sflags.numSendSockets),
 #endif
         eventStatsBuffer{sflags.syncPeriods},
-        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket), 
+        syncThreadState(*this, sflags.syncPeriodMs, sflags.connectedSocket),
         // set thread index to 0 for a single send thread
-        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.ticksAsREEventNum, sflags.connectedSocket),
+        sendThreadState(*this, 0, sflags.dpV6, sflags.mtu, sflags.ticksAsREEventNum, sflags.enableFec, sflags.connectedSocket),
         cpuCoreList{cpuCoreList},
         warmUpMs{sflags.warmUpMs},
         useCP{sflags.useCP},
@@ -414,31 +419,37 @@ namespace e2sar
                 // and reflects into the stats block
                 boost::asio::post(threadPool,
                     [this, rri, item, interFrameSleepUsec]() {
+                        if (enableFec) {
+                            auto res = _sendWithFec(item->event, item->bytes,
+                                item->eventNum, item->dataId,
+                                item->entropy, rri);
+                            if (item->callback != nullptr)
+                                item->callback(item->cbArg);
+                            delete item;
+                            return;
+                        }
 #ifdef LIBURING_AVAILABLE
-                        if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
+                        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                             seg.ringMtxs[rri].lock();
-#endif 
-                        auto res = _send(item->event, item->bytes, 
+#endif
+                        auto res = _send(item->event, item->bytes,
                             item->eventNum, item->dataId,
                             item->entropy, rri, interFrameSleepUsec,
                             item->callback, item->cbArg);
 
 #ifdef LIBURING_AVAILABLE
-                        if (Optimizations::isSelected(Optimizations::Code::liburing_send)) 
+                        if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                         {
-                            // reap the CQEs and will call the callback if needed
                             _reap(rri);
                             seg.ringMtxs[rri].unlock();
                         }
                         else
 #endif
                         {
-                            // call the callback on the worker thread (except with liburing)
                             if (item->callback != nullptr)
                                 item->callback(item->cbArg);
                         }
-                        
-                        // delete item here to properly call destructor
+
                         delete item;
                 });
 
@@ -870,6 +881,170 @@ namespace e2sar
         return numBuffers * 0;
     }
 
+    result<int> Segmenter::SendThreadState::_sendWithFec(u_int8_t *event, size_t bytes,
+        EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy, size_t roundRobinIndex)
+    {
+        int err;
+        int sendSocket = (useV6 ? GET_FD(socketFd6, roundRobinIndex) : GET_FD(socketFd4, roundRobinIndex));
+        struct msghdr sendhdr{};
+        int flags{0};
+
+        if (connectSocket) {
+            sendhdr.msg_name = nullptr;
+            sendhdr.msg_namelen = 0;
+        } else {
+            if (useV6)
+                sendhdr.msg_name = (sockaddr_in *)& GET_REMOTE_SEND_STRUCT(socketFd6, roundRobinIndex);
+            else
+                sendhdr.msg_name = (sockaddr_in *)& GET_REMOTE_SEND_STRUCT(socketFd4, roundRobinIndex);
+            sendhdr.msg_namelen = sizeof(sockaddr_in);
+        }
+
+        auto nowT = boost::chrono::system_clock::now();
+        auto now = boost::chrono::duration_cast<boost::chrono::microseconds>(nowT.time_since_epoch()).count();
+        EventNum_t lbEventNum = seg.addEntropy ? seg.addClockEntropy(now) : now;
+        if (ticksAsREEventNum)
+            eventNum = lbEventNum;
+        if (entropy == 0)
+            entropy = randDist(ranlux);
+
+        const size_t colHeight = fecColHeight;
+        const size_t maxUserData = fecMaxUserData;
+        const size_t numSegs = (bytes + maxUserData - 1) / maxUserData;
+        const size_t numBlocks = (numSegs + 31) / 32;
+
+        auto& fb = fecBufs[roundRobinIndex];
+
+        fec::FecBlockParams fecParams;
+        fecParams.col_height = static_cast<uint32_t>(colHeight);
+
+        for (size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
+            const size_t segsInBlock = std::min(size_t{32}, numSegs - blockIdx * 32);
+            const uint8_t padFrames = static_cast<uint8_t>(32 - segsInBlock);
+
+            std::memset(fb.segmentBuf.data(), 0, fb.segmentBuf.size());
+
+            size_t dataOffset = blockIdx * 32 * maxUserData;
+            for (size_t i = 0; i < segsInBlock; ++i) {
+                uint8_t* dst = fb.segmentBuf.data() + i * colHeight;
+                size_t segDataLen = std::min(maxUserData, bytes - dataOffset);
+
+                auto* re = new (dst) REHdr();
+                re->set(dataId, static_cast<u_int32_t>(dataOffset), static_cast<u_int32_t>(bytes), eventNum);
+                std::memcpy(dst + sizeof(REHdr), event + dataOffset, segDataLen);
+
+                dataOffset += segDataLen;
+            }
+
+            std::memset(fb.codewordBuf.data(), 0, fb.codewordBuf.size());
+
+#if defined(__ARM_NEON)
+            fec::interleave_neon_tiled(fb.segmentBuf, fb.codewordBuf, fecParams);
+            fec::rs_encode_neon(fb.codewordBuf, fecParams);
+#else
+            fec::interleave(fb.segmentBuf, fb.codewordBuf, fecParams);
+            fec::rs_encode(fb.codewordBuf, fecParams);
+#endif
+
+            std::memset(fb.parityBuf.data(), 0, fb.parityBuf.size());
+#if defined(__ARM_NEON)
+            fec::deinterleave_parity_neon(fb.codewordBuf, fb.parityBuf, fecParams);
+#else
+            fec::deinterleave_parity(fb.codewordBuf, fb.parityBuf, fecParams);
+#endif
+
+            uint32_t blockNum = fecBlockNum++;
+
+            for (size_t i = 0; i < segsInBlock; ++i) {
+                void *hdrspace = malloc(sizeof(LBECHdr));
+                auto hdr = new (hdrspace) LBECHdr(seg.lbHdrVersion);
+
+                switch(seg.lbHdrVersion) {
+                    default:
+                    case 2:
+                        hdr->lbu.lb2.set(entropy, lbEventNum);
+                        break;
+                    case 3:
+                        hdr->lbu.lb3.set(lbEventNum & 0xFFFF, entropy, lbEventNum);
+                        break;
+                }
+
+                u_int16_t segPadBytes = 0;
+                if (i == segsInBlock - 1) {
+                    size_t lastSegOffset = blockIdx * 32 * maxUserData + i * maxUserData;
+                    size_t lastSegDataLen = std::min(maxUserData, bytes - lastSegOffset);
+                    size_t lastSegTotalLen = sizeof(REHdr) + lastSegDataLen;
+                    if (lastSegTotalLen < colHeight)
+                        segPadBytes = static_cast<u_int16_t>(colHeight - lastSegTotalLen);
+                }
+
+                hdr->ec.set(dataId, false, static_cast<u_int8_t>(i), padFrames,
+                            static_cast<u_int16_t>(colHeight), segPadBytes, blockNum);
+                hdr->ec.nextProto = ecNextProtoRE;
+
+                auto iov = static_cast<struct iovec*>(malloc(2 * sizeof(struct iovec)));
+                iov[0].iov_base = hdr;
+                iov[0].iov_len = sizeof(LBECHdr);
+                iov[1].iov_base = fb.segmentBuf.data() + i * colHeight;
+                iov[1].iov_len = colHeight;
+                sendhdr.msg_iov = iov;
+                sendhdr.msg_iovlen = 2;
+
+                seg.sendStats.msgCnt++;
+                err = (int)sendmsg(sendSocket, &sendhdr, flags);
+                free(hdr);
+                free(iov);
+                if (err == -1) {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+            }
+
+            for (size_t j = 0; j < 8; ++j) {
+                void *hdrspace = malloc(sizeof(LBECREHdr));
+                auto hdr = new (hdrspace) LBECREHdr(seg.lbHdrVersion);
+
+                switch(seg.lbHdrVersion) {
+                    default:
+                    case 2:
+                        hdr->lbu.lb2.set(entropy, lbEventNum);
+                        break;
+                    case 3:
+                        hdr->lbu.lb3.set(lbEventNum & 0xFFFF, entropy, lbEventNum);
+                        break;
+                }
+
+                hdr->ec.set(dataId, true, static_cast<u_int8_t>(j), padFrames,
+                            static_cast<u_int16_t>(colHeight), 0, blockNum);
+                hdr->ec.nextProto = ecNextProtoRE;
+
+                hdr->re.set(dataId, 0, static_cast<u_int32_t>(bytes), eventNum);
+
+                auto iov = static_cast<struct iovec*>(malloc(2 * sizeof(struct iovec)));
+                iov[0].iov_base = hdr;
+                iov[0].iov_len = sizeof(LBECREHdr);
+                iov[1].iov_base = fb.parityBuf.data() + j * colHeight;
+                iov[1].iov_len = colHeight;
+                sendhdr.msg_iov = iov;
+                sendhdr.msg_iovlen = 2;
+
+                seg.sendStats.msgCnt++;
+                err = (int)sendmsg(sendSocket, &sendhdr, flags);
+                free(hdr);
+                free(iov);
+                if (err == -1) {
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+            }
+        }
+
+        seg.eventsInCurrentSync++;
+        return 0;
+    }
+
     // in Linux use an ioctl to read socket send buffer state
     // otherwise just close
     result<int> Segmenter::SendThreadState::_waitAndCloseFd(int fd)
@@ -898,20 +1073,24 @@ namespace e2sar
     }
 
     // Blocking call specifying event number.
-    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes, 
+    result<int> Segmenter::sendEvent(u_int8_t *event, size_t bytes,
         EventNum_t _eventNum, u_int16_t _dataId, u_int16_t entropy) noexcept
     {
-        // reset local event number to override
         if (_eventNum != 0)
             userEventNum.exchange(_eventNum);
 
         roundRobinIndex = (roundRobinIndex + 1) % numSendSockets;
 
-        // use specified event number and dataId
-        return sendThreadState._send(event, bytes, 
-            // continue incrementing
-            userEventNum++, 
-            (_dataId  == 0 ? dataId : _dataId), 
+        if (sendThreadState.enableFec) {
+            return sendThreadState._sendWithFec(event, bytes,
+                userEventNum++,
+                (_dataId == 0 ? dataId : _dataId),
+                entropy, roundRobinIndex);
+        }
+
+        return sendThreadState._send(event, bytes,
+            userEventNum++,
+            (_dataId  == 0 ? dataId : _dataId),
             entropy, roundRobinIndex
         );
     }
@@ -989,8 +1168,10 @@ namespace e2sar
             sFlags.smooth);
         sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
             sFlags.multiPort);
-        sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion", 
+        sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion",
             sFlags.lbHdrVersion);
+        sFlags.enableFec = paramTree.get<bool>("data-plane.enableFec",
+            sFlags.enableFec);
 
         return sFlags;
     }

@@ -202,6 +202,12 @@ namespace e2sar
              * This thread sends data to the LB to be distributed to different processing
              * nodes.
              */
+            struct FecSendBuffers {
+                std::vector<uint8_t> segmentBuf;
+                std::vector<uint8_t> codewordBuf;
+                std::vector<uint8_t> parityBuf;
+            };
+
             struct SendThreadState {
                 // owner object
                 Segmenter &seg;
@@ -214,11 +220,18 @@ namespace e2sar
                 // flags
                 const bool useV6;
                 const bool ticksAsREEventNum;
+                const bool enableFec;
 
                 // transmit parameters
                 size_t mtu{0}; // must accommodate typical IP, UDP, LB+RE headers and payload; not a const because we may change it
                 std::string iface{""}; // outgoing interface - we may set it if possible
                 size_t maxPldLen; // not a const because mtu is not a const
+
+                // FEC state
+                size_t fecColHeight{0};
+                size_t fecMaxUserData{0};
+                std::vector<FecSendBuffers> fecBufs;
+                std::atomic<uint32_t> fecBlockNum{0};
 
                 // UDP sockets and matching sockaddr structures (local and remote)
                 // <socket fd, local address, remote address>
@@ -236,15 +249,26 @@ namespace e2sar
                 // to get random port numbers we skip low numbered privileged ports
                 boost::random::uniform_int_distribution<> portDist{10000, std::numeric_limits<u_int16_t>::max()};
 
-                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool tasreenum, bool cnct=true): 
-                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, ticksAsREEventNum{tasreenum}, mtu{mtu}, 
-                    maxPldLen{mtu - getTotalHeaderLength(v6)}, socketFd4(s.numSendSockets), 
+                inline SendThreadState(Segmenter &s, int idx, bool v6, u_int16_t mtu, bool tasreenum, bool fec, bool cnct=true):
+                    seg{s}, threadIndex{idx}, connectSocket{cnct}, useV6{v6}, ticksAsREEventNum{tasreenum},
+                    enableFec{fec}, mtu{mtu},
+                    maxPldLen{mtu - getTotalHeaderLength(v6)}, socketFd4(s.numSendSockets),
                     socketFd6(s.numSendSockets),
-                    ranlux{static_cast<u_int32_t>(std::time(0))} 
+                    ranlux{static_cast<u_int32_t>(std::time(0))}
                 {
-                    // this way every segmenter send thread has a unique PRNG sequence
                     auto nowT = boost::chrono::system_clock::now();
                     ranlux.seed(boost::chrono::duration_cast<boost::chrono::nanoseconds>(nowT.time_since_epoch()).count());
+
+                    if (enableFec) {
+                        fecColHeight = mtu - getFecTotalHeaderLength(v6);
+                        fecMaxUserData = fecColHeight - sizeof(REHdr);
+                        fecBufs.resize(s.numSendSockets);
+                        for (auto& fb : fecBufs) {
+                            fb.segmentBuf.resize(32 * fecColHeight, 0);
+                            fb.codewordBuf.resize(fecColHeight * 40, 0);
+                            fb.parityBuf.resize(8 * fecColHeight, 0);
+                        }
+                    }
                 }
 
                 // open v4/v6 sockets
@@ -254,9 +278,12 @@ namespace e2sar
                 // close a given socket, wait that it has sent all the data (in Linux)
                 result<int> _waitAndCloseFd(int fd);
                 // fragment and send the event
-                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId, 
-                    u_int16_t entropy, size_t roundRobinIndex, int64_t interFrameSleepUsec = 0, 
+                result<int> _send(u_int8_t *event, size_t bytes, EventNum_t altEventNum, u_int16_t dataId,
+                    u_int16_t entropy, size_t roundRobinIndex, int64_t interFrameSleepUsec = 0,
                     void (*callback)(boost::any) = nullptr, boost::any cbArg = nullptr);
+                // fragment with FEC encoding and send
+                result<int> _sendWithFec(u_int8_t *event, size_t bytes, EventNum_t eventNum,
+                    u_int16_t dataId, u_int16_t entropy, size_t roundRobinIndex);
                 // thread loop
                 void _threadBody();
 #ifdef LIBURING_AVAILABLE
@@ -315,6 +342,9 @@ namespace e2sar
 
                 if (sendThreadState.mtu <= getTotalHeaderLength(sendThreadState.useV6))
                     throw E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate headers"};
+
+                if (sendThreadState.enableFec && sendThreadState.mtu <= getFecTotalHeaderLength(sendThreadState.useV6))
+                    throw E2SARErrorInfo{E2SARErrorc::SocketError, "Insufficient MTU length to accommodate FEC headers"};
             }
 
             /** Threads keep running while this is false */
@@ -367,9 +397,9 @@ namespace e2sar
              * which is a tick, primarily good for debugging {false}
              * - lbHdrVersion - version of the LB header to be used (2 or 3 are valid) {2}
              */
-            struct SegmenterFlags 
+            struct SegmenterFlags
             {
-                bool dpV6; 
+                bool dpV6;
                 bool connectedSocket;
                 bool useCP;
                 u_int16_t warmUpMs;
@@ -382,12 +412,14 @@ namespace e2sar
                 bool smooth;
                 bool multiPort;
                 bool ticksAsREEventNum;
-                u_int8_t lbHdrVersion; 
+                u_int8_t lbHdrVersion;
+                bool enableFec;
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
-                    multiPort{false}, ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
+                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false},
+                    multiPort{false}, ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2},
+                    enableFec{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

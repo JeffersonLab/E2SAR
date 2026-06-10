@@ -45,6 +45,37 @@ void deinterleave(
     }
 }
 
+void deinterleave_parity(
+    std::span<const uint8_t> codewords,
+    std::span<uint8_t>       parity_segs,
+    const FecBlockParams&    p)
+{
+    assert(codewords.size()   == p.codeword_buf_size());
+    assert(parity_segs.size() == 8u * p.col_height);
+
+    std::memset(parity_segs.data(), 0, parity_segs.size());
+
+    const uint32_t nw = p.num_words();
+    const uint32_t ch = p.col_height;
+
+    for (uint32_t w = 0; w < nw; ++w) {
+        const uint32_t byte_idx  = w / 8u;
+        const uint32_t bit_shift = 7u - (w % 8u);
+
+        const uint8_t parity_byte = codewords[size_t{w} * FecBlockParams::CODEWORD_BYTES + 4u];
+        const uint8_t p0_nibble = (parity_byte >> 4u) & 0xFu;
+        const uint8_t p1_nibble =  parity_byte        & 0xFu;
+
+        for (uint32_t b = 0; b < 4u; ++b) {
+            const uint8_t bit0 = (p0_nibble >> (3u - b)) & 1u;
+            parity_segs[b * ch + byte_idx] |= static_cast<uint8_t>(bit0 << bit_shift);
+
+            const uint8_t bit1 = (p1_nibble >> (3u - b)) & 1u;
+            parity_segs[(4u + b) * ch + byte_idx] |= static_cast<uint8_t>(bit1 << bit_shift);
+        }
+    }
+}
+
 } // namespace fec
 
 // =============================================================================
@@ -161,6 +192,60 @@ void deinterleave_neon(
 
             // Horizontal weighted sum: bit_val[i] * pack_wt[i] → output byte.
             // vaddv_u8 is AArch64; safe on Apple Silicon and any ARMv8-A target.
+            seg_out[byte_idx] = vaddv_u8(vmul_u8(bit_val, pack_wt));
+        }
+    }
+}
+
+void deinterleave_parity_neon(
+    std::span<const uint8_t> codewords,
+    std::span<uint8_t>       parity_segs,
+    const FecBlockParams&    p)
+{
+    assert(codewords.size()   == p.codeword_buf_size());
+    assert(parity_segs.size() == 8u * p.col_height);
+
+    const uint32_t ch = p.col_height;
+
+    const uint8x8_t pack_wt = {128u, 64u, 32u, 16u, 8u, 4u, 2u, 1u};
+
+    // TBL index for byte 4 of each codeword in an 8-codeword (40-byte) block.
+    // Byte 4 offsets: 4, 9, 14, 19, 24, 29, 34, 39
+    // For the 3-register table (reg0=0..15, reg1=16..31, reg2=24..39 → idx 32..47):
+    //   offsets < 32 use direct index; offset 34 → 42, offset 39 → 47
+    static const uint8x8_t par_idx = { 4, 9, 14, 19, 24, 29, 42, 47 };
+
+    for (uint32_t seg = 0; seg < 8u; ++seg) {
+        // seg 0..3 come from parity symbol 0 (high nibble of byte 4)
+        // seg 4..7 come from parity symbol 1 (low nibble of byte 4)
+        const bool     high_nib = (seg < 4u);
+        const uint32_t bp       = seg % 4u;
+        const int8x8_t nib_shift = vdup_n_s8(-(int8_t)(3u - bp));
+
+        uint8_t* seg_out = parity_segs.data() + size_t{seg} * ch;
+
+        for (uint32_t byte_idx = 0; byte_idx < ch; ++byte_idx) {
+            const uint8_t* blk = codewords.data() + size_t{byte_idx} * 40u;
+
+            const uint8x16x3_t block = {{
+                vld1q_u8(blk),
+                vld1q_u8(blk + 16),
+                vld1q_u8(blk + 24),
+            }};
+
+            uint8x8_t cb = vqtbl3_u8(block, par_idx);
+
+            uint8x8_t nibble;
+            if (high_nib) {
+                nibble = vshr_n_u8(cb, 4);
+            } else {
+                nibble = vand_u8(cb, vdup_n_u8(0xFu));
+            }
+
+            uint8x8_t bit_val = vand_u8(
+                vreinterpret_u8_s8(vshl_s8(vreinterpret_s8_u8(nibble), nib_shift)),
+                vdup_n_u8(1u));
+
             seg_out[byte_idx] = vaddv_u8(vmul_u8(bit_val, pack_wt));
         }
     }
