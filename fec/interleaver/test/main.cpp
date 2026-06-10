@@ -13,6 +13,7 @@
 #include "fec/deinterleaver.h"
 #include "fec/pipeline.h"
 #include "fec/rs_encode.h"
+#include "fec/rs_decode.h"
 
 // ---------------------------------------------------------------------------
 // Minimal test harness
@@ -994,7 +995,183 @@ static void test_deinterleave_parity_neon() {
 #endif // __ARM_NEON
 
 // ---------------------------------------------------------------------------
-// Test 11 — Performance: scalar vs NEON comparison at col_height = 8192
+// Test 11 — interleave_parity round-trip with deinterleave_parity
+// ---------------------------------------------------------------------------
+static void test_interleave_parity() {
+    section("interleave_parity round-trip");
+
+    const uint32_t test_heights[] = {1, 8, 16, 64, 512, 8192};
+
+    for (uint32_t height : test_heights) {
+        fec::FecBlockParams p;
+        p.col_height = height;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw, p);
+        fec::rs_encode(cw, p);
+
+        std::vector<uint8_t> par_orig(8u * p.col_height, 0);
+        fec::deinterleave_parity(cw, par_orig, p);
+
+        std::vector<uint8_t> cw2(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw2, p);
+
+        fec::interleave_parity(par_orig, cw2, p);
+
+        char label[128];
+
+        bool cw_match = (std::memcmp(cw.data(), cw2.data(), cw.size()) == 0);
+        std::snprintf(label, sizeof(label),
+            "interleave_parity restores codewords (ch=%u)", height);
+        EXPECT(cw_match, label);
+
+        std::vector<uint8_t> par_rt(8u * p.col_height, 0);
+        fec::deinterleave_parity(cw2, par_rt, p);
+
+        bool par_match = (par_orig == par_rt);
+        std::snprintf(label, sizeof(label),
+            "deinterleave_parity(interleave_parity(x)) == x (ch=%u)", height);
+        EXPECT(par_match, label);
+    }
+}
+
+#if defined(__ARM_NEON)
+static void test_interleave_parity_neon() {
+    section("interleave_parity NEON vs scalar");
+
+    const uint32_t test_heights[] = {1, 16, 64, 8192};
+
+    for (uint32_t height : test_heights) {
+        fec::FecBlockParams p;
+        p.col_height = height;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw, p);
+        fec::rs_encode(cw, p);
+
+        std::vector<uint8_t> par(8u * p.col_height, 0);
+        fec::deinterleave_parity(cw, par, p);
+
+        std::vector<uint8_t> cw_scalar(p.codeword_buf_size(), 0);
+        std::vector<uint8_t> cw_neon(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw_scalar, p);
+        fec::interleave(src, cw_neon, p);
+
+        fec::interleave_parity(par, cw_scalar, p);
+        fec::interleave_parity_neon(par, cw_neon, p);
+
+        char label[128];
+        std::snprintf(label, sizeof(label),
+            "interleave_parity_neon matches scalar (ch=%u)", height);
+        EXPECT(cw_scalar == cw_neon, label);
+    }
+}
+#endif // __ARM_NEON
+
+// ---------------------------------------------------------------------------
+// Test 12 — RS decode: encode, erase columns, decode, verify recovery
+// ---------------------------------------------------------------------------
+static void test_rs_decode() {
+    section("RS decode (column erasure recovery)");
+
+    fec::RsDecodeContext ctx;
+    EXPECT(ctx.initialized, "RsDecodeContext initialized successfully");
+
+    const uint32_t test_heights[] = {1, 8, 64, 512};
+
+    for (uint32_t height : test_heights) {
+        fec::FecBlockParams p;
+        p.col_height = height;
+
+        std::vector<uint8_t> src(p.segment_buf_size());
+        for (size_t i = 0; i < src.size(); ++i)
+            src[i] = static_cast<uint8_t>(i * 37u + 91u);
+
+        std::vector<uint8_t> cw_ref(p.codeword_buf_size(), 0);
+        fec::interleave(src, cw_ref, p);
+        fec::rs_encode(cw_ref, p);
+
+        std::vector<uint8_t> par(8u * p.col_height, 0);
+        fec::deinterleave_parity(cw_ref, par, p);
+
+        // Test: erase 1 column, recover
+        {
+            std::vector<uint8_t> src_damaged(src);
+            for (uint32_t seg = 0; seg < 4u; ++seg)
+                std::memset(src_damaged.data() + seg * p.col_height, 0, p.col_height);
+
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave(src_damaged, cw, p);
+            fec::interleave_parity(par, cw, p);
+
+            std::vector<int> erased = {0};
+            int ret = fec::rs_decode(cw, p, erased, ctx);
+
+            char label[128];
+            std::snprintf(label, sizeof(label),
+                "rs_decode returns 0 for 1 erased column (ch=%u)", height);
+            EXPECT(ret == 0, label);
+
+            std::vector<uint8_t> recovered(p.segment_buf_size(), 0);
+            fec::deinterleave(cw, recovered, p);
+
+            std::snprintf(label, sizeof(label),
+                "rs_decode recovers data for 1 erased column (ch=%u)", height);
+            EXPECT(recovered == src, label);
+        }
+
+        // Test: erase 2 columns, recover
+        {
+            std::vector<uint8_t> src_damaged(src);
+            for (uint32_t seg = 0; seg < 4u; ++seg)
+                std::memset(src_damaged.data() + seg * p.col_height, 0, p.col_height);
+            for (uint32_t seg = 20; seg < 24u; ++seg)
+                std::memset(src_damaged.data() + seg * p.col_height, 0, p.col_height);
+
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            fec::interleave(src_damaged, cw, p);
+            fec::interleave_parity(par, cw, p);
+
+            std::vector<int> erased = {0, 5};
+            int ret = fec::rs_decode(cw, p, erased, ctx);
+
+            char label[128];
+            std::snprintf(label, sizeof(label),
+                "rs_decode returns 0 for 2 erased columns (ch=%u)", height);
+            EXPECT(ret == 0, label);
+
+            std::vector<uint8_t> recovered(p.segment_buf_size(), 0);
+            fec::deinterleave(cw, recovered, p);
+
+            std::snprintf(label, sizeof(label),
+                "rs_decode recovers data for 2 erased columns (ch=%u)", height);
+            EXPECT(recovered == src, label);
+        }
+
+        // Test: 3 erased columns should fail
+        {
+            std::vector<int> erased = {0, 3, 7};
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0);
+            int ret = fec::rs_decode(cw, p, erased, ctx);
+
+            char label[128];
+            std::snprintf(label, sizeof(label),
+                "rs_decode rejects 3 erased columns (ch=%u)", height);
+            EXPECT(ret == -1, label);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test 13 — Performance: scalar vs NEON comparison at col_height = 8192
 // ---------------------------------------------------------------------------
 static void test_performance() {
     section("Performance comparison (col_height = 8192)");
@@ -1237,6 +1414,11 @@ int main() {
 #if defined(__ARM_NEON)
     test_deinterleave_parity_neon();
 #endif
+    test_interleave_parity();
+#if defined(__ARM_NEON)
+    test_interleave_parity_neon();
+#endif
+    test_rs_decode();
     test_cross_validation();
     test_performance();
 

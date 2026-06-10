@@ -229,7 +229,9 @@ void print_rs_model(rs_model *rs) {
 
 rs_model *init_rs() {
 
+#ifndef EJFAT_RS_QUIET
   printf("Initilizing rs model\n");
+#endif
 
   rs_model *rs = (rs_model *) malloc(sizeof(rs_model));
 
@@ -294,8 +296,10 @@ rs_model *init_rs() {
     }
   }
 
+#ifndef EJFAT_RS_QUIET
   printf(" ---- RS model after init \n");
   print_rs_model(rs);
+#endif
   
   return rs;
 }

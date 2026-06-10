@@ -23,6 +23,7 @@
 #endif
 
 #include <atomic>
+#include <tuple>
 
 #include "e2sarError.hpp"
 #include "e2sarUtil.hpp"
@@ -67,17 +68,23 @@ namespace e2sar
                 u_int8_t *event;
                 u_int16_t dataId;
 
-                EventQueueItem(): numFragments{0},  bytes{0}, curBytes{0},  
+                // FEC tracking (only used when enableFec is true)
+                size_t fecBlocksExpected{0};
+                size_t fecBlocksCompleted{0};
+
+                EventQueueItem(): numFragments{0},  bytes{0}, curBytes{0},
                     eventNum{0}, event{nullptr}, dataId{0}  {}
 
                 ~EventQueueItem() {}
 
                 EventQueueItem& operator=(const EventQueueItem &i) = delete;
 
-                EventQueueItem(const EventQueueItem &i): firstSegment{i.firstSegment}, 
-                    numFragments{i.numFragments},               
-                    bytes{i.bytes}, curBytes{i.curBytes}, 
-                    eventNum{i.eventNum},   event{i.event},  dataId{i.dataId} {}
+                EventQueueItem(const EventQueueItem &i): firstSegment{i.firstSegment},
+                    numFragments{i.numFragments},
+                    bytes{i.bytes}, curBytes{i.curBytes},
+                    eventNum{i.eventNum},   event{i.event},  dataId{i.dataId},
+                    fecBlocksExpected{i.fecBlocksExpected},
+                    fecBlocksCompleted{i.fecBlocksCompleted} {}
                 /**
                  * Initialize from REHdr
                  */
@@ -94,7 +101,32 @@ namespace e2sar
                     // user deallocates this, so we don't use a pool
                     event = new u_int8_t[rehdr->get_bufferLength()];
                     // set the timestamp
-                    firstSegment = boost::chrono::steady_clock::now();  
+                    firstSegment = boost::chrono::steady_clock::now();
+                }
+            };
+
+            // Per-FEC-block state for tracking received data/parity segments
+            struct FecBlockState {
+                uint32_t dataReceived{0};      // bitmask: bits 0-31 for data segments
+                uint8_t  parityReceived{0};    // bitmask: bits 0-7 for parity segments
+                uint8_t  padFrames{0};
+                uint16_t colHeight{0};
+                uint32_t fecBlockNum{0};
+                std::vector<uint8_t> segmentBuf;
+                std::vector<uint8_t> parityBuf;
+                EventNum_t eventNum{0};
+                uint16_t dataId{0};
+                size_t totalEventBytes{0};
+                boost::chrono::steady_clock::time_point firstSegment;
+            };
+
+            // Hash for FEC block key: (eventNum, dataId, fecBlockNum)
+            struct FecBlockKeyHash {
+                size_t operator()(const std::tuple<EventNum_t, u_int16_t, u_int32_t> &k) const {
+                    auto h1 = std::hash<EventNum_t>{}(std::get<0>(k));
+                    auto h2 = std::hash<u_int16_t>{}(std::get<1>(k));
+                    auto h3 = std::hash<u_int32_t>{}(std::get<2>(k));
+                    return h1 ^ (h2 << 16) ^ (h3 << 32);
                 }
             };
 
@@ -106,6 +138,8 @@ namespace e2sar
                 std::atomic<size_t> totalBytesReceived{0};
                 std::atomic<size_t> totalPacketsReceived{0};
                 std::atomic<size_t> badHeaderDiscards{0}; // number of frames discarded due to failed header check
+                std::atomic<EventNum_t> fecRecoveries{0}; // FEC blocks successfully recovered
+                std::atomic<EventNum_t> fecFailures{0}; // FEC blocks that failed recovery
                 // last error code
                 std::atomic<int> lastErrno{0};
                 // gRPC error count
@@ -227,6 +261,9 @@ namespace e2sar
                 // segments are transmitted, they are guarangeed to go
                 // to the same port
                 boost::unordered_map<std::pair<EventNum_t, u_int16_t>, std::shared_ptr<EventQueueItem>, pair_hash, pair_equal> eventsInProgress;
+                // Per-thread FEC block tracking
+                boost::unordered_map<std::tuple<EventNum_t, u_int16_t, u_int32_t>,
+                    std::shared_ptr<FecBlockState>, FecBlockKeyHash> fecBlocksInProgress;
                 // mutex for guarding access to events in progress (recv thread, gc thread)
                 boost::mutex evtsInProgressMutex;
                 // thread local instance of events we lost
@@ -290,6 +327,7 @@ namespace e2sar
             const size_t numRecvPorts;
             std::vector<std::list<int>> threadsToPorts;
             const bool withLBHeader;
+            const bool enableFec;
             const int eventTimeout_ms; // how long we allow events to linger 'in progress' before we give up
             const int recvWaitTimeout_ms{10}; // how long we wait on condition variable before we come up for air
             // recv socket buffer size for setsockop
@@ -389,13 +427,15 @@ namespace e2sar
                 int dataErrCnt; 
                 E2SARErrorc lastE2SARError;
                 size_t totalPackets, totalBytes, badHeaderDiscards;
+                EventNum_t fecRecoveries, fecFailures;
 
                 ReportedStats() = delete;
-                ReportedStats(const AtomicStats &as): enqueueLoss{as.enqueueLoss}, 
+                ReportedStats(const AtomicStats &as): enqueueLoss{as.enqueueLoss},
                     reassemblyLoss{as.reassemblyLoss}, eventSuccess{as.eventSuccess},
                     lastErrno{as.lastErrno}, grpcErrCnt{as.grpcErrCnt}, dataErrCnt{as.dataErrCnt},
-                    lastE2SARError{as.lastE2SARError}, totalPackets{as.totalPacketsReceived}, 
-                    totalBytes{as.totalBytesReceived}, badHeaderDiscards{as.badHeaderDiscards}
+                    lastE2SARError{as.lastE2SARError}, totalPackets{as.totalPacketsReceived},
+                    totalBytes{as.totalBytesReceived}, badHeaderDiscards{as.badHeaderDiscards},
+                    fecRecoveries{as.fecRecoveries}, fecFailures{as.fecFailures}
                     {}
             };
 
@@ -437,11 +477,12 @@ namespace e2sar
                 int rcvSocketBufSize; 
                 float weight, min_factor, max_factor;
                 bool reportStats;
+                bool enableFec;
                 ReassemblerFlags(): useCP{true}, useHostAddress{false},
-                    period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
+                    period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.},
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0},
-                    reportStats{false} {}
+                    reportStats{false}, enableFec{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

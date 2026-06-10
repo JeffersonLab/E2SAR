@@ -48,6 +48,36 @@ void interleave(
     }
 }
 
+void interleave_parity(
+    std::span<const uint8_t> parity_segs,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    p)
+{
+    assert(parity_segs.size() == 8u * p.col_height);
+    assert(codewords.size()   == p.codeword_buf_size());
+
+    const uint32_t nw = p.num_words();
+    const uint32_t ch = p.col_height;
+
+    for (uint32_t w = 0; w < nw; ++w) {
+        const uint32_t byte_idx  = w / 8u;
+        const uint32_t bit_shift = 7u - (w % 8u);
+
+        uint8_t p0_nibble = 0;
+        uint8_t p1_nibble = 0;
+
+        for (uint32_t b = 0; b < 4u; ++b) {
+            p0_nibble |= static_cast<uint8_t>(
+                ((parity_segs[b * ch + byte_idx] >> bit_shift) & 1u) << (3u - b));
+            p1_nibble |= static_cast<uint8_t>(
+                ((parity_segs[(4u + b) * ch + byte_idx] >> bit_shift) & 1u) << (3u - b));
+        }
+
+        codewords[size_t{w} * FecBlockParams::CODEWORD_BYTES + 4u] =
+            static_cast<uint8_t>((p0_nibble << 4u) | p1_nibble);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // interleave_magic
 //
@@ -445,6 +475,49 @@ void interleave_neon_tiled(
 #undef IL_BIT_BODY
 #undef IL_BIT
 #undef IL_BIT0
+
+void interleave_parity_neon(
+    std::span<const uint8_t> parity_segs,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    p)
+{
+    assert(parity_segs.size() == 8u * p.col_height);
+    assert(codewords.size()   == p.codeword_buf_size());
+
+    const uint32_t ch = p.col_height;
+
+    for (uint32_t byte_idx = 0; byte_idx < ch; ++byte_idx) {
+        uint8_t par_bytes[8];
+        for (uint32_t s = 0; s < 8u; ++s)
+            par_bytes[s] = parity_segs[s * ch + byte_idx];
+
+        uint8x8_t seg_data = vld1_u8(par_bytes);
+
+        for (uint32_t bit = 0; bit < 8u; ++bit) {
+            const uint32_t w = byte_idx * 8u + bit;
+            const int shift = 7 - static_cast<int>(bit);
+
+            uint8x8_t shifted = vreinterpret_u8_s8(
+                vshl_s8(vreinterpret_s8_u8(seg_data), vdup_n_s8(-shift)));
+            uint8x8_t bits = vand_u8(shifted, vdup_n_u8(1u));
+
+            uint8_t p0_nibble =
+                (vget_lane_u8(bits, 0) << 3u) |
+                (vget_lane_u8(bits, 1) << 2u) |
+                (vget_lane_u8(bits, 2) << 1u) |
+                (vget_lane_u8(bits, 3) << 0u);
+
+            uint8_t p1_nibble =
+                (vget_lane_u8(bits, 4) << 3u) |
+                (vget_lane_u8(bits, 5) << 2u) |
+                (vget_lane_u8(bits, 6) << 1u) |
+                (vget_lane_u8(bits, 7) << 0u);
+
+            codewords[size_t{w} * FecBlockParams::CODEWORD_BYTES + 4u] =
+                static_cast<uint8_t>((p0_nibble << 4u) | p1_nibble);
+        }
+    }
+}
 
 } // namespace fec
 

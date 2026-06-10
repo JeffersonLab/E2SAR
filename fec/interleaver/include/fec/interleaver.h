@@ -101,4 +101,30 @@ double interleave_metal_gpu_us(
 #endif // __APPLE__
 
 
+// interleave_parity() — writes 8 parity segments into byte 4 of each codeword.
+//
+// This is the inverse of deinterleave_parity(): it reads bits from parity
+// segment bytes and packs them into the parity nibbles of each codeword.
+//
+// Parity column mapping (byte 4 of each codeword):
+//   High nibble = parity symbol 0:
+//     bit 3 ← segment 0, bit 2 ← segment 1, bit 1 ← segment 2, bit 0 ← segment 3
+//   Low nibble = parity symbol 1:
+//     bit 3 ← segment 4, bit 2 ← segment 5, bit 1 ← segment 6, bit 0 ← segment 7
+//
+// Precondition: parity_segs.size() == 8 * params.col_height
+//               codewords.size()   == params.codeword_buf_size()
+// Note: only byte 4 of each codeword is written; bytes 0-3 are untouched.
+void interleave_parity(
+    std::span<const uint8_t> parity_segs,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    params);
+
+#if defined(__ARM_NEON)
+void interleave_parity_neon(
+    std::span<const uint8_t> parity_segs,
+    std::span<uint8_t>       codewords,
+    const FecBlockParams&    params);
+#endif // __ARM_NEON
+
 } // namespace fec

@@ -392,7 +392,9 @@ typedef struct {
 
 // Initialize decoder table with all possible erasure patterns
 int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
+#ifndef EJFAT_RS_QUIET
   printf("Initializing RS decoder table...\n");
+#endif
   
   // Calculate total number of possible erasure patterns
   // For RS(10,8): no erasures (1) + single erasures (10) + double erasures (10*9/2 = 45)
@@ -564,14 +566,18 @@ int init_rs_decode_table(rs_model *rs, rs_decode_table *table) {
     }
   }
   
+#ifndef EJFAT_RS_QUIET
   printf("Decoder table initialized with %d patterns\n", table->size);
-  
+#endif
+
   // Count valid patterns
   int valid_count = 0;
   for (int i = 0; i < table->size; i++) {
     if (table->entries[i].valid) valid_count++;
   }
+#ifndef EJFAT_RS_QUIET
   printf("Valid patterns: %d/%d\n", valid_count, table->size);
+#endif
   
   return 0;
 }

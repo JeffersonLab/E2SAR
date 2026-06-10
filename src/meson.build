@@ -18,7 +18,8 @@ libe2sar_t = static_library('e2sar_t',
 libe2sar = static_library('e2sar',
                         objects : [libe2sar_t.extract_all_objects(recursive: false),
                                    liblbgrpc.extract_all_objects(recursive: false),
-                                   libfec_interleaver.extract_all_objects(recursive: false)],
+                                   libfec_interleaver.extract_all_objects(recursive: false),
+                                   libfec_rs_decode_c.extract_all_objects(recursive: false)],
 			install : true)
 
 # The pybind

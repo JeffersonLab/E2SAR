@@ -6,8 +6,16 @@
 
 #include "portable_endian.h"
 
+#include <set>
+
 #include "e2sarAffinity.hpp"
 #include "e2sarDPReassembler.hpp"
+
+#include "fec/fec_block.h"
+#include "fec/interleaver.h"
+#include "fec/deinterleaver.h"
+#include "fec/rs_encode.h"
+#include "fec/rs_decode.h"
 
 
 namespace e2sar 
@@ -52,6 +60,7 @@ namespace e2sar
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
         threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
+        enableFec{rflags.enableFec},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
@@ -86,6 +95,7 @@ namespace e2sar
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
         threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
+        enableFec{rflags.enableFec},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
@@ -117,6 +127,7 @@ namespace e2sar
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
         threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
+        enableFec{rflags.enableFec},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
@@ -158,6 +169,7 @@ namespace e2sar
         numRecvPorts{static_cast<size_t>(portRange > 0 ? 2 << (portRange - 1): 1)},
         threadsToPorts(numRecvThreads),
         withLBHeader{rflags.withLBHeader},
+        enableFec{rflags.enableFec},
         eventTimeout_ms{rflags.eventTimeout_ms},
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
@@ -237,55 +249,159 @@ namespace e2sar
     {
         auto eventTimeout_ms = boost::chrono::milliseconds(reas.eventTimeout_ms);
 
-        // TODO: move to a more granular affinity setting for main
-        // threads and then set this thread to anything other than
-        // the cores specified by user
-        // set affinity to anything other than cores we are using
-        // if (reas.cpuCoreList.size() > 0)
-        // {
-        //     auto res = Affinity::setThreadXOR(reas.cpuCoreList);
-        //     if (res.has_error())
-        //     reas.recvStats.lastE2SARError = res.error().code();
-        // }
+        fec::RsDecodeContext fecDecodeCtx;
 
         while (!reas.threadsStop)
         {
             auto nowT = boost::chrono::steady_clock::now();
 
-            // iterate over threads
             for(auto i = reas.recvThreadState.begin(); i != reas.recvThreadState.end(); ++i)
             {
                 i->evtsInProgressMutex.lock();
+
+                // Sweep timed-out FEC blocks and attempt recovery
+                if (reas.enableFec) {
+                    for (auto bit = i->fecBlocksInProgress.begin(); bit != i->fecBlocksInProgress.end(); ) {
+                        auto &blk = bit->second;
+                        auto inWaiting = nowT - blk->firstSegment;
+                        auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
+
+                        if (inWaiting_ms <= eventTimeout_ms) {
+                            ++bit;
+                            continue;
+                        }
+
+                        uint32_t dataSegsNeeded = 32u - blk->padFrames;
+                        uint32_t dataMask = (dataSegsNeeded == 32u) ? 0xFFFFFFFFu : ((1u << dataSegsNeeded) - 1u);
+                        uint32_t dataPresent = blk->dataReceived & dataMask;
+                        uint32_t dataMissing = dataSegsNeeded - __builtin_popcount(dataPresent);
+
+                        auto eventKey = std::make_pair(blk->eventNum, blk->dataId);
+                        auto eit = i->eventsInProgress.find(eventKey);
+
+                        bool recovered = false;
+
+                        if (dataMissing > 0 && dataMissing <= 8 && fecDecodeCtx.initialized) {
+                            // Identify which columns have missing segments
+                            std::set<int> damagedCols;
+                            for (uint32_t s = 0; s < dataSegsNeeded; ++s) {
+                                if (!(dataPresent & (1u << s)))
+                                    damagedCols.insert(static_cast<int>(s / 4u));
+                            }
+
+                            if (damagedCols.size() <= 2 &&
+                                __builtin_popcount(blk->parityReceived) >= static_cast<int>(damagedCols.size()))
+                            {
+                                fec::FecBlockParams params;
+                                params.col_height = blk->colHeight;
+
+                                // Zero out all segments in damaged columns
+                                for (int col : damagedCols) {
+                                    for (int b = 0; b < 4; ++b) {
+                                        uint32_t seg = col * 4 + b;
+                                        if (seg < 32u)
+                                            std::memset(blk->segmentBuf.data() + seg * blk->colHeight,
+                                                        0, blk->colHeight);
+                                    }
+                                }
+
+                                std::vector<uint8_t> cw(params.codeword_buf_size(), 0);
+#if defined(__ARM_NEON)
+                                fec::interleave_neon_tiled(blk->segmentBuf, cw, params);
+#else
+                                fec::interleave(blk->segmentBuf, cw, params);
+#endif
+                                fec::interleave_parity(blk->parityBuf, cw, params);
+
+                                std::vector<int> erasedCols(damagedCols.begin(), damagedCols.end());
+                                int ret = fec::rs_decode(cw, params, erasedCols, fecDecodeCtx);
+
+                                if (ret == 0) {
+#if defined(__ARM_NEON)
+                                    fec::deinterleave_neon(cw, blk->segmentBuf, params);
+#else
+                                    fec::deinterleave(cw, blk->segmentBuf, params);
+#endif
+                                    recovered = true;
+                                    reas.recvStats.fecRecoveries++;
+                                }
+                            }
+                        } else if (dataMissing == 0) {
+                            recovered = true;
+                        }
+
+                        if (recovered && eit != i->eventsInProgress.end()) {
+                            auto &item = eit->second;
+                            size_t maxUserData = blk->colHeight - sizeof(REHdr);
+                            for (uint32_t s = 0; s < dataSegsNeeded; ++s) {
+                                auto *segRe = reinterpret_cast<REHdr*>(
+                                    blk->segmentBuf.data() + s * blk->colHeight);
+                                size_t offset = segRe->get_bufferOffset();
+                                size_t segDataLen = std::min(maxUserData,
+                                    blk->totalEventBytes - offset);
+                                std::memcpy(item->event + offset,
+                                    blk->segmentBuf.data() + s * blk->colHeight + sizeof(REHdr),
+                                    segDataLen);
+                                item->curBytes += segDataLen;
+                            }
+                            item->fecBlocksCompleted++;
+
+                            if (item->fecBlocksCompleted == item->fecBlocksExpected) {
+                                auto ret = reas.enqueue(item);
+                                if (ret == 1) {
+                                    i->logLostEvent(item, true);
+                                    delete[] item->event;
+                                }
+                                item.reset();
+                                i->eventsInProgress.erase(eventKey);
+                                reas.recvStats.eventSuccess++;
+                            }
+                        } else if (!recovered) {
+                            reas.recvStats.fecFailures++;
+                            if (eit != i->eventsInProgress.end()) {
+                                i->logLostEvent(eit->second, false);
+                                delete[] eit->second->event;
+                                eit->second.reset();
+                                i->eventsInProgress.erase(eventKey);
+                            }
+                        }
+
+                        blk.reset();
+                        bit = i->fecBlocksInProgress.erase(bit);
+                    }
+                }
+
+                // Sweep timed-out non-FEC events
                 for (auto it = i->eventsInProgress.begin(); it != i->eventsInProgress.end(); ) {
-                    // we save time by looking at the first segment time of arrival
-                    // this way we avoid querying time on every segment arrival
                     auto inWaiting = nowT - it->second->firstSegment;
                     auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                     if (inWaiting_ms > eventTimeout_ms) {
                         i->logLostEvent(it->second, false);
                         delete[] it->second->event;
-                        // deallocate queue item
                         it->second.reset();
-                        it = i->eventsInProgress.erase(it);  // erase returns the next element (or end())
+                        it = i->eventsInProgress.erase(it);
                     } else {
-                        ++it;  // Just advance the iterator if no deletion
+                        ++it;
                     }
                 }
                 i->evtsInProgressMutex.unlock();
             }
-            // sleep approximately for eventTimeout msecs
             auto until = nowT + boost::chrono::milliseconds(eventTimeout_ms);
             boost::this_thread::sleep_until(until);
         }
         // drain in progress queues in threads
-        for(auto i = reas.recvThreadState.begin(); i != reas.recvThreadState.end(); ++i) 
+        for(auto i = reas.recvThreadState.begin(); i != reas.recvThreadState.end(); ++i)
         {
             for (auto it = i->eventsInProgress.begin(); it != i->eventsInProgress.end(); ) {
                 if (it->second->event != nullptr) {
                     delete[] it->second->event;
                     it->second.reset();
                 }
-                it = i->eventsInProgress.erase(it); 
+                it = i->eventsInProgress.erase(it);
+            }
+            for (auto bit = i->fecBlocksInProgress.begin(); bit != i->fecBlocksInProgress.end(); ) {
+                bit->second.reset();
+                bit = i->fecBlocksInProgress.erase(bit);
             }
         }
     }
@@ -332,11 +448,149 @@ namespace e2sar
                 reas.recvStats.totalPacketsReceived++;
                 reas.recvStats.totalBytesReceived += nbytes;
 
-                // start a new event if offset 0 (check for event number collisions)
-                // or attach to existing event
+                u_int8_t *payload = recvBuffer;
+                ssize_t payloadLen = nbytes;
+
+                if (reas.withLBHeader) {
+                    payload += sizeof(LBHdrU);
+                    payloadLen -= sizeof(LBHdrU);
+                }
+
+                // Check for EC header (FEC-encoded packet)
+                if (reas.enableFec && payloadLen >= static_cast<ssize_t>(sizeof(ECHdr)) &&
+                    payload[0] == 'E' && payload[1] == 'C')
+                {
+                    auto *echdr = reinterpret_cast<ECHdr*>(payload);
+                    if (!echdr->validate()) {
+                        reas.recvStats.badHeaderDiscards++;
+                        free(recvBuffer);
+                        continue;
+                    }
+
+                    auto *rehdr = reinterpret_cast<REHdr*>(payload + sizeof(ECHdr));
+                    if (!rehdr->validate()) {
+                        reas.recvStats.badHeaderDiscards++;
+                        free(recvBuffer);
+                        continue;
+                    }
+
+                    bool isParity = echdr->get_parity();
+                    uint8_t ecFrameNum = echdr->get_ecFrameNum();
+                    uint8_t padFrames = echdr->get_padFrames();
+                    uint16_t colHeight = echdr->get_ecSegmentSize();
+                    uint32_t fecBlockNum = echdr->get_fecBlockNum();
+                    EventNum_t eventNum = rehdr->get_eventNum();
+                    uint16_t dataId = rehdr->get_dataId();
+                    size_t totalEventBytes = rehdr->get_bufferLength();
+
+                    auto blockKey = std::make_tuple(eventNum, dataId, fecBlockNum);
+                    auto eventKey = std::make_pair(eventNum, dataId);
+
+                    evtsInProgressMutex.lock();
+
+                    // Look up or create FEC block state
+                    auto bit = fecBlocksInProgress.find(blockKey);
+                    std::shared_ptr<FecBlockState> blk;
+                    if (bit != fecBlocksInProgress.end()) {
+                        blk = bit->second;
+                    } else {
+                        blk = std::make_shared<FecBlockState>();
+                        blk->padFrames = padFrames;
+                        blk->colHeight = colHeight;
+                        blk->fecBlockNum = fecBlockNum;
+                        blk->eventNum = eventNum;
+                        blk->dataId = dataId;
+                        blk->totalEventBytes = totalEventBytes;
+                        blk->firstSegment = boost::chrono::steady_clock::now();
+                        blk->segmentBuf.resize(32u * colHeight, 0);
+                        blk->parityBuf.resize(8u * colHeight, 0);
+                        fecBlocksInProgress[blockKey] = blk;
+                    }
+
+                    // Look up or create event-level tracking
+                    auto eit = eventsInProgress.find(eventKey);
+                    std::shared_ptr<EventQueueItem> item;
+                    if (eit != eventsInProgress.end()) {
+                        item = eit->second;
+                    } else {
+                        item = std::make_shared<EventQueueItem>();
+                        item->bytes = totalEventBytes;
+                        item->eventNum = eventNum;
+                        item->dataId = dataId;
+                        item->event = new u_int8_t[totalEventBytes];
+                        std::memset(item->event, 0, totalEventBytes);
+                        item->firstSegment = boost::chrono::steady_clock::now();
+                        size_t maxUserData = colHeight - sizeof(REHdr);
+                        size_t numSegs = (totalEventBytes + maxUserData - 1) / maxUserData;
+                        item->fecBlocksExpected = (numSegs + 31) / 32;
+                        eventsInProgress[eventKey] = item;
+                    }
+
+                    evtsInProgressMutex.unlock();
+
+                    // Copy segment data into block staging buffer
+                    u_int8_t *segData = payload + sizeof(ECHdr);
+                    if (isParity) {
+                        segData += sizeof(REHdr);
+                        if (ecFrameNum < 8u && !(blk->parityReceived & (1u << ecFrameNum))) {
+                            std::memcpy(blk->parityBuf.data() + ecFrameNum * colHeight,
+                                        segData, colHeight);
+                            blk->parityReceived |= (1u << ecFrameNum);
+                        }
+                    } else {
+                        if (ecFrameNum < 32u && !(blk->dataReceived & (1u << ecFrameNum))) {
+                            std::memcpy(blk->segmentBuf.data() + ecFrameNum * colHeight,
+                                        segData, colHeight);
+                            blk->dataReceived |= (1u << ecFrameNum);
+                        }
+                    }
+
+                    item->numFragments++;
+                    free(recvBuffer);
+
+                    // Check if this FEC block is fully received (no recovery needed)
+                    uint32_t dataSegsNeeded = 32u - padFrames;
+                    uint32_t dataMask = (dataSegsNeeded == 32u) ? 0xFFFFFFFFu : ((1u << dataSegsNeeded) - 1u);
+                    if (__builtin_popcount(blk->dataReceived & dataMask) == static_cast<int>(dataSegsNeeded)) {
+                        // All data segments received — copy into event buffer
+                        size_t maxUserData = colHeight - sizeof(REHdr);
+                        for (uint32_t i = 0; i < dataSegsNeeded; ++i) {
+                            auto *segRe = reinterpret_cast<REHdr*>(
+                                blk->segmentBuf.data() + i * colHeight);
+                            size_t offset = segRe->get_bufferOffset();
+                            size_t segDataLen = std::min(maxUserData,
+                                totalEventBytes - offset);
+                            std::memcpy(item->event + offset,
+                                blk->segmentBuf.data() + i * colHeight + sizeof(REHdr),
+                                segDataLen);
+                            item->curBytes += segDataLen;
+                        }
+
+                        evtsInProgressMutex.lock();
+                        fecBlocksInProgress.erase(blockKey);
+                        item->fecBlocksCompleted++;
+
+                        if (item->fecBlocksCompleted == item->fecBlocksExpected) {
+                            eventsInProgress.erase(eventKey);
+                            evtsInProgressMutex.unlock();
+
+                            auto ret = reas.enqueue(item);
+                            if (ret == 1) {
+                                logLostEvent(item, true);
+                                delete[] item->event;
+                            }
+                            item.reset();
+                            reas.recvStats.eventSuccess++;
+                        } else {
+                            evtsInProgressMutex.unlock();
+                        }
+                    }
+
+                    continue;
+                }
+
+                // Non-FEC path: parse REHdr directly
                 REHdr *rehdr{nullptr};
-                // for testing we may leave LB header attached, so it needs to be
-                // subtracted
                 if (reas.withLBHeader)
                 {
                     rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdrU));
@@ -350,7 +604,6 @@ namespace e2sar
 
                 if (not rehdr->validate())
                 {
-                    // discard invalid frames, increment counter
                     reas.recvStats.badHeaderDiscards++;
                     free(recvBuffer);
                     continue;
@@ -360,69 +613,45 @@ namespace e2sar
 
                 if (rehdr->get_bufferOffset() == 0)
                 {
-                    // new event - start a new event item and new event buffer 
-                    // since this is done by many threads, can't use object_pool easily
                     item = std::make_shared<EventQueueItem>(rehdr);
-                    // add to in progress map based on <event number, data id> tuple
                     evtsInProgressMutex.lock();
                     eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                     evtsInProgressMutex.unlock();
-                } else 
+                } else
                 {
-                    // try to locate the event in the in progress map
                     evtsInProgressMutex.lock();
                     auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
-                    if (it != eventsInProgress.end()) 
+                    if (it != eventsInProgress.end())
                         item = it->second;
                     else
                     {
-                        // out of order delivery and we haven't seen this event
-                        // start a new event item and new event buffer 
                         item = std::make_shared<EventQueueItem>(rehdr);
-                        // add to in progress map
                         eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
                     }
                     evtsInProgressMutex.unlock();
                 }
 
-
-                // copy segment into event buffer into its proper place 
-                // note that with or without LB header, our REhdr should be set now
-                memcpy(item->event + rehdr->get_bufferOffset(), 
+                memcpy(item->event + rehdr->get_bufferOffset(),
                     reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
 
-                // free the recv buffer
                 free(recvBuffer);
 
-                // count this fragment received (it could be anywhere in the event)
                 item->numFragments++;
-
                 item->curBytes += nbytes;
 
-                // check if this event is completed, if so put on queue
                 if (item->curBytes == item->bytes )
                 {
-                    // remove this item from in progress map
                     evtsInProgressMutex.lock();
-                    // TODO: a bit inefficient as this searches for all keys equal to this.
-                    // If we can get ahold of an iterator in advance we can precisely erase the element
                     eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
                     evtsInProgressMutex.unlock();
 
-                    // queue it up for the user to receive
                     auto ret = reas.enqueue(item);
-                    // event lost on enqueuing
-                    if (ret == 1) 
+                    if (ret == 1)
                     {
-                        // log this lost event
                         logLostEvent(item, true);
-                        // delete event buffer
                         delete[] item->event;
                     }
-                    // deallocate queue item - either we put a copy of the item
-                    // on the queue or we couldn't, either way we release
                     item.reset();
-                    // update statistics
                     reas.recvStats.eventSuccess++;
                 }
             }
@@ -703,6 +932,7 @@ namespace e2sar
         rFlags.withLBHeader = paramTree.get<bool>("data-plane.withLBHeader", rFlags.withLBHeader);
         rFlags.eventTimeout_ms = paramTree.get<int>("data-plane.eventTimeoutMS", rFlags.eventTimeout_ms);
         rFlags.rcvSocketBufSize = paramTree.get<int>("data-plane.rcvSocketBufSize", rFlags.rcvSocketBufSize);
+        rFlags.enableFec = paramTree.get<bool>("data-plane.enableFec", rFlags.enableFec);
         rFlags.epoch_ms = paramTree.get<u_int32_t>("data-plane.epochMS", rFlags.epoch_ms);
         rFlags.period_ms = paramTree.get<u_int16_t>("data-plane.periodMS", rFlags.period_ms);
 

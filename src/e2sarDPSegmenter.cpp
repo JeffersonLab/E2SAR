@@ -400,10 +400,15 @@ namespace e2sar
             {
                 if (not seg.smooth && seg.rateLimit)
                 {
-                    // if rate limiting is enabled, we will use high-res clock for inter-event and inter-frame sleep
                     nowTE = boost::chrono::high_resolution_clock::now();
-                    // convert send rate into inter-event sleep time 
-                    interEventSleepUsec = static_cast<int64_t>(item->bytes*8/(seg.rateGbps * 1000));
+                    size_t wireBytes = item->bytes;
+                    if (enableFec) {
+                        size_t numSegs = (item->bytes + fecMaxUserData - 1) / fecMaxUserData;
+                        size_t numBlocks = (numSegs + 31) / 32;
+                        wireBytes = numSegs * (sizeof(LBECHdr) + fecColHeight)
+                                  + numBlocks * 8 * (sizeof(LBECREHdr) + fecColHeight);
+                    }
+                    interEventSleepUsec = static_cast<int64_t>(wireBytes*8/(seg.rateGbps * 1000));
                 }
                 // round robin through sending sockets
                 seg.roundRobinIndex = (seg.roundRobinIndex + 1) % seg.numSendSockets;

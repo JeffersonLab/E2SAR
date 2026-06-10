@@ -97,3 +97,11 @@ test('DPSyncLiveTests', e2sar_sync_live_test, suite: 'live')
 test('DPSegLiveTests', e2sar_seg_live_test, suite: 'live')
 test('DPReasLiveTests', e2sar_reas_live_test, suite: 'live')
 
+e2sar_fec_bench = executable('e2sar_fec_bench', 'e2sar_fec_bench.cpp',
+                            include_directories: inc,
+                            link_with: libe2sar,
+                            link_args: linker_flags,
+                            cpp_args: ['-std=c++20', '-O3'],
+                            dependencies: [boost_dep, thread_dep, grpc_dep, protobuf_dep,
+                                           fec_interleaver_dep])
+

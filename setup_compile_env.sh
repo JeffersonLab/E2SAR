@@ -1,24 +1,20 @@
 #!/bin/bash
 
-# Update and source this script to setup your environment so meson can find things
-# point wherever gRPC installation is 
+# Update and source this script to setup your environment so meson can find things.
+# Prerequisites: activate the e2sar-dev conda environment before sourcing this script.
+#   conda activate e2sar-dev
 
-# Pay particular attention to where gRPC (likely installed from source) and Boost (possibly
-# installed from source) are located.
+CONDA_ENV=/opt/anaconda3/envs/e2sar-dev
 
-# point to gRPC
-# On Homebrew it is just /opt/homebrew
-GRPC_ROOT=/opt/homebrew
-# to point to Boost 
-# On Homebrew it is just /opt/homebrew
-export BOOST_ROOT=/opt/homebrew
+# All dependencies (gRPC, Boost, protobuf) come from the conda environment.
+export BOOST_ROOT=${CONDA_ENV}
+export PKG_CONFIG_PATH=${CONDA_ENV}/lib/pkgconfig
 
-# point pkg_config and meson to .pc files
-export PKG_CONFIG_PATH=${GRPC_ROOT}/lib/pkgconfig
-# point to bin/ of grpc to find protoc (you may also need to add $HOME/.local/bin for python local installs of meson)
-export PATH=${GRPC_ROOT}/bin:$PATH
-# for MacOS point to lib where grpc and boost compiled artifacts can be
-export DYLD_LIBRARY_PATH=${GRPC_ROOT}/lib:${BOOST_ROOT}/lib
-# for Linux point to lib where grpc and boost compiled artifacts can be
-# for RHEL, also add ${GRPC_ROOT}/lib64
-export LD_LIBRARY_PATH=${GRPC_ROOT}/lib:${BOOST_ROOT}/lib
+# Clear any stale CPPFLAGS/LDFLAGS that could inject conflicting system headers.
+export CPPFLAGS=""
+export LDFLAGS=""
+
+# macOS runtime library path
+export DYLD_LIBRARY_PATH=${CONDA_ENV}/lib
+# Linux runtime library path
+export LD_LIBRARY_PATH=${CONDA_ENV}/lib
