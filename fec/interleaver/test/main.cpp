@@ -6,6 +6,8 @@
 #include <thread>
 #include <chrono>
 
+#include "../../test_vectors/test_vectors.h"
+
 #include "fec/fec_block.h"
 #include "fec/interleaver.h"
 #include "fec/deinterleaver.h"
@@ -794,7 +796,122 @@ static void test_pipeline_combined() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 9 — Performance: scalar vs NEON comparison at col_height = 8192
+// Test 9 — Cross-validation against Python golden reference
+//
+// Checks the scalar C++ implementations against static test vectors generated
+// by fec/test_vectors/generate_test_vectors.py (galois library as ground truth).
+// NEON/magic variants are already validated against scalar in earlier tests,
+// so verifying scalar transitively validates all.
+// ---------------------------------------------------------------------------
+static void test_cross_validation() {
+    section("Cross-validation against Python golden reference");
+
+    // ---- Level 1: single-codeword RS encode ----
+    {
+        fec::FecBlockParams p;
+        p.col_height = 1;
+        const uint32_t cwb = fec::FecBlockParams::CODEWORD_BYTES;
+
+        std::vector<uint8_t> cw(p.codeword_buf_size(), 0u);
+
+        bool all_ok = true;
+        char label[128];
+        for (std::size_t i = 0; i < kRsCwVectorCount; ++i) {
+            const auto& v = kRsCwVectors[i];
+            // All 8 codewords in the buffer get the same data symbols —
+            // we test word 0 (first codeword) for parity.
+            for (uint32_t w = 0; w < p.num_words(); ++w) {
+                uint8_t* c = cw.data() + w * cwb;
+                c[0] = static_cast<uint8_t>((v.data[0] << 4) | v.data[1]);
+                c[1] = static_cast<uint8_t>((v.data[2] << 4) | v.data[3]);
+                c[2] = static_cast<uint8_t>((v.data[4] << 4) | v.data[5]);
+                c[3] = static_cast<uint8_t>((v.data[6] << 4) | v.data[7]);
+                c[4] = 0u;
+            }
+            fec::rs_encode(cw, p);
+
+            uint8_t got_p0 = (cw[4] >> 4) & 0xFu;
+            uint8_t got_p1 =  cw[4]       & 0xFu;
+
+            if (got_p0 != v.parity[0] || got_p1 != v.parity[1]) {
+                std::snprintf(label, sizeof(label),
+                    "L1 vector %zu: parity got {%u,%u} want {%u,%u}",
+                    i, got_p0, got_p1, v.parity[0], v.parity[1]);
+                EXPECT(false, label);
+                all_ok = false;
+            }
+        }
+        if (all_ok) {
+            std::snprintf(label, sizeof(label),
+                "Level 1: all %zu RS codeword vectors pass", kRsCwVectorCount);
+            EXPECT(true, label);
+        }
+    }
+
+    // ---- Level 2: interleave (bit-transpose) ----
+    {
+        bool all_ok = true;
+        char label[128];
+        for (std::size_t i = 0; i < kInterleaveVectorCount; ++i) {
+            const auto& v = kInterleaveVectors[i];
+            fec::FecBlockParams p;
+            p.col_height = v.col_height;
+
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0u);
+            fec::interleave(
+                std::span<const uint8_t>(v.segments, v.seg_len),
+                std::span<uint8_t>(cw),
+                p);
+
+            if (std::memcmp(cw.data(), v.codewords, v.cw_len) != 0) {
+                std::snprintf(label, sizeof(label),
+                    "L2 vector %zu (ch=%u): codeword mismatch", i, v.col_height);
+                EXPECT(false, label);
+                all_ok = false;
+            }
+        }
+        if (all_ok) {
+            std::snprintf(label, sizeof(label),
+                "Level 2: all %zu interleave vectors pass", kInterleaveVectorCount);
+            EXPECT(true, label);
+        }
+    }
+
+    // ---- Level 3: full pipeline (interleave + rs_encode + parity extraction) ----
+    // We test the codeword buffer but not parity extraction yet (deinterleave_parity
+    // is planned; when it exists, add that check here).
+    {
+        bool cw_ok = true;
+        char label[128];
+        for (std::size_t i = 0; i < kPipelineVectorCount; ++i) {
+            const auto& v = kPipelineVectors[i];
+            fec::FecBlockParams p;
+            p.col_height = v.col_height;
+
+            std::vector<uint8_t> cw(p.codeword_buf_size(), 0u);
+            fec::interleave(
+                std::span<const uint8_t>(v.segments, v.seg_len),
+                std::span<uint8_t>(cw),
+                p);
+            fec::rs_encode(std::span<uint8_t>(cw), p);
+
+            if (std::memcmp(cw.data(), v.codewords, v.cw_len) != 0) {
+                std::snprintf(label, sizeof(label),
+                    "L3 vector %zu (ch=%u): codeword mismatch", i, v.col_height);
+                EXPECT(false, label);
+                cw_ok = false;
+            }
+        }
+        if (cw_ok) {
+            std::snprintf(label, sizeof(label),
+                "Level 3: all %zu pipeline vectors pass (codewords)", kPipelineVectorCount);
+            EXPECT(true, label);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test 10 — Performance: scalar vs NEON comparison at col_height = 8192
 // ---------------------------------------------------------------------------
 static void test_performance() {
     section("Performance comparison (col_height = 8192)");
@@ -1017,6 +1134,7 @@ int main() {
     test_rs_encode_metal();
 #endif
     test_pipeline_combined();
+    test_cross_validation();
     test_performance();
 
     std::printf("\n--- Results: %d passed, %d failed ---\n", g_pass, g_fail);
