@@ -104,6 +104,7 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets)
         .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
         .def_readwrite("rateGbps", &Segmenter::SegmenterFlags::rateGbps)
+        .def_readwrite("enableFec", &Segmenter::SegmenterFlags::enableFec)
         .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
     // Constructor-simple
@@ -267,6 +268,7 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)
         .def_readwrite("min_factor", &Reassembler::ReassemblerFlags::min_factor)
         .def_readwrite("max_factor", &Reassembler::ReassemblerFlags::max_factor)
+        .def_readwrite("enableFec", &Reassembler::ReassemblerFlags::enableFec)
         .def("getFromINI", &Reassembler::ReassemblerFlags::getFromINI);
 
     // Constructor-simple
