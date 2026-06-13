@@ -1,0 +1,165 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.5 Chrome/138.0.7204.251 Electron/37.6.1 Safari/537.36" version="28.2.5">
+  <diagram name="Page-1" id="TQ4OTbU2K33YiB5RNhun">
+    <mxGraphModel dx="968" dy="1032" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-1" value="User Message&lt;br&gt;# 1" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="150" y="195" width="120" height="480" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-2" value="User Segment&lt;br&gt;Data 0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="350" y="195" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-4" value="User Segment&lt;br&gt;Data 1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="350" y="235" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-5" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="195" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-6" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="235" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-7" value="&lt;font style=&quot;font-size: 21px;&quot;&gt;&lt;b&gt;...&lt;/b&gt;&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;rotation=0;" parent="1" vertex="1">
+          <mxGeometry x="360" y="275" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-8" value="User Segment&lt;br&gt;Data 31" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="315" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-9" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="315" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="LTL5KZsRPfyIoQULlDHE-47" target="LTL5KZsRPfyIoQULlDHE-12" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="510" y="275" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-12" value="Group of 32&lt;br&gt;Segments forms&lt;br&gt;a single FEC Block&lt;br&gt;(last segment can be&lt;br&gt;shorter than others)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" parent="1" vertex="1">
+          <mxGeometry x="555" y="230" width="130" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-15" value="&lt;font style=&quot;font-size: 21px;&quot;&gt;&lt;b&gt;...&lt;/b&gt;&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;rotation=0;" parent="1" vertex="1">
+          <mxGeometry x="370" y="415" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-16" value="User Segment&lt;br&gt;Data 0" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="515" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-17" value="User Segment&lt;br&gt;Data 1" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="555" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-18" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="515" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-19" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="555" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-20" value="&lt;font style=&quot;font-size: 21px;&quot;&gt;&lt;b&gt;...&lt;/b&gt;&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;rotation=0;" parent="1" vertex="1">
+          <mxGeometry x="360" y="595" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-21" value="User Segment&lt;br&gt;Data 16" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="350" y="635" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-22" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="635" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="LTL5KZsRPfyIoQULlDHE-48" target="LTL5KZsRPfyIoQULlDHE-25" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="510" y="595" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-25" value="Final FEC Block&lt;br&gt;can contain less than&lt;br&gt;32 segments&lt;br&gt;(last segment can be&lt;br&gt;shorter than others)" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" parent="1" vertex="1">
+          <mxGeometry x="550" y="550" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-26" value="User Message&lt;br&gt;# n" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="150" y="715" width="120" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-27" value="User Segment&lt;br&gt;Data 0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="350" y="715" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-28" value="User Segment&lt;br&gt;Data 1" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="755" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-29" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="715" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-30" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="755" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-31" value="&lt;font style=&quot;font-size: 21px;&quot;&gt;&lt;b&gt;...&lt;/b&gt;&lt;/font&gt;" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;rotation=0;" parent="1" vertex="1">
+          <mxGeometry x="360" y="795" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-32" value="User Segment&lt;br&gt;Data 31" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="835" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-33" value="Segment&lt;br&gt;Header" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="835" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="LTL5KZsRPfyIoQULlDHE-49" target="LTL5KZsRPfyIoQULlDHE-36" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="510" y="795" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-36" value="New User Message must&lt;br&gt;always start a new&lt;br&gt;FEC Block" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" parent="1" vertex="1">
+          <mxGeometry x="540" y="765" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-37" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="150" y="195" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-38" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="150" y="235" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-39" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="150" y="715" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-41" value="" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#FFFFFF;" parent="1" vertex="1">
+          <mxGeometry x="230" y="635" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-40" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="150" y="635" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-42" value="" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0;entryDx=0;entryDy=0;" parent="1" source="LTL5KZsRPfyIoQULlDHE-41" target="LTL5KZsRPfyIoQULlDHE-41" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="360" y="815" as="sourcePoint" />
+            <mxPoint x="410" y="765" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-44" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="LTL5KZsRPfyIoQULlDHE-45" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="330" y="925" />
+            </Array>
+            <mxPoint x="555" y="935" as="sourcePoint" />
+            <mxPoint x="330" y="895" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-45" value="Segment Header&lt;br&gt;is added by the&lt;br&gt;application.&lt;br&gt;Segment Header&lt;br&gt;and&lt;br&gt;User Segment Data&lt;br&gt;together are a single&lt;br&gt;FEC protected&lt;br&gt;unit." style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" parent="1" vertex="1">
+          <mxGeometry x="550" y="855" width="130" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-51" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;endArrow=none;endFill=0;startArrow=classic;startFill=1;" parent="1" source="LTL5KZsRPfyIoQULlDHE-46" target="LTL5KZsRPfyIoQULlDHE-50" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="385" y="125" />
+              <mxPoint x="620" y="125" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-46" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;legacyAnchorPoints=0;rotation=-90;" parent="1" vertex="1">
+          <mxGeometry x="375" y="80" width="20" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-47" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;legacyAnchorPoints=0;" parent="1" vertex="1">
+          <mxGeometry x="490" y="195" width="20" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-48" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;legacyAnchorPoints=0;" parent="1" vertex="1">
+          <mxGeometry x="490" y="515" width="20" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-49" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;legacyAnchorPoints=0;" parent="1" vertex="1">
+          <mxGeometry x="490" y="715" width="20" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="LTL5KZsRPfyIoQULlDHE-50" value="Segment Header +&lt;br&gt;User Segment Data&lt;br&gt;together form&lt;br&gt;a FEC Segment" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" parent="1" vertex="1">
+          <mxGeometry x="555" y="145" width="130" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="pDM0AmDeTOebDNy1N0KL-182" value="&lt;font style=&quot;font-size: 20px;&quot;&gt;Mapping from User Message into Segment Headers and User Segment Data&lt;br&gt;Submitted to FEC Block Encoding&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="80" y="40" width="700" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
