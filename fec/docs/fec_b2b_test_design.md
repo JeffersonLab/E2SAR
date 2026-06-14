@@ -13,7 +13,27 @@ This suite adds loss injection and correctness checks.
 
 ---
 
-## Test Architecture
+## Test Infrastructure
+
+### Pipeline Fixtures
+
+| Fixture | MTU | Sockets | Use |
+|---------|-----|---------|-----|
+| `fec_pipeline` | 1500 | 4 | Single-event tests |
+| `fec_pipeline_single_socket` | 1500 | 1 | Multi-event tests with proxy loss keyed by block number |
+| `fec_pipeline_mtu500` | 500 | 1 | MTU variation tests |
+| `fec_pipeline_mtu9000` | 9000 | 1 | MTU variation (jumbo frame) tests |
+
+`mtu_params(mtu)` computes `(col_height, max_user_data, bytes_per_block)` from
+any MTU using the canonical formula:
+
+```python
+col_height    = mtu - 80          # FEC header overhead (IPv4)
+max_user_data = col_height - 20   # RE header embedded in each segment
+bytes_per_block = max_user_data * 32
+```
+
+### Pipeline Architecture
 
 ```
 Segmenter ──UDP──▶ FecUdpProxy ──drop/forward──▶ Reassembler
@@ -81,10 +101,26 @@ At MTU 1500 (IPv4):
 
 ```
 getFecTotalHeaderLength = 20(IP) + 8(UDP) + 16(LB) + 16(EC) + 20(RE) = 80 B
-col_height = 1500 − 80 = 1420 B per segment
-maxUserData = 1420 − 20 (RE header) = 1400 B of user payload per segment
-bytes per full block = 32 × 1400 = 44 800 B
-packets per full block = 32 data + 8 parity = 40 UDP datagrams
+col_height   = 1500 − 80 = 1420 B per segment
+maxUserData  = 1420 − 20 (RE header) = 1400 B of user payload per segment
+bytes/block  = 32 × 1400 = 44 800 B
+packets/block = 32 data + 8 parity = 40 UDP datagrams
+```
+
+At MTU 500 (IPv4):
+
+```
+col_height   = 500 − 80 = 420 B
+maxUserData  = 400 B
+bytes/block  = 32 × 400 = 12 800 B
+```
+
+At MTU 9000 (jumbo, IPv4):
+
+```
+col_height   = 9000 − 80 = 8920 B
+maxUserData  = 8900 B
+bytes/block  = 32 × 8900 = 284 800 B
 ```
 
 ---
@@ -266,6 +302,86 @@ proxy bugs.
 | `test_proxy_counters_no_loss` | 1 full block | none | rx=40, fwd=40, drop=0 |
 | `test_proxy_counters_with_column_loss` | 1 full block | col 3 (4 frames) | rx=40, drop=4, fwd=36 |
 
+### Category A — MTU / Segment Size Variation
+
+Exercise the same recovery logic at MTU 500 (small segments) and MTU 9000
+(jumbo frames).  `mtu_params()` derives correct event sizes so the block
+geometry (8 cols × 4 rows = 32 data segs, 2 parity cols) is identical across
+all MTU values.
+
+| Test | MTU | Event size | Loss | Expected |
+|------|-----|-----------|------|---------|
+| `test_mtu500_no_loss_single_block` | 500 | 12 800 B (1 block) | none | fast path |
+| `test_mtu500_one_col_recoverable` | 500 | 12 800 B | col 0 | `fecRecoveries≥1` |
+| `test_mtu500_two_col_recoverable` | 500 | 12 800 B | cols 2, 5 | `fecRecoveries≥1` |
+| `test_mtu500_three_col_unrecoverable` | 500 | 12 800 B | cols 0, 3, 7 | `fecFailures≥1` |
+| `test_mtu9000_no_loss_single_block` | 9000 | 284 800 B (1 block) | none | fast path |
+| `test_mtu9000_one_col_recoverable` | 9000 | 284 800 B | col 7 | `fecRecoveries≥1` |
+| `test_mtu9000_two_col_recoverable` | 9000 | 284 800 B | cols 0, 4 | `fecRecoveries≥1` |
+| `test_mtu9000_padded_block_recovery` | 9000 | 8 segs (71 200 B) | col 1 | `fecRecoveries≥1` |
+
+### Category B — Block Count Variation
+
+Events spanning 2, 4, and 5 FEC blocks (existing tests cover only 1 and 3).
+
+| Test | Blocks | Event size | Loss | Expected |
+|------|--------|-----------|------|---------|
+| `test_two_block_no_loss` | 2 | 89 600 B | none | fast path |
+| `test_two_block_one_col_loss_each` | 2 | 89 600 B | blk1: col 5 | `fecRecoveries≥1` |
+| `test_four_block_all_clean` | 4 | 179 200 B | none | fast path |
+| `test_four_block_mixed_loss` | 4 | 179 200 B | blk1: col 0; blk3: cols 1,6 | `fecRecoveries≥2` |
+| `test_five_block_one_unrecoverable` | 5 | 224 000 B | blk4: cols 0,3,7 | `fecFailures≥1` |
+
+For recovery tests, at least one block completes via the fast path to anchor the
+event in the reassembler while the lossy block awaits GC.
+
+### Category C — Cross-Block Loss Patterns
+
+Distinct loss patterns applied to every block within a multi-block event.
+Verifies that independent per-block recovery does not contaminate other blocks.
+
+| Test | Blocks | Loss pattern | Expected |
+|------|--------|-------------|---------|
+| `test_all_blocks_one_col_loss` | 3 | blk0: col 0, blk1: col 3, blk2: col 7 | `fecRecoveries≥3` |
+| `test_escalating_loss_across_blocks` | 3 | blk0: 1-col, blk1: 2-col, blk2: clean | `fecRecoveries≥2` |
+| `test_all_blocks_two_col_loss` | 3 | every block: cols 0,7 (max capacity) | `fecRecoveries≥3` |
+| `test_cross_block_mixed_data_parity_loss` | 3 | blk0: col 2 + par 4–7; blk1: col 5 (all parity); blk2: clean | `fecRecoveries≥2` |
+| `test_cross_block_one_fails_rest_recover` | 4 | blk0–2: 1-col each; blk3: cols 0,3,7 | `fecFailures≥1`, `eventSuccess=0` |
+
+### Category D — Interleaved Events of Different Sizes
+
+Multiple events with different block counts through the same pipeline.  Uses
+`fec_pipeline_single_socket` so block numbers are monotonic and the proxy
+correctly applies per-block loss patterns.
+
+| Test | Events (sizes) | Loss | Expected |
+|------|---------------|------|---------|
+| `test_interleaved_different_sizes` | 1-blk, 3-blk, 1-blk | none | all 3 recovered |
+| `test_interleaved_mixed_loss` | 1-blk, 2-blk, 1-blk | evt1 blk0: col 3; evt3 blk0: col 5 | all 3 recovered |
+| `test_interleaved_one_lost` | 1-blk, 1-blk, 1-blk | evt2: cols 0,3,7 | evts 1+3 ok, evt 2 lost |
+| `test_interleaved_padded_and_full` | 8-seg padded, 32-seg full | padded: col 0; full: col 7 | both recovered |
+
+### Category E — Boundary / Edge-Case Event Sizes
+
+Non-aligned event sizes exercising segment padding, block-boundary transitions,
+and partial last segments.
+
+| Test | Event size | Segs | Blocks | Loss | Expected |
+|------|-----------|------|--------|------|---------|
+| `test_block_boundary_33_segments` | 44 801 B | 33 | 2 | none | fast path (both blocks) |
+| `test_block_boundary_33_segs_loss` | 44 801 B | 33 | 2 | blk0: col 2 | blk0 GC recovery, blk1 fast path |
+| `test_non_aligned_event_size` | 10 000 B | 8 (partial last) | 1 | none | fast path |
+| `test_non_aligned_with_recovery` | 10 000 B | 8 | 1 | col 0 | `fecRecoveries≥1` |
+| `test_exactly_one_byte` | 1 B | 1 | 1 | none | fast path |
+
+**Limitation discovered:** When every data segment of a 1-segment tail block is
+dropped (sole data frame lost, only parity arrives), the GC cannot determine
+`totalEventBytes` because that value is read from the RE header carried by data
+packets.  Recovery from a fully-data-dropped padded block is therefore
+impossible even when sufficient parity is present.  The test is designed to
+lose a column from the full block 0 instead, leaving the 1-segment block 1 to
+complete cleanly via fast path.
+
 ---
 
 ## Key Findings and Insights
@@ -335,8 +451,36 @@ starts.
 A 3-block event where blocks 1 and 2 need GC recovery requires the GC to
 process them in the same sweep (possible if both timed out before the sweep
 runs) or across two sweeps (requiring 2 × `eventTimeout_ms`).  Using a polling
-loop with an 8× `eventTimeout_ms` deadline avoids race-sensitive fixed sleeps
+loop with a 16× `eventTimeout_ms` deadline avoids race-sensitive fixed sleeps
 while still bounding the test duration.
+
+### 7. GC Recovery Requires at Least One Data Packet per Block
+
+The GC reads `totalEventBytes` from the RE header embedded in each **data**
+segment.  Parity segments do not carry this field.  If every data segment of a
+block is dropped, the GC cannot determine how large the original event was and
+therefore cannot verify recovery correctness.  `rs_decode` will run and may
+return 0 (no error), but the recovered payload is meaningless because the event
+size is unknown.
+
+This affects any scenario where a block's data-to-pad ratio is 1:31 (a
+1-segment tail block) and that sole data frame is lost.  The test
+`test_block_boundary_33_segs_loss` is designed to avoid this by losing data
+from the full block 0 instead.
+
+### 8. Parity Symbol 1 Cannot Substitute for Symbol 0 in 1-Column Recovery
+
+The GC's parity-availability guard counts segments (`popcount(parityReceived) ≥
+damagedCols.size()`), which passes with as few as 1 segment for a 1-column
+loss.  However, the underlying `rs_decode` call requires a **complete** parity
+symbol (4 consecutive parity segments forming one GF(16) coefficient).
+
+When parity symbol 0 (frames 0–3) is dropped and only symbol 1 (frames 4–7)
+is kept, `rs_decode` returns 0 (success) but writes silently incorrect data for
+the erased column.  The guard does not catch this.  Tests must use complete
+symbol groups {0–3} or {4–7}; mixing across groups produces wrong output without
+any error indication.  (`test_cross_block_mixed_data_parity_loss` uses only
+symbol 0 on each lossy block for exactly this reason.)
 
 ---
 
@@ -357,9 +501,16 @@ pytest test/py_test/test_fec_b2b.py -m fec_b2b -v -k "multiblock"
 pytest test/py_test/test_fec_b2b.py::test_two_column_loss_recoverable -v
 ```
 
-Total suite: 34 tests, ~165 s on macOS with MTU 1500 and `eventTimeout_ms=1000`.
+Total suite: **61 tests**, ~360 s on macOS with `eventTimeout_ms=1000`.
+
+| Fixture / MTU | Approx. time |
+|---------------|-------------|
+| MTU 1500 (most tests) | ~5 s per GC-recovery test |
+| MTU 500 (category A) | ~5 s per GC-recovery test |
+| MTU 9000 (category A) | ~5–10 s per test (larger payloads) |
 
 Fast-path tests (no loss, parity-only loss) return within ~0.1 s of the event
 arriving.  GC-recovery tests return as soon as the GC processes the block,
 typically within 1–2 s of sending.  Unrecoverable tests wait the full deadline
-to confirm the event does not arrive.
+(`RECV_WAIT_S` = 4 s for single-block, `RECV_WAIT_S_MULTIBLOCK` = 16 s for
+multi-block) to confirm the event does not arrive.
