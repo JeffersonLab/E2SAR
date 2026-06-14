@@ -476,7 +476,9 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         .def_readonly("lastE2SARError", &Reassembler::ReportedStats::lastE2SARError)
         .def_readonly("totalPackets", &Reassembler::ReportedStats::totalPackets)
         .def_readonly("totalBytes", &Reassembler::ReportedStats::totalBytes)
-        .def_readonly("badHeaderDiscards", &Reassembler::ReportedStats::badHeaderDiscards);
+        .def_readonly("badHeaderDiscards", &Reassembler::ReportedStats::badHeaderDiscards)
+        .def_readonly("fecRecoveries", &Reassembler::ReportedStats::fecRecoveries)
+        .def_readonly("fecFailures", &Reassembler::ReportedStats::fecFailures);
     reas.def("getStats", &Reassembler::getStats);
 
     // Return type: ip::address - convert to string for Python
