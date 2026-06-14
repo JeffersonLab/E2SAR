@@ -24,6 +24,7 @@
 
 #include <atomic>
 #include <tuple>
+#include <unordered_set>
 
 #include "e2sarError.hpp"
 #include "e2sarUtil.hpp"
@@ -264,6 +265,9 @@ namespace e2sar
                 // Per-thread FEC block tracking
                 boost::unordered_map<std::tuple<EventNum_t, u_int16_t, u_int32_t>,
                     std::shared_ptr<FecBlockState>, FecBlockKeyHash> fecBlocksInProgress;
+                // Completed FEC block keys — used to discard late-arriving parity/data
+                // packets for blocks already assembled by the fast path.
+                std::unordered_set<std::tuple<EventNum_t, u_int16_t, u_int32_t>, FecBlockKeyHash> completedFecBlocks;
                 // mutex for guarding access to events in progress (recv thread, gc thread)
                 boost::mutex evtsInProgressMutex;
                 // thread local instance of events we lost

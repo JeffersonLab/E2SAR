@@ -488,6 +488,13 @@ namespace e2sar
 
                     evtsInProgressMutex.lock();
 
+                    // Discard late-arriving packets for blocks already assembled.
+                    if (completedFecBlocks.count(blockKey)) {
+                        evtsInProgressMutex.unlock();
+                        free(recvBuffer);
+                        continue;
+                    }
+
                     // Look up or create FEC block state
                     auto bit = fecBlocksInProgress.find(blockKey);
                     std::shared_ptr<FecBlockState> blk;
@@ -568,6 +575,7 @@ namespace e2sar
 
                         evtsInProgressMutex.lock();
                         fecBlocksInProgress.erase(blockKey);
+                        completedFecBlocks.insert(blockKey);
                         item->fecBlocksCompleted++;
 
                         if (item->fecBlocksCompleted == item->fecBlocksExpected) {
