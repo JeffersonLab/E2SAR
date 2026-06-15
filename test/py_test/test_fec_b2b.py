@@ -63,12 +63,14 @@ def mtu_params(mtu: int, v6: bool = False) -> tuple:
 # GC thread sleeps eventTimeout_ms between sweeps.
 # Wait 3× the timeout to guarantee the GC has run at least twice after the
 # last packet arrives (once to expire the block, once to attempt recovery).
-EVENT_TIMEOUT_MS = 50
-# Wait window = 200 × EVENT_TIMEOUT_MS so the GC fires 200 times within the
+EVENT_TIMEOUT_MS = 100
+# Wait window = 40 × EVENT_TIMEOUT_MS so the GC fires 40 times within the
 # budget, making tests immune to scheduler jitter under full-suite load.
-RECV_WAIT_S = (EVENT_TIMEOUT_MS * 80) / 1000.0        # 4 seconds
-RECV_WAIT_S_MULTIBLOCK = (EVENT_TIMEOUT_MS * 320) / 1000.0  # 16 seconds
-RECV_WAIT_S_HEAVY = (EVENT_TIMEOUT_MS * 600) / 1000.0  # 30 seconds
+# 100 ms is well above the ~5 ms send time for a 3-block loopback event,
+# so the GC cannot fire before packets arrive.
+RECV_WAIT_S = (EVENT_TIMEOUT_MS * 40) / 1000.0        # 4 seconds
+RECV_WAIT_S_MULTIBLOCK = (EVENT_TIMEOUT_MS * 160) / 1000.0  # 16 seconds
+RECV_WAIT_S_HEAVY = (EVENT_TIMEOUT_MS * 300) / 1000.0  # 30 seconds
 
 # UDP port pool - incremented to avoid TIME_WAIT conflicts between tests
 _port_base = 11000
@@ -625,7 +627,7 @@ def test_multiblock_one_unrecoverable(fec_pipeline):
         2: LossSpec(drop_data_frames=columns_frames(0, 3, 7)),     # 3-col: unrecoverable
     }
     recv, stats = send_recv(seg, reas, proxy, event_data, loss, seed=71,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S)
 
     assert recv is None, "Event should be lost when one block is unrecoverable"
     assert stats.fecFailures >= 1
@@ -1219,7 +1221,7 @@ def test_five_block_one_unrecoverable(fec_pipeline):
         4: LossSpec(drop_data_frames=columns_frames(0, 3, 7)),
     }
     recv, stats = send_recv(seg, reas, proxy, event_data, loss,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S)
 
     assert recv is None
     assert stats.fecFailures >= 1
@@ -1333,7 +1335,7 @@ def test_cross_block_one_fails_rest_recover(fec_pipeline):
         3: LossSpec(drop_data_frames=columns_frames(0, 3, 7)),   # unrecoverable
     }
     recv, stats = send_recv(seg, reas, proxy, event_data, loss,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S)
 
     assert recv is None
     assert stats.fecFailures >= 1
