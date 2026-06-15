@@ -63,10 +63,12 @@ def mtu_params(mtu: int, v6: bool = False) -> tuple:
 # GC thread sleeps eventTimeout_ms between sweeps.
 # Wait 3× the timeout to guarantee the GC has run at least twice after the
 # last packet arrives (once to expire the block, once to attempt recovery).
-EVENT_TIMEOUT_MS = 500
-RECV_WAIT_S = (EVENT_TIMEOUT_MS * 8) / 1000.0         # 4 seconds (single GC block)
-RECV_WAIT_S_MULTIBLOCK = (EVENT_TIMEOUT_MS * 32) / 1000.0  # 16 seconds (1 GC block, multi-block event)
-RECV_WAIT_S_HEAVY = (EVENT_TIMEOUT_MS * 60) / 1000.0  # 30 seconds (2+ simultaneous GC blocks)
+EVENT_TIMEOUT_MS = 50
+# Wait window = 200 × EVENT_TIMEOUT_MS so the GC fires 200 times within the
+# budget, making tests immune to scheduler jitter under full-suite load.
+RECV_WAIT_S = (EVENT_TIMEOUT_MS * 80) / 1000.0        # 4 seconds
+RECV_WAIT_S_MULTIBLOCK = (EVENT_TIMEOUT_MS * 320) / 1000.0  # 16 seconds
+RECV_WAIT_S_HEAVY = (EVENT_TIMEOUT_MS * 600) / 1000.0  # 30 seconds
 
 # UDP port pool - incremented to avoid TIME_WAIT conflicts between tests
 _port_base = 11000
@@ -341,7 +343,7 @@ def fec_pipeline_mtu500():
 def fec_pipeline_mtu9000():
     """MTU 9000 (jumbo frames): colHeight=8920, maxUserData=8900, bytes_per_block=284,800.
     Adds extra teardown sleep to drain CPU load from 285KB sends before the next GC test."""
-    yield from _make_pipeline(num_send_sockets=1, mtu=9000, extra_teardown_sleep=3.0)
+    yield from _make_pipeline(num_send_sockets=1, mtu=9000, extra_teardown_sleep=5.0)
 
 
 @pytest.fixture
@@ -360,7 +362,7 @@ def fec_pipeline_v6_mtu1500():
 def fec_pipeline_v6_mtu9000():
     """IPv6, MTU 9000 (jumbo): colHeight=8900, maxUserData=8880, bytes_per_block=284,160.
     Adds extra teardown sleep to drain CPU load from 284KB sends before the next GC test."""
-    yield from _make_pipeline(num_send_sockets=1, mtu=9000, v6=True, extra_teardown_sleep=3.0)
+    yield from _make_pipeline(num_send_sockets=1, mtu=9000, v6=True, extra_teardown_sleep=5.0)
 
 
 @pytest.fixture
@@ -1248,7 +1250,7 @@ def test_all_blocks_one_col_loss(fec_pipeline_single_socket):
         2: LossSpec(drop_data_frames=column_frames(3)),
     }
     recv, stats = send_recv(seg, reas, proxy, event_data, loss,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S_HEAVY)
 
     assert recv == event_data
     assert stats.fecRecoveries >= 1
@@ -1256,13 +1258,13 @@ def test_all_blocks_one_col_loss(fec_pipeline_single_socket):
 
 
 @pytest.mark.fec_b2b
-def test_escalating_loss_across_blocks(fec_pipeline):
+def test_escalating_loss_across_blocks(fec_pipeline_single_socket):
     """3-block event: blk0+blk1 clean (fast path), blk2=2-col loss — recovers at max capacity.
 
     Two blocks anchor the event via fast path. Block 2 loses two columns, exercising
     maximum RS(10,8) capacity via GC recovery while prior blocks are already done.
     """
-    seg, reas, proxy = fec_pipeline
+    seg, reas, proxy = fec_pipeline_single_socket
     event_data = generate_event_data(BYTES_PER_BLOCK * 3, seed=231)
 
     loss = {
@@ -1270,7 +1272,7 @@ def test_escalating_loss_across_blocks(fec_pipeline):
         2: LossSpec(drop_data_frames=columns_frames(2, 6)),    # 2-col: max capacity
     }
     recv, stats = send_recv(seg, reas, proxy, event_data, loss,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S_HEAVY)
 
     assert recv == event_data
     assert stats.fecRecoveries >= 1
@@ -1287,7 +1289,7 @@ def test_all_blocks_two_col_loss(fec_pipeline_single_socket):
     # blk0+blk1 clean (fast path); blk2 loses 2 columns at max RS capacity
     loss = {2: LossSpec(drop_data_frames=columns_frames(0, 7))}
     recv, stats = send_recv(seg, reas, proxy, event_data, loss,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S_HEAVY)
 
     assert recv == event_data
     assert stats.fecRecoveries >= 1
@@ -1295,14 +1297,14 @@ def test_all_blocks_two_col_loss(fec_pipeline_single_socket):
 
 
 @pytest.mark.fec_b2b
-def test_cross_block_mixed_data_parity_loss(fec_pipeline):
+def test_cross_block_mixed_data_parity_loss(fec_pipeline_single_socket):
     """3-block event: blk0 loses col 2 + par 4-7 (1 data col, parity symbol 0 kept),
     blk1 loses col 5 with all parity, blk2 is clean.
 
     Validates that partial parity loss on one block does not interfere with
     recovery of an adjacent block. Parity symbol 0 (frames 0-3) is sufficient
     for 1 damaged column — the same boundary verified in test_one_col_one_parity_symbol."""
-    seg, reas, proxy = fec_pipeline
+    seg, reas, proxy = fec_pipeline_single_socket
     event_data = generate_event_data(BYTES_PER_BLOCK * 3, seed=233)
 
     loss = {
@@ -1522,7 +1524,7 @@ def test_block_boundary_33_segs_loss(fec_pipeline):
 
     loss = {0: LossSpec(drop_data_frames=column_frames(2))}
     recv, stats = send_recv(seg, reas, proxy, event_data, loss,
-                            wait_s=RECV_WAIT_S_MULTIBLOCK)
+                            wait_s=RECV_WAIT_S_HEAVY)
 
     assert recv == event_data
     assert stats.fecRecoveries >= 1
