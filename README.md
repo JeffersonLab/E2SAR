@@ -250,6 +250,7 @@ $ anaconda upload \
 5. Verify and install (shown for python 3.9, also supported 3.10 and 3.11)
 ```bash
 $ conda search -c ibaldin -i e2sar
+$ conda search 'e2sar[channel=ibaldin, subdir=linux-64]' 
 $ conda install -c ibaldin e2sar python=3.9
 ```
 A quick test script may look like this:
