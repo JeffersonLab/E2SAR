@@ -366,7 +366,7 @@ int main(int argc, char **argv)
     u_int16_t mtu;
     u_int32_t eventSourceId;
     u_int16_t dataId;
-    u_int8_t lbHdrVer;
+    unsigned int lbHdrVer;
     size_t numThreads, numSockets, readThreads;
     float rateGbps;
     int sockBufSize;
@@ -394,7 +394,7 @@ int main(int argc, char **argv)
     opts("mtu,m", po::value<u_int16_t>(&mtu)->default_value(1500), "MTU (default 1500) [s]");
     opts("src", po::value<u_int32_t>(&eventSourceId)->default_value(1234), "Event source (default 1234) [s]");
     opts("dataid", po::value<u_int16_t>(&dataId)->default_value(4321), "Data id (default 4321) [s]");
-    opts("lbhdrversion", po::value<u_int8_t>(&lbHdrVer)->default_value(2), "LB Header version (2 or 3, 2 is default) [s]");
+    opts("lbhdrversion", po::value<unsigned int>(&lbHdrVer)->default_value(2), "LB Header version (2 or 3, 2 is default) [s]");
     opts("threads", po::value<size_t>(&numThreads)->default_value(1), "number of receive threads (defaults to 1) [r]");
     opts("sockets", po::value<size_t>(&numSockets)->default_value(4), "number of send sockets (defaults to 4) [r]");
     opts("rate", po::value<float>(&rateGbps)->default_value(1.0), "send rate in Gbps (defaults to 1.0, negative value means no limit)");

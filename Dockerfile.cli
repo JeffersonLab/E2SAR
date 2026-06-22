@@ -87,6 +87,8 @@ ENV PATH=${E2SARINSTALL}/bin:/usr/local/bin:$PATH
 # Install only runtime dependencies
 RUN apt-get -yq update && \
     apt-get -yq install --no-install-recommends \
+        python3 \
+        python3-pip \
         ca-certificates \
         wget \
         libglib2.0-0 \
@@ -103,6 +105,7 @@ RUN apt-get -yq update && \
         iputils-ping \
 	gdb \
         nano && \
+    pip3 install --break-system-packages scapy && \
     wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && \
     dpkg -i ./boost_grpc.deb && \
     rm -f ./boost_grpc.deb && \
