@@ -38,18 +38,18 @@ namespace e2sar
         /**
          * Get the outgoing interface and its MTU for a given IPv4 or IPv6
          * @param ipaddr - destination IP address string
-         * @return a tuple of interface name and its MTU
+         * @return a tuple of interface name and its MTU and src IP
          */
-        static inline result<boost::tuple<std::string, u_int16_t>> getInterfaceAndMTU(const std::string &ipaddr) 
+        static inline result<boost::tuple<std::string, u_int16_t, ip::address>> getInterfaceAndMTU(const std::string &ipaddr) 
         {
             return getInterfaceAndMTU(ip::make_address(ipaddr));
         }
         /**
          * Get the outgoing interface and its MTU for a given IPv4 or IPv6
          * @param addr - destination IP address object 
-         * @return a tuple of interface name and its MTU
+         * @return a tuple of interface name and its MTU and src IP 
          */
-        static result<boost::tuple<std::string, u_int16_t>> getInterfaceAndMTU(const ip::address &addr);
+        static result<boost::tuple<std::string, u_int16_t, ip::address>> getInterfaceAndMTU(const ip::address &addr);
 
 #endif
         static result<int> getSocketOutstandingBytes(int sockfd) noexcept;
