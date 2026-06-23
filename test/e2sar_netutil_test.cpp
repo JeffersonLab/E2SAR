@@ -39,7 +39,10 @@ BOOST_AUTO_TEST_CASE(NetUtilTest3)
     BOOST_CHECK(!res.has_error());
 
     std::cout << "Outgoing interface to reach " << destination << " is " << res.value().get<0>() << 
-        " and the MTU is " << res.value().get<1>() << std::endl;
+        " and the MTU is " << res.value().get<1>() << " and src address is " << res.value().get<2>() << std::endl;
+
+    BOOST_CHECK(res.value().get<1>() > 0);
+    BOOST_CHECK(!res.value().get<2>().is_unspecified());
     #else
     std::cout << "Skipping test for getting outgoing interface and MTU - platform not supported" << std::endl;
     #endif
