@@ -410,9 +410,10 @@ namespace e2sar
         if (intfRes.has_error())
             return intfRes.error();
 
-        if (intfRes.value().get<2>().s_addr == 0)
+        if (intfRes.value().get<2>().is_unspecified()) {
             // this is a hack - doesn't work with hosts with complex IP configuration
             return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+        }
         else {
             std::vector<ip::address> ret;
             // Source ip::address (v4 or v6) should be attached already 

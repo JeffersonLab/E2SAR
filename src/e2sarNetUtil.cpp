@@ -131,6 +131,7 @@ namespace e2sar
         char src_ip_str[INET6_ADDRSTRLEN]; // long enough for both IPv4 and IPv6
         ip::address srcAddr;
 
+        bool found = false;
         for (; NLMSG_OK(nlh, len); nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_type == NLMSG_DONE)
                 break;
@@ -144,7 +145,6 @@ namespace e2sar
             struct rtmsg *rtm = reinterpret_cast<struct rtmsg*>(NLMSG_DATA(nlh));
             struct rtattr *rta = RTM_RTA(rtm);
             int rta_len = RTM_PAYLOAD(nlh);
-            bool found = false;
 
             // walk RTNETLINK attributes
             for (; RTA_OK(rta, rta_len); rta = RTA_NEXT(rta, rta_len)) {
