@@ -74,9 +74,8 @@ namespace e2sar
     /**
      * Get the outgoing interface and its MTU for a given IPv4 or IPv6
      */
-    result<boost::tuple<std::string, u_int16_t>> NetUtil::getInterfaceAndMTU(const ip::address &addr) 
+    result<boost::tuple<std::string, u_int16_t, ip::address>> NetUtil::getInterfaceAndMTU(const ip::address &addr) 
     {
-        // Untested code from ChatGPT 07/12/24
         struct sockaddr_nl sa{};
         struct {
             struct nlmsghdr nlh;
@@ -123,6 +122,16 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
 
         struct nlmsghdr *nlh = (struct nlmsghdr *)buffer;
+
+        int ifindex = -1;
+        char ifname[IFNAMSIZ];
+        size_t mtu = 0;
+        struct in_addr src_ip4 = {0};
+        struct in6_addr src_ip6 = {0};
+        char src_ip_str[INET6_ADDRSTRLEN]; // long enough for both IPv4 and IPv6
+        ip::address srcAddr;
+
+        bool found = false;
         for (; NLMSG_OK(nlh, len); nlh = NLMSG_NEXT(nlh, len)) {
             if (nlh->nlmsg_type == NLMSG_DONE)
                 break;
@@ -140,18 +149,27 @@ namespace e2sar
             // walk RTNETLINK attributes
             for (; RTA_OK(rta, rta_len); rta = RTA_NEXT(rta, rta_len)) {
                 if (rta->rta_type == RTA_OIF) {
-                    int ifindex = *(int *)RTA_DATA(rta);
-                    char ifname[IFNAMSIZ];
+                    ifindex = *(int *)RTA_DATA(rta);
                     if_indextoname(ifindex, ifname);
-                    
-                    auto mtu = getMTU(ifname);
-                    close(sock);
-                    return boost::make_tuple<std::string, u_int16_t>(ifname, mtu);
+                    mtu = getMTU(ifname);
+                    found = true;
+                } else if (rta->rta_type == RTA_PREFSRC) {
+                    if (addr.is_v6()) {
+                        src_ip6 = *(reinterpret_cast<struct in6_addr*>RTA_DATA(rta));
+                        inet_ntop(AF_INET6, &src_ip6, src_ip_str, sizeof(src_ip_str));
+                    }
+                    else {
+                        src_ip4 = *(reinterpret_cast<struct in_addr*>RTA_DATA(rta));
+                        inet_ntop(AF_INET, &src_ip4, src_ip_str, sizeof(src_ip_str));
+                    }
                 }
             }   
         }
         close(sock);
-        return E2SARErrorInfo{E2SARErrorc::SocketError, "Unrecoverable NETLINK error"};
+        if (found)
+            return boost::make_tuple<std::string, u_int16_t, ip::address>(ifname, mtu, ip::make_address(src_ip_str));
+        else
+            return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to determine outgoing interface"};
     }
 #endif
     result<int> NetUtil::getSocketOutstandingBytes(int sockfd) noexcept {

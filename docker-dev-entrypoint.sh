@@ -3,7 +3,24 @@
 GIT_SSH_KEY_MOUNT=/src/git_ssh_key
 GIT_SSH_KEY=/src/ssh/git_ssh_key
 
-if [[ "$1" == 'setup_src' ]]; then
+if [[ "$1" == 'mount_src' ]]; then
+        WORKSPACE=${WORKSPACE:-/workspace}
+        echo "***** Source expected at ${WORKSPACE}"
+        if [[ ! -d "${WORKSPACE}" ]]; then
+                echo "ERROR: ${WORKSPACE} not found. Mount your source tree with -v \$(pwd):${WORKSPACE}"
+                exit 1
+        fi
+        cd "${WORKSPACE}"
+        if [[ ! -d "build-linux" ]]; then
+                echo "***** Running meson setup (build-linux)"
+                meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix /usr/local build-linux
+        else
+                echo "***** build-linux already configured, skipping meson setup"
+        fi
+        echo "***** Ready. Run: meson compile -C build-linux"
+        exec bash
+
+elif [[ "$1" == 'setup_src' ]]; then
         echo "***** Preparing SSH key"
         # copy to a new file the readonly key and adjust permissions
         mkdir -p /src/ssh

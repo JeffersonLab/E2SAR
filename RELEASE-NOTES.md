@@ -2,6 +2,9 @@
 
 API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2SAR/wiki) and in the [Doxygen site](https://jeffersonlab.github.io/E2SAR-doc/annotated.html). 
 
+## v0.4.0
+- Improved the detection of source address for sender registration - `--autoip` for senders should work reliably now.
+
 ## v0.3.2
 - Fixed Conda packaging
 - Fixed a bug with LB header version specification (u_int8_t which was interpreted as char to unsigned int)
