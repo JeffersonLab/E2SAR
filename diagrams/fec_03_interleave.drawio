@@ -1,0 +1,190 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-interleave" name="Interleave: Segments to Codewords">
+        <mxGraphModel dx="1275" dy="646" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;Diagram 3: Interleave — Segment Buffer → Codeword Buffer&lt;/b&gt;&lt;br&gt;Bit-level transposition: 32 segments × colHeight bytes → 11,360 codewords × 5 bytes" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="15" width="560" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="seg_title" value="&lt;b&gt;segmentBuf&lt;/b&gt; (input)&lt;br&gt;32 rows × 1420 bytes" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="40" width="160" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="bit_labels" value="Within each column group of 4 segs:&lt;br&gt;  seg c×4+0 → bit 3 (MSB) of symbol c&lt;br&gt;  seg c×4+1 → bit 2&lt;br&gt;  seg c×4+2 → bit 1&lt;br&gt;  seg c×4+3 → bit 0 (LSB) of symbol c" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontFamily=Courier New;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="455" width="320" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="byte_idx_note" value="← 1420 bytes (colHeight) →&lt;br&gt;byte 0 ... byte 1419&lt;br&gt;Each byte has 8 bits (MSB-first: bit 7 → word 0)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="90" width="280" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="transform_arrow" value="" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#f8cecc;strokeColor=#b85450;width=20;endSize=8;startSize=0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="310" y="550" as="sourcePoint"/>
+                        <mxPoint x="310" y="610" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="transform_label" value="&lt;b&gt;interleave()&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="570" width="100" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_title" value="&lt;b&gt;codewordBuf&lt;/b&gt; (output)&lt;br&gt;11,360 codewords × 5 bytes = 56,800 bytes" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="620" width="280" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw0" value="CW 0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="665" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw1" value="CW 1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="665" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw2" value="CW 2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="665" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwdots" value="..." style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="668" width="30" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw7" value="CW 7" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="665" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwdots2" value="..." style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="405" y="668" width="30" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwlast" value="CW 11359" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="665" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="byte_cw_note" value="byte_idx 0 of all 32 segs → CW 0..7 (8 words per byte)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="698" width="310" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwdetail_title" value="&lt;b&gt;Single Codeword (5 bytes = 10 GF(16) symbols)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="740" width="340" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwb0" value="Byte 0&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;[S0|S1]&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="775" width="120" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwb1" value="Byte 1&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;[S2|S3]&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="775" width="120" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwb2" value="Byte 2&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;[S4|S5]&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="775" width="120" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwb3" value="Byte 3&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;[S6|S7]&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="775" width="120" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwb4" value="Byte 4&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;[P0|P1]&lt;/font&gt;&lt;br&gt;= 0x00" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="775" width="120" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwb_note" value="S0–S7: 4-bit data symbols (from segments)     P0,P1: parity (zeroed here, filled by RS encode)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="825" width="570" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="mapping_title" value="&lt;b&gt;Mapping for Codeword W&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="70" width="180" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="mapping_detail" value="&lt;font face=&quot;Courier New&quot;&gt;byte_idx  = W / 8&lt;br&gt;bit_shift = 7 − (W % 8)&lt;/font&gt;&lt;br&gt;&lt;br&gt;For each symbol s (0..7):&lt;br&gt;  Extract 1 bit from each of 4 segments in column s&lt;br&gt;  at position &lt;font face=&quot;Courier New&quot;&gt;[seg × colHeight + byte_idx]&lt;/font&gt;, shifted by &lt;font face=&quot;Courier New&quot;&gt;bit_shift&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;nibble_s = (bit from seg s×4+0) &lt;&lt; 3   ← MSB&lt;br&gt;         | (bit from seg s×4+1) &lt;&lt; 2&lt;br&gt;         | (bit from seg s×4+2) &lt;&lt; 1&lt;br&gt;         | (bit from seg s×4+3) &lt;&lt; 0   ← LSB&lt;/font&gt;&lt;br&gt;&lt;br&gt;Pack nibble pairs into bytes:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;cw[0] = (nibble_0 &lt;&lt; 4) | nibble_1&lt;br&gt;cw[1] = (nibble_2 &lt;&lt; 4) | nibble_3&lt;br&gt;cw[2] = (nibble_4 &lt;&lt; 4) | nibble_5&lt;br&gt;cw[3] = (nibble_6 &lt;&lt; 4) | nibble_7&lt;br&gt;cw[4] = 0x00&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=3;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="100" width="360" height="265" as="geometry"/>
+                </mxCell>
+                <mxCell id="example_title" value="&lt;b&gt;Example: Word W=0 (byte_idx=0, bit_shift=7)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="390" width="310" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="example_box" value="Extract bit 7 of byte 0 from all 32 segments:&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;Seg 0[0] bit 7 ─┐&lt;br&gt;Seg 1[0] bit 7 ─┤ → nibble for symbol 0&lt;br&gt;Seg 2[0] bit 7 ─┤   = {b3, b2, b1, b0}&lt;br&gt;Seg 3[0] bit 7 ─┘&lt;br&gt;&lt;br&gt;Seg 4[0] bit 7 ─┐&lt;br&gt;Seg 5[0] bit 7 ─┤ → nibble for symbol 1&lt;br&gt;Seg 6[0] bit 7 ─┤&lt;br&gt;Seg 7[0] bit 7 ─┘&lt;br&gt;    ⋮&lt;br&gt;Seg28[0] bit 7 ─┐&lt;br&gt;Seg29[0] bit 7 ─┤ → nibble for symbol 7&lt;br&gt;Seg30[0] bit 7 ─┤&lt;br&gt;Seg31[0] bit 7 ─┘&lt;/font&gt;&lt;br&gt;&lt;br&gt;Result: CW[0] = 5 bytes encoding 8 nibbles" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=10;rounded=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="415" width="310" height="270" as="geometry"/>
+                </mxCell>
+                <mxCell id="mem_title" value="&lt;b&gt;Memory Layout Relationship&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="710" width="200" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="mem_note" value="&lt;font face=&quot;Courier New&quot;&gt;num_words = colHeight × 8 = 1420 × 8 = 11,360&lt;br&gt;&lt;br&gt;segmentBuf size  = 32 × 1420     = 45,440 B&lt;br&gt;codewordBuf size = 11,360 × 5    = 56,800 B&lt;br&gt;&lt;br&gt;Ratio: codewordBuf / segmentBuf ≈ 1.25×&lt;/font&gt;&lt;br&gt;(25% expansion from parity byte in each codeword)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="735" width="340" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="bitorder_title" value="&lt;b&gt;Bit Ordering (MSB-first)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="870" width="170" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="bitorder" value="Within each segment byte, bits are numbered MSB-first:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;  Bit 7 of byte 0 → word 0&lt;br&gt;  Bit 6 of byte 0 → word 1&lt;br&gt;  Bit 5 of byte 0 → word 2&lt;br&gt;  ...&lt;br&gt;  Bit 0 of byte 0 → word 7&lt;br&gt;  Bit 7 of byte 1 → word 8&lt;br&gt;  ...&lt;br&gt;  Bit 0 of byte 1419 → word 11,359&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=6;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="895" width="340" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="group" vertex="1" connectable="0" parent="1">
+                    <mxGeometry x="40" y="120" width="515" height="326" as="geometry"/>
+                </mxCell>
+                <mxCell id="c0s0" value="Seg 0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c0s1" value="Seg 1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="18" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c0s2" value="Seg 2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="36" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c0s3" value="Seg 3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="54" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c0_label" value="Col 0 → Sym 0" style="text;html=1;align=right;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#6c8ebf;fontStyle=1;" parent="2" vertex="1">
+                    <mxGeometry x="420" y="19" width="95" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1s0" value="Seg 4" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="76" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1s1" value="Seg 5" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="94" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1s2" value="Seg 6" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="112" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1s3" value="Seg 7" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="130" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c1_label" value="Col 1 → Sym 1" style="text;html=1;align=right;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#82b366;fontStyle=1;" parent="2" vertex="1">
+                    <mxGeometry x="420" y="95" width="95" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2s0" value="Seg 8" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="152" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2s1" value="Seg 9" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="170" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2s2" value="Seg 10" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="188" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2s3" value="Seg 11" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="206" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c2_label" value="Col 2 → Sym 2" style="text;html=1;align=right;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#d6b656;fontStyle=1;" parent="2" vertex="1">
+                    <mxGeometry x="420" y="171" width="95" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="dots_cols" value="⋮&amp;nbsp;&amp;nbsp;&amp;nbsp;(columns 3–6: segments 12–27, same pattern)&amp;nbsp;&amp;nbsp;&amp;nbsp;⋮" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="2" vertex="1">
+                    <mxGeometry x="60" y="228" width="330" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="c7s0" value="Seg 28" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="254" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c7s1" value="Seg 29" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="272" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c7s2" value="Seg 30" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="290" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c7s3" value="Seg 31" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;align=center;" parent="2" vertex="1">
+                    <mxGeometry y="308" width="420" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="c7_label" value="Col 7 → Sym 7" style="text;html=1;align=right;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#9673a6;fontStyle=1;" parent="2" vertex="1">
+                    <mxGeometry x="420" y="273" width="95" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="" style="endArrow=none;html=1;entryX=0.046;entryY=0.022;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="2">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="40" y="329.6" as="sourcePoint"/>
+                        <mxPoint x="40.320000000000164" y="-0.004000000000041859" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="4" value="" style="endArrow=none;html=1;entryX=0.046;entryY=0.022;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="2">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="90" y="329" as="sourcePoint"/>
+                        <mxPoint x="90" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="5" value="" style="endArrow=none;html=1;entryX=0.046;entryY=0.022;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="2">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="140" y="327.5" as="sourcePoint"/>
+                        <mxPoint x="140" y="-1.5" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="6" value="" style="verticalLabelPosition=bottom;shadow=0;dashed=0;align=center;html=1;verticalAlign=top;strokeWidth=1;shape=mxgraph.mockup.markup.curlyBrace;whiteSpace=wrap;strokeColor=#999999;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="720" width="600" height="16" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

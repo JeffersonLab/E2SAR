@@ -371,7 +371,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6, realmalloc;
+    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6, realmalloc, enableFec;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -421,6 +421,7 @@ int main(int argc, char **argv)
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
     opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
     opts("realmalloc", po::bool_switch()->default_value(false), "use real mallocs to allocate event buffers, rather than reusing a buffer [s]");
+    opts("fec,F", po::bool_switch(&enableFec)->default_value(false), "enable FEC encoding/decoding (RS(10,8)) [s,r]");
 
 
     po::variables_map vm;
@@ -516,6 +517,7 @@ int main(int argc, char **argv)
     quiet = vm["quiet"].as<bool>();
     dpv6 = vm["dpv6"].as<bool>();
     realmalloc = vm["realmalloc"].as<bool>();
+    enableFec  = vm["fec"].as<bool>();
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
@@ -585,8 +587,10 @@ int main(int argc, char **argv)
                     sflags.lbHdrVersion = lbHdrVer;
                 if (not vm["dpv6"].defaulted())
                     sflags.dpV6 = dpv6;
-            } else {   
-                sflags.useCP = withCP; 
+                if (not vm["fec"].defaulted())
+                    sflags.enableFec = enableFec;
+            } else {
+                sflags.useCP = withCP;
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
@@ -595,6 +599,7 @@ int main(int argc, char **argv)
                 sflags.smooth = smooth;
                 sflags.lbHdrVersion = lbHdrVer;
                 sflags.dpV6 = dpv6;
+                sflags.enableFec = enableFec;
             }
 
             // if using control plane
@@ -633,6 +638,7 @@ int main(int argc, char **argv)
             }
 
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "FEC encoding:                  " << (sflags.enableFec ? "ON" : "OFF") << std::endl;
             std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
@@ -708,7 +714,9 @@ int main(int argc, char **argv)
                     rflags.validateCert = validate;
                 if (not vm["timeout"].defaulted())
                     rflags.eventTimeout_ms = eventTimeoutMS;
-            } else 
+                if (not vm["fec"].defaulted())
+                    rflags.enableFec = enableFec;
+            } else
             {
                 rflags.useCP = withCP;
                 rflags.withLBHeader = not withCP;
@@ -716,8 +724,10 @@ int main(int argc, char **argv)
                 rflags.useHostAddress = preferHostAddr;
                 rflags.validateCert = validate;
                 rflags.eventTimeout_ms = eventTimeoutMS;
+                rflags.enableFec = enableFec;
             }
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
+            std::cout << "FEC decoding:                  " << (rflags.enableFec ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Explicit NUMA memory binding:  " << (numaNode >= 0 ? "ON" : "OFF") << std::endl;
             std::cout << "Event reassembly timeout (ms): " << rflags.eventTimeout_ms << std::endl;

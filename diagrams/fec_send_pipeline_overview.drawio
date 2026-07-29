@@ -1,0 +1,146 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-send-overview" name="FEC Send Pipeline Overview">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;FEC Send Pipeline Overview&lt;/b&gt;&lt;br&gt;(MTU = 1500, IPv4)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="20" width="280" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="event" value="&lt;b&gt;Event Buffer&lt;/b&gt;&lt;br&gt;N bytes (application data)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="90" width="360" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="event" target="partition" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow1_label" value="partition into segments" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=2;" parent="arrow1" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="75" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="partition" value="&lt;b&gt;Partition&lt;/b&gt;&lt;br&gt;numSegs = ⌈N / 1400⌉ segments&lt;br&gt;numBlocks = ⌈numSegs / 32⌉ blocks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;verticalAlign=middle;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="180" width="360" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="partition" target="perblock_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="perblock_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;dashed=1;dashPattern=8 4;strokeWidth=2;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="280" width="720" height="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="perblock_label" value="&lt;b&gt;Per Block&lt;/b&gt; (repeated numBlocks times)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="395" y="285" width="280" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="segbuf" value="&lt;b&gt;segmentBuf&lt;/b&gt;&lt;br&gt;32 × colHeight = 32 × 1420 = 45,440 bytes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="320" width="440" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="seg_detail" value="Each row (1420 B):&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;[REHdr 20B][data ≤1400B][pad 0+B]&lt;/font&gt;&lt;br&gt;&lt;br&gt;Unused rows (padFrames) = all zeros" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=11;rounded=1;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="380" width="250" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="seg_detail_arrow" style="edgeStyle=none;rounded=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;strokeColor=#82b366;" parent="1" source="segbuf" target="seg_detail" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="segbuf" target="cwbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow3_label" value="&lt;b&gt;interleave&lt;/b&gt; (bit transpose)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=0;" parent="arrow3" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="-100" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="il_detail" value="For each word W (0..11359):&lt;br&gt;  byte_idx = W / 8&lt;br&gt;  bit_shift = 7 − (W % 8)&lt;br&gt;Extract 1 bit from each of 32 segs&lt;br&gt;→ 8 nibbles (4-bit GF(16) symbols)&lt;br&gt;→ pack into 4 bytes + 1 zero byte" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="395" y="390" width="220" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwbuf" value="&lt;b&gt;codewordBuf&lt;/b&gt;&lt;br&gt;num_words × 5 = 11,360 × 5 = 56,800 bytes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="510" width="440" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_detail" value="Each codeword (5 bytes = 10 nibbles):&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;B0[S0|S1] B1[S2|S3] B2[S4|S5] B3[S6|S7] B4[P0|P1]&lt;/font&gt;&lt;br&gt;Symbols S0–S7: data (from interleave)&lt;br&gt;Symbols P0–P1: parity (zeroed, then filled by RS)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=10;rounded=1;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="570" width="320" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_detail_arrow" style="edgeStyle=none;rounded=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;strokeColor=#d6b656;" parent="1" source="cwbuf" target="cw_detail" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="cwbuf" target="cwbuf_encoded" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow4_label" value="&lt;b&gt;RS(10,8) encode&lt;/b&gt; over GF(2⁴)&lt;br&gt;(fills byte 4 of each codeword)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;" parent="arrow4" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="-130" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cwbuf_encoded" value="&lt;b&gt;codewordBuf&lt;/b&gt; (encoded)&lt;br&gt;11,360 × 5 = 56,800 bytes (byte 4 now has parity)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="680" width="440" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="cwbuf_encoded" target="parbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow5_label" value="&lt;b&gt;deinterleave_parity&lt;/b&gt;&lt;br&gt;(extract byte 4 bits → 8 segments)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;" parent="arrow5" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="-130" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="parbuf" value="&lt;b&gt;parityBuf&lt;/b&gt;&lt;br&gt;8 × colHeight = 8 × 1420 = 11,360 bytes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="820" width="440" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="par_detail" value="Segs 0–3: bits 3,2,1,0 of parity symbol P0&lt;br&gt;Segs 4–7: bits 3,2,1,0 of parity symbol P1&lt;br&gt;Each seg = 1420 bytes (= colHeight)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#9673a6;fillColor=#e1d5e7;fontSize=10;rounded=1;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="880" width="250" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="par_detail_arrow" style="edgeStyle=none;rounded=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;strokeColor=#9673a6;" parent="1" source="parbuf" target="par_detail" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow6a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;" parent="1" source="parbuf" target="data_pkt" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="630" y="900"/>
+                            <mxPoint x="560" y="900"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow6a_label" value="send 32 data packets&lt;br&gt;(from segmentBuf)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" parent="arrow6a" vertex="1" connectable="0">
+                    <mxGeometry x="0.3" relative="1" as="geometry">
+                        <mxPoint x="-40" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow6b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#9673a6;" parent="1" source="parbuf" target="par_pkt" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="850" y="900"/>
+                            <mxPoint x="920" y="900"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow6b_label" value="send 8 parity packets&lt;br&gt;(from parityBuf)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" parent="arrow6b" vertex="1" connectable="0">
+                    <mxGeometry x="0.3" relative="1" as="geometry">
+                        <mxPoint x="40" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="data_pkt" value="&lt;b&gt;Data Packet&lt;/b&gt; (×32)&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;2&quot;&gt;[IP 20][UDP 8][LBHdrV2 16][ECHdr 16][payload 1420]&lt;/font&gt;&lt;br&gt;&lt;br&gt;UDP payload = LBECHdr(32B) + segmentBuf row(1420B)&lt;br&gt;&lt;b&gt;Wire size: 1480 bytes&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="940" width="320" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="par_pkt" value="&lt;b&gt;Parity Packet&lt;/b&gt; (×8)&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;2&quot;&gt;[IP 20][UDP 8][LBHdrV2 16][ECHdr 16][REHdr 20][parity 1420]&lt;/font&gt;&lt;br&gt;&lt;br&gt;UDP payload = LBECREHdr(52B) + parityBuf row(1420B)&lt;br&gt;&lt;b&gt;Wire size: 1500 bytes (= MTU)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="940" width="340" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="summary" value="&lt;b&gt;Per-block totals:&lt;/b&gt; 40 packets = 32 × 1480 + 8 × 1500 = 47,360 + 12,000 = 59,360 bytes on wire&lt;br&gt;&lt;b&gt;Per-event totals:&lt;/b&gt; numBlocks × 40 packets ≈ ⌈N / 44,800⌉ × 40 packets&lt;br&gt;&lt;b&gt;Overhead:&lt;/b&gt; RS parity adds 25% packet count (8/32); headers add ~4.3% to data, ~5.6% to parity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="1080" width="640" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="sizes_title" value="&lt;b&gt;Key Constants (MTU=1500, IPv4)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="90" width="220" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="sizes" value="colHeight = MTU − 80 = 1420 B&lt;br&gt;maxUserData = colHeight − 20 = 1400 B&lt;br&gt;num_words = colHeight × 8 = 11,360&lt;br&gt;&lt;br&gt;sizeof(REHdr) = 20 B&lt;br&gt;sizeof(LBHdrV2) = 16 B&lt;br&gt;sizeof(ECHdr) = 16 B&lt;br&gt;sizeof(LBECHdr) = 32 B&lt;br&gt;sizeof(LBECREHdr) = 52 B&lt;br&gt;&lt;br&gt;getFecTotalHeaderLength =&lt;br&gt;  IP(20) + UDP(8) + LB(16)&lt;br&gt;  + EC(16) + RE(20) = 80 B" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="120" width="210" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="fec_params_title" value="&lt;b&gt;FEC Parameters&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="340" width="120" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="fec_params" value="RS(10,8) over GF(2⁴)&lt;br&gt;8 data symbols + 2 parity symbols&lt;br&gt;NUM_COLUMNS = 8&lt;br&gt;SEGS_PER_COLUMN = 4&lt;br&gt;NUM_SEGMENTS = 32&lt;br&gt;CODEWORD_BYTES = 5&lt;br&gt;BITS_PER_SYMBOL = 4 (nibble)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=9;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="370" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="bufsizes_title" value="&lt;b&gt;Buffer Sizes (per block)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="510" width="180" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="bufsizes" value="segmentBuf:  32 × 1420 = 45,440 B&lt;br&gt;codewordBuf: 11,360 × 5 = 56,800 B&lt;br&gt;parityBuf:   8 × 1420 = 11,360 B&lt;br&gt;&lt;br&gt;Total working memory per&lt;br&gt;send thread: ~113.6 KB" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="540" width="230" height="105" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

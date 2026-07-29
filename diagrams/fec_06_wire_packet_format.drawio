@@ -1,0 +1,181 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-wire-format" name="Wire Packet Format">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1200" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;Diagram 6: Wire Packet Format&lt;/b&gt;&lt;br&gt;Per block: 32 data packets + 8 parity packets = 40 packets total" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="15" width="420" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="data_title" value="&lt;b&gt;Data Packet&lt;/b&gt; (×32 per block, one per data segment)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="70" width="340" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_ip" value="&lt;b&gt;IPv4&lt;/b&gt;&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="100" width="60" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_udp" value="&lt;b&gt;UDP&lt;/b&gt;&lt;br&gt;8 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="100" width="40" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_lb" value="&lt;b&gt;LBHdrV2&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="100" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_ec" value="&lt;b&gt;ECHdr&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="100" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_payload" value="&lt;b&gt;Segment Payload&lt;/b&gt;&lt;br&gt;colHeight = 1420 B&lt;br&gt;(REHdr + event data + padding)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="100" width="700" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_total_arrow" value="" style="endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#333333;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="60" y="165" as="sourcePoint"/>
+                        <mxPoint x="1020" y="165" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_total_label" value="&lt;b&gt;Total: 20 + 8 + 16 + 16 + 1420 = 1480 bytes&lt;/b&gt; (20 bytes under MTU)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" parent="d_total_arrow" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_udp_payload" value="" style="endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#82b366;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="160" y="180" as="sourcePoint"/>
+                        <mxPoint x="1020" y="180" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_udp_payload_label" value="UDP payload: LBECHdr(32B) + segment data(1420B) = 1452 B" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#82b366;" parent="d_udp_payload" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_pay_rehdr" value="REHdr&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="195" width="50" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_pay_data" value="Event data (≤ 1400 B)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="370" y="195" width="500" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_pay_pad" value="Pad&lt;br&gt;(0+B)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;verticalAlign=middle;align=center;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="870" y="195" width="150" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_pay_note" value="← segmentBuf[i × colHeight .. (i+1)×colHeight − 1] →" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="232" width="310" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="par_title" value="&lt;b&gt;Parity Packet&lt;/b&gt; (×8 per block, one per parity segment)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="275" width="340" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_ip" value="&lt;b&gt;IPv4&lt;/b&gt;&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="305" width="60" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_udp" value="&lt;b&gt;UDP&lt;/b&gt;&lt;br&gt;8 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="305" width="40" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_lb" value="&lt;b&gt;LBHdrV2&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="305" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_ec" value="&lt;b&gt;ECHdr&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="305" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_re" value="&lt;b&gt;REHdr&lt;/b&gt;&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="305" width="70" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_payload" value="&lt;b&gt;Parity Data&lt;/b&gt;&lt;br&gt;colHeight = 1420 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="305" width="630" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_total_arrow" value="" style="endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#333333;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="60" y="370" as="sourcePoint"/>
+                        <mxPoint x="1020" y="370" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="p_total_label" value="&lt;b&gt;Total: 20 + 8 + 16 + 16 + 20 + 1420 = 1500 bytes = MTU (exactly)&lt;/b&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" parent="p_total_arrow" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_udp_payload" value="" style="endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#9673a6;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="160" y="385" as="sourcePoint"/>
+                        <mxPoint x="1020" y="385" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="p_udp_payload_label" value="UDP payload: LBECREHdr(52B) + parity data(1420B) = 1472 B" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#9673a6;" parent="p_udp_payload" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_pay_note" value="← parityBuf[j × colHeight .. (j+1)×colHeight − 1] →" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="395" width="310" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="hdr_title" value="&lt;b&gt;Header Field Details&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="430" width="160" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="lb_detail_title" value="&lt;b&gt;LBHdrV2 (16 bytes)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="460" width="140" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lb_fields" value="&lt;font face=&quot;Courier New&quot;&gt;preamble[2]  = &quot;LB&quot;           (2 B)&lt;br&gt;version      = 2              (1 B)&lt;br&gt;nextProto    = 1 (RE)         (1 B)&lt;br&gt;reserved                      (2 B)&lt;br&gt;entropy      = per-event rand (2 B)&lt;br&gt;eventNum     = timestamp/seq  (8 B)&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=10;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="482" width="290" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec_detail_title" value="&lt;b&gt;ECHdr (16 bytes)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="460" width="130" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec_fields" value="&lt;font face=&quot;Courier New&quot;&gt;magic[2]      = &quot;EC&quot;                  (2 B)&lt;br&gt;version       = 1                    (1 B)&lt;br&gt;nextProto     = 1 (RE follows)       (1 B)&lt;br&gt;dataId                               (2 B)&lt;br&gt;pFrameNum     = [P|frameNum(7b)]     (1 B)&lt;br&gt;rPadFrames    = [R|padFrames(7b)]    (1 B)&lt;br&gt;ecSegmentSize = colHeight (1420)     (2 B)&lt;br&gt;padBytes      = trailing zeros count (2 B)&lt;br&gt;fecBlockNum   = block sequence #     (4 B)&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="482" width="360" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec_p_note" value="&lt;b&gt;P bit:&lt;/b&gt; 0 = data packet, 1 = parity packet&lt;br&gt;&lt;b&gt;frameNum:&lt;/b&gt; 0–31 for data (segment index), 0–7 for parity&lt;br&gt;&lt;b&gt;padFrames:&lt;/b&gt; how many of the 32 slots are empty (= 32 − segsInBlock)&lt;br&gt;&lt;b&gt;padBytes:&lt;/b&gt; zero-padding in last data segment (0 for all others)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="645" width="420" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="re_parity_title" value="&lt;b&gt;REHdr in Parity Packets (20 bytes)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="600" width="250" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="re_parity_fields" value="&lt;font face=&quot;Courier New&quot;&gt;preamble[2]   = {0x10, 0x00}&lt;br&gt;dataId        = source identifier&lt;br&gt;bufferOffset  = 0 (always)&lt;br&gt;bufferLength  = N (total event size)&lt;br&gt;eventNum      = event sequence number&lt;/font&gt;&lt;br&gt;&lt;br&gt;Note: bufferOffset=0 distinguishes parity from data&lt;br&gt;(data packets have progressive offsets 0, 1400, 2800...)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="622" width="320" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="order_title" value="&lt;b&gt;Send Ordering (per block)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="790" width="200" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_d0" value="D0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="820" width="35" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_d1" value="D1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="95" y="820" width="35" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_d2" value="D2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="820" width="35" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_dots1" value="..." style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="170" y="823" width="30" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_d31" value="D31" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="820" width="40" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_p0" value="P0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="820" width="35" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_p1" value="P1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="820" width="35" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_dots2" value="..." style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="823" width="30" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="ord_p7" value="P7" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="820" width="35" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="time_arrow" value="" style="endArrow=classic;html=1;strokeColor=#333333;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="60" y="865" as="sourcePoint"/>
+                        <mxPoint x="395" y="865" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="time_label" value="time →" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontStyle=2;" parent="time_arrow" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="order_note" value="All 32 data packets sent first (sequential by segment index),&lt;br&gt;then all 8 parity packets (sequential by parity segment index).&lt;br&gt;Within a block, all packets share the same entropy and lbEventNum." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="878" width="400" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="compare_title" value="&lt;b&gt;Size Comparison&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="460" width="120" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="compare_box" value="&lt;font face=&quot;Courier New&quot;&gt;Data packet:    60B hdrs + 1420B payload = 1480B&lt;br&gt;Parity packet:  80B hdrs + 1420B payload = 1500B&lt;/font&gt;&lt;br&gt;&lt;br&gt;Why the 20B difference?&lt;br&gt;  Parity packets include an &lt;b&gt;extra REHdr&lt;/b&gt; (20B)&lt;br&gt;  outside the FEC-protected payload so the receiver&lt;br&gt;  can identify which event the parity belongs to&lt;br&gt;  without decoding the parity data itself.&lt;br&gt;&lt;br&gt;  Data packets carry REHdr &lt;i&gt;inside&lt;/i&gt; the segment&lt;br&gt;  payload (FEC-protected), so no outer copy needed.&lt;br&gt;&lt;br&gt;&lt;b&gt;colHeight is sized so parity packets = MTU:&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;  colHeight = MTU − (IP+UDP+LB+EC+RE)&lt;br&gt;           = 1500 − 80 = 1420&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=3;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="485" width="380" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="totals_title" value="&lt;b&gt;Per-Block Wire Totals&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="750" width="160" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="totals_box" value="&lt;font face=&quot;Courier New&quot;&gt;32 data packets  × 1480 B =  47,360 B&lt;br&gt; 8 parity packets × 1500 B =  12,000 B&lt;br&gt;─────────────────────────────────────&lt;br&gt;40 packets total           =  59,360 B&lt;/font&gt;&lt;br&gt;&lt;br&gt;User data per block (max): 32 × 1400 = 44,800 B&lt;br&gt;Overhead: (59,360 − 44,800) / 44,800 = &lt;b&gt;32.5%&lt;/b&gt;&lt;br&gt;  • 25% from parity packets (8/32)&lt;br&gt;  • 7.5% from headers" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=10;rounded=1;arcSize=6;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="775" width="340" height="155" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

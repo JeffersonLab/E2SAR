@@ -11,11 +11,13 @@
 #include "e2sarAffinity.hpp"
 #include "e2sarDPReassembler.hpp"
 
+#ifdef E2SAR_ENABLE_FEC
 #include "fec/fec_block.h"
 #include "fec/interleaver.h"
 #include "fec/deinterleaver.h"
 #include "fec/rs_encode.h"
 #include "fec/rs_decode.h"
+#endif
 
 
 namespace e2sar 
@@ -249,7 +251,9 @@ namespace e2sar
     {
         auto eventTimeout_ms = boost::chrono::milliseconds(reas.eventTimeout_ms);
 
+#ifdef E2SAR_ENABLE_FEC
         fec::RsDecodeContext fecDecodeCtx;
+#endif
 
         while (!reas.threadsStop)
         {
@@ -260,6 +264,7 @@ namespace e2sar
                 i->evtsInProgressMutex.lock();
 
                 // Sweep timed-out FEC blocks and attempt recovery
+#ifdef E2SAR_ENABLE_FEC
                 if (reas.enableFec) {
                     for (auto bit = i->fecBlocksInProgress.begin(); bit != i->fecBlocksInProgress.end(); ) {
                         auto &blk = bit->second;
@@ -370,12 +375,33 @@ namespace e2sar
                         bit = i->fecBlocksInProgress.erase(bit);
                     }
                 }
+#endif // E2SAR_ENABLE_FEC
 
                 // Sweep timed-out non-FEC events
                 for (auto it = i->eventsInProgress.begin(); it != i->eventsInProgress.end(); ) {
                     auto inWaiting = nowT - it->second->firstSegment;
                     auto inWaiting_ms = boost::chrono::duration_cast<boost::chrono::milliseconds>(inWaiting);
                     if (inWaiting_ms > eventTimeout_ms) {
+#ifdef E2SAR_ENABLE_FEC
+                        // FEC events with pending blocks must not be deleted here — the FEC
+                        // block GC (above) handles their completion or loss. Without this
+                        // guard, a multi-block event whose blocks straddle a GC wake-up
+                        // boundary would have block-0 recovered and the event immediately
+                        // deleted before block-1 is processed in the next GC iteration.
+                        if (reas.enableFec && it->second->fecBlocksExpected > 0) {
+                            auto evtNum = it->second->eventNum;
+                            auto dId    = it->second->dataId;
+                            bool hasPending = false;
+                            for (auto &fb : i->fecBlocksInProgress) {
+                                if (std::get<0>(fb.first) == evtNum &&
+                                    std::get<1>(fb.first) == dId) {
+                                    hasPending = true;
+                                    break;
+                                }
+                            }
+                            if (hasPending) { ++it; continue; }
+                        }
+#endif
                         i->logLostEvent(it->second, false);
                         delete[] it->second->event;
                         it->second.reset();
@@ -457,6 +483,7 @@ namespace e2sar
                 }
 
                 // Check for EC header (FEC-encoded packet)
+#ifdef E2SAR_ENABLE_FEC
                 if (reas.enableFec && payloadLen >= static_cast<ssize_t>(sizeof(ECHdr)) &&
                     payload[0] == 'E' && payload[1] == 'C')
                 {
@@ -596,6 +623,7 @@ namespace e2sar
 
                     continue;
                 }
+#endif // E2SAR_ENABLE_FEC
 
                 // Non-FEC path: parse REHdr directly
                 REHdr *rehdr{nullptr};

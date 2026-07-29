@@ -1,0 +1,109 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-deinterleave-parity" name="Parity Extraction (Deinterleave Parity)">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;Diagram 5: Parity Extraction (deinterleave_parity)&lt;/b&gt;&lt;br&gt;Extracts byte 4 of all codewords → 8 parity segments of colHeight (1420) bytes each" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="20" width="560" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="input_title" value="&lt;b&gt;Input: codewordBuf&lt;/b&gt; (11,360 codewords, only byte 4 is read)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="80" width="380" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw0_data" value="B0-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="110" width="50" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw0_par" value="&lt;b&gt;B4&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="110" y="110" width="25" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw1_data" value="B0-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="145" y="110" width="50" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw1_par" value="&lt;b&gt;B4&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="195" y="110" width="25" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw2_data" value="B0-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="110" width="50" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw2_par" value="&lt;b&gt;B4&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="110" width="25" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_dots" value="  ...  " style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="310" y="115" width="50" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwN_data" value="B0-3" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="110" width="50" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwN_par" value="&lt;b&gt;B4&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="410" y="110" width="25" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="byte4_detail" value="Each byte 4: &lt;font face=&quot;Courier New&quot;&gt;[P0 hi-nibble | P1 lo-nibble]&lt;/font&gt;&lt;br&gt;P0 = parity symbol 0 (4 bits)&lt;br&gt;P1 = parity symbol 1 (4 bits)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=10;rounded=1;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="100" width="250" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="transform_arrow" value="" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;width=20;endSize=8;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="260" y="165" as="sourcePoint"/>
+                        <mxPoint x="260" y="225" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="transform_label" value="&lt;b&gt;deinterleave_parity()&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="183" width="155" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="output_title" value="&lt;b&gt;Output: parityBuf&lt;/b&gt; (8 × colHeight = 8 × 1420 = 11,360 bytes)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="230" width="380" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0_group_label" value="&lt;b&gt;Parity Symbol P0 (high nibble)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="255" width="210" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps0" value="Parity Seg 0 — bit 3 (MSB) of P0 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="275" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps1" value="Parity Seg 1 — bit 2 of P0 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="303" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps2" value="Parity Seg 2 — bit 1 of P0 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="331" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps3" value="Parity Seg 3 — bit 0 (LSB) of P0 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="359" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps_size" value="1420 B" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" parent="1" vertex="1">
+                    <mxGeometry x="665" y="310" width="50" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_group_label" value="&lt;b&gt;Parity Symbol P1 (low nibble)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="395" width="200" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps4" value="Parity Seg 4 — bit 3 (MSB) of P1 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="415" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps5" value="Parity Seg 5 — bit 2 of P1 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="443" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps6" value="Parity Seg 6 — bit 1 of P1 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="471" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps7" value="Parity Seg 7 — bit 0 (LSB) of P1 for all words" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="499" width="600" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="map_title" value="&lt;b&gt;Bit Mapping (inverse of interleave)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="555" width="260" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="map_box" value="For each codeword W (0..11,359):&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;  byte_idx  = W / 8&lt;br&gt;  bit_shift = 7 − (W % 8)&lt;/font&gt;&lt;br&gt;&lt;br&gt;Extract parity nibbles from &lt;font face=&quot;Courier New&quot;&gt;codewordBuf[W×5 + 4]&lt;/font&gt;:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;  P0 = (byte4 &gt;&gt; 4) &amp; 0xF    (high nibble)&lt;br&gt;  P1 =  byte4        &amp; 0xF    (low nibble)&lt;/font&gt;&lt;br&gt;&lt;br&gt;Scatter bits into parity segments:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;  parityBuf[0 × colHeight + byte_idx] |= ((P0 &gt;&gt; 3) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;  parityBuf[1 × colHeight + byte_idx] |= ((P0 &gt;&gt; 2) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;  parityBuf[2 × colHeight + byte_idx] |= ((P0 &gt;&gt; 1) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;  parityBuf[3 × colHeight + byte_idx] |= ((P0 &gt;&gt; 0) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;&lt;br&gt;  parityBuf[4 × colHeight + byte_idx] |= ((P1 &gt;&gt; 3) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;  parityBuf[5 × colHeight + byte_idx] |= ((P1 &gt;&gt; 2) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;  parityBuf[6 × colHeight + byte_idx] |= ((P1 &gt;&gt; 1) &amp; 1) &lt;&lt; bit_shift&lt;br&gt;  parityBuf[7 × colHeight + byte_idx] |= ((P1 &gt;&gt; 0) &amp; 1) &lt;&lt; bit_shift&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=3;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="580" width="530" height="265" as="geometry"/>
+                </mxCell>
+                <mxCell id="why_title" value="&lt;b&gt;Why 8 Parity Segments?&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="230" width="170" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="why_box" value="2 parity symbols × 4 bits per symbol = 8 bits&lt;br&gt;&lt;br&gt;Each bit becomes one parity segment:&lt;br&gt;  • Same size as data segments (colHeight bytes)&lt;br&gt;  • Sent as its own UDP packet&lt;br&gt;  • Loss of any one parity segment =&lt;br&gt;    loss of 1 bit from one parity symbol&lt;br&gt;&lt;br&gt;The 8 parity segments map to exactly the&lt;br&gt;same bit-to-symbol structure as data:&lt;br&gt;  4 segs per column × 2 parity columns = 8 segs&lt;br&gt;&lt;br&gt;This symmetry means the receiver uses the&lt;br&gt;same interleave/deinterleave machinery for&lt;br&gt;both data and parity reconstruction." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="255" width="310" height="225" as="geometry"/>
+                </mxCell>
+                <mxCell id="wire_title" value="&lt;b&gt;Relationship to Wire Packets&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="510" width="220" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="wire_box" value="Each of the 8 parity segments becomes the&lt;br&gt;payload of one parity packet on the wire:&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;Parity packet j (j=0..7):&lt;br&gt;  payload = parityBuf[j × colHeight .. (j+1)×colHeight−1]&lt;br&gt;  size    = colHeight = 1420 bytes&lt;/font&gt;&lt;br&gt;&lt;br&gt;Combined with:&lt;br&gt;  • 32 data packets (from segmentBuf)&lt;br&gt;  • 8 parity packets (from parityBuf)&lt;br&gt;  = 40 packets per block" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="535" width="330" height="180" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

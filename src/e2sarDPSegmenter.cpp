@@ -14,10 +14,12 @@
 #include "e2sarNetUtil.hpp"
 #include "e2sarAffinity.hpp"
 
+#ifdef E2SAR_ENABLE_FEC
 #include "fec/fec_block.h"
 #include "fec/interleaver.h"
 #include "fec/deinterleaver.h"
 #include "fec/rs_encode.h"
+#endif
 
 
 namespace e2sar 
@@ -415,7 +417,7 @@ namespace e2sar
 
                 auto rri = seg.roundRobinIndex;
 
-                // FIXME: do something with result? 
+                // NOTE: do we do something with result? 
                 // it IS  taken care by lastErrno in the stats block. 
                 // Note that in the case of liburing
                 // result cannot reflect the status of any of the send
@@ -424,6 +426,7 @@ namespace e2sar
                 // and reflects into the stats block
                 boost::asio::post(threadPool,
                     [this, rri, item, interFrameSleepUsec]() {
+#ifdef E2SAR_ENABLE_FEC
                         if (enableFec) {
                             auto res = _sendWithFec(item->event, item->bytes,
                                 item->eventNum, item->dataId,
@@ -433,6 +436,7 @@ namespace e2sar
                             delete item;
                             return;
                         }
+#endif
 #ifdef LIBURING_AVAILABLE
                         if (Optimizations::isSelected(Optimizations::Code::liburing_send))
                             seg.ringMtxs[rri].lock();
@@ -886,6 +890,7 @@ namespace e2sar
         return numBuffers * 0;
     }
 
+#ifdef E2SAR_ENABLE_FEC
     result<int> Segmenter::SendThreadState::_sendWithFec(u_int8_t *event, size_t bytes,
         EventNum_t eventNum, u_int16_t dataId, u_int16_t entropy, size_t roundRobinIndex)
     {
@@ -1049,6 +1054,7 @@ namespace e2sar
         seg.eventsInCurrentSync++;
         return 0;
     }
+#endif // E2SAR_ENABLE_FEC
 
     // in Linux use an ioctl to read socket send buffer state
     // otherwise just close
@@ -1086,12 +1092,14 @@ namespace e2sar
 
         roundRobinIndex = (roundRobinIndex + 1) % numSendSockets;
 
+#ifdef E2SAR_ENABLE_FEC
         if (sendThreadState.enableFec) {
             return sendThreadState._sendWithFec(event, bytes,
                 userEventNum++,
                 (_dataId == 0 ? dataId : _dataId),
                 entropy, roundRobinIndex);
         }
+#endif
 
         return sendThreadState._send(event, bytes,
             userEventNum++,
