@@ -15,6 +15,12 @@
 
 #include "e2sar.hpp"
 
+#ifdef E2SAR_ENABLE_FEC
+static constexpr bool kFecAvailable = true;
+#else
+static constexpr bool kFecAvailable = false;
+#endif
+
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 using namespace e2sar;
@@ -421,7 +427,9 @@ int main(int argc, char **argv)
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
     opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
     opts("realmalloc", po::bool_switch()->default_value(false), "use real mallocs to allocate event buffers, rather than reusing a buffer [s]");
-    opts("fec,F", po::bool_switch(&enableFec)->default_value(false), "enable FEC encoding/decoding (RS(10,8)) [s,r]");
+    opts("fec,F", po::bool_switch(&enableFec)->default_value(false),
+        kFecAvailable ? "enable FEC encoding/decoding (RS(10,8)) [s,r]"
+                      : "enable FEC encoding/decoding (RS(10,8)) [s,r] [not compiled in — rebuild with -Denable_fec=true]");
 
 
     po::variables_map vm;
@@ -518,6 +526,11 @@ int main(int argc, char **argv)
     dpv6 = vm["dpv6"].as<bool>();
     realmalloc = vm["realmalloc"].as<bool>();
     enableFec  = vm["fec"].as<bool>();
+    if (enableFec && !kFecAvailable) {
+        std::cerr << "Warning: --fec has no effect; library was built without FEC support "
+                     "(rebuild with -Denable_fec=true)" << std::endl;
+        enableFec = false;
+    }
 
     if (not autoIP and (vm["ip"].as<std::string>().length() == 0))
     {
