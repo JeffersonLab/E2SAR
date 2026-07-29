@@ -99,6 +99,12 @@ endif
 
 add_project_arguments(f'-DE2SAR_VERSION="' + meson.project_version() + '"', language:['cpp'])
 
+# FEC support (off by default; enable with -Denable_fec=true)
+enable_fec = get_option('enable_fec')
+if enable_fec
+    add_project_arguments('-DE2SAR_ENABLE_FEC', language: ['cpp'])
+endif
+
 # -Wall
 warning_level=1
 #add_project_arguments('-Wall -Wno-deprecated-declarations', language: ['cpp'])
@@ -136,7 +142,9 @@ lb_proto_dir = '../udplbd2/proto/loadbalancer'
 lb_proto = lb_proto_dir + '/loadbalancer.proto'
 
 # subdirectories
-subdir('fec')
+if enable_fec
+    subdir('fec')
+endif
 subdir('include')
 subdir('src')
 subdir('test')
@@ -167,5 +175,6 @@ summary({
 
 summary({
   'Build type': get_option('buildtype'),
-  'C++ standard': get_option('cpp_std'),  # c++20 required by FEC interleaver (std::span)
+  'C++ standard': get_option('cpp_std'),
+  'FEC enabled': enable_fec,
 }, section: 'Configuration')
