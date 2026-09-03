@@ -441,7 +441,7 @@ namespace e2sar
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
                     epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0},
-                    reportStats{false} {}
+                    reportStats{true} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
