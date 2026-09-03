@@ -4,6 +4,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 
 ## v0.4.0
 - Improved the detection of source address for sender registration - `--autoip` for senders should work reliably now.
+- Added SegmenterFlags.eventQueueSize parameter (still defaults to 2047) which governs the size of the queue from which the events are sent out. In case of a host running out of RAM, reduce this.
 
 ## v0.3.2
 - Fixed Conda packaging

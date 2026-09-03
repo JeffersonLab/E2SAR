@@ -77,9 +77,6 @@ namespace e2sar
             // which LB header version are we using
             const u_int8_t lbHdrVersion;
 
-            // Max size of internal queue holding events to be sent. 
-            static constexpr size_t QSIZE{2047};
-
             // size of CQE batch we peek
             static constexpr unsigned cqeBatchSize{100};
 
@@ -98,7 +95,7 @@ namespace e2sar
             };
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
-            boost::lockfree::queue<EventQueueItem*, boost::lockfree::fixed_sized<true>> eventQueue{QSIZE};
+            boost::lockfree::queue<EventQueueItem*, boost::lockfree::fixed_sized<true>> eventQueue;
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
@@ -354,6 +351,8 @@ namespace e2sar
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
              * IP, UDP and LBRE headers). Value of 0 means auto-detect based on MTU of outgoing interface
              * - Linux only {1500}
+             * - eventQueueSize - sie of the queue used to send events. Default 2047 is generous, but
+             * in a situation where events are large and fast-coming, can overwhelm the host RAM.
              * - numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
@@ -376,6 +375,7 @@ namespace e2sar
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
+                size_t eventQueueSize;
                 size_t numSendSockets;
                 int sndSocketBufSize;
                 float rateGbps;
@@ -386,7 +386,7 @@ namespace e2sar
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
+                    eventQueueSize{2047}, numSendSockets{4},sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
                     multiPort{false}, ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
                 /**
                  * Initialize flags from an INI file

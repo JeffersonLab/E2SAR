@@ -36,6 +36,7 @@ namespace e2sar
         smooth{sflags.smooth},
         multiPort{sflags.multiPort},
         lbHdrVersion{sflags.lbHdrVersion},
+        eventQueue{sflags.eventQueueSize},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
         ringMtxs(sflags.numSendSockets),
@@ -991,6 +992,8 @@ namespace e2sar
             sFlags.multiPort);
         sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion", 
             sFlags.lbHdrVersion);
+        sFlags.eventQueueSize = paramTree.get<size_t>("data-plane.eventQueueSize",
+            sFlags.eventQueueSize);
 
         return sFlags;
     }
