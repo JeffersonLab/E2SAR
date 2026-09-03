@@ -66,7 +66,7 @@ COPY . /src/
 
 # create a build configuration and compile
 RUN PATH=$HOME/.local/bin:/usr/local/bin:$PATH BOOST_ROOT=/usr/local/ LD_LIBRARY_PATH=${LD_LIBRARY_PATH} \
-    meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} --prefix ${E2SARINSTALL} build && \
+    meson setup -Dpkg_config_path=${PKG_CONFIG_PATH} -Denable_fec=true --prefix ${E2SARINSTALL} build && \
     sed -i 's/-std=c++11//g' build/build.ninja && \
     meson compile -C build -j 2 && \
     meson install -C build
