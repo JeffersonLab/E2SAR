@@ -2,7 +2,7 @@
 
 Be sure to set PYTHONPATH and E2SARCONFIGDIR variables like so, for example:
 ```
-$ export PYTHONPATH=/home/ubuntu/E2SAR/build/src/pybind
+$ export PYTHONPATH=/home/ubuntu/E2SAR/build/src/pybind:/home/ubuntu/E2SAR/src/python
 $ export E2SARCONFIGDIR=/home/ubuntu/E2SAR/test/py_test
 ```
 The former points to .so with Python bindings, the latter to a directory with .INI files for segmenter_config.ini and reassembler_config.ini

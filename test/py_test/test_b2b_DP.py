@@ -44,7 +44,6 @@ def get_reassembler():
     reas_uri = e2sar_py.EjfatURI(uri=REAS_URI_, tt=e2sar_py.EjfatURI.TokenType.instance)
     rflags = e2sar_py.DataPlane.Reassembler.ReassemblerFlags()
     rflags.useCP = False  # turn off CP. Default value is True
-    rflags.withLBHeader = True  # LB header will be attached since there is no LB
     #rflags.eventTimeout_ms = 4500 # make sure event timeout is long enough to receive events
     return e2sar_py.DataPlane.Reassembler(
         reas_uri, e2sar_py.IPAddress.from_string(DP_IPV4_ADDR), DP_IPV4_PORT, 1, rflags)

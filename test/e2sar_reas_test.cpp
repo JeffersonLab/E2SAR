@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.withLBHeader = true; // LB header will be attached since there is no LB
+
 
         ip::address loopback = ip::make_address("127.0.0.1");
         u_int16_t listen_port = 10000;
@@ -203,7 +203,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.withLBHeader = true; // LB header will be attached since there is no LB
+
 
         ip::address loopback = ip::make_address("127.0.0.1");
         u_int16_t listen_port = 10000;
@@ -462,7 +462,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.withLBHeader = true; // LB header will be attached since there is no LB
+
         rflags.portRange = 2;
 
         ip::address loopback = ip::make_address("127.0.0.1");

@@ -22,3 +22,6 @@ libe2sar = static_library('e2sar',
 
 # The pybind
 subdir('pybind')
+
+# High-level Python package (pure Python ergonomics layer)
+subdir('python')

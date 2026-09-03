@@ -412,8 +412,6 @@ namespace e2sar
              * then the number of ports matches either the number of CPU cores or the number of threads. Normally
              * this value is calculated based on the number of cores or threads requested, but
              * it can be overridden here. Use with caution. {-1}
-             * - withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
-             * normal operation); slaved to useCP {not useCP}
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              * - rcvSocketBufSize - socket buffer size for receiving set via SO_RCVBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.rmem_max) to be higher. {3MB}
@@ -434,14 +432,13 @@ namespace e2sar
                 float Ki, Kp, Kd, setPoint;
                 u_int32_t epoch_ms;
                 int portRange; 
-                bool withLBHeader;
                 int eventTimeout_ms;
-                int rcvSocketBufSize; 
+                int rcvSocketBufSize;
                 float weight, min_factor, max_factor;
                 bool reportStats;
                 ReassemblerFlags(): useCP{true}, useHostAddress{false},
-                    period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
-                    epoch_ms{1000}, portRange{-1}, withLBHeader{not useCP}, eventTimeout_ms{500},
+                    period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.},
+                    epoch_ms{1000}, portRange{-1}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0},
                     reportStats{true} {}
                 /**
