@@ -754,7 +754,6 @@ int main(int argc, char **argv)
             }
 
             rflags.useCP = withCP;
-            rflags.withLBHeader = not withCP;
             rflags.rcvSocketBufSize = sockBufSize;
             rflags.useHostAddress = preferHostAddr;
             rflags.validateCert = validate;

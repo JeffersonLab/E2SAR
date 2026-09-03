@@ -413,7 +413,7 @@ namespace e2sar
              * this value is calculated based on the number of cores or threads requested, but
              * it can be overridden here. Use with caution. {-1}
              * - withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
-             * normal operation) {false}
+             * normal operation); slaved to useCP {not useCP}
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              * - rcvSocketBufSize - socket buffer size for receiving set via SO_RCVBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.rmem_max) to be higher. {3MB}
@@ -422,6 +422,8 @@ namespace e2sar
              * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
              * - max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
              * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
+             * - reportStats - report additional statistics when the worker call control plane with PID values {true}. Should
+             * only be set to false for older control planes if it causes problems.
              */
             struct ReassemblerFlags 
             {
@@ -439,7 +441,7 @@ namespace e2sar
                 bool reportStats;
                 ReassemblerFlags(): useCP{true}, useHostAddress{false},
                     period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
-                    epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
+                    epoch_ms{1000}, portRange{-1}, withLBHeader{not useCP}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0},
                     reportStats{true} {}
                 /**

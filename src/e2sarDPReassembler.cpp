@@ -700,7 +700,8 @@ namespace e2sar
 
         // data plane
         rFlags.portRange = paramTree.get<int>("data-plane.portRange", rFlags.portRange);
-        rFlags.withLBHeader = paramTree.get<bool>("data-plane.withLBHeader", rFlags.withLBHeader);
+        // flag being obsoleted
+        rFlags.withLBHeader = not rFlags.useCP;
         rFlags.eventTimeout_ms = paramTree.get<int>("data-plane.eventTimeoutMS", rFlags.eventTimeout_ms);
         rFlags.rcvSocketBufSize = paramTree.get<int>("data-plane.rcvSocketBufSize", rFlags.rcvSocketBufSize);
         rFlags.epoch_ms = paramTree.get<u_int32_t>("data-plane.epochMS", rFlags.epoch_ms);

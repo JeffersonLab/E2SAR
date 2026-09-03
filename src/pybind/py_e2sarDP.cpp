@@ -267,7 +267,6 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         .def_readwrite("setPoint", &Reassembler::ReassemblerFlags::setPoint)
         .def_readwrite("epoch_ms", &Reassembler::ReassemblerFlags::epoch_ms)
         .def_readwrite("portRange", &Reassembler::ReassemblerFlags::portRange)
-        .def_readwrite("withLBHeader", &Reassembler::ReassemblerFlags::withLBHeader)
         .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms)
         .def_readwrite("rcvSocketBufSize", &Reassembler::ReassemblerFlags::rcvSocketBufSize)
         .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)

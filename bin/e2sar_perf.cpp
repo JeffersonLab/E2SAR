@@ -698,7 +698,6 @@ int main(int argc, char **argv)
                 if (not vm["withcp"].defaulted())
                 {
                     rflags.useCP = withCP;
-                    rflags.withLBHeader = not withCP;
                 }
                 if (not vm["bufsize"].defaulted()) 
                     rflags.rcvSocketBufSize = sockBufSize;
@@ -711,7 +710,6 @@ int main(int argc, char **argv)
             } else 
             {
                 rflags.useCP = withCP;
-                rflags.withLBHeader = not withCP;
                 rflags.rcvSocketBufSize = sockBufSize;
                 rflags.useHostAddress = preferHostAddr;
                 rflags.validateCert = validate;
