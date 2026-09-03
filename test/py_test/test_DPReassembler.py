@@ -39,7 +39,6 @@ def init_reassembler():
     assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
     flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
 
     assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
 
@@ -77,7 +76,6 @@ def test_reas_constructor_core_list():
     assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
     flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
 
     assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
 
@@ -97,7 +95,6 @@ def test_reas_constructor_core_list_auto_data_ip():
     assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
     flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
 
     assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
 
@@ -140,7 +137,6 @@ def test_get_data_ip():
     assert res.has_error() is False, f"Error: {res.error().message}"
     flags = res.value()
     flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
 
     assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
 
@@ -168,7 +164,6 @@ def test_get_lost_event():
     assert res.has_error() is False
     flags = res.value()
     flags.useCP = False  # turn off CP. Default value is True
-    flags.withLBHeader = True  # LB header will be attached since there is no LB
 
     assert isinstance(flags, rflags), "ReassemblerFlags object creation failed! "
 
