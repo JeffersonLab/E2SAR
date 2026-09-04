@@ -456,6 +456,21 @@ namespace e2sar
                     reas.recvStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
+                // validate the length since it will silently cap it to the system max
+                int actualBufSize{0};
+                socklen_t lenActualBufSize = sizeof(actualBufSize);
+                if (getsockopt(socketFd, SOL_SOCKET, SO_RCVBUF, &actualBufSize, &lenActualBufSize) < 0) {
+                    close(socketFd);
+                    reas.recvStats.dataErrCnt++;
+                    reas.recvStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // we ignore Linux doubling the returned value, because MacOS doesn't double
+                if (reas.rcvSocketBufSize > actualBufSize) {
+                    close(socketFd);
+                    reas.recvStats.dataErrCnt++;
+                    return E2SARErrorInfo{E2SARErrorc::MemoryError, "System socket buffer set too low for this receive socket buffer size"};
+                }
 
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
@@ -483,6 +498,21 @@ namespace e2sar
                     reas.recvStats.dataErrCnt++;
                     reas.recvStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // validate the length since it will silently cap it to the system max
+                int actualBufSize{0};
+                socklen_t lenActualBufSize = sizeof(actualBufSize);
+                if (getsockopt(socketFd, SOL_SOCKET, SO_RCVBUF, &actualBufSize, &lenActualBufSize) < 0) {
+                    close(socketFd);
+                    reas.recvStats.dataErrCnt++;
+                    reas.recvStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // we ignore Linux doubling the returned value, because MacOS doesn't double
+                if (reas.rcvSocketBufSize > actualBufSize) {
+                    close(socketFd);
+                    reas.recvStats.dataErrCnt++;
+                    return E2SARErrorInfo{E2SARErrorc::MemoryError, "System socket buffer set too low for this receive socket buffer size"};
                 }
 
                 sockaddr_in dataAddrStruct4{};

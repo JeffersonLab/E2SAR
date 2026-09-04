@@ -7,6 +7,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Added SegmenterFlags.eventQueueSize parameter (still defaults to 2047) which governs the size of the queue from which the events are sent out. In case of a host running out of RAM, reduce this.
 - Modified the default ReassemblerFlags.reportStats to be true (it was set to false for compatibility reasons with older CPs, however doesn't seem relevant anymore; in the future this flag will be deprecated)
 - Deprecated ReassemblerFlags.withLBHeader - the field has been removed, instead the logic uses the useCP flag to determine whether to expect (useCP==false) or not to expect (useCP==true) the LB header in the received packets.
+- Added checks in Segmenter and Reassembler to make sure the requested send or receive buffer size is actually honored (error is raised if the OS didn't accept it). Previous behavior was to silently succeed even if the OS allocated a smaller buffer.
 
 ## v0.3.2
 - Fixed Conda packaging
