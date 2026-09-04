@@ -10,7 +10,8 @@ pybind11_src = [
     'py_e2sarDP.cpp',
     'py_e2sarHeaders.cpp',
     'py_e2sarUtil.cpp',
-    'py_e2sarAffinity.cpp'
+    'py_e2sarAffinity.cpp',
+    'py_e2sarNetUtil.cpp'
     ]
 
 # check the version of Python by looking for python executable

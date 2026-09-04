@@ -172,6 +172,48 @@ namespace e2sar
             return E2SARErrorInfo{E2SARErrorc::SystemError, "Unable to determine outgoing interface"};
     }
 #endif
+    bool NetUtil::isNonRoutable(const std::string &addr_str) noexcept
+    {
+        try
+        {
+            auto addr = ip::make_address(addr_str);
+
+            if (addr.is_loopback() || addr.is_unspecified())
+                return true;
+
+            if (addr.is_v4())
+            {
+                auto bytes = addr.to_v4().to_bytes();
+                return (bytes[0] == 10) ||
+                       (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+                       (bytes[0] == 192 && bytes[1] == 168) ||
+                       (bytes[0] == 169 && bytes[1] == 254);
+            }
+
+            if (addr.is_v6())
+            {
+                auto v6 = addr.to_v6();
+                if (v6.is_v4_mapped())
+                    return isNonRoutable(ip::make_address_v4(ip::v4_mapped, v6).to_string());
+                auto bytes = v6.to_bytes();
+                return ((bytes[0] & 0xfe) == 0xfc) ||
+                       (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80);
+            }
+        }
+        catch (...)
+        {
+        }
+        return false;
+    }
+
+    bool NetUtil::isNonRoutable(const std::vector<std::string> &addrs) noexcept
+    {
+        for (const auto &a : addrs)
+            if (isNonRoutable(a))
+                return true;
+        return false;
+    }
+
     result<int> NetUtil::getSocketOutstandingBytes(int sockfd) noexcept {
         int outstanding = 0;
         int res = 0;

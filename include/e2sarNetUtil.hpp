@@ -53,6 +53,17 @@ namespace e2sar
 
 #endif
         static result<int> getSocketOutstandingBytes(int sockfd) noexcept;
+
+        /**
+         * Check if an IP address string is non-routable (private RFC1918, loopback,
+         * link-local, IPv6 ULA, or unspecified). Returns false on parse failure.
+         */
+        static bool isNonRoutable(const std::string &addr_str) noexcept;
+
+        /**
+         * Check if any address in the vector is non-routable.
+         */
+        static bool isNonRoutable(const std::vector<std::string> &addrs) noexcept;
     };
 }
 #endif

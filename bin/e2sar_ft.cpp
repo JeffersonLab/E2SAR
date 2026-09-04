@@ -647,6 +647,8 @@ int main(int argc, char **argv)
                 // register senders
                 if (not autoIP)
                 {
+                    if (NetUtil::isNonRoutable(sndrcvIP))
+                        std::cerr << "WARNING: '" << sndrcvIP << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
                     senders.push_back(sndrcvIP);
                     for (auto s: senders)
                         std::cout << s << " ";
@@ -765,6 +767,9 @@ int main(int argc, char **argv)
             std::cout << "Event reassembly timeout (ms): " << rflags.eventTimeout_ms << std::endl;
 
             try {
+                if (not autoIP and rflags.useCP and NetUtil::isNonRoutable(sndrcvIP))
+                    std::cerr << "WARNING: '" << sndrcvIP << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
+
                 if (vm.count("cores"))
                 {
                     if (not autoIP)
