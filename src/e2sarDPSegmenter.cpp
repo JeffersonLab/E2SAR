@@ -1,4 +1,5 @@
 #include <sys/ioctl.h>
+#include <limits.h>
 
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
@@ -866,21 +867,33 @@ namespace e2sar
         if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
         {
             // send using vector of msg_hdrs via sendmmsg
-            seg.sendStats.msgCnt += numBuffers;
-            // this is a blocking version so send everything or error out
-            err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
+            // Note that sendmmsg mmsgvec has a typical limit of 1024 (IOV_MAX)
+            // so we may need several calls to sendmmsg to send everything out.
+            size_t sentOut{0};
+            size_t numBuffersThisBatch{0};
+            while(sentOut < numBuffers)
+            {
+                numBuffersThisBatch = (numBuffers - sentOut > IOV_MAX ? IOV_MAX : numBuffers - sentOut);
+                // this is a blocking version so send everything or error out
+                err = (int) sendmmsg(sendSocket, &mmsgvec[sentOut], numBuffersThisBatch, 0);
+                if (err < 0)
+                    break;
+                sentOut += err;
+                if (err != (int)numBuffersThisBatch)
+                    break;
+            }
+
             // free up mmsgvec and included headers and iovecs
             for(size_t i = 0; i < numBuffers; i++)
             {
                 free(mmsgvec[i].msg_hdr.msg_iov[0].iov_base);
                 free(mmsgvec[i].msg_hdr.msg_iov);
             }
+            seg.sendStats.msgCnt += sentOut;
             free(mmsgvec);
-            // sendmmsg returns the number of updated mmsgvec[i].msg_len entries
-            if (err != (int)numBuffers)
+            if (sentOut != numBuffers)
             {
-                seg.sendStats.errCnt += numBuffers - err;
-                // don't override with ESUCCESS
+                seg.sendStats.errCnt += numBuffers - sentOut;
                 if (errno != 0)
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
