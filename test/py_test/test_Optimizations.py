@@ -25,6 +25,7 @@ def test_code_enum():
     assert int(opt.Code.sendmmsg) == 1
     assert int(opt.Code.liburing_send) == 2
     assert int(opt.Code.liburing_recv) == 3
+    assert int(opt.Code.recvmmsg) == 4
     assert int(opt.Code.unknown) == 15
 
 
@@ -35,6 +36,7 @@ def test_to_word():
     assert opt.toWord(opt.Code.sendmmsg) == 1 << int(opt.Code.sendmmsg)
     assert opt.toWord(opt.Code.liburing_send) == 1 << int(opt.Code.liburing_send)
     assert opt.toWord(opt.Code.liburing_recv) == 1 << int(opt.Code.liburing_recv)
+    assert opt.toWord(opt.Code.recvmmsg) == 1 << int(opt.Code.recvmmsg)
     assert opt.toWord(opt.Code.unknown) == 1 << int(opt.Code.unknown)
 
 
@@ -45,6 +47,7 @@ def test_to_string():
     assert opt.toString(opt.Code.sendmmsg) == "sendmmsg"
     assert opt.toString(opt.Code.liburing_send) == "liburing_send"
     assert opt.toString(opt.Code.liburing_recv) == "liburing_recv"
+    assert opt.toString(opt.Code.recvmmsg) == "recvmmsg"
     assert opt.toString(opt.Code.unknown) == "unknown"
 
 
@@ -55,6 +58,7 @@ def test_from_string():
     assert opt.fromString("sendmmsg") == opt.Code.sendmmsg
     assert opt.fromString("liburing_send") == opt.Code.liburing_send
     assert opt.fromString("liburing_recv") == opt.Code.liburing_recv
+    assert opt.fromString("recvmmsg") == opt.Code.recvmmsg
     assert opt.fromString("random_invalid") == opt.Code.unknown
 
 

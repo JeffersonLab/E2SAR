@@ -1,4 +1,5 @@
 #include <sys/ioctl.h>
+#include <limits.h>
 
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
@@ -36,6 +37,7 @@ namespace e2sar
         smooth{sflags.smooth},
         multiPort{sflags.multiPort},
         lbHdrVersion{sflags.lbHdrVersion},
+        eventQueue{sflags.eventQueueSize},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
         ringMtxs(sflags.numSendSockets),
@@ -531,6 +533,21 @@ namespace e2sar
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
                 }
+                // validate the length since it will silently cap it to the system max
+                int actualBufSize{0};
+                socklen_t lenActualBufSize = sizeof(actualBufSize);
+                if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &actualBufSize, &lenActualBufSize) < 0) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // we ignore Linux doubling the returned value, because MacOS doesn't double
+                if (seg.sndSocketBufSize > actualBufSize) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    return E2SARErrorInfo{E2SARErrorc::MemoryError, "System socket buffer set too low for this send socket buffer size"};
+                }
 
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
@@ -607,6 +624,21 @@ namespace e2sar
                     seg.sendStats.errCnt++;
                     seg.sendStats.lastErrno = errno;
                     return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // validate the length since it will silently cap it to the system max
+                int actualBufSize{0};
+                socklen_t lenActualBufSize = sizeof(actualBufSize);
+                if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &actualBufSize, &lenActualBufSize) < 0) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    seg.sendStats.lastErrno = errno;
+                    return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
+                }
+                // we ignore Linux doubling the returned value, because MacOS doesn't double
+                if (seg.sndSocketBufSize > actualBufSize) {
+                    close(fd);
+                    seg.sendStats.errCnt++;
+                    return E2SARErrorInfo{E2SARErrorc::MemoryError, "System socket buffer set too low for this send socket buffer size"};
                 }
 
                 sockaddr_in dataAddrStruct4{};
@@ -835,21 +867,33 @@ namespace e2sar
         if (Optimizations::isSelected(Optimizations::Code::sendmmsg))
         {
             // send using vector of msg_hdrs via sendmmsg
-            seg.sendStats.msgCnt += numBuffers;
-            // this is a blocking version so send everything or error out
-            err = (int) sendmmsg(sendSocket, mmsgvec, numBuffers, 0);
+            // Note that sendmmsg mmsgvec has a typical limit of 1024 (IOV_MAX)
+            // so we may need several calls to sendmmsg to send everything out.
+            size_t sentOut{0};
+            size_t numBuffersThisBatch{0};
+            while(sentOut < numBuffers)
+            {
+                numBuffersThisBatch = (numBuffers - sentOut > IOV_MAX ? IOV_MAX : numBuffers - sentOut);
+                // this is a blocking version so send everything or error out
+                err = (int) sendmmsg(sendSocket, &mmsgvec[sentOut], numBuffersThisBatch, 0);
+                if (err < 0)
+                    break;
+                sentOut += err;
+                if (err != (int)numBuffersThisBatch)
+                    break;
+            }
+
             // free up mmsgvec and included headers and iovecs
             for(size_t i = 0; i < numBuffers; i++)
             {
                 free(mmsgvec[i].msg_hdr.msg_iov[0].iov_base);
                 free(mmsgvec[i].msg_hdr.msg_iov);
             }
+            seg.sendStats.msgCnt += sentOut;
             free(mmsgvec);
-            // sendmmsg returns the number of updated mmsgvec[i].msg_len entries
-            if (err != (int)numBuffers)
+            if (sentOut != numBuffers)
             {
-                seg.sendStats.errCnt += numBuffers - err;
-                // don't override with ESUCCESS
+                seg.sendStats.errCnt += numBuffers - sentOut;
                 if (errno != 0)
                     seg.sendStats.lastErrno = errno;
                 return E2SARErrorInfo{E2SARErrorc::SocketError, strerror(errno)};
@@ -991,6 +1035,8 @@ namespace e2sar
             sFlags.multiPort);
         sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion", 
             sFlags.lbHdrVersion);
+        sFlags.eventQueueSize = paramTree.get<size_t>("data-plane.eventQueueSize",
+            sFlags.eventQueueSize);
 
         return sFlags;
     }

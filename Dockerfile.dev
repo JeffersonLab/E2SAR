@@ -4,34 +4,34 @@
 # Single-stage development container for E2SAR - contains compiler, debugger and other tools
 #
 
-FROM ubuntu:24.04 AS base
+FROM --platform=linux/amd64 ubuntu:24.04 AS base
 
 ENV DISTRO=ubuntu24
 ENV HOME=/home/ubuntu
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PATH=/usr/local/bin:$PATH
-ENV DEPSVER=0.3.0
-ENV DEPSDEB=e2sar-deps_${DEPS_VER}_amd64.deb
+ENV DEPSVER=0.3.2
+ENV DEPSDEB=e2sar-deps_${DEPSVER}_amd64.deb
+ENV BOOST_ROOT=/usr/local
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 
 RUN apt-get -yq update && apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev libsystemd-dev protobuf-compiler libre2-dev gdb curl git vim
 
-RUN pip3 install pybind11 scapy meson
-
-RUN apt-get install git-lfs && git lfs install 
+RUN pip3 install --break-system-packages pybind11 scapy meson
 
 #
 # Stage 'compile'
 #
-FROM base AS compile
+FROM --platform=linux/amd64 base AS compile
 
 WORKDIR /src
 
 COPY ./docker-dev-entrypoint.sh /src/docker-dev-entrypoint.sh
 
 # download and install boost and grpc deps
-RUN curl -Ls https://github.com/JeffersonLab/E2SAR/releases/download/E2SAR-main-$DEPSVER-ubuntu-24.04/$DEPSDEB > $DEPSDEB  
+RUN curl -Ls https://github.com/JeffersonLab/E2SAR/releases/download/E2SAR-$DEPSVER-main-ubuntu-24.04/$DEPSDEB > $DEPSDEB
 RUN dpkg -i $DEPSDEB
 
 ENTRYPOINT ["/src/docker-dev-entrypoint.sh"]
 
-CMD ["setup_src"]
+CMD ["bash"]

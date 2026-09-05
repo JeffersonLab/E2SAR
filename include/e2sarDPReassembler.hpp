@@ -255,6 +255,8 @@ namespace e2sar
                 result<int> _close();
                 // thread loop
                 void _threadBody();
+                // process a single packet
+                void _processPacket(u_int8_t* , ssize_t, bool);
 
                 // log a lost event and add to lost queue for external inspection
                 // boolean flag discriminates between enqueue losses (true)
@@ -341,6 +343,7 @@ namespace e2sar
             SendStateThreadState sendStateThreadState;
             bool useCP; // for debugging we may not want to have CP running
             bool reportStats; // report worker stats in sendState thread (usually false)
+            unsigned int rcvIovecSize; // size of iovec vector when recvmmsg is used
             // global thread stop signal
             bool threadsStop{false};
 
@@ -412,8 +415,6 @@ namespace e2sar
              * then the number of ports matches either the number of CPU cores or the number of threads. Normally
              * this value is calculated based on the number of cores or threads requested, but
              * it can be overridden here. Use with caution. {-1}
-             * - withLBHeader - expect LB header to be included (mainly for testing, as normally LB strips it off in
-             * normal operation) {false}
              * - eventTimeout_ms - how long (in ms) we allow events to remain in assembly before we give up {500}
              * - rcvSocketBufSize - socket buffer size for receiving set via SO_RCVBUF setsockopt. Note
              * that this requires systemwide max set via sysctl (net.core.rmem_max) to be higher. {3MB}
@@ -422,6 +423,9 @@ namespace e2sar
              * for example, 4 nodes with a minFactor of 0.5 = (512 slots / 4) * 0.5 = min 64 slots
              * - max_factor - multiplied with the number of slots that would be assigned evenly to determine max number of slots
              * for example, 4 nodes with a maxFactor of 2 = (512 slots / 4) * 2 = max 256 slots set to 0 to specify no maximum
+             * - reportStats - report additional statistics when the worker call control plane with PID values {true}. Should
+             * only be set to false for older control planes if it causes problems.
+             * - recvIovecSize - if using recvmmsg optimization, this is the size of iovec vector to accept packets {100, max 1024}
              */
             struct ReassemblerFlags 
             {
@@ -432,16 +436,16 @@ namespace e2sar
                 float Ki, Kp, Kd, setPoint;
                 u_int32_t epoch_ms;
                 int portRange; 
-                bool withLBHeader;
                 int eventTimeout_ms;
-                int rcvSocketBufSize; 
+                int rcvSocketBufSize;
                 float weight, min_factor, max_factor;
                 bool reportStats;
+                unsigned int rcvIovecSize;
                 ReassemblerFlags(): useCP{true}, useHostAddress{false},
-                    period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.}, 
-                    epoch_ms{1000}, portRange{-1}, withLBHeader{false}, eventTimeout_ms{500},
+                    period_ms{100}, validateCert{true}, Ki{0.}, Kp{0.}, Kd{0.}, setPoint{0.},
+                    epoch_ms{1000}, portRange{-1}, eventTimeout_ms{500},
                     rcvSocketBufSize{1024*1024*3}, weight{1.0}, min_factor{0.5}, max_factor{2.0},
-                    reportStats{false} {}
+                    reportStats{true}, rcvIovecSize{100} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

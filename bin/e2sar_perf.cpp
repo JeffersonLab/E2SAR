@@ -379,6 +379,7 @@ int main(int argc, char **argv)
     std::vector<std::string> optimizations;
     int numaNode;
     int eventTimeoutMS;
+    unsigned int rcvIovecSize;
 
     // define a simple clog-based logger
     defineClogLogger();
@@ -414,13 +415,14 @@ int main(int argc, char **argv)
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
-    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
+    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s,r]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
     opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
     opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
     opts("realmalloc", po::bool_switch()->default_value(false), "use real mallocs to allocate event buffers, rather than reusing a buffer [s]");
+    opts("rcviovecsize", po::value<unsigned int>(&rcvIovecSize)->default_value(100), "if using recvmmsg optimization, this many packets will be received at once [r]");
 
 
     po::variables_map vm;
@@ -447,6 +449,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "period");
         conflicting_options(vm, "ipv4", "ipv6");
         conflicting_options(vm, "send", "quiet");
+        conflicting_options(vm, "send", "rcviovecsize");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -607,6 +610,8 @@ int main(int argc, char **argv)
                 // register senders
                 if (not autoIP)
                 {
+                    if (NetUtil::isNonRoutable(sndrcvIP))
+                        std::cerr << "WARNING: '" << sndrcvIP << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
                     senders.push_back(sndrcvIP);
                     for (auto s: senders)
                         std::cout << s << " ";
@@ -698,7 +703,6 @@ int main(int argc, char **argv)
                 if (not vm["withcp"].defaulted())
                 {
                     rflags.useCP = withCP;
-                    rflags.withLBHeader = not withCP;
                 }
                 if (not vm["bufsize"].defaulted()) 
                     rflags.rcvSocketBufSize = sockBufSize;
@@ -708,14 +712,16 @@ int main(int argc, char **argv)
                     rflags.validateCert = validate;
                 if (not vm["timeout"].defaulted())
                     rflags.eventTimeout_ms = eventTimeoutMS;
+                if (not vm["rcviovecsize"].defaulted())
+                    rflags.rcvIovecSize = rcvIovecSize;
             } else 
             {
                 rflags.useCP = withCP;
-                rflags.withLBHeader = not withCP;
                 rflags.rcvSocketBufSize = sockBufSize;
                 rflags.useHostAddress = preferHostAddr;
                 rflags.validateCert = validate;
                 rflags.eventTimeout_ms = eventTimeoutMS;
+                rflags.rcvIovecSize = rcvIovecSize;
             }
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
@@ -724,6 +730,9 @@ int main(int argc, char **argv)
             std::cout << "Will run for:                  " << (durationSec ? std::to_string(durationSec) + " sec": "until Ctrl-C") << std::endl;
 
             try {
+
+                if (not autoIP and rflags.useCP and NetUtil::isNonRoutable(sndrcvIP))
+                    std::cerr << "WARNING: '" << sndrcvIP << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
 
                 if (vm.count("cores"))
                 {

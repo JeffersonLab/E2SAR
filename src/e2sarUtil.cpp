@@ -4,6 +4,7 @@
 #include <set>
 #include <cstdlib>
 #include <boost/url.hpp>
+#include <boost/asio.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include "e2sarUtil.hpp"
@@ -26,7 +27,7 @@ namespace e2sar
     const std::vector<Optimizations::Code> Optimizations::available {
         Optimizations::Code::none
 #ifdef SENDMMSG_AVAILABLE
-        , Optimizations::Code::sendmmsg
+        , Optimizations::Code::sendmmsg, Optimizations::Code::recvmmsg, 
 #endif
 #ifdef LIBURING_AVAILABLE
         , Optimizations::Code::liburing_send, Optimizations::Code::liburing_recv
@@ -95,9 +96,10 @@ namespace e2sar
         }
 
         // check for conflict
-        if (isSelected(Code::sendmmsg) and
-            (isSelected(Code::liburing_recv) or 
-            isSelected(Code::liburing_send)))
+        if ((isSelected(Code::sendmmsg) and 
+            isSelected(Code::liburing_send)) or
+            (isSelected(Code::recvmmsg) and
+            isSelected(Code::liburing_recv)))
         {
             inst->selected_optimizations = toWord(Code::none);
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
@@ -409,7 +411,17 @@ namespace e2sar
         if (intfRes.has_error())
             return intfRes.error();
 
-        return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+        if (intfRes.value().get<2>().is_unspecified()) {
+            // this is a hack - doesn't work with hosts with complex IP configuration
+            return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+        }
+        else {
+            std::vector<ip::address> ret;
+            // Source ip::address (v4 or v6) should be attached already 
+            ret.push_back(intfRes.value().get<2>());
+            return ret;
+        }
+
 #else
         return E2SARErrorInfo{E2SARErrorc::SystemError, "Capability to determine outgoing address not supported on this platform"};
 #endif

@@ -104,6 +104,12 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         .def_readwrite("numSendSockets", &Segmenter::SegmenterFlags::numSendSockets)
         .def_readwrite("sndSocketBufSize", &Segmenter::SegmenterFlags::sndSocketBufSize)
         .def_readwrite("rateGbps", &Segmenter::SegmenterFlags::rateGbps)
+        .def_readwrite("warmUpMs", &Segmenter::SegmenterFlags::warmUpMs)
+        .def_readwrite("eventQueueSize", &Segmenter::SegmenterFlags::eventQueueSize)
+        .def_readwrite("smooth", &Segmenter::SegmenterFlags::smooth)
+        .def_readwrite("multiPort", &Segmenter::SegmenterFlags::multiPort)
+        .def_readwrite("ticksAsREEventNum", &Segmenter::SegmenterFlags::ticksAsREEventNum)
+        .def_readwrite("lbHdrVersion", &Segmenter::SegmenterFlags::lbHdrVersion)
         .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);
 
     // Constructor-simple
@@ -261,12 +267,12 @@ void init_e2sarDP_reassembler(py::module_ &m) {
         .def_readwrite("setPoint", &Reassembler::ReassemblerFlags::setPoint)
         .def_readwrite("epoch_ms", &Reassembler::ReassemblerFlags::epoch_ms)
         .def_readwrite("portRange", &Reassembler::ReassemblerFlags::portRange)
-        .def_readwrite("withLBHeader", &Reassembler::ReassemblerFlags::withLBHeader)
         .def_readwrite("eventTimeout_ms", &Reassembler::ReassemblerFlags::eventTimeout_ms)
         .def_readwrite("rcvSocketBufSize", &Reassembler::ReassemblerFlags::rcvSocketBufSize)
         .def_readwrite("weight", &Reassembler::ReassemblerFlags::weight)
         .def_readwrite("min_factor", &Reassembler::ReassemblerFlags::min_factor)
         .def_readwrite("max_factor", &Reassembler::ReassemblerFlags::max_factor)
+        .def_readwrite("reportStats", &Reassembler::ReassemblerFlags::reportStats)
         .def("getFromINI", &Reassembler::ReassemblerFlags::getFromINI);
 
     // Constructor-simple

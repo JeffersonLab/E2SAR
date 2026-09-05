@@ -163,28 +163,61 @@ Using `snifgen.py` also requires using `host` network driver if receiving live t
 
 ### Development Docker
 
-We provide another Docker image which allows development inside the running container. It includes all necessary dependencies for a given version of E2SAR. VSCode can be attached to it to ease the development. 
+We provide a Docker image (`Dockerfile.dev`) that runs as `linux/amd64` and includes all build dependencies for a given E2SAR release. It supports two workflows: live development against a locally-mounted source tree, and fully self-contained development inside the container. VSCode can be attached to either for an IDE experience.
 
-To build this image (Dockerfile.dev) use the following command:
-```
-$ docker build -t <username>/<repo>:<version> -t <username>/<repo>:latest -f Dockerfile.dev .
+Build the image once (or after any change to `Dockerfile.dev`):
+```bash
+$ docker buildx build --platform linux/amd64 -f Dockerfile.dev -t e2sar-dev:latest .
 ```
 
-This docker image expects that user's GitHub SSH key is mounted read-only when it is started in order to be able to checkout the code. It also expects an optional E2SAR branch indicator as shown:
+#### Workflow A: mount local source tree (recommended for active development)
+
+This workflow mounts your checked-out source tree into the container. Edits made on the host are immediately visible inside the container without rebuilding the image. Build artifacts are stored in a Docker-managed named volume (`e2sar-build`) so the Linux filesystem is used rather than the host filesystem, keeping rebuilds fast.
+
+```bash
+$ docker run --platform linux/amd64 -it \
+    -v "$(pwd)":/workspace \
+    -v e2sar-build:/workspace/build-linux \
+    -w /workspace \
+    e2sar-dev:latest mount_src
 ```
-$ docker run --rm -v "${HOME}/.ssh/github_ecdsa:/src/git_ssh_key:ro" -e E2SAR_BRANCH=docker-dev ibaldin/e2sar-dev:latest
+
+The `mount_src` entrypoint command runs `meson setup` the first time (subsequent runs skip it if `build-linux/` already exists), then drops into a bash shell. From there:
+
+```bash
+# compile
+$ meson compile -C build-linux
+
+# run unit tests
+$ meson test -C build-linux --suite unit --timeout 0
 ```
-Note that the SSH key in the container must always be named `/src/git_ssh_key`. You can add `-d` option to background the process. If you want to preserve the container state, omit the `--rm` option above. Then after the container is stopped, it can be restarted (with all the changes) as follows:
+
+To connect VSCode to this container, install the `Dev Containers` extension, press `F1`, search for `Dev Containers: Attach to Running Container`, and open the `/workspace` folder. The `build-linux/` directory inside it contains the compiled artifacts.
+
+#### Workflow B: self-contained container with GitHub checkout
+
+This workflow clones a specific branch from GitHub inside the container. It requires your GitHub SSH key to be mounted read-only:
+
+```bash
+$ docker run --rm \
+    -v "${HOME}/.ssh/github_ecdsa:/src/git_ssh_key:ro" \
+    -e E2SAR_BRANCH=main \
+    e2sar-dev:latest setup_src
 ```
+
+Omit `--rm` if you want to preserve the container state across restarts. A stopped container can be resumed with:
+```bash
 $ docker start <container name>
 ```
 
-Once the container is started it checks out the appropriate branch and compiles it and then continues to run indefinitely. You can connect to it and find the code in `/src/E2SAR`:
-```
+Once running, connect to it and find the code under `/src/E2SAR`:
+```bash
 $ docker exec -ti <container id> bash
 # cd /src/E2SAR
+# meson compile -C build
 ```
-To connect VSCode be sure to install the `Dev Containers`  VSCode extension. To connect click `<F1>` then in the command prompt search for `Dev Containers: Attach to Running Container`. Select that, then select the running container. A new window will open connected to this container. You can open the `/src/E2SAR` folder in this workspace to find the source code. Compiling the code requires opening a terminal from inside VSCode. Locate `/src/E2SAR` directory then issue `meson compile -C build` command like explained above to build inside the container.
+
+To attach VSCode, use the `Dev Containers: Attach to Running Container` command and open `/src/E2SAR`.
 
 ## Installing and creating a distribution or a release
 

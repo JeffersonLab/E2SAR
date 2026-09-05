@@ -1,5 +1,6 @@
 #define BOOST_TEST_MODULE DPSegLiveTests
 #include <stdlib.h>
+#include <climits>
 #include <iostream>
 #include <cmath>
 #include <boost/asio.hpp>
@@ -52,7 +53,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.withLBHeader = true; // LB header will be attached since there is no LB
+
 
         ip::address loopback = ip::make_address("127.0.0.1");
         u_int16_t listen_port = 10000;
@@ -203,7 +204,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.withLBHeader = true; // LB header will be attached since there is no LB
+
 
         ip::address loopback = ip::make_address("127.0.0.1");
         u_int16_t listen_port = 10000;
@@ -462,7 +463,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
-        rflags.withLBHeader = true; // LB header will be attached since there is no LB
+
         rflags.portRange = 2;
 
         ip::address loopback = ip::make_address("127.0.0.1");
@@ -712,6 +713,42 @@ BOOST_AUTO_TEST_CASE(DPReasTest5)
     BOOST_CHECK(readFlags.rcvSocketBufSize == paramTree.get<int>("data-plane.rcvSocketBufSize"));
 
     std::remove(iniFileName.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(DPReasTest6)
+{
+    std::cout << "DPReasTest6: test that openAndStart fails when rcvSocketBufSize exceeds OS limit" << std::endl;
+
+    std::string reasUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.0.1:12345&data=127.0.0.1"};
+
+    try {
+        EjfatURI reasUri(reasUriString, EjfatURI::TokenType::instance);
+
+        Reassembler::ReassemblerFlags rflags;
+        rflags.useCP = false;
+        rflags.rcvSocketBufSize = INT_MAX;
+
+        ip::address loopback = ip::make_address("127.0.0.1");
+        u_int16_t listen_port = 10000;
+        Reassembler reas(reasUri, loopback, listen_port, 1, rflags);
+
+        auto res = reas.openAndStart();
+
+        BOOST_CHECK(res.has_error());
+        if (res.has_error())
+        {
+            std::cout << "Expected error: " << res.error().message() << std::endl;
+            BOOST_CHECK(res.error().message().find("socket buffer") != std::string::npos);
+        }
+    }
+    catch (E2SARException &ee) {
+        std::cout << "Exception encountered: " << static_cast<std::string>(ee) << std::endl;
+        BOOST_CHECK(false);
+    }
+    catch (...) {
+        std::cout << "Unexpected exception" << std::endl;
+        BOOST_CHECK(false);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
