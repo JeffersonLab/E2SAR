@@ -467,6 +467,7 @@ int main(int argc, char **argv)
     std::string fileExtension, filePrefix;
     size_t writeThreads, readThreads;
     int eventTimeoutMS;
+    unsigned int rcvIovecSize;
 
     auto opts = od.add_options()("help,h", "show this help message");
 
@@ -490,7 +491,7 @@ int main(int argc, char **argv)
     opts("novalidate,v", "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
-    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
+    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s,r]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
     opts("path,p", po::value<std::vector<std::string>>(&filePaths)->multitoken(), "path containing the files need to be sent or to save to. For send more than one can be specified, for receive only the first path is used. Files can be narrowed down by extension [s]");
     opts("extension,e", po::value<std::string>(&fileExtension), "extension of the files on the path that need to be sent or created [s,r]");
@@ -500,6 +501,7 @@ int main(int argc, char **argv)
     opts("prefix", po::value<std::string>(&filePrefix)->default_value("e2sar_out"), "prefix of the files to create [r]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
+    opts("rcviovecsize", po::value<unsigned int>(&rcvIovecSize)->default_value(100), "if using recvmmsg optimization, this many packets will be received at once [r]");
 
 
     po::positional_options_description p;
@@ -529,6 +531,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "ipv4", "ipv6");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
+        conflicting_options(vm, "send", "rcviovecsize");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -760,6 +763,7 @@ int main(int argc, char **argv)
             rflags.useHostAddress = preferHostAddr;
             rflags.validateCert = validate;
             rflags.eventTimeout_ms = eventTimeoutMS;
+            rflags.rcvIovecSize = rcvIovecSize;
 
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;

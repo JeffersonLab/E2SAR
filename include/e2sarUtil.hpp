@@ -612,6 +612,7 @@ namespace e2sar
                 sendmmsg = 1,
                 liburing_send = 2,
                 liburing_recv = 3,
+                recvmmsg = 4,
                 // always last
                 unknown = 15
             };
@@ -628,6 +629,7 @@ namespace e2sar
                     case Code::sendmmsg: return "sendmmsg";
                     case Code::liburing_recv: return "liburing_recv";
                     case Code::liburing_send: return "liburing_send";
+                    case Code::recvmmsg: return "recvmmsg";
                     default: "unknown"s;
                 }
                 return "unknown"s;
@@ -642,6 +644,8 @@ namespace e2sar
                     return Code::liburing_recv;
                 else if (opt == "liburing_send"s)
                     return Code::liburing_send;
+                else if (opt == "recvmmsg"s)
+                    return Code::recvmmsg;
                 return Code::unknown;
             }
             /**

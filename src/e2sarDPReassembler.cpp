@@ -1,3 +1,6 @@
+#include <limits.h>
+#include <sys/socket.h>
+
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -56,7 +59,8 @@ namespace e2sar
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP},
-        reportStats{rflags.reportStats}
+        reportStats{rflags.reportStats},
+        rcvIovecSize{(rflags.rcvIovecSize > IOV_MAX ? IOV_MAX : rflags.rcvIovecSize)}
     {
         sanityChecks();
         auto afres = Affinity::setProcess(cpuCoreList);
@@ -90,7 +94,8 @@ namespace e2sar
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP},
-        reportStats{rflags.reportStats}
+        reportStats{rflags.reportStats},
+        rcvIovecSize{(rflags.rcvIovecSize > IOV_MAX ? IOV_MAX : rflags.rcvIovecSize)}
     {
         sanityChecks();
         // note if the user chooses to override portRange in rflags, 
@@ -121,7 +126,8 @@ namespace e2sar
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP},
-        reportStats{rflags.reportStats}
+        reportStats{rflags.reportStats},
+        rcvIovecSize{(rflags.rcvIovecSize > IOV_MAX ? IOV_MAX : rflags.rcvIovecSize)}
     {
         auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
         if (dpRes.has_error())
@@ -162,7 +168,8 @@ namespace e2sar
         rcvSocketBufSize{rflags.rcvSocketBufSize},
         sendStateThreadState(*this, rflags.period_ms),
         useCP{rflags.useCP},
-        reportStats{rflags.reportStats}
+        reportStats{rflags.reportStats},
+        rcvIovecSize{(rflags.rcvIovecSize > IOV_MAX ? IOV_MAX : rflags.rcvIovecSize)}
     {
         auto dpRes = dpuri.getDataplaneLocalAddresses(v6);
         if (dpRes.has_error())
@@ -290,6 +297,105 @@ namespace e2sar
         }
     }
 
+    void Reassembler::RecvThreadState::_processPacket(u_int8_t* recvBuffer, ssize_t nbytes, bool deallocFlag)
+    {
+        // start a new event if offset 0 (check for event number collisions)
+        // or attach to existing event
+        REHdr *rehdr{nullptr};
+        // for testing we may leave LB header attached, so it needs to be
+        // subtracted
+        if (reas.withLBHeader)
+        {
+            rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdrU));
+            nbytes -= sizeof(LBHdrU) + sizeof(REHdr);
+        }
+        else
+        {
+            rehdr = reinterpret_cast<REHdr*>(recvBuffer);
+            nbytes -= sizeof(REHdr);
+        }
+
+        if (not rehdr->validate())
+        {
+            // discard invalid frames, increment counter
+            reas.recvStats.badHeaderDiscards++;
+            if (deallocFlag)
+                free(recvBuffer);
+            //continue;
+            return;
+        }
+
+        std::shared_ptr<EventQueueItem> item;
+
+        if (rehdr->get_bufferOffset() == 0)
+        {
+            // new event - start a new event item and new event buffer 
+            // since this is done by many threads, can't use object_pool easily
+            item = std::make_shared<EventQueueItem>(rehdr);
+            // add to in progress map based on <event number, data id> tuple
+            evtsInProgressMutex.lock();
+            eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+            evtsInProgressMutex.unlock();
+        } else 
+        {
+            // try to locate the event in the in progress map
+            evtsInProgressMutex.lock();
+            auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
+            if (it != eventsInProgress.end()) 
+                item = it->second;
+            else
+            {
+                // out of order delivery and we haven't seen this event
+                // start a new event item and new event buffer 
+                item = std::make_shared<EventQueueItem>(rehdr);
+                // add to in progress map
+                eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+            }
+            evtsInProgressMutex.unlock();
+        }
+
+        // copy segment into event buffer into its proper place 
+        // note that with or without LB header, our REhdr should be set now
+        memcpy(item->event + rehdr->get_bufferOffset(), 
+            reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
+
+        // free the recv buffer
+        if (deallocFlag)
+            free(recvBuffer);
+
+        // count this fragment received (it could be anywhere in the event)
+        item->numFragments++;
+
+        item->curBytes += nbytes;
+
+        // check if this event is completed, if so put on queue
+        if (item->curBytes == item->bytes )
+        {
+            // remove this item from in progress map
+            evtsInProgressMutex.lock();
+            // TODO: a bit inefficient as this searches for all keys equal to this.
+            // If we can get ahold of an iterator in advance we can precisely erase the element
+            eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
+            evtsInProgressMutex.unlock();
+
+            // queue it up for the user to receive
+            auto ret = reas.enqueue(item);
+            // event lost on enqueuing
+            if (ret == 1) 
+            {
+                // log this lost event
+                logLostEvent(item, true);
+                // delete event buffer
+                delete[] item->event;
+            }
+            // deallocate queue item - either we put a copy of the item
+            // on the queue or we couldn't, either way we release
+            item.reset();
+            // update statistics
+            reas.recvStats.eventSuccess++;
+        }
+    }
+
     void Reassembler::RecvThreadState::_threadBody()
     {
         while(!reas.threadsStop)
@@ -312,118 +418,84 @@ namespace e2sar
                 if (!FD_ISSET(fd, &curSet))
                     continue;
 
-                // allocate receive buffer 
-                auto recvBuffer = static_cast<u_int8_t*>(malloc(RECV_BUFFER_SIZE));
-
-                struct sockaddr_in client_addr{};
-                socklen_t client_addr_len = sizeof(client_addr);
-
-                ssize_t nbytes = recvfrom(fd, recvBuffer, RECV_BUFFER_SIZE, 0,
-                    (struct sockaddr*)&client_addr, &client_addr_len);
-
-                if (nbytes == -1) {
-                    reas.recvStats.dataErrCnt++;
-                    reas.recvStats.lastErrno = errno;
-                    free(recvBuffer);
-                    continue;
-                }
-                // count fragment received by socket
-                reas.recvStats.fragmentsPerFd[fd]++;
-                reas.recvStats.totalPacketsReceived++;
-                reas.recvStats.totalBytesReceived += nbytes;
-
-                // start a new event if offset 0 (check for event number collisions)
-                // or attach to existing event
-                REHdr *rehdr{nullptr};
-                // for testing we may leave LB header attached, so it needs to be
-                // subtracted
-                if (reas.withLBHeader)
+#ifdef SENDMMSG_AVAILABLE
+                if (Optimizations::isSelected(Optimizations::Code::recvmmsg))
                 {
-                    rehdr = reinterpret_cast<REHdr*>(recvBuffer + sizeof(LBHdrU));
-                    nbytes -= sizeof(LBHdrU) + sizeof(REHdr);
-                }
+                    // allocate this whole thing with alignment to save time
+                    u_int8_t *recvBatch{nullptr};
+                    unsigned int mmsghdrOffset{0}, iovecsOffset{sizeof(struct mmsghdr)*reas.rcvIovecSize},
+                        buffersOffset{iovecsOffset + sizeof(struct iovec) * reas.rcvIovecSize}, 
+                        totalBatchSize{buffersOffset + sizeof(u_int8_t) * reas.rcvIovecSize * RECV_BUFFER_SIZE};
+
+                    recvBatch = reinterpret_cast<u_int8_t*>(aligned_alloc(64, ((totalBatchSize + 63) & ~63)));
+                    // first come mmsghdrs, then iovec, then buffers
+                    struct mmsghdr *mmsgs = reinterpret_cast<struct mmsghdr*>(recvBatch);
+                    struct iovec *iovecs = reinterpret_cast<struct iovec*>(recvBatch + iovecsOffset);
+                    u_int8_t *buffers = reinterpret_cast<u_int8_t*>(recvBatch + buffersOffset);
+                    
+                    // zero out mmsghdrs up to the start of iovecs
+                    memset(mmsgs, 0, iovecsOffset);
+
+                    // distribute the memory
+                    for(auto i = 0; i < reas.recvIovecSize; ++i)
+                    {
+                        iovecs[i].iov_base = &buffers[i * RECV_BUFFER_SIZE];
+                        iovecs[i].iov_len = RECV_BUFFER_SIZE;
+                        mmsgs[i].msg_hdr.msg_iov = &iovecs[i];
+                        mmsgs[i].msg_hdr.msg_iov_len = 1;
+                    }
+
+                    // make non-blocking call
+                    auto numBuffersReceived = recvmmsg(fd, mmsgs, reas.rcvIovecSize, MSG_DONTWAIT, nullptr);
+
+                    if (numBuffersReceived < 0) 
+                    {
+                        // could be just wouldblock which is innocuous and we keep going
+                        // otherwise note the error
+                        if (errno != EWOULDBLOCK && errno != EAGAIN)
+                        {
+                            reas.recvStats.dataErrCnt++;
+                            reas.recvStats.lastErrno = errno;
+                        }
+                        free(recvBatch);
+                        continue;                
+                    }
+                    reas.recvStats.fragmentsPerFd[fd] += numBuffersReceived;
+                    reas.recvStats.totalPacketsReceived += numBuffersReceived;
+                    // process the received buffers
+                    for(auto i = 0; i < numBuffersReceived; ++i)
+                    {
+                        reas.recvStats.totalBytesReceived += mmsgs[i].msg_len;
+                        _processPacket(static_cast<u_int8_t*>(iovecs[i].iov_base), mmsgs[i].msg_len, false);
+                    }
+
+                    // free the whole block
+                    free(recvBatch);
+                } 
                 else
+#endif
                 {
-                    rehdr = reinterpret_cast<REHdr*>(recvBuffer);
-                    nbytes -= sizeof(REHdr);
-                }
+                    // allocate receive buffer 
+                    auto recvBuffer = static_cast<u_int8_t*>(malloc(RECV_BUFFER_SIZE));
 
-                if (not rehdr->validate())
-                {
-                    // discard invalid frames, increment counter
-                    reas.recvStats.badHeaderDiscards++;
-                    free(recvBuffer);
-                    continue;
-                }
+                    struct sockaddr_in client_addr{};
+                    socklen_t client_addr_len = sizeof(client_addr);
 
-                std::shared_ptr<EventQueueItem> item;
+                    ssize_t nbytes = recvfrom(fd, recvBuffer, RECV_BUFFER_SIZE, 0,
+                        (struct sockaddr*)&client_addr, &client_addr_len);
 
-                if (rehdr->get_bufferOffset() == 0)
-                {
-                    // new event - start a new event item and new event buffer 
-                    // since this is done by many threads, can't use object_pool easily
-                    item = std::make_shared<EventQueueItem>(rehdr);
-                    // add to in progress map based on <event number, data id> tuple
-                    evtsInProgressMutex.lock();
-                    eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
-                    evtsInProgressMutex.unlock();
-                } else 
-                {
-                    // try to locate the event in the in progress map
-                    evtsInProgressMutex.lock();
-                    auto it = eventsInProgress.find(std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId()));
-                    if (it != eventsInProgress.end()) 
-                        item = it->second;
-                    else
-                    {
-                        // out of order delivery and we haven't seen this event
-                        // start a new event item and new event buffer 
-                        item = std::make_shared<EventQueueItem>(rehdr);
-                        // add to in progress map
-                        eventsInProgress[std::make_pair(rehdr->get_eventNum(), rehdr->get_dataId())] = item;
+                    if (nbytes == -1) {
+                        reas.recvStats.dataErrCnt++;
+                        reas.recvStats.lastErrno = errno;
+                        free(recvBuffer);
+                        continue;
                     }
-                    evtsInProgressMutex.unlock();
-                }
+                    // count fragment received by socket
+                    reas.recvStats.fragmentsPerFd[fd]++;
+                    reas.recvStats.totalPacketsReceived++;
+                    reas.recvStats.totalBytesReceived += nbytes;
 
-
-                // copy segment into event buffer into its proper place 
-                // note that with or without LB header, our REhdr should be set now
-                memcpy(item->event + rehdr->get_bufferOffset(), 
-                    reinterpret_cast<u_int8_t*>(rehdr) + sizeof(REHdr), nbytes);
-
-                // free the recv buffer
-                free(recvBuffer);
-
-                // count this fragment received (it could be anywhere in the event)
-                item->numFragments++;
-
-                item->curBytes += nbytes;
-
-                // check if this event is completed, if so put on queue
-                if (item->curBytes == item->bytes )
-                {
-                    // remove this item from in progress map
-                    evtsInProgressMutex.lock();
-                    // TODO: a bit inefficient as this searches for all keys equal to this.
-                    // If we can get ahold of an iterator in advance we can precisely erase the element
-                    eventsInProgress.erase(std::make_pair(item->eventNum, item->dataId));
-                    evtsInProgressMutex.unlock();
-
-                    // queue it up for the user to receive
-                    auto ret = reas.enqueue(item);
-                    // event lost on enqueuing
-                    if (ret == 1) 
-                    {
-                        // log this lost event
-                        logLostEvent(item, true);
-                        // delete event buffer
-                        delete[] item->event;
-                    }
-                    // deallocate queue item - either we put a copy of the item
-                    // on the queue or we couldn't, either way we release
-                    item.reset();
-                    // update statistics
-                    reas.recvStats.eventSuccess++;
+                    _processPacket(recvBuffer, nbytes, true);
                 }
             }
         }
@@ -734,15 +806,16 @@ namespace e2sar
         rFlags.rcvSocketBufSize = paramTree.get<int>("data-plane.rcvSocketBufSize", rFlags.rcvSocketBufSize);
         rFlags.epoch_ms = paramTree.get<u_int32_t>("data-plane.epochMS", rFlags.epoch_ms);
         rFlags.period_ms = paramTree.get<u_int16_t>("data-plane.periodMS", rFlags.period_ms);
+        rFlags.rcvIovecSize = paramTree.get<unsigned int>("data-plane.rcvIovecSize", rFlags.rcvIovecSize);
 
         // PID parameters
         rFlags.setPoint = paramTree.get<float>("pid.setPoint", rFlags.setPoint);
         rFlags.Ki = paramTree.get<float>("pid.Ki", rFlags.Ki);
         rFlags.Kp = paramTree.get<float>("pid.Kp", rFlags.Kp);
         rFlags.Kd = paramTree.get<float>("pid.Kd", rFlags.Kd);
-        rFlags.Kd = paramTree.get<float>("pid.weight", rFlags.Kd);
-        rFlags.Kd = paramTree.get<float>("pid.min_factor", rFlags.Kd);
-        rFlags.Kd = paramTree.get<float>("pid.max_factor", rFlags.Kd);
+        rFlags.weight = paramTree.get<float>("pid.weight", rFlags.weight);
+        rFlags.min_factor = paramTree.get<float>("pid.min_factor", rFlags.min_factor);
+        rFlags.max_factor = paramTree.get<float>("pid.max_factor", rFlags.max_factor);
 
         return rFlags;
     }

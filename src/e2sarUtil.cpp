@@ -27,7 +27,7 @@ namespace e2sar
     const std::vector<Optimizations::Code> Optimizations::available {
         Optimizations::Code::none
 #ifdef SENDMMSG_AVAILABLE
-        , Optimizations::Code::sendmmsg
+        , Optimizations::Code::sendmmsg, Optimizations::Code::recvmmsg, 
 #endif
 #ifdef LIBURING_AVAILABLE
         , Optimizations::Code::liburing_send, Optimizations::Code::liburing_recv
@@ -96,9 +96,10 @@ namespace e2sar
         }
 
         // check for conflict
-        if (isSelected(Code::sendmmsg) and
-            (isSelected(Code::liburing_recv) or 
-            isSelected(Code::liburing_send)))
+        if ((isSelected(Code::sendmmsg) and 
+            isSelected(Code::liburing_send)) or
+            (isSelected(Code::recvmmsg) and
+            isSelected(Code::liburing_recv)))
         {
             inst->selected_optimizations = toWord(Code::none);
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};

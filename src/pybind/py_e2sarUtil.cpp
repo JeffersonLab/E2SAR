@@ -148,6 +148,7 @@ void init_e2sarUtil(py::module_ &m) {
         .value("sendmmsg", Optimizations::Code::sendmmsg)
         .value("liburing_send", Optimizations::Code::liburing_send)
         .value("liburing_recv", Optimizations::Code::liburing_recv)
+        .value("recvmmsg", Optimizations::Code::recvmmsg)
         .value("unknown", Optimizations::Code::unknown)
         .export_values();
 }

@@ -9,6 +9,7 @@ API Details can always be found in the [wiki](https://github.com/JeffersonLab/E2
 - Deprecated ReassemblerFlags.withLBHeader - the field has been removed, instead the logic uses the useCP flag to determine whether to expect (useCP==false) or not to expect (useCP==true) the LB header in the received packets.
 - Added checks in Segmenter and Reassembler to make sure the requested send or receive buffer size is actually honored (error is raised if the OS didn't accept it). Previous behavior was to silently succeed even if the OS allocated a smaller buffer.
 - Executables in bin/ (e2sar_perf, lbadm and e2sar_ft) now flag with a warning if a non-routable IPv4 or IPv6 address is used for sender or receiver. The code proceeds, only a stderr warning is shown. 
+- Added 'recvmmsg' receiver-side optimization - with it on a single recvmmsg call consumes up to ReassemblerFlags.rcvIovecSize buffers (defaults to 100, max 1024) packets with  single system call. "--rcviovecsize" command line option was added to e2sar_perf.cpp and e2sar_ft.cpp
 
 ## v0.3.2
 - Fixed Conda packaging
