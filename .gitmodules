@@ -1,9 +1,9 @@
 [submodule "docs"]
 	path = docs
-	url = git@github.com:JeffersonLab/E2SAR-doc.git
+	url = ../E2SAR-doc.git
 [submodule "wiki"]
 	path = wiki
-	url = git@github.com:JeffersonLab/E2SAR.wiki.git
+	url = ../E2SAR.wiki.git
 [submodule "udplbd2"]
 	path = udplbd2
-	url = git@github.com:esnet/udplbd2.git
+	url = https://github.com/esnet/udplbd2.git
