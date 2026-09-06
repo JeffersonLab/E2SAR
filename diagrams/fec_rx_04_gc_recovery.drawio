@@ -1,0 +1,139 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-rx-04-gc" name="RX Diagram 4: GC Thread Recovery">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;RX Diagram 4: GC Thread FEC Recovery&lt;/b&gt;&lt;br&gt;Single GC thread sweeps all recv-thread states on a timer; attempts RS erasure recovery for timed-out blocks with missing data" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="15" width="800" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="trigger_title" value="&lt;b&gt;GC Sweep Trigger&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="75" width="170" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="trigger_box" value="GC thread wakes periodically and sweeps all recv thread states:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;for each recv thread state i:&lt;br&gt;  i.evtsInProgressMutex.lock()&lt;br&gt;  for each (blockKey, blk) in i.fecBlocksInProgress:&lt;br&gt;    inWaiting_ms = now − blk.firstSegment&lt;br&gt;    if inWaiting_ms &lt;= eventTimeout_ms: skip (not timed out)&lt;br&gt;    → TIMED OUT: attempt recovery or declare failure&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="102" width="680" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="trigger_box" target="missing_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="missing_title" value="&lt;b&gt;Compute Missing Segments&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="235" width="260" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="missing_box" value="&lt;font face=&quot;Courier New&quot;&gt;dataSegsNeeded = 32u − blk.padFrames&lt;br&gt;dataMask   = (1u &lt;&lt; dataSegsNeeded) − 1&lt;br&gt;dataPresent = blk.dataReceived &amp; dataMask&lt;br&gt;dataMissing = dataSegsNeeded − popcount(dataPresent)&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="262" width="500" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="missing_box" target="dec_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec_title" value="&lt;b&gt;Decision Tree&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="358" width="140" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec_box" value="dataMissing == 0?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="385" width="240" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec_yes_lbl" value="YES → already complete" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="315" y="400" width="175" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec_yes_arr" style="edgeStyle=none;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="dec_box" target="recovered_yes" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec_no_arr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="dec_box" target="dec2_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec_no_lbl" value="NO" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="170" y="437" width="30" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec2_box" value="0 &lt; dataMissing ≤ 8 AND fecDecodeCtx.initialized?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="460" width="320" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec2_no_arr" style="edgeStyle=none;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="dec2_box" target="fail_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec2_no_lbl" value="NO (dataMissing &gt; 8 or ctx not ready)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="396" y="475" width="270" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec2_yes_arr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="dec2_box" target="dec3_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec2_yes_lbl" value="YES" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="185" y="513" width="30" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec3_box" value="damagedCols.size() ≤ 2 AND popcount(parityReceived) ≥ |damagedCols|?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="540" width="380" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec3_detail" value="damagedCols = { s/4 : segment s missing }&lt;br&gt;(each missing segment s → RS column s/4 is damaged)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="455" y="550" width="330" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec3_no_arr" style="edgeStyle=none;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="dec3_box" target="fail_box" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="460" y="568"/>
+                            <mxPoint x="460" y="485"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="dec3_no_lbl" value="NO (too many damaged cols or not enough parity)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="396" y="540" width="310" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec3_yes_arr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="dec3_box" target="recovery_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="dec3_yes_lbl" value="YES → attempt RS erasure recovery" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="597" width="240" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="recovery_title" value="&lt;b&gt;RS Erasure Recovery (5 steps)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="634" width="280" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="recovery_box" value="① &lt;b&gt;Zero damaged columns:&lt;/b&gt;&lt;br&gt;  for col in damagedCols: for b in 0..3:&lt;br&gt;    memset(segmentBuf + (col*4+b)*colHeight, 0, colHeight)&lt;br&gt;&lt;br&gt;② &lt;b&gt;interleave&lt;/b&gt;(segmentBuf, codewordBuf, params)  → fills bytes 0–3 of codewords&lt;br&gt;   (NEON variant: interleave_neon_tiled on ARM)&lt;br&gt;&lt;br&gt;③ &lt;b&gt;interleave_parity&lt;/b&gt;(parityBuf, codewordBuf, params)  → fills byte 4 of codewords&lt;br&gt;   Parity nibbles from received parity segments are loaded here.&lt;br&gt;&lt;br&gt;④ &lt;b&gt;rs_decode&lt;/b&gt;(codewordBuf, params, erasedCols, fecDecodeCtx)&lt;br&gt;   erasedCols = vector of int from damagedCols set&lt;br&gt;   Returns 0 on success; in-place fills erased symbol nibbles&lt;br&gt;&lt;br&gt;⑤ &lt;b&gt;deinterleave&lt;/b&gt;(codewordBuf, segmentBuf, params)  → writes recovered data back&lt;br&gt;   (NEON variant: deinterleave_neon on ARM)&lt;br&gt;   Previously zero rows now contain reconstructed segment data." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d79b00;fillColor=#ffe6cc;fontSize=11;rounded=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="660" width="680" height="255" as="geometry"/>
+                </mxCell>
+                <mxCell id="recovery_arr_ok" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="recovery_box" target="recovered_yes" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="755" y="787"/>
+                            <mxPoint x="755" y="410"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="recovery_arr_ok_lbl" value="ret==0 (success)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=2;" parent="recovery_arr_ok" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="recovery_arr_fail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="recovery_box" target="fail_box" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="810" y="915"/>
+                            <mxPoint x="810" y="485"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="recovery_arr_fail_lbl" value="ret!=0 (failed)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=2;" parent="recovery_arr_fail" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="recovered_yes" value="&lt;b&gt;recovered = true&lt;/b&gt;&lt;br&gt;Scatter segmentBuf → event[N]&lt;br&gt;(same loop as happy path)&lt;br&gt;fecBlocksCompleted++&lt;br&gt;fecRecoveries++&lt;br&gt;Check if all blocks done → enqueue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="380" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="fail_box" value="&lt;b&gt;Recovery failed&lt;/b&gt;&lt;br&gt;fecFailures++&lt;br&gt;Delete event[]: item.event memory freed&lt;br&gt;eventsInProgress.erase(eventKey)&lt;br&gt;logLostEvent()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="455" width="280" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="ctx_title" value="&lt;b&gt;RsDecodeContext&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="75" width="170" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="ctx_box" value="Pre-initialized once per GC thread:&lt;br&gt;  GF(16) log/exp lookup tables&lt;br&gt;  Parity check matrix H&lt;br&gt;  fecDecodeCtx.initialized = true&lt;br&gt;&lt;br&gt;Shared across all block recovery&lt;br&gt;attempts in the same GC sweep.&lt;br&gt;&lt;br&gt;Initialization can fail (returns ctx&lt;br&gt;with initialized=false); if so, no&lt;br&gt;recovery is attempted." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d79b00;fillColor=#ffe6cc;fontSize=10;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="102" width="285" height="175" as="geometry"/>
+                </mxCell>
+                <mxCell id="timing_title" value="&lt;b&gt;Timing Details&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="300" width="130" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="timing_box" value="eventTimeout_ms: default 500 ms&lt;br&gt;  (configurable via ReassemblerFlags)&lt;br&gt;&lt;br&gt;firstSegment: recorded when the&lt;br&gt;  first packet for a blockKey arrives&lt;br&gt;&lt;br&gt;GC checks: now − blk.firstSegment&lt;br&gt;  &gt; eventTimeout_ms → timed out&lt;br&gt;&lt;br&gt;Implication: parity packets need to&lt;br&gt;  arrive within eventTimeout_ms of&lt;br&gt;  the first data packet for that block." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="328" width="285" height="185" as="geometry"/>
+                </mxCell>
+                <mxCell id="col_title" value="&lt;b&gt;RS Column Mapping&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="535" width="185" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="col_box" value="32 segments → 8 RS columns (4 segs/col):&lt;br&gt;  Col 0: segs 0,1,2,3 → RS symbol 0&lt;br&gt;  Col 1: segs 4,5,6,7 → RS symbol 1&lt;br&gt;  Col 2: segs 8,9,10,11 → RS symbol 2&lt;br&gt;  …&lt;br&gt;  Col 7: segs 28,29,30,31 → RS symbol 7&lt;br&gt;&lt;br&gt;damagedCols = { s/4 : seg s missing }&lt;br&gt;  e.g. segs 5,6 both missing → col 1&lt;br&gt;  e.g. segs 5 and 12 missing → cols 1,3&lt;br&gt;&lt;br&gt;Can recover: 1 or 2 damaged columns.&lt;br&gt;Cannot recover: 3+ damaged columns." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d79b00;fillColor=#ffe6cc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="562" width="285" height="205" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

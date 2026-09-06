@@ -1,0 +1,157 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-rx-05-rs" name="RX Diagram 5: RS Erasure Correction">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1050" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;RX Diagram 5: RS Erasure Correction Detail&lt;/b&gt;&lt;br&gt;Four-stage pipeline executed by GC thread to recover missing data segments from received parity" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="15" width="760" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="input_title" value="&lt;b&gt;Input: segmentBuf with damaged columns zeroed&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="75" width="400" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_intact0" value="Row 0 (seg 0, Col 0)  intact" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="102" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_intact1" value="Row 1 (seg 1, Col 0)  intact" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="124" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_intact2" value="Row 2 (seg 2, Col 0)  intact" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="146" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_intact3" value="Row 3 (seg 3, Col 0)  intact" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="168" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_zero4" value="Row 4 (seg 4, Col 1)  ← ZEROED (missing)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="190" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_zero5" value="Row 5 (seg 5, Col 1)  ← ZEROED (missing)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="212" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_zero6" value="Row 6 (seg 6, Col 1)  ← ZEROED (missing)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="234" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_zero7" value="Row 7 (seg 7, Col 1)  ← ZEROED (missing)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="256" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_intact8" value="Row 8 (seg 8, Col 2)  intact" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="278" width="370" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_dots2" value="⋮  (rows 9–31: intact or zero per damagedCols)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="300" width="310" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="sb_note" value="Example: damagedCols = {1} (segs 4–7 missing, col 1 = RS symbol 1)&lt;br&gt;Only col 1 rows are zeroed; all other rows retain received data." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="325" width="400" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="stage1_arrow" value="" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#d5e8d4;strokeColor=#82b366;width=12;endSize=8;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="210" y="375" as="sourcePoint"/>
+                        <mxPoint x="210" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="stage1_lbl" value="① interleave(segmentBuf, codewordBuf, params)&lt;br&gt;Bit-transpose: 32 rows × 1420 B → 11,360 codewords" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="235" y="380" width="360" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_title" value="&lt;b&gt;codewordBuf after interleave — bytes 0–3 filled (byte 4 = 0x00)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="435" width="490" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_note" value="Symbol 1 nibbles (from erased col 1 rows) = 0 in all codewords → erasure positions" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="458" width="500" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw0b" value="CW 0: [S0|S1=0] [S2|S3] [S4|S5] [S6|S7] [0x00]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="480" width="430" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw1b" value="CW 1: [S0|S1=0] [S2|S3] [S4|S5] [S6|S7] [0x00]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="502" width="430" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwdots_b" value="⋮  (11,360 codewords total; all have S1=0 due to erasure)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="524" width="400" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="stage2_arrow" value="" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;width=12;endSize=8;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="210" y="555" as="sourcePoint"/>
+                        <mxPoint x="210" y="605" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="stage2_lbl" value="② interleave_parity(parityBuf, codewordBuf, params)&lt;br&gt;Loads parity nibbles into byte 4 of each codeword from received parityBuf rows" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="235" y="560" width="440" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_p_title" value="&lt;b&gt;codewordBuf after interleave_parity — byte 4 now has parity nibbles&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="615" width="530" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw0p" value="CW 0: [S0|S1=0] [S2|S3] [S4|S5] [S6|S7] [P0|P1] ← byte 4 filled" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="640" width="500" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw1p" value="CW 1: [S0|S1=0] [S2|S3] [S4|S5] [S6|S7] [P0|P1] ← byte 4 filled" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="662" width="500" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwdots_p" value="⋮  (all 11,360 codewords: S1 still erased, P0/P1 loaded)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="685" width="420" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="stage3_arrow" value="" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#f8cecc;strokeColor=#b85450;width=12;endSize=8;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="210" y="717" as="sourcePoint"/>
+                        <mxPoint x="210" y="767" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="stage3_lbl" value="③ rs_decode(codewordBuf, params, erasedCols, fecDecodeCtx)&lt;br&gt;erasedCols = {1}; RS(10,8) erasure decoder over GF(2⁴) fills in symbol 1 nibbles" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="235" y="722" width="480" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_r_title" value="&lt;b&gt;codewordBuf after rs_decode — erased symbol 1 nibbles now recovered&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="777" width="540" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw0r" value="CW 0: [S0|S1✓] [S2|S3] [S4|S5] [S6|S7] [P0|P1]  ← S1 recovered" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="802" width="520" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw1r" value="CW 1: [S0|S1✓] [S2|S3] [S4|S5] [S6|S7] [P0|P1]  ← S1 recovered" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="824" width="520" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cwdots_r" value="⋮  (all 11,360 codewords: S1 nibble now has correct recovered value)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="847" width="450" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="stage4_arrow" value="" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#d5e8d4;strokeColor=#82b366;width=12;endSize=8;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="210" y="878" as="sourcePoint"/>
+                        <mxPoint x="210" y="928" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="stage4_lbl" value="④ deinterleave(codewordBuf, segmentBuf, params)&lt;br&gt;Inverse bit-transpose: recovered nibbles written back into rows 4–7 of segmentBuf" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="235" y="882" width="470" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="out_title" value="&lt;b&gt;Output: repaired segmentBuf (all rows populated)&lt;/b&gt; → proceed to scatter loop (see RX Diagram 3)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="938" width="640" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_detail_title" value="&lt;b&gt;Single Codeword Detail (5 bytes = 10 GF(16) symbols)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="75" width="420" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_b0" value="Byte 0&lt;br&gt;[S0|S1]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="105" width="90" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_b1" value="Byte 1&lt;br&gt;[S2|S3]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="105" width="90" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_b2" value="Byte 2&lt;br&gt;[S4|S5]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="940" y="105" width="90" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_b3" value="Byte 3&lt;br&gt;[S6|S7]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="1030" y="105" width="90" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_b4" value="Byte 4&lt;br&gt;[P0|P1]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="105" width="90" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_erased_note" value="S1 is erased (from col 1 = RS symbol 1); set to 0 before decode" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="148" width="300" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="rs_box2" value="&lt;b&gt;RS(10,8) Erasure Decode&lt;/b&gt;&lt;br&gt;&lt;br&gt;Input: 10 symbols (S0–S7, P0, P1)&lt;br&gt;  S1 = 0 (erased, position known)&lt;br&gt;&lt;br&gt;Erasure correction formula:&lt;br&gt;  Syndrome = H × [S0,0,S2,...,S7,P0,P1]ᵀ&lt;br&gt;  Recover S1 using GF(16) linear algebra&lt;br&gt;&lt;br&gt;Result: S1 = correct recovered value&lt;br&gt;Written to byte 0 bits [4:0] of codeword" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="180" width="360" height="175" as="geometry"/>
+                </mxCell>
+                <mxCell id="scale_box2" value="&lt;b&gt;Scale:&lt;/b&gt; rs_decode runs on all 11,360 codewords per block.&lt;br&gt;With erasedCols = {1}: each codeword recovers nibble S1.&lt;br&gt;With erasedCols = {c1,c2}: each codeword recovers 2 nibbles.&lt;br&gt;&lt;br&gt;Recovering 1 column = recovering 4 segments.&lt;br&gt;Recovering 2 columns = recovering up to 8 segments.&lt;br&gt;&lt;br&gt;After decode: S1 nibbles are valid in codewords.&lt;br&gt;deinterleave() scatters them back to rows 4–7 of segmentBuf." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="375" width="430" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="parity_src_box" value="&lt;b&gt;Parity Source (interleave_parity):&lt;/b&gt;&lt;br&gt;parityBuf rows 0–7 (received parity segments):&lt;br&gt;  parityBuf[0]: encodes P0 nibble bits 3,2,1,0&lt;br&gt;    (parity segs 0–3 = 4 bits of P0)&lt;br&gt;  parityBuf[4]: encodes P1 nibble bits 3,2,1,0&lt;br&gt;    (parity segs 4–7 = 4 bits of P1)&lt;br&gt;&lt;br&gt;For a 1-column erasure: only parityBuf[0] needed.&lt;br&gt;For a 2-column erasure: both parityBuf[0] and [4] needed." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#9673a6;fillColor=#e1d5e7;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="560" width="430" height="175" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

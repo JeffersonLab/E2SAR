@@ -1,0 +1,122 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-recv-overview" name="FEC Receive Pipeline Overview">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1280" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;FEC Receive Pipeline Overview&lt;/b&gt;&lt;br&gt;(MTU = 1500, IPv4)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="20" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="wire" value="&lt;b&gt;Wire&lt;/b&gt;: 40 UDP packets/block&lt;br&gt;32 × data (1480 B each) + 8 × parity (1500 B each)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="90" width="510" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="wire" target="recv_thread" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow1_lbl" value="per packet arrival" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=2;" parent="arrow1" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="90" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="recv_thread" value="&lt;b&gt;Recv Thread&lt;/b&gt; (per packet)&lt;br&gt;Strip LBHdrU → check magic 'EC' → validate ECHdr + REHdr&lt;br&gt;extract: isParity, ecFrameNum, padFrames, colHeight, fecBlockNum, eventNum, dataId&lt;br&gt;blockKey = (eventNum, dataId, fecBlockNum)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="200" width="510" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="recv_thread" target="perblock_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="perblock_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;dashed=1;dashPattern=8 4;strokeWidth=2;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="315" width="780" height="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="perblock_lbl" value="&lt;b&gt;Per Block&lt;/b&gt; (repeated numBlocks times)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="375" y="320" width="280" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="fecstate" value="&lt;b&gt;FecBlockState&lt;/b&gt; (per blockKey; created on first packet for this block)&lt;br&gt;segmentBuf [32 × colHeight = 45,440 B]    dataReceived bitmask (32 bits, bit i set when seg i arrives)&lt;br&gt;parityBuf  [ 8 × colHeight = 11,360 B]    parityReceived bitmask (8 bits, bit j set when parity j arrives)&lt;br&gt;&lt;br&gt;data pkt (P=0): segData=payload+sizeof(ECHdr)  → segmentBuf[ecFrameNum×colHeight]; dataReceived|=(1&lt;&lt;ecFrameNum)&lt;br&gt;parity pkt (P=1): segData=payload+sizeof(ECHdr)+sizeof(REHdr) → parityBuf[ecFrameNum×colHeight]; parityReceived|=(1&lt;&lt;ecFrameNum)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="360" width="740" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="happy_hdr" value="&lt;b&gt;Happy Path&lt;/b&gt; (checked after each data packet)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="370" y="488" width="300" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="happy_box" value="dataSegsNeeded = 32 − padFrames&lt;br&gt;dataMask = (1 &lt;&lt; dataSegsNeeded) − 1&lt;br&gt;&lt;br&gt;if popcount(dataReceived &amp; dataMask)&lt;br&gt;   == dataSegsNeeded&lt;br&gt;   &lt;b&gt;→ assemble block immediately&lt;/b&gt;&lt;br&gt;&lt;br&gt;(no GC thread needed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="370" y="515" width="295" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="gc_hdr" value="&lt;b&gt;GC Recovery&lt;/b&gt; (on block timeout)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="705" y="488" width="270" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="gc_box" value="Condition: 0 &lt; dataMissing ≤ 8, fecDecodeCtx.initialized&lt;br&gt;damagedCols = { s/4 : segment s is missing }&lt;br&gt;damagedCols.size() ≤ 2&lt;br&gt;popcount(parityReceived) ≥ |damagedCols|&lt;br&gt;&lt;br&gt;① zero damaged columns in segmentBuf&lt;br&gt;② &lt;b&gt;interleave&lt;/b&gt;(segmentBuf) → codewordBuf [bytes 0–3]&lt;br&gt;③ &lt;b&gt;interleave_parity&lt;/b&gt;(parityBuf) → codewordBuf [byte 4]&lt;br&gt;④ &lt;b&gt;rs_decode&lt;/b&gt;(codewords, erasedCols) over GF(2⁴)&lt;br&gt;⑤ &lt;b&gt;deinterleave&lt;/b&gt;(codewordBuf) → repaired segmentBuf&lt;br&gt;&lt;br&gt;fecRecoveries++  /  fecFailures++" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="705" y="515" width="390" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_to_happy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;" parent="1" source="fecstate" target="happy_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_to_gc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" parent="1" source="fecstate" target="gc_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="scatter_box" value="&lt;b&gt;Scatter Segments → Event Buffer&lt;/b&gt;&lt;br&gt;for i in 0..dataSegsNeeded−1:&lt;br&gt;  offset = REHdr[i].bufferOffset&lt;br&gt;  segDataLen = min(maxUserData, totalEventBytes − offset)&lt;br&gt;  memcpy(event + offset, segmentBuf[i×colHeight + sizeof(REHdr)], segDataLen)&lt;br&gt;fecBlocksCompleted++" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="830" width="740" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_happy_scat" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;" parent="1" source="happy_box" target="scatter_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_gc_scat" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;strokeColor=#d79b00;" parent="1" source="gc_box" target="scatter_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="scatter_box" target="event_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow3_lbl" value="if fecBlocksCompleted == fecBlocksExpected" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=2;" parent="arrow3" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="150" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="event_box" value="&lt;b&gt;EventQueueItem.event[N bytes]&lt;/b&gt; (all blocks assembled)&lt;br&gt;enqueue() → placed in output queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="1085" width="510" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="event_box" target="app_box" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="app_box" value="&lt;b&gt;Application&lt;/b&gt;: recvEvent() / getEvent()&lt;br&gt;receives pointer to assembled N-byte event buffer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="1200" width="510" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="lsb_const_title" value="&lt;b&gt;Key Constants (MTU=1500)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="90" width="200" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="lsb_const" value="colHeight = ecSegmentSize = 1420 B&lt;br&gt;maxUserData = colHeight − 20 = 1400 B&lt;br&gt;num_words = colHeight × 8 = 11,360&lt;br&gt;&lt;br&gt;sizeof(REHdr) = 20 B&lt;br&gt;sizeof(ECHdr) = 16 B&lt;br&gt;sizeof(LBHdrU) = 16 B&lt;br&gt;&lt;br&gt;segmentBuf:  32 × 1420 = 45,440 B&lt;br&gt;parityBuf:   8 × 1420 = 11,360 B&lt;br&gt;codewordBuf: 11,360 × 5 = 56,800 B" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="120" width="215" height="175" as="geometry"/>
+                </mxCell>
+                <mxCell id="lsb_fec_title" value="&lt;b&gt;FEC Parameters&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="315" width="130" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="lsb_fec" value="RS(10,8) over GF(2⁴)&lt;br&gt;8 data + 2 parity symbols&lt;br&gt;NUM_COLUMNS = 8&lt;br&gt;SEGS_PER_COLUMN = 4&lt;br&gt;NUM_SEGMENTS = 32&lt;br&gt;&lt;br&gt;Max recoverable:&lt;br&gt;  2 damaged RS columns&lt;br&gt;  = up to 8 missing segments" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=9;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="345" width="220" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="lsb_stats_title" value="&lt;b&gt;Recv Stats Counters&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="510" width="160" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="lsb_stats" value="fecRecoveries: blocks recovered by RS erasure&lt;br&gt;fecFailures: blocks lost (unrecoverable timeout)&lt;br&gt;eventSuccess: events fully assembled&lt;br&gt;badHeaderDiscards: invalid ECHdr or REHdr" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="540" width="245" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="rsb_evt_title" value="&lt;b&gt;EventQueueItem (per event)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="90" width="210" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="rsb_evt" value="event[totalEventBytes]  (output buffer, N bytes)&lt;br&gt;fecBlocksExpected = ⌈numSegs / 32⌉&lt;br&gt;fecBlocksCompleted (per-block counter)&lt;br&gt;curBytes (bytes copied so far)&lt;br&gt;eventNum, dataId&lt;br&gt;firstSegment (arrival timestamp for timeout)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=11;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="120" width="270" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="rsb_keys_title" value="&lt;b&gt;Lookup Keys&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="250" width="120" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="rsb_keys" value="blockKey = (eventNum, dataId, fecBlockNum)&lt;br&gt;  → indexes fecBlocksInProgress map&lt;br&gt;&lt;br&gt;eventKey = (eventNum, dataId)&lt;br&gt;  → indexes eventsInProgress map&lt;br&gt;&lt;br&gt;completedFecBlocks set&lt;br&gt;  → discard late-arriving packets" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="280" width="265" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="rsb_threads_title" value="&lt;b&gt;Threading Model&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=4;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="425" width="140" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="rsb_threads" value="Recv threads (N): each owns its own&lt;br&gt;  fecBlocksInProgress and completedFecBlocks.&lt;br&gt;  evtsInProgressMutex guards EventQueueItem.&lt;br&gt;&lt;br&gt;GC thread (1): sweeps all recv thread states,&lt;br&gt;  holds evtsInProgressMutex during sweep.&lt;br&gt;&lt;br&gt;eventTimeout_ms (default 500 ms)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=11;rounded=1;arcSize=7;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="455" width="270" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="summary" value="&lt;b&gt;Per-block input:&lt;/b&gt; 40 packets (32 data + 8 parity)  —  &lt;b&gt;Per-block output:&lt;/b&gt; up to 32 × 1400 = 44,800 B event data&lt;br&gt;&lt;b&gt;Per-event totals:&lt;/b&gt; numBlocks = ⌈N / 44,800⌉  —  fecBlocksExpected = numBlocks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="1150" width="510" height="45" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

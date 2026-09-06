@@ -1,0 +1,109 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-rx-01-wire" name="RX Diagram 1: Wire Packet Format (Receiver View)">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;RX Diagram 1: Wire Packet Format (Receiver View)&lt;/b&gt;&lt;br&gt;Two packet types arrive; receiver extracts fields from ECHdr and REHdr to route each packet" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="15" width="560" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="data_title" value="&lt;b&gt;Data Packet&lt;/b&gt; (×32 per block, P=0)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="70" width="260" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_ip" value="&lt;b&gt;IPv4&lt;/b&gt;&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="100" width="60" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_udp" value="&lt;b&gt;UDP&lt;/b&gt;&lt;br&gt;8 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="100" width="40" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_lb" value="&lt;b&gt;LBHdrV2&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="100" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_ec" value="&lt;b&gt;ECHdr&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="100" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_payload" value="&lt;b&gt;Segment Payload&lt;/b&gt;&lt;br&gt;colHeight = 1420 B&lt;br&gt;[REHdr(20B) | event data(≤1400B) | padding]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="100" width="700" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_total_arrow" value="" style="endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#333333;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="60" y="165" as="sourcePoint"/>
+                        <mxPoint x="1020" y="165" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_total_label" value="&lt;b&gt;Total: 20+8+16+16+1420 = 1480 bytes&lt;/b&gt; (20 B under MTU)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" parent="d_total_arrow" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_recv_extracts" value="Receiver extracts from ECHdr: P=0, ecFrameNum (0–31), padFrames, colHeight, fecBlockNum&lt;br&gt;Receiver extracts from REHdr (inside payload): eventNum, dataId, bufferOffset, bufferLength (=N)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="180" width="660" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="par_title" value="&lt;b&gt;Parity Packet&lt;/b&gt; (×8 per block, P=1)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="225" width="270" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_ip" value="&lt;b&gt;IPv4&lt;/b&gt;&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="255" width="60" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_udp" value="&lt;b&gt;UDP&lt;/b&gt;&lt;br&gt;8 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="255" width="40" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_lb" value="&lt;b&gt;LBHdrV2&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="255" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_ec" value="&lt;b&gt;ECHdr&lt;/b&gt;&lt;br&gt;16 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="255" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_re" value="&lt;b&gt;REHdr&lt;/b&gt;&lt;br&gt;20 B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="255" width="70" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_payload" value="&lt;b&gt;Parity Data&lt;/b&gt;&lt;br&gt;colHeight = 1420 B&lt;br&gt;parityBuf[ecFrameNum × colHeight]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=middle;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="255" width="630" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_total_arrow" value="" style="endArrow=block;startArrow=block;endFill=1;startFill=1;strokeColor=#333333;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="60" y="320" as="sourcePoint"/>
+                        <mxPoint x="1020" y="320" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="p_total_label" value="&lt;b&gt;Total: 20+8+16+16+20+1420 = 1500 bytes = MTU (exactly)&lt;/b&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" parent="p_total_arrow" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_recv_extracts" value="Receiver extracts from ECHdr: P=1, ecFrameNum (0–7), padFrames, colHeight, fecBlockNum&lt;br&gt;Receiver extracts from REHdr (before parity data): eventNum, dataId, bufferLength=N (bufferOffset always 0 for parity)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=2;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="336" width="700" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="hdr_title" value="&lt;b&gt;Header Field Details&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="385" width="160" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec_title2" value="&lt;b&gt;ECHdr (16 bytes) — Receiver Reads&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="415" width="250" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec_fields" value="&lt;font face=&quot;Courier New&quot;&gt;magic[2]      = 'E','C'   → detect FEC packet    (2 B)&lt;br&gt;version       = 1                                  (1 B)&lt;br&gt;nextProto     = 1 (RE follows)                     (1 B)&lt;br&gt;dataId                                             (2 B)&lt;br&gt;pFrameNum     = [P(1b) | frameNum(7b)]             (1 B)&lt;br&gt;  P=0: data, ecFrameNum=0–31 (segmentBuf row index)&lt;br&gt;  P=1: parity, ecFrameNum=0–7 (parityBuf row index)&lt;br&gt;rPadFrames    = [R(1b) | padFrames(7b)]            (1 B)&lt;br&gt;  padFrames: empty rows in this block (32−segsInBlock)&lt;br&gt;ecSegmentSize = colHeight = 1420                   (2 B)&lt;br&gt;padBytes      = trailing zeros in last data segment (2 B)&lt;br&gt;fecBlockNum   = block index for this event          (4 B)&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=10;rounded=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="438" width="460" height="185" as="geometry"/>
+                </mxCell>
+                <mxCell id="re_title" value="&lt;b&gt;REHdr (20 bytes) — Inside Segment Payload (data) or Before Parity Data&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="415" width="510" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="re_fields" value="&lt;font face=&quot;Courier New&quot;&gt;preamble[2]   = {0x10, 0x00}          (2 B)&lt;br&gt;dataId        = source identifier      (2 B)&lt;br&gt;bufferOffset  = offset in event buf    (4 B)&lt;br&gt;  data pkt: i × maxUserData (0, 1400, 2800, ...)&lt;br&gt;  parity pkt: 0 (always)&lt;br&gt;bufferLength  = N (total event bytes)  (4 B)&lt;br&gt;eventNum      = event sequence number  (8 B)&lt;/font&gt;&lt;br&gt;&lt;br&gt;Receiver uses bufferOffset to scatter segment data&lt;br&gt;into the correct position of the event buffer." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=10;rounded=1;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="438" width="430" height="185" as="geometry"/>
+                </mxCell>
+                <mxCell id="late_title" value="&lt;b&gt;Late-Arrival and Duplicate Handling&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="645" width="300" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="late_box" value="completedFecBlocks set: if blockKey = (eventNum, dataId, fecBlockNum) is in this set,&lt;br&gt;the block was already assembled — incoming packet is silently dropped (free + continue).&lt;br&gt;&lt;br&gt;This prevents duplicate data or parity from corrupting an already-assembled segmentBuf.&lt;br&gt;&lt;br&gt;Duplicate data segments within a still-in-progress block:&lt;br&gt;  if (dataReceived &amp; (1 &lt;&lt; ecFrameNum)) → skip (do not overwrite existing row)&lt;br&gt;  This applies to both data and parity segments." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="672" width="580" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="order_title" value="&lt;b&gt;Arrival Order Notes&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="645" width="180" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="order_box" value="Packets can arrive in any order:&lt;br&gt;  • Data segments from different blocks of the same event&lt;br&gt;  • Parity before data (stored in parityBuf; used only if recovery needed)&lt;br&gt;  • Multiple events interleaved (keyed by blockKey)&lt;br&gt;&lt;br&gt;The receiver handles all orderings correctly because:&lt;br&gt;  • Each FecBlockState is keyed independently&lt;br&gt;  • Bitmasks track which rows have been filled&lt;br&gt;  • Scatter uses REHdr.bufferOffset (not arrival order)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="672" width="400" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="sizes_box" value="&lt;b&gt;Wire Sizes&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;Data pkt:   60B hdrs + 1420B = 1480B&lt;br&gt;Parity pkt: 80B hdrs + 1420B = 1500B&lt;/font&gt;&lt;br&gt;&lt;br&gt;Data has REHdr inside payload (FEC-protected).&lt;br&gt;Parity has REHdr outside payload so receiver&lt;br&gt;can identify the event without decoding parity." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="800" width="340" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="seg_data_note" value="&lt;b&gt;segData pointer offset:&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;data pkt:   segData = payload + sizeof(ECHdr)&lt;br&gt;            → points to REHdr (inside segment payload)&lt;br&gt;            → copy colHeight bytes to segmentBuf row&lt;br&gt;&lt;br&gt;parity pkt: segData = payload + sizeof(ECHdr) + sizeof(REHdr)&lt;br&gt;            → skip outer REHdr, points to parity bytes&lt;br&gt;            → copy colHeight bytes to parityBuf row&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="800" width="430" height="130" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

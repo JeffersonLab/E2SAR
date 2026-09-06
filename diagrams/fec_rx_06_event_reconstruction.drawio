@@ -1,0 +1,118 @@
+<mxfile host="65bd71144e">
+    <diagram id="fec-rx-06-evtrec" name="RX Diagram 6: Multi-Block Event Reconstruction">
+        <mxGraphModel dx="1594" dy="807" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="850" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;b&gt;RX Diagram 6: Multi-Block Event Reconstruction&lt;/b&gt;&lt;br&gt;How segments from numBlocks = ⌈N/44,800⌉ blocks are scattered into a single N-byte event buffer" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="15" width="760" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk0_title" value="&lt;b&gt;Block 0&lt;/b&gt; (fecBlockNum=0)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="75" width="195" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk0_s0" value="Seg 0&lt;br&gt;off=0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="102" width="55" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk0_s1" value="Seg 1&lt;br&gt;off=1400" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="105" y="102" width="55" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk0_dots" value="···" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="165" y="112" width="25" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk0_s31" value="Seg 31&lt;br&gt;off=43400" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="102" width="65" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk1_title" value="&lt;b&gt;Block 1&lt;/b&gt; (fecBlockNum=1)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="310" y="75" width="195" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk1_s0" value="Seg 32&lt;br&gt;off=44800" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="310" y="102" width="60" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk1_s1" value="Seg 33&lt;br&gt;off=46200" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="370" y="102" width="60" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk1_dots" value="···" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="435" y="112" width="25" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="blk1_s31" value="Seg 63&lt;br&gt;off=88200" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="102" width="65" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blkdots_title" value="···  (more blocks)  ···" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="570" y="100" width="180" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="blkn_title" value="&lt;b&gt;Block n−1&lt;/b&gt; (last block)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="790" y="75" width="205" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="blkn_s0" value="Seg (n−1)×32&lt;br&gt;off=…" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="790" y="102" width="75" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blkn_dots" value="···" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="870" y="112" width="25" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="blkn_last" value="Seg numSegs−1&lt;br&gt;off=(numSegs−1)×1400&lt;br&gt;len ≤ 1400 B (may be shorter)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="895" y="102" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="blkn_pad" value="(padFrames&lt;br&gt;empty rows)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;verticalAlign=middle;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="1015" y="102" width="80" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_b0s0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.02;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;" parent="1" source="blk0_s0" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_b0s1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.06;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;" parent="1" source="blk0_s1" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_b0s31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.18;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;" parent="1" source="blk0_s31" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_b1s0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.28;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" parent="1" source="blk1_s0" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_b1s31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.38;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;" parent="1" source="blk1_s31" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_bn0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;strokeColor=#9673a6;" parent="1" source="blkn_s0" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arr_bn_last" style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.92;entryY=0;entryDx=0;entryDy=0;strokeColor=#9673a6;" parent="1" source="blkn_last" target="evtbuf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="evtbuf" value="&lt;b&gt;event[N bytes]&lt;/b&gt;  (EventQueueItem.event)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="240" width="1200" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="evt_b0" value="Block 0 data&lt;br&gt;[0..44,799]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="290" width="210" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="evt_b1" value="Block 1 data&lt;br&gt;[44,800..89,599]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="290" width="210" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="evt_dots2" value="···" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="465" y="300" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="evt_bn" value="Block n−1 data&lt;br&gt;[… .. N−1]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1000" y="290" width="240" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="evt_note" value="←  event buffer N bytes  →" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="330" width="1200" height="18" as="geometry"/>
+                </mxCell>
+                <mxCell id="offset_title" value="&lt;b&gt;bufferOffset Formula&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="370" width="200" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="offset_box" value="Segment i of block b has REHdr.bufferOffset = (b × 32 + i) × maxUserData&lt;br&gt;maxUserData = colHeight − sizeof(REHdr) = 1420 − 20 = 1400 B&lt;br&gt;&lt;br&gt;Examples:&lt;br&gt;  Block 0, seg 0:   offset = 0&lt;br&gt;  Block 0, seg 1:   offset = 1,400&lt;br&gt;  Block 0, seg 31:  offset = 43,400&lt;br&gt;  Block 1, seg 0:   offset = 44,800   (= 32 × 1400)&lt;br&gt;  Block 1, seg 31:  offset = 88,200&lt;br&gt;  Block n−1, last:  offset = (numSegs−1) × 1400&lt;br&gt;&lt;br&gt;Last segment: segDataLen = min(maxUserData, N − offset)  (may be &lt; 1400 B)" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=11;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="397" width="640" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="evtitem_title2" value="&lt;b&gt;EventQueueItem Lifecycle&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="370" width="230" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="evtitem_box2" value="Created: on first packet for any block of this event&lt;br&gt;  event = new uint8_t[totalEventBytes]  (N bytes, zeroed)&lt;br&gt;  fecBlocksExpected = (numSegs + 31) / 32&lt;br&gt;  fecBlocksCompleted = 0&lt;br&gt;&lt;br&gt;Updated: each time a block completes (happy path or GC)&lt;br&gt;  memcpy fills segments at their bufferOffset positions&lt;br&gt;  fecBlocksCompleted++&lt;br&gt;&lt;br&gt;Completed: fecBlocksCompleted == fecBlocksExpected&lt;br&gt;  eventsInProgress.erase(eventKey)&lt;br&gt;  enqueue(item) → output queue&lt;br&gt;  recvStats.eventSuccess++&lt;br&gt;&lt;br&gt;Dropped (GC failure): fecRecoveries cannot fix a block&lt;br&gt;  delete[] item-&gt;event&lt;br&gt;  fecFailures++, logLostEvent()" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="397" width="510" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="params_box2" value="&lt;b&gt;Key Parameters&lt;/b&gt;&lt;br&gt;maxUserData = 1400 B&lt;br&gt;numSegs = ⌈N / 1400⌉&lt;br&gt;numBlocks = ⌈numSegs / 32⌉&lt;br&gt;dataSegsNeeded per block = 32 − padFrames&lt;br&gt;  (last block: 32 − padFrames = numSegs mod 32)&lt;br&gt;  (full blocks: padFrames = 0)&lt;br&gt;&lt;br&gt;Max user data per block: 32 × 1400 = 44,800 B&lt;br&gt;Max user data per event: numBlocks × 44,800 B" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#b85450;fillColor=#f8cecc;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="615" width="400" height="185" as="geometry"/>
+                </mxCell>
+                <mxCell id="ordering_box" value="&lt;b&gt;Block Arrival Order&lt;/b&gt;&lt;br&gt;Blocks for the same event can arrive in any order.&lt;br&gt;Each block is keyed by (eventNum, dataId, fecBlockNum)&lt;br&gt;and assembled independently by recv threads.&lt;br&gt;&lt;br&gt;REHdr.bufferOffset — not arrival order — determines&lt;br&gt;where in the event buffer each segment is placed.&lt;br&gt;&lt;br&gt;EventQueueItem.fecBlocksExpected is computed on the&lt;br&gt;first arriving packet and compared against&lt;br&gt;fecBlocksCompleted as each block finishes." style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=10;rounded=1;arcSize=5;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="615" width="410" height="185" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
