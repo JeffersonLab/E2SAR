@@ -11,11 +11,17 @@ Or, add this path to PYTHONPATH, e.g,
 # export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
+import sys
 import pytest
 
 # Make sure the compiled module is added to your path
 import e2sar_py
 opt = e2sar_py.Optimizations
+
+_no_sendmmsg = pytest.mark.skipif(
+    sys.platform == 'darwin',
+    reason='sendmmsg not available on macOS'
+)
 
 
 @pytest.mark.unit
@@ -78,6 +84,7 @@ def test_available_as_word():
 
 
 @pytest.mark.unit
+@_no_sendmmsg
 def test_select_by_string():
     """Test the select function with string inputs."""
     opt_names = ["sendmmsg"]
@@ -87,6 +94,7 @@ def test_select_by_string():
 
 
 @pytest.mark.unit
+@_no_sendmmsg
 def test_select_by_enum():
     """Test the select function with enum inputs."""
     # According to the underlying cpp implementation, "sendmmg" cannot be

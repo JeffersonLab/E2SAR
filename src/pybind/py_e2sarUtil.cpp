@@ -44,8 +44,19 @@ void init_e2sarUtil(py::module_ &m) {
     // Return types of void
     ejfat_uri.def("set_instance_token", &EjfatURI::set_InstanceToken);
     ejfat_uri.def("set_session_token", &EjfatURI::set_SessionToken);
-    ejfat_uri.def("set_sync_addr", &EjfatURI::set_syncAddr);
-    ejfat_uri.def("set_data_addr", &EjfatURI::set_dataAddr);
+    ejfat_uri.def("set_sync_addr", [](EjfatURI &u, const std::string &addr, u_int16_t port) {
+        auto r = string_to_ip(addr);
+        if (r.has_error()) throw std::runtime_error(r.error().message());
+        u.set_syncAddr({r.value(), port});
+    }, py::arg("addr"), py::arg("port"));
+    ejfat_uri.def("set_data_addr", [](EjfatURI &u, const std::string &addr,
+                                      u_int16_t min_port, u_int16_t max_port) {
+        auto r = string_to_ip(addr);
+        if (r.has_error()) throw std::runtime_error(r.error().message());
+        u.set_dataAddr({r.value(), {min_port, max_port}});
+    }, py::arg("addr"), py::arg("min_port"), py::arg("max_port"));
+    ejfat_uri.def("set_data_port_range", &EjfatURI::set_dataPortRange,
+        py::arg("min_port"), py::arg("max_port"));
 
     // Return types of bool
     ejfat_uri.def("get_useTls", &EjfatURI::get_useTls);
@@ -53,6 +64,8 @@ void init_e2sarUtil(py::module_ &m) {
     ejfat_uri.def("has_data_addr_v6", &EjfatURI::has_dataAddrv6);
     ejfat_uri.def("has_data_addr", &EjfatURI::has_dataAddr);
     ejfat_uri.def("has_sync_addr", &EjfatURI::has_syncAddr);
+    ejfat_uri.def("has_sync_addr_v4", &EjfatURI::has_syncAddrv4);
+    ejfat_uri.def("has_sync_addr_v6", &EjfatURI::has_syncAddrv6);
 
     // Return types of result<std::string>.
     ejfat_uri.def("get_instance_token", &EjfatURI::get_InstanceToken);
@@ -61,9 +74,30 @@ void init_e2sarUtil(py::module_ &m) {
 
     // Return types of result<std::pair<ip::address, u_int16_t>>.
     ejfat_uri.def("get_cp_addr", &EjfatURI::get_cpAddr);
-    ejfat_uri.def("get_data_addr_v4", &EjfatURI::get_dataAddrv4);
-    ejfat_uri.def("get_data_addr_v6", &EjfatURI::get_dataAddrv6);
     ejfat_uri.def("get_sync_addr", &EjfatURI::get_syncAddr);
+    ejfat_uri.def("get_sync_addr_v4", &EjfatURI::get_syncAddrv4);
+    ejfat_uri.def("get_sync_addr_v6", &EjfatURI::get_syncAddrv6);
+
+    // Return types of result<pair<ip::address, pair<u_int16_t,u_int16_t>>> as (addr, min, max) tuples.
+    ejfat_uri.def("get_data_addr_v4", [](const EjfatURI &u) {
+        auto r = u.get_dataAddrv4();
+        if (r.has_error()) throw std::runtime_error(r.error().message());
+        return py::make_tuple(r.value().first.to_string(),
+                              (int)r.value().second.first, (int)r.value().second.second);
+    });
+    ejfat_uri.def("get_data_addr_v6", [](const EjfatURI &u) {
+        auto r = u.get_dataAddrv6();
+        if (r.has_error()) throw std::runtime_error(r.error().message());
+        return py::make_tuple(r.value().first.to_string(),
+                              (int)r.value().second.first, (int)r.value().second.second);
+    });
+
+    // Return type of result<pair<u_int16_t,u_int16_t>> as (min, max) tuple.
+    ejfat_uri.def("get_data_port_range", [](const EjfatURI &u) {
+        auto r = u.get_dataPortRange();
+        if (r.has_error()) throw std::runtime_error(r.error().message());
+        return py::make_tuple((int)r.value().first, (int)r.value().second);
+    });
 
     // Return type of result<std::vector<ip::address>> - return a list of IP strings
     ejfat_uri.def("get_dp_local_addrs",

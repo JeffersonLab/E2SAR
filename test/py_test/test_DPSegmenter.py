@@ -87,6 +87,7 @@ def test_seg_constructor_simple():
 
 
 @pytest.mark.unit
+@pytest.mark.skipif(sys.platform == 'darwin', reason='Thread affinity not supported on macOS')
 def test_seg_constructor_from_cpucorelist():
     """Test segmenter constructor with CPU core list."""
     flags = sflags.getFromINI(SFLAGS_INIT_FILE).value()

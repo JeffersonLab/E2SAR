@@ -11,14 +11,21 @@ Or, add this path to PYTHONPATH, e.g,
 # export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
+import sys
 import pytest
 
 # Make sure the compiled module is added to your path
 import e2sar_py
 affinity = e2sar_py.Affinity
 
+_no_affinity = pytest.mark.skipif(
+    sys.platform == 'darwin',
+    reason='Thread/process affinity (pthread_setaffinity_np / NUMA) not available on macOS'
+)
+
 
 @pytest.mark.unit
+@_no_affinity
 def test_set_process():
     """Test set_process() method."""
     cpu_cores = [0]
@@ -28,6 +35,7 @@ def test_set_process():
 
 
 @pytest.mark.unit
+@_no_affinity
 def test_set_thread():
     """Test set_thread() method."""
     cpu_core = 0
@@ -37,6 +45,7 @@ def test_set_thread():
 
 
 @pytest.mark.unit
+@_no_affinity
 def test_set_thread_xor():
     """Test set_thread_xor() method."""
     cpu_cores = [1]
@@ -46,6 +55,7 @@ def test_set_thread_xor():
 
 
 @pytest.mark.unit
+@_no_affinity
 def test_numa_bind():
     """Test set_numa_bind() method."""
     node = 0

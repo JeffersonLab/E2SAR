@@ -26,14 +26,25 @@ def get_local_addr(url: str) -> str:
     if not ip_port:
         raise ValueError("URL query string must define data=")
 
-    if ":" in ip_port:
+    if ip_port.startswith("["):
+        # IPv6 in brackets: [addr]:port or [addr]:min-max or [addr]
+        bracket_end = ip_port.index("]")
+        ip_addr = ip_port[1:bracket_end]
+        port_part = ip_port[bracket_end + 1:]
+        if port_part.startswith(":"):
+            port = int(port_part[1:].split("-")[0])
+        else:
+            port = 80
+    elif ":" in ip_port:
         ip_addr, port_str = ip_port.split(":", 1)
-        port = int(port_str)
+        port = int(port_str.split("-")[0])
     else:
         ip_addr = ip_port
         port = 80
 
-    test_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    is_v6 = ":" in ip_addr
+    family = socket.AF_INET6 if is_v6 else socket.AF_INET
+    test_sock = socket.socket(family, socket.SOCK_DGRAM)
     test_sock.connect((ip_addr, port))
     with test_sock:
         local_ip, _ = test_sock.getsockname()
