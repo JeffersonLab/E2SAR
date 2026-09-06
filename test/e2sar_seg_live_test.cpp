@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
         lbman.get_URI().get_syncAddr().value().first << ":" << 
         lbman.get_URI().get_syncAddr().value().second << " and data " <<
         lbman.get_URI().get_dataAddrv4().value().first << ":" <<
-        lbman.get_URI().get_dataAddrv4().value().second << 
+        lbman.get_URI().get_dataAddrv4().value().second.first << 
         std::endl;
     
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
         lbman.get_URI().get_syncAddr().value().first << ":" << 
         lbman.get_URI().get_syncAddr().value().second << " and data " <<
         lbman.get_URI().get_dataAddrv4().value().first << ":" <<
-        lbman.get_URI().get_dataAddrv4().value().second << 
+        lbman.get_URI().get_dataAddrv4().value().second.first << 
         std::endl;
     
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 1/2 SECONDS."s};

@@ -553,9 +553,9 @@ namespace e2sar
                 dataAddrStruct6.sin6_family = AF_INET6;
                 // use consecutive destination ports of requested
                 if (seg.multiPort)
-                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second + fdCount);
+                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second.first + fdCount);
                 else
-                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
+                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second.first);
                 inet_pton(AF_INET6, dataAddr6.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
 
                 if (connectSocket) {
@@ -645,9 +645,9 @@ namespace e2sar
                 dataAddrStruct4.sin_family = AF_INET;
                 // use consecutive destination ports of requested
                 if (seg.multiPort)
-                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second + fdCount);
+                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second.first + fdCount);
                 else
-                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second.first);
 
                 inet_pton(AF_INET, dataAddr4.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
 
