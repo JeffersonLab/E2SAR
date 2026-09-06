@@ -28,7 +28,6 @@ class Segmenter:
         warm_up_ms: Sync-only warm-up period before data sends (ms).
         event_queue_size: Size of the internal send queue.
         smooth: Shape rate per sendmsg() call rather than per event.
-        multi_port: Use numSendSockets consecutive destination ports.
         ticks_as_re_event_num: Override RE event number with LB event number.
         lb_hdr_version: LB header version to use (2 or 3).
 
@@ -54,7 +53,6 @@ class Segmenter:
         warm_up_ms: int = 1000,
         event_queue_size: int = 2047,
         smooth: bool = False,
-        multi_port: bool = False,
         ticks_as_re_event_num: bool = False,
         lb_hdr_version: int = 2,
     ):
@@ -78,7 +76,6 @@ class Segmenter:
         sflags.warmUpMs = warm_up_ms
         sflags.eventQueueSize = event_queue_size
         sflags.smooth = smooth
-        sflags.multiPort = multi_port
         sflags.ticksAsREEventNum = ticks_as_re_event_num
         sflags.lbHdrVersion = lb_hdr_version
 

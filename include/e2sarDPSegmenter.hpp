@@ -72,8 +72,6 @@ namespace e2sar
             // WARNING: Incompatible with optimizations that send entire batches of 
             // frames to the kernel, i.e. sendMmsg and io_uring
             const bool smooth;
-            // use multiple destination ports (for back-to-back testing only)
-            const bool multiPort;
             // which LB header version are we using
             const u_int8_t lbHdrVersion;
 
@@ -360,8 +358,6 @@ namespace e2sar
              * - rateGbps - send rate as floating point expression in Gbps. Negative value means unlimited. {-1.0}
              * - smooth - shape on a per sendmsg() call rather than after every event, doesn't work for
              * send optimizations and only works at low speeds (~<3Gbps) {false}
-             * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
-             * rather than a single port; source ports are still randomized  {false}
              * - ticksAsREEventNum - override the RE event number field with the same event number as LB event number
              * which is a tick, primarily good for debugging {false}
              * - lbHdrVersion - version of the LB header to be used (2 or 3 are valid) {2}
@@ -380,14 +376,13 @@ namespace e2sar
                 int sndSocketBufSize;
                 float rateGbps;
                 bool smooth;
-                bool multiPort;
                 bool ticksAsREEventNum;
                 u_int8_t lbHdrVersion; 
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    eventQueueSize{2047}, numSendSockets{4},sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
-                    multiPort{false}, ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
+                    eventQueueSize{2047}, numSendSockets{4},sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false},
+                    ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

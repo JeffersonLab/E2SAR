@@ -263,12 +263,20 @@ This replaces both the `multiPort=true` and `multiPort=false` paths with a singl
 
 **B2B testing note**: Instead of `--multiport`, users craft a tight range URI matching the Reassembler's port count, e.g., `data=127.0.0.1:10000-10003` for 4 recv threads. The Reassembler opens consecutive ports from `starting_port`, so a tight range produces the matching consecutive destination ports.
 
-### 3E. Remove `multiPort` flag
+### 3E. Remove `multiPort` flag (implemented alongside 3D)
 
-- Remove `multiPort` from `SegmenterFlags` and from the `Segmenter` class
-- Remove `--multiport` CLI option from `e2sar_perf.cpp` and `e2sar_ft.cpp`
-- Remove any `multiPort` references in pybind bindings (`py_e2sarDP.cpp`) if exposed
-- Port distribution is now always automatic from the URI's port range
+All locations containing `multiPort` (confirmed by grep):
+
+| File | Change |
+|---|---|
+| `include/e2sarDPSegmenter.hpp` | Remove `const bool multiPort` Segmenter member; remove `bool multiPort` + `multiPort{false}` from `SegmenterFlags`; remove its doc comment entry |
+| `src/e2sarDPSegmenter.cpp` | Remove `multiPort{sflags.multiPort}` from constructor init; replace `if (seg.multiPort)` conditionals in `_openDataSockets` with port distribution formula (3D); remove `sFlags.multiPort = ...` INI parsing |
+| `bin/e2sar_perf.cpp` | Remove `multiPort` bool variable, `opts("multiport",...)`, `conflicting_options(..., "multiport")`, `vm["multiport"]` assignment, both `sflags.multiPort = multiPort` assignments, and the `"Multiple destination ports"` status output line |
+| `src/pybind/py_e2sarDP.cpp` | Remove `.def_readwrite("multiPort", ...)` |
+| `src/python/e2sar/segmenter.py` | Remove `multi_port` docstring entry, parameter, and `sflags.multiPort = multi_port` assignment |
+| `segmenter_config.ini` (root + `test/py_test/`) | Remove `multiPort = false` line and its comment |
+
+`e2sar_ft.cpp` has no multiPort references — no change needed.
 
 ### 3F. `test/e2sar_seg_test.cpp` — display-only port accesses
 

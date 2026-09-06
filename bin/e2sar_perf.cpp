@@ -371,7 +371,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6, realmalloc;
+    bool withCP, smooth, autoIP, validate, quiet, dpv6, realmalloc;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -417,7 +417,6 @@ int main(int argc, char **argv)
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s,r]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
-    opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
     opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
@@ -453,7 +452,6 @@ int main(int argc, char **argv)
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
-        conflicting_options(vm, "recv", "multiport");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
         conflicting_options(vm, "rate", "rateGbps");
@@ -513,7 +511,6 @@ int main(int argc, char **argv)
 
     withCP = vm["withcp"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
-    multiPort = vm["multiport"].as<bool>();
     smooth = vm["smooth"].as<bool>();
     validate = not vm["novalidate"].as<bool>();
     quiet = vm["quiet"].as<bool>();
@@ -580,8 +577,6 @@ int main(int argc, char **argv)
                     sflags.numSendSockets = numSockets;
                 if (not vm["rate"].defaulted())
                     sflags.rateGbps = rateGbps;
-                if (not vm["multiport"].defaulted())
-                    sflags.multiPort = multiPort;
                 if (not vm["smooth"].defaulted())
                     sflags.smooth = smooth;
                 if (not vm["lbhdrversion"].defaulted())
@@ -594,7 +589,6 @@ int main(int argc, char **argv)
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
                 sflags.rateGbps = rateGbps;
-                sflags.multiPort = multiPort;
                 sflags.smooth = smooth;
                 sflags.lbHdrVersion = lbHdrVer;
                 sflags.dpV6 = dpv6;
@@ -638,7 +632,6 @@ int main(int argc, char **argv)
             }
 
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
-            std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Sending sockets/threads:       " << sflags.numSendSockets << std::endl;
