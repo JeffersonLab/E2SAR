@@ -69,7 +69,14 @@ def test_reas_constructor():
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
 
+_no_affinity_or_routing = pytest.mark.skipif(
+    sys.platform == 'darwin',
+    reason='Thread affinity and outgoing-IP auto-detection not supported on macOS'
+)
+
+
 @pytest.mark.unit
+@_no_affinity_or_routing
 def test_reas_constructor_core_list():
     """Test reassembler constructor with CPU core list."""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -89,6 +96,7 @@ def test_reas_constructor_core_list():
 
 
 @pytest.mark.unit
+@_no_affinity_or_routing
 def test_reas_constructor_core_list_auto_data_ip():
     """Test reassembler constructor with CPU core list and auto dataIP detection."""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -131,6 +139,7 @@ def test_get_fd_stats():
 
 
 @pytest.mark.unit
+@_no_affinity_or_routing
 def test_get_data_ip():
     """Test Reassembler::get_dataIP"""
     res = rflags.getFromINI(RFLAGS_INIT_FILE)
@@ -147,14 +156,11 @@ def test_get_data_ip():
     reassembler = reas(reas_uri, DP_IPV4_PORT, core_list, flags, False)
     assert isinstance(reassembler, reas), "Reassembler object creation failed! "
 
-    res = reas_uri.get_data_addr_v4()
-    assert res.has_error() is False, f"Error: {res.error().message}"
-    ip = res.value()[0]
-    assert isinstance(ip, e2sar_py.IPAddress)
-    assert str(ip) == DP_IPV4_ADDR, "EjfatURI get_data_addr_v4() failed!"
+    addr_str, min_port, max_port = reas_uri.get_data_addr_v4()
+    assert addr_str == DP_IPV4_ADDR, "EjfatURI get_data_addr_v4() failed!"
 
     ret_ip = reassembler.get_dataIP()
-    assert ret_ip == str(ip), "Reassembler::get_dataIP() method failed!"
+    assert ret_ip == addr_str, "Reassembler::get_dataIP() method failed!"
 
 
 '''

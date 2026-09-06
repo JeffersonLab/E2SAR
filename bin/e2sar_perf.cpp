@@ -371,7 +371,7 @@ int main(int argc, char **argv)
     float rateGbps;
     int sockBufSize;
     int durationSec;
-    bool withCP, multiPort, smooth, autoIP, validate, quiet, dpv6, realmalloc;
+    bool withCP, smooth, autoIP, validate, quiet, dpv6, realmalloc;
     std::string sndrcvIP;
     std::string iniFile;
     u_int16_t recvStartPort;
@@ -411,13 +411,13 @@ int main(int argc, char **argv)
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("dpv6", po::bool_switch()->default_value(false), "use IPv6 in the dataplane when initializing segmenter [s]. Assumes EJFAT_URI contains an IPv6 'data' address");
+    opts("syncv6", po::bool_switch()->default_value(false), "use IPv6 sync address (default is IPv4 regardless of dataplane family) [s]");
     opts("novalidate,v", po::bool_switch()->default_value(false), "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
     opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s,r]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
-    opts("multiport", po::bool_switch()->default_value(false), "use consecutive destination ports instead of one port [s]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
     opts("quiet,q", po::bool_switch()->default_value(false), "quiet, do not print intermediate lost event statistics [r]");
@@ -448,12 +448,12 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "send", "period");
         conflicting_options(vm, "ipv4", "ipv6");
+        conflicting_options(vm, "recv", "syncv6");
         conflicting_options(vm, "send", "quiet");
         conflicting_options(vm, "send", "rcviovecsize");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
-        conflicting_options(vm, "recv", "multiport");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
         conflicting_options(vm, "rate", "rateGbps");
@@ -486,8 +486,8 @@ int main(int argc, char **argv)
 
         std::cout << "A trivial loopback invocation sending 10 1MB events at 1Gbps looks like this" << std::endl;
         std::cout << "(start the receiver first, stop it with Ctrl-C when done): " << std::endl;
-        std::cout << "Receiver: e2sar_perf --ip '127.0.0.1' -r -u 'ejfat://token@127.0.0.1:18020/lb/36?data=127.0.0.1:10000'" << std::endl;
-        std::cout << "Sender:   e2sar_perf --ip '127.0.0.1' -s -u 'ejfat://token@127.0.0.1:18020/lb/36?data=127.0.0.1:10000' --rate 1" << std::endl;
+        std::cout << "Receiver: e2sar_perf --ip '127.0.0.1' -r -u 'ejfat://token@127.0.0.1:18020/lb/36?data=127.0.0.1:10000-10003'" << std::endl;
+        std::cout << "Sender:   e2sar_perf --ip '127.0.0.1' -s -u 'ejfat://token@127.0.0.1:18020/lb/36?data=127.0.0.1:10000-10003' --rate 1" << std::endl;
         return 0;
     }
 
@@ -513,7 +513,6 @@ int main(int argc, char **argv)
 
     withCP = vm["withcp"].as<bool>();
     autoIP = vm["autoip"].as<bool>();
-    multiPort = vm["multiport"].as<bool>();
     smooth = vm["smooth"].as<bool>();
     validate = not vm["novalidate"].as<bool>();
     quiet = vm["quiet"].as<bool>();
@@ -580,24 +579,24 @@ int main(int argc, char **argv)
                     sflags.numSendSockets = numSockets;
                 if (not vm["rate"].defaulted())
                     sflags.rateGbps = rateGbps;
-                if (not vm["multiport"].defaulted())
-                    sflags.multiPort = multiPort;
                 if (not vm["smooth"].defaulted())
                     sflags.smooth = smooth;
                 if (not vm["lbhdrversion"].defaulted())
                     sflags.lbHdrVersion = lbHdrVer;
                 if (not vm["dpv6"].defaulted())
                     sflags.dpV6 = dpv6;
-            } else {   
-                sflags.useCP = withCP; 
+                if (not vm["syncv6"].defaulted())
+                    sflags.syncV6 = vm["syncv6"].as<bool>();
+            } else {
+                sflags.useCP = withCP;
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
                 sflags.rateGbps = rateGbps;
-                sflags.multiPort = multiPort;
                 sflags.smooth = smooth;
                 sflags.lbHdrVersion = lbHdrVer;
                 sflags.dpV6 = dpv6;
+                sflags.syncV6 = vm["syncv6"].as<bool>();
             }
 
             // if using control plane
@@ -638,7 +637,6 @@ int main(int argc, char **argv)
             }
 
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
-            std::cout << "Multiple destination ports:    " << (sflags.multiPort ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
             std::cout << "Sending sockets/threads:       " << sflags.numSendSockets << std::endl;

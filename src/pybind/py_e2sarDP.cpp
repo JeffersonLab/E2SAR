@@ -107,7 +107,7 @@ void init_e2sarDP_segmenter(py::module_ &m) {
         .def_readwrite("warmUpMs", &Segmenter::SegmenterFlags::warmUpMs)
         .def_readwrite("eventQueueSize", &Segmenter::SegmenterFlags::eventQueueSize)
         .def_readwrite("smooth", &Segmenter::SegmenterFlags::smooth)
-        .def_readwrite("multiPort", &Segmenter::SegmenterFlags::multiPort)
+        .def_readwrite("syncV6", &Segmenter::SegmenterFlags::syncV6)
         .def_readwrite("ticksAsREEventNum", &Segmenter::SegmenterFlags::ticksAsREEventNum)
         .def_readwrite("lbHdrVersion", &Segmenter::SegmenterFlags::lbHdrVersion)
         .def("getFromINI", &Segmenter::SegmenterFlags::getFromINI);

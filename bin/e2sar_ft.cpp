@@ -488,6 +488,7 @@ int main(int argc, char **argv)
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
+    opts("syncv6", po::bool_switch()->default_value(false), "use IPv6 sync address (default is IPv4 regardless of dataplane family) [s]");
     opts("novalidate,v", "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
@@ -529,6 +530,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "recv", "dataid");
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "ipv4", "ipv6");
+        conflicting_options(vm, "recv", "syncv6");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
         conflicting_options(vm, "send", "rcviovecsize");
@@ -684,6 +686,7 @@ int main(int argc, char **argv)
             sflags.numSendSockets = numSockets;
             sflags.rateGbps = rateGbps; // unlimited
             sflags.smooth = smooth;
+            sflags.syncV6 = vm["syncv6"].as<bool>();
 
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;

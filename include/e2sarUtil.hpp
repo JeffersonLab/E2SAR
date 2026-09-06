@@ -45,12 +45,15 @@ namespace e2sar
     extern sources::severity_logger_mt<trivial::severity_level> lg;
 
     const u_int16_t DATAPLANE_PORT = 19522;
+    const u_int16_t DATAPLANE_PORT_MIN = 16384;
+    const u_int16_t DATAPLANE_PORT_MAX = 32767;
 
-    /** Structure to hold info parsed from an ejfat URI (and a little extra). 
+    /** Structure to hold info parsed from an ejfat URI (and a little extra).
      * The URI is of the format:
-     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>[:<data_port>]][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
-     * More than one data= address can be specified (typically an IPv4 and IPv6). For data
-     * the port is optional and defaults to 19522, however for testing/debugging can be overridden
+     * ejfat[s]://[<token>@]<cp_host>:<cp_port>/lb/<lb_id>[?[data=<data_host>[:<data_port_or_range>]][&sync=<sync_host>:<sync_port>]][&sessionid=<string>].
+     * More than one data= and sync= address can be specified (typically an IPv4 and IPv6 each).
+     * For data the port can be a single port (e.g. :1234), a range (e.g. :1234-5678), or omitted
+     * (defaults to range 16384-32767).
     */
     class EjfatURI
     {
@@ -98,18 +101,21 @@ namespace e2sar
         bool haveDatav4;
         bool haveDatav6;
         /** Is there a valid sync addr & port? */
-        bool haveSync;
+        bool haveSyncv4;
+        bool haveSyncv6;
         /** Use TLS */
         bool useTls;
         /** Use IPv6 control plane IP address if available */
         bool preferV6;
 
-        /** UDP port for event sender to send sync messages to. */
-        u_int16_t syncPort;
+        /** UDP port for event sender to send sync messages to (per address family). */
+        u_int16_t syncPortv4;
+        u_int16_t syncPortv6;
         /** TCP port for grpc communications with CP. */
         u_int16_t cpPort;
-        /** Dataplane port (normally defaults to DATAPLANE_PORT) */
-        u_int16_t dataPort;
+        /** Dataplane port range (shared between v4 and v6) */
+        u_int16_t dataMinPort;
+        u_int16_t dataMaxPort;
 
         /** String given by user, during registration, to label an LB instance. */
         std::string lbName;
@@ -123,8 +129,9 @@ namespace e2sar
         /** data plane addresses - there can ever only be one v4 and one v6 */
         ip::address dataAddrv4;
         ip::address dataAddrv6;
-        /** address to send sync messages to. Not used, for future expansion. (v4 or v6)*/
-        ip::address syncAddr;
+        /** addresses to send sync messages to (v4 and/or v6) */
+        ip::address syncAddrv4;
+        ip::address syncAddrv6;
         /** IP address (and host if available) for grpc communication with CP. */
         ip::address cpAddr;
         std::string cpHost;
@@ -221,19 +228,26 @@ namespace e2sar
         }
 
         /**
-         * Set the sync address (v4 or v6)
+         * Set the sync address — dispatches to v4 or v6 based on address family
         */
         inline void set_syncAddr(const std::pair<ip::address, u_int16_t> &a)
         {
-            syncAddr = a.first;
-            syncPort = a.second;
-            haveSync = true;
+            if (a.first.is_v4()) {
+                syncAddrv4 = a.first;
+                syncPortv4 = a.second;
+                haveSyncv4 = true;
+            } else {
+                syncAddrv6 = a.first;
+                syncPortv6 = a.second;
+                haveSyncv6 = true;
+            }
         }
 
         /**
-         * Set a dataplane address (v4 or v6)
+         * Set a dataplane address and port range — dispatches to v4 or v6 based on address family.
+         * The inner pair is (minPort, maxPort).
         */
-        inline void set_dataAddr(const std::pair<ip::address, u_int16_t> &a)
+        inline void set_dataAddr(const std::pair<ip::address, std::pair<u_int16_t, u_int16_t>> &a)
         {
             if (a.first.is_v4()) {
                 dataAddrv4 = a.first;
@@ -243,6 +257,17 @@ namespace e2sar
                 dataAddrv6 = a.first;
                 haveDatav6 = true;
             }
+            dataMinPort = a.second.first;
+            dataMaxPort = a.second.second;
+        }
+
+        /**
+         * Set the dataplane port range
+        */
+        inline void set_dataPortRange(u_int16_t minPort, u_int16_t maxPort)
+        {
+            dataMinPort = minPort;
+            dataMaxPort = maxPort;
         }
 
         /** get LB name */
@@ -296,33 +321,73 @@ namespace e2sar
             return haveDatav4 || haveDatav6;
         }
 
-        /** does the URI contain a sync address */
+        /** does the URI contain any sync address */
         inline const bool has_syncAddr() const
         {
-            return haveSync;
+            return haveSyncv4 || haveSyncv6;
         }
 
-        /** get data plane v4 address and port */
-        inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv4() const noexcept
+        /** does the URI contain a v4 sync address */
+        inline const bool has_syncAddrv4() const
+        {
+            return haveSyncv4;
+        }
+
+        /** does the URI contain a v6 sync address */
+        inline const bool has_syncAddrv6() const
+        {
+            return haveSyncv6;
+        }
+
+        /** get data plane v4 address and port range (minPort, maxPort) */
+        inline const result<std::pair<ip::address, std::pair<u_int16_t, u_int16_t>>> get_dataAddrv4() const noexcept
         {
             if (haveDatav4)
-                return std::pair<ip::address, u_int16_t>(dataAddrv4, dataPort);
+                return std::make_pair(dataAddrv4, std::make_pair(dataMinPort, dataMaxPort));
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 
-        /** get data plane v6 address and port */
-        inline const result<std::pair<ip::address, u_int16_t>> get_dataAddrv6() const noexcept
+        /** get data plane v6 address and port range (minPort, maxPort) */
+        inline const result<std::pair<ip::address, std::pair<u_int16_t, u_int16_t>>> get_dataAddrv6() const noexcept
         {
             if (haveDatav6)
-                return std::pair<ip::address, u_int16_t>(dataAddrv6, dataPort);
+                return std::make_pair(dataAddrv6, std::make_pair(dataMinPort, dataMaxPort));
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
         }
 
-        /** get sync address and port */
+        /** get data plane port range (minPort, maxPort) */
+        inline const result<std::pair<u_int16_t, u_int16_t>> get_dataPortRange() const noexcept
+        {
+            if (haveDatav4 || haveDatav6)
+                return std::pair<u_int16_t, u_int16_t>(dataMinPort, dataMaxPort);
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Data plane address not available"s};
+        }
+
+        /** get sync v4 address and port */
+        inline const result<std::pair<ip::address, u_int16_t>> get_syncAddrv4() const noexcept
+        {
+            if (haveSyncv4)
+                return std::pair<ip::address, u_int16_t>(syncAddrv4, syncPortv4);
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Sync v4 address not available"s};
+        }
+
+        /** get sync v6 address and port */
+        inline const result<std::pair<ip::address, u_int16_t>> get_syncAddrv6() const noexcept
+        {
+            if (haveSyncv6)
+                return std::pair<ip::address, u_int16_t>(syncAddrv6, syncPortv6);
+            return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Sync v6 address not available"s};
+        }
+
+        /** get sync address and port — picks v4 or v6 based on preferV6 flag, for display/utility callers */
         inline const result<std::pair<ip::address, u_int16_t>> get_syncAddr() const noexcept
         {
-            if (haveSync)
-                return std::pair<ip::address, u_int16_t>(syncAddr, syncPort);
+            if (preferV6 && haveSyncv6)
+                return std::pair<ip::address, u_int16_t>(syncAddrv6, syncPortv6);
+            if (haveSyncv4)
+                return std::pair<ip::address, u_int16_t>(syncAddrv4, syncPortv4);
+            if (haveSyncv6)
+                return std::pair<ip::address, u_int16_t>(syncAddrv6, syncPortv6);
             return E2SARErrorInfo{E2SARErrorc::ParameterNotAvailable, "Sync address not available"s};
         }
         /** implicit cast to string which prints session token if available, otherwise insstance
@@ -489,6 +554,56 @@ namespace e2sar
         if (r1 && r2)
             return std::pair<ip::address, int>(r1.value(), r2.value());
         return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port"s};
+    }
+
+    /**
+     * Convert a colon-separated tuple into ip address and port range.
+     * Accepts: "ip", "ip:port", "ip:minPort-maxPort", "[ipv6]", "[ipv6]:port", "[ipv6]:minPort-maxPort"
+     * Returns (addr, 0, 0) when no port is specified — caller applies defaults.
+     * Returns (addr, port, port) for a single port.
+     * Returns (addr, minPort, maxPort) for a range.
+     */
+    static inline const result<std::tuple<ip::address, u_int16_t, u_int16_t>> string_tuple_to_ip_and_port_range(const std::string &t) noexcept
+    {
+        auto const pos = t.find_last_of("]:");
+
+        // IP by itself (no port)
+        if ((pos == std::string::npos) || (t[pos] == ']'))
+        {
+            auto r1 = string_to_ip(t);
+            if (r1)
+                return std::tuple<ip::address, u_int16_t, u_int16_t>(r1.value(), 0, 0);
+            else
+                return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port range"s};
+        }
+
+        auto r1 = string_to_ip(t.substr(0, pos));
+        if (!r1)
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port range"s};
+
+        std::string portStr = t.substr(pos + 1);
+        auto dashPos = portStr.find('-');
+        if (dashPos != std::string::npos)
+        {
+            // port range: minPort-maxPort
+            auto r2 = string_to_port(portStr.substr(0, dashPos));
+            auto r3 = string_to_port(portStr.substr(dashPos + 1));
+            if (r2 && r3)
+            {
+                if (r2.value() > r3.value())
+                    return E2SARErrorInfo{E2SARErrorc::ParameterError, "Invalid port range: min > max in "s + t};
+                return std::tuple<ip::address, u_int16_t, u_int16_t>(r1.value(), r2.value(), r3.value());
+            }
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port range"s};
+        }
+        else
+        {
+            // single port
+            auto r2 = string_to_port(portStr);
+            if (r2)
+                return std::tuple<ip::address, u_int16_t, u_int16_t>(r1.value(), r2.value(), r2.value());
+            return E2SARErrorInfo{E2SARErrorc::ParameterError, "Unable to convert "s + t + " to ip address and port range"s};
+        }
     }
 
     /**

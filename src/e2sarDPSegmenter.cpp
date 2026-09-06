@@ -35,8 +35,8 @@ namespace e2sar
         rateGbps{sflags.rateGbps},
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
         smooth{sflags.smooth},
-        multiPort{sflags.multiPort},
         lbHdrVersion{sflags.lbHdrVersion},
+        syncV6{sflags.syncV6},
         eventQueue{sflags.eventQueueSize},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
@@ -283,7 +283,7 @@ namespace e2sar
 
     result<int> Segmenter::SyncThreadState::_open()
     {
-        auto syncAddr = seg.dpuri.get_syncAddr();
+        auto syncAddr = seg.syncV6 ? seg.dpuri.get_syncAddrv6() : seg.dpuri.get_syncAddrv4();
         if (syncAddr.has_error())
             return syncAddr.error();
 
@@ -477,12 +477,21 @@ namespace e2sar
 #endif
         unsigned int fdCount{0};
 
+        // Compute port distribution across sockets
+        auto portRangeRes = seg.dpuri.get_dataPortRange();
+        if (portRangeRes.has_error())
+            return portRangeRes.error();
+        u_int16_t minP = portRangeRes.value().first;
+        u_int16_t maxP = portRangeRes.value().second;
+        u_int32_t rangeSize = (u_int32_t)(maxP - minP) + 1;
+        u_int32_t stride = std::max(1u, rangeSize / (u_int32_t)seg.numSendSockets);
+
         // Open v4 and v6 sockets for sending data message via DP
 
         // create numSendSocket bound sockets either v6 or v4. With each socket
         // we save the sockaddr structure in case they are of not connected variety
         // so we can use in sendmsg
-        if (useV6) 
+        if (useV6)
         {
             auto dataAddr6 = seg.dpuri.get_dataAddrv6();
             if (dataAddr6.has_error())
@@ -551,11 +560,7 @@ namespace e2sar
 
                 sockaddr_in6 dataAddrStruct6{};
                 dataAddrStruct6.sin6_family = AF_INET6;
-                // use consecutive destination ports of requested
-                if (seg.multiPort)
-                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second + fdCount);
-                else
-                    dataAddrStruct6.sin6_port = htobe16(dataAddr6.value().second);
+                dataAddrStruct6.sin6_port = htobe16(minP + (u_int16_t)((fdCount * stride) % rangeSize));
                 inet_pton(AF_INET6, dataAddr6.value().first.to_string().c_str(), &dataAddrStruct6.sin6_addr);
 
                 if (connectSocket) {
@@ -643,11 +648,7 @@ namespace e2sar
 
                 sockaddr_in dataAddrStruct4{};
                 dataAddrStruct4.sin_family = AF_INET;
-                // use consecutive destination ports of requested
-                if (seg.multiPort)
-                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second + fdCount);
-                else
-                    dataAddrStruct4.sin_port = htobe16(dataAddr4.value().second);
+                dataAddrStruct4.sin_port = htobe16(minP + (u_int16_t)((fdCount * stride) % rangeSize));
 
                 inet_pton(AF_INET, dataAddr4.value().first.to_string().c_str(), &dataAddrStruct4.sin_addr);
 
@@ -1031,8 +1032,6 @@ namespace e2sar
             sFlags.rateGbps);
         sFlags.smooth = paramTree.get<bool>("data-plane.smooth",
             sFlags.smooth);
-        sFlags.multiPort = paramTree.get<bool>("data-plane.multiPort",
-            sFlags.multiPort);
         sFlags.lbHdrVersion = paramTree.get<int>("data-plane.lbHdrVersion", 
             sFlags.lbHdrVersion);
         sFlags.eventQueueSize = paramTree.get<size_t>("data-plane.eventQueueSize",

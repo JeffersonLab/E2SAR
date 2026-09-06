@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     // create a segmenter and start the threads
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
@@ -207,7 +207,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
@@ -290,7 +290,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
