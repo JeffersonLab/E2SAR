@@ -36,6 +36,7 @@ namespace e2sar
         rateLimit{(sflags.rateGbps > 0.0 ? true: false)},
         smooth{sflags.smooth},
         lbHdrVersion{sflags.lbHdrVersion},
+        syncV6{sflags.syncV6},
         eventQueue{sflags.eventQueueSize},
 #ifdef LIBURING_AVAILABLE
         rings(sflags.numSendSockets),
@@ -282,7 +283,7 @@ namespace e2sar
 
     result<int> Segmenter::SyncThreadState::_open()
     {
-        auto syncAddr = seg.dpuri.get_syncAddr();
+        auto syncAddr = seg.syncV6 ? seg.dpuri.get_syncAddrv6() : seg.dpuri.get_syncAddrv4();
         if (syncAddr.has_error())
             return syncAddr.error();
 

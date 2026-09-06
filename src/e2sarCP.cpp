@@ -120,15 +120,22 @@ namespace e2sar
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
-        if (!rep.syncipv4address().empty())
         {
-            /** protobuf definition uses u_int32 */
-            u_int16_t short_port = rep.syncudpport();
-            auto o = string_to_ip(rep.syncipv4address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), short_port);
-            _cpuri.set_syncAddr(a);
+            u_int16_t short_port = static_cast<u_int16_t>(rep.syncudpport());
+            if (!rep.syncipv4address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv4address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
+            if (!rep.syncipv6address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv6address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
         }
 
         {
@@ -292,15 +299,22 @@ namespace e2sar
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
-        if (!rep.syncipv4address().empty())
         {
-            /** protobuf definition uses u_int32 */
-            u_int16_t short_port = rep.syncudpport();
-            auto o = string_to_ip(rep.syncipv4address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), short_port);
-            _cpuri.set_syncAddr(a);
+            u_int16_t short_port = static_cast<u_int16_t>(rep.syncudpport());
+            if (!rep.syncipv4address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv4address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
+            if (!rep.syncipv6address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv6address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
         }
 
         {

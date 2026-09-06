@@ -74,6 +74,8 @@ namespace e2sar
             const bool smooth;
             // which LB header version are we using
             const u_int8_t lbHdrVersion;
+            // sync address family: false=IPv4 (default), true=IPv6
+            const bool syncV6;
 
             // size of CQE batch we peek
             static constexpr unsigned cqeBatchSize{100};
@@ -361,10 +363,11 @@ namespace e2sar
              * - ticksAsREEventNum - override the RE event number field with the same event number as LB event number
              * which is a tick, primarily good for debugging {false}
              * - lbHdrVersion - version of the LB header to be used (2 or 3 are valid) {2}
+             * - syncV6 - use IPv6 sync address; false (default) always selects IPv4 sync regardless of dpV6 {false}
              */
-            struct SegmenterFlags 
+            struct SegmenterFlags
             {
-                bool dpV6; 
+                bool dpV6;
                 bool connectedSocket;
                 bool useCP;
                 u_int16_t warmUpMs;
@@ -377,12 +380,13 @@ namespace e2sar
                 float rateGbps;
                 bool smooth;
                 bool ticksAsREEventNum;
-                u_int8_t lbHdrVersion; 
+                u_int8_t lbHdrVersion;
+                bool syncV6;
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
                     eventQueueSize{2047}, numSendSockets{4},sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false},
-                    ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
+                    ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2}, syncV6{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file

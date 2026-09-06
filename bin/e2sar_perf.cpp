@@ -411,6 +411,7 @@ int main(int argc, char **argv)
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("dpv6", po::bool_switch()->default_value(false), "use IPv6 in the dataplane when initializing segmenter [s]. Assumes EJFAT_URI contains an IPv6 'data' address");
+    opts("syncv6", po::bool_switch()->default_value(false), "use IPv6 sync address (default is IPv4 regardless of dataplane family) [s]");
     opts("novalidate,v", po::bool_switch()->default_value(false), "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("deq", po::value<size_t>(&readThreads)->default_value(1), "number of event dequeue threads in receiver (defaults to 1) [r]");
@@ -447,6 +448,7 @@ int main(int argc, char **argv)
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "send", "period");
         conflicting_options(vm, "ipv4", "ipv6");
+        conflicting_options(vm, "recv", "syncv6");
         conflicting_options(vm, "send", "quiet");
         conflicting_options(vm, "send", "rcviovecsize");
         option_dependency(vm, "recv", "ip");
@@ -583,8 +585,10 @@ int main(int argc, char **argv)
                     sflags.lbHdrVersion = lbHdrVer;
                 if (not vm["dpv6"].defaulted())
                     sflags.dpV6 = dpv6;
-            } else {   
-                sflags.useCP = withCP; 
+                if (not vm["syncv6"].defaulted())
+                    sflags.syncV6 = vm["syncv6"].as<bool>();
+            } else {
+                sflags.useCP = withCP;
                 sflags.mtu = mtu;
                 sflags.sndSocketBufSize = sockBufSize;
                 sflags.numSendSockets = numSockets;
@@ -592,6 +596,7 @@ int main(int argc, char **argv)
                 sflags.smooth = smooth;
                 sflags.lbHdrVersion = lbHdrVer;
                 sflags.dpV6 = dpv6;
+                sflags.syncV6 = vm["syncv6"].as<bool>();
             }
 
             // if using control plane
