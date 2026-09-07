@@ -5,12 +5,12 @@ on:
     inputs:
       grpc_ver:
         description: 'GRPC Version'
-        default: '1.54.1'
+        default: '1.74.1'
         type: string
         required: true
       boost_ver: 
         description: 'BOOST Version'
-        default: '1.85.0'
+        default: '1.89.0'
         type: string
         required: true
       e2sar_ver:
