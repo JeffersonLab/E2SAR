@@ -437,12 +437,12 @@ namespace e2sar
                     memset(mmsgs, 0, iovecsOffset);
 
                     // distribute the memory
-                    for(auto i = 0; i < reas.recvIovecSize; ++i)
+                    for(auto i = 0; i < reas.rcvIovecSize; ++i)
                     {
                         iovecs[i].iov_base = &buffers[i * RECV_BUFFER_SIZE];
                         iovecs[i].iov_len = RECV_BUFFER_SIZE;
                         mmsgs[i].msg_hdr.msg_iov = &iovecs[i];
-                        mmsgs[i].msg_hdr.msg_iov_len = 1;
+                        mmsgs[i].msg_hdr.msg_iovlen = 1;
                     }
 
                     // make non-blocking call
