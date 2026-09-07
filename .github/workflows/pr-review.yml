@@ -28,7 +28,7 @@ jobs:
           fi
       
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run /review-pr skill
         uses: anthropics/claude-code-action@beta

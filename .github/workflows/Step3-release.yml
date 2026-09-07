@@ -81,7 +81,7 @@ jobs:
           echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
 
       - name: Checkout E2SAR code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: E2SAR
           submodules: false
@@ -92,7 +92,7 @@ jobs:
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
         id: download-artifact
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v18
         with:
           workflow: Step2a-deps2debs-rpms.yml
           name: ${{ env.ARTIFACT_NAME }}-e2sar-${{env.E2SAR_VER}}-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}-package
@@ -101,7 +101,7 @@ jobs:
       - name: Download built e2sar rpm
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
         id: download-e2sar-rpm
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v18
         with:
           workflow: Step2b-e2sar-artifact.yml
           name: ${{ env.ARTIFACT_NAME }}-e2sar-${{ github.ref_name }}-${{ env.E2SAR_VER }}-package
