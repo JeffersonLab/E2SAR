@@ -5,12 +5,12 @@ on:
     inputs:
       grpc_ver:
         description: 'GRPC Version'
-        default: '1.54.1'
+        default: '1.74.1'
         type: string
         required: true
       boost_ver: 
         description: 'BOOST Version'
-        default: '1.85.0'
+        default: '1.89.0'
         type: string
         required: true
 
@@ -22,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "rockylinux/rockylinux:9.6", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04","debian:bullseye", "debian:bookworm"]
-        #container: ["debian:bullseye", "debian:bookworm", "debian:trixie"]
+        container: ["rockylinux/rockylinux:9.0", "rockylinux/rockylinux:9.5", "rockylinux/rockylinux:9.6", "ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04", "debian:bookworm"]
+        #container: ["debian:bookworm", "debian:trixie"]
     container:
       image: ${{ matrix.container }}
     steps:
@@ -57,19 +57,8 @@ jobs:
                 gem install fpm
             elif [ "${DISTRO}" = "debian" ]; then
                 echo Installing for Debian
-                if [ "${DISTRO_VER}" = "11" ]; then
-                  # Bullseye is EOL: replace sources with archive; [check-valid-until=no] bypasses expired Release timestamps
-                  printf 'deb [check-valid-until=no] http://archive.debian.org/debian bullseye main contrib non-free\n' > /etc/apt/sources.list
-                  printf 'deb [check-valid-until=no] http://archive.debian.org/debian-security bullseye-security main contrib non-free\n' >> /etc/apt/sources.list
-                  printf 'deb [check-valid-until=no] http://archive.debian.org/debian bullseye-updates main contrib non-free\n' >> /etc/apt/sources.list
-                  printf 'deb [check-valid-until=no] http://archive.debian.org/debian bullseye-backports main\n' > /etc/apt/sources.list.d/bullseye-backports.list
-                  apt-get -yq update
-                  apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler rubygems squashfs-tools git wget
-                  apt-get -yq -t bullseye-backports install libre2-dev
-                else
-                  apt-get -yq update
-                  apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler libre2-dev rubygems squashfs-tools git wget
-                fi
+                apt-get -yq update
+                apt-get -yq install python3-pip build-essential autoconf cmake libtool pkg-config libglib2.0-dev ninja-build openssl libssl-dev zlib1g-dev libsystemd-dev protobuf-compiler libre2-dev rubygems squashfs-tools git wget
                 gem install fpm
             fi
 
