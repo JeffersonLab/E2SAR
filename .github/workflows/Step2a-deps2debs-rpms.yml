@@ -96,7 +96,7 @@ jobs:
       - name: Download built boost and grpc artifact
         if: steps.cache.outputs.cache-hit != 'true'  # Only run if cache wasn't hit
         id: download-artifact
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v18
         with:
           workflow: Step1-dep-artifacts.yml
           name: ${{ env.ARTIFACT_NAME }}-package-e2sar-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}
@@ -126,7 +126,7 @@ jobs:
           fi
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARTIFACT_NAME }}-e2sar-${{env.E2SAR_VER}}-deps-grpc-${{env.GRPC_VER}}-boost-${{env.BOOST_VER}}-package
           path: |
