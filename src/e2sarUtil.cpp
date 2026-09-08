@@ -27,7 +27,7 @@ namespace e2sar
     const std::vector<Optimizations::Code> Optimizations::available {
         Optimizations::Code::none
 #ifdef SENDMMSG_AVAILABLE
-        , Optimizations::Code::sendmmsg, Optimizations::Code::recvmmsg, 
+        , Optimizations::Code::sendmmsg, Optimizations::Code::recvmmsg
 #endif
 #ifdef LIBURING_AVAILABLE
         , Optimizations::Code::liburing_send, Optimizations::Code::liburing_recv
