@@ -8,6 +8,11 @@ e2sar_sources = ['e2sarUtil.cpp', 'e2sarCP.cpp',
 # Index 0 is the .h file in each custom target's output list
 grpc_generated_headers = [lb_grpc_ch[0], lb_pb_ch[0]]
 
+# Exportable dependency: forces grpc codegen to complete before any consumer's
+# compile step begins.  Add to dependencies: in every executable target that
+# (even transitively) includes the generated protobuf/grpc headers.
+grpc_hdr_dep = declare_dependency(sources: grpc_generated_headers)
+
 libe2sar_t = static_library('e2sar_t',
                         e2sar_sources + grpc_generated_headers,
                         include_directories : inc,

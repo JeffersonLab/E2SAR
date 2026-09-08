@@ -5,7 +5,7 @@
 # This is a multi-stage build optimized for minimal image size
 
 # Global build arguments (available to all stages)
-ARG DEPS_VER=0.4.0
+ARG DEPS_VER=0.4.0a1
 ARG E2SAR_DEPS_DEB=E2SAR-${DEPS_VER}-main-ubuntu-24.04/e2sar-deps_${DEPS_VER}_amd64.deb
 ARG E2SAR_DEPS_DEB_URL=https://github.com/JeffersonLab/E2SAR/releases/download/${E2SAR_DEPS_DEB}
 ARG E2SARINSTALL=/e2sar-install
@@ -44,6 +44,7 @@ RUN apt-get -yq update && \
         libsystemd-dev \
         protobuf-compiler \
         libre2-dev \
+        liburing-dev \
         wget \
         ca-certificates && \
     pip3 install --break-system-packages pybind11 meson && \
@@ -96,14 +97,15 @@ RUN apt-get -yq update && \
         libssl3 \
         libsystemd0 \
         libre2-10 \
-        libprotobuf32 \
+        liburing2 \
+        libprotobuf32t64 \
         netcat-traditional \
         net-tools \
         bc \
         ethtool \
         iproute2 \
         iputils-ping \
-	gdb \
+        gdb \
         nano && \
     pip3 install --break-system-packages scapy && \
     wget -q -O boost_grpc.deb ${E2SAR_DEPS_DEB_URL} && \
