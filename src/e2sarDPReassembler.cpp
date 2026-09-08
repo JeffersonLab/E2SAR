@@ -423,8 +423,8 @@ namespace e2sar
                 {
                     // allocate this whole thing with alignment to save time
                     u_int8_t *recvBatch{nullptr};
-                    unsigned int mmsghdrOffset{0}, iovecsOffset{sizeof(struct mmsghdr)*reas.rcvIovecSize},
-                        buffersOffset{iovecsOffset + sizeof(struct iovec) * reas.rcvIovecSize}, 
+                    size_t iovecsOffset{sizeof(struct mmsghdr)*reas.rcvIovecSize},
+                        buffersOffset{iovecsOffset + sizeof(struct iovec) * reas.rcvIovecSize},
                         totalBatchSize{buffersOffset + sizeof(u_int8_t) * reas.rcvIovecSize * RECV_BUFFER_SIZE};
 
                     recvBatch = reinterpret_cast<u_int8_t*>(aligned_alloc(64, ((totalBatchSize + 63) & ~63)));
@@ -437,7 +437,7 @@ namespace e2sar
                     memset(mmsgs, 0, iovecsOffset);
 
                     // distribute the memory
-                    for(auto i = 0; i < reas.rcvIovecSize; ++i)
+                    for(unsigned int i = 0; i < reas.rcvIovecSize; ++i)
                     {
                         iovecs[i].iov_base = &buffers[i * RECV_BUFFER_SIZE];
                         iovecs[i].iov_len = RECV_BUFFER_SIZE;
