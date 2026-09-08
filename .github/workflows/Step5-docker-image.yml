@@ -23,6 +23,7 @@ jobs:
         with:
           submodules: true
           ref: v${{ inputs.e2sar_ver }}
+          fetch-tags: true
           token: ${{ secrets.CLASSIC_REPO_PAT }}
 
       - name: Set up Docker Buildx
