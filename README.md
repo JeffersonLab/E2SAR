@@ -236,7 +236,13 @@ You can use the GitHub actions to create a release in GitHub. Four workflows are
 - Step 3: publish a release: using DEBs RPMs of dependencies and E2SAR itself built in steps 2a and 2b publish a release
 - Step 4: create a Conda package
 
-Steps 2a, 2b and 3 depend on the tag in the form of `vX.Y.Z` (e.g. `v0.1.5`) to be present on main marking the release. Tagging is done with `git tag -s vX.Y.Z -m "Message" && git push origin vX.Y.Z`
+Steps 2a, 2b and 3 depend on a release tag being present marking the release. Tagging is done with `git tag -s <tag> -m "Message" && git push origin <tag>`.
+
+Development and tagging follow a per-minor-version working-branch model: a long-lived `vX.Y.Z-wip` branch (e.g. `v0.4.0-wip`) is the working branch, and release tags are placed **directly on that branch** rather than on `main`:
+- successive alpha tags `vX.Y.ZaN` (e.g. `v0.4.0a1`, `v0.4.0a2`, ...) as development progresses, and
+- a final `vX.Y.Z` tag (e.g. `v0.4.0`) to close out the release.
+
+Keep `VERSION.txt` in step with the tag being cut (e.g. `0.4.0a1`), and when bumping an alpha also bump any pinned Docker image references (the published `ibaldin/e2sar:<version>` image and the loopback harness default image tag) in lockstep.
 
 All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b, Step 3, and Step 4. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
@@ -414,6 +420,32 @@ $ scripts/loopback-in-container.sh --bare --regimes a1,a2 --rate 0.2 --num 50
 
 At the default rate `a2` (multi-thread) still passes while `a1` shows loopback loss; add
 `--allow-loss` if you want to keep the full rate and only warn on the shortfall.
+
+#### Interpreting throughput and high-rate loss
+
+The matrix is a **code-path correctness gate, not a benchmark**: its intended verdict is the
+default paced 1 Gbps sweep (all regimes green). Any run above 1 Gbps is characterization,
+where loopback socket overrun is expected and the strict 0-loss tolerance is the wrong lens —
+add `--allow-loss` to keep the matrix green while exploring higher rates. Two behaviors are
+worth knowing:
+
+- **Paced runs undershoot the requested rate.** The sender's rate limiter sleeps a fixed
+  `event_bits / rate` between events and does *not* subtract the time already spent sending, so
+  the achieved rate asymptotes to `sleep / (sleep + send_cost)`. Slower send paths (e.g. the
+  multi-threaded `liburing_send` `c2` regime) undershoot more. Use a larger `--num` for a
+  steadier number — it amortizes fixed startup cost (ring init, worker registration, thread
+  spin-up).
+- **High-rate loss is receiver-side, and tunable.** At unlimited/high rates the UDP receive
+  socket buffer (capped by `net.core.rmem_max`) overflows and the kernel drops silently (sender
+  still reports `0 errors`). The knobs are receiver count (`--threads`) and the `recvmmsg` iovec
+  batch (`--rcviovecsize`, exposed on `scripts/perf-loopback.sh` — the matrix only sets it for
+  the `s4`/`s5` special regimes). To tune the receive path for a normal regime, drop to the
+  single-run engine, e.g. `scripts/perf-loopback.sh --send-opt liburing_send --recv-opt recvmmsg
+  --threads 8 --rcviovecsize 256 --mtu 9000 --rate 5 --num 2000`.
+
+See [`notes/2026-09-09-loopback-c2-throughput-characterization.md`](notes/2026-09-09-loopback-c2-throughput-characterization.md)
+for a worked example (the `c2` send path ceils at ~11.5 Gbps on loopback; the paced 0.82 Gbps
+was the pacer, not the send path).
 
 The matrix exits non-zero if any non-skipped regime fails, so it can gate CI.
 
