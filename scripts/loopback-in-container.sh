@@ -8,7 +8,7 @@
 #     Default: prefer podman, fall back to docker; pass --bare (or
 #     --runtime bare) to skip containers and use a local build instead.
 #   Containerized (podman/docker):
-#     - PULL a pre-built image (default ibaldin/e2sar:0.4.0a1); do NOT rebuild
+#     - PULL a pre-built image (default ibaldin/e2sar:0.4.0rc1); do NOT rebuild
 #       per run. The published image is expected to include
 #       sendmmsg/recvmmsg/liburing_send.
 #     - Always run with --network=host so loopback traffic uses the real host
@@ -37,7 +37,7 @@ log_warn()  { echo -e "${C_YELLOW}[WARN]${C_RESET} $*" >&2; }
 log_error() { echo -e "${C_RED}[ERROR]${C_RESET} $*" >&2; }
 
 # --- Defaults ---
-IMAGE_VERSION="${E2SAR_IMAGE_VERSION:-0.4.0a1}"
+IMAGE_VERSION="${E2SAR_IMAGE_VERSION:-0.4.0rc1}"
 IMAGE=""                 # if set via --image, overrides the ibaldin/e2sar default
 DO_BUILD=0               # --build: build locally from Dockerfile.cli (iteration only)
 NO_PULL=0                # --no-pull: use whatever image is already present
@@ -79,7 +79,7 @@ Any other flags are forwarded to loopback-matrix.sh, e.g.:
   $(basename "$0") --regimes a1,b1,c1 --rate 5.0
   $(basename "$0") --only-special --num 50
   $(basename "$0") --bare --regimes a1,a2 --num 20
-  $(basename "$0") --version 0.4.0a1 -- --out /scripts/results.tsv
+  $(basename "$0") --version 0.4.0rc1 -- --out /scripts/results.tsv
 EOF
     exit 0
 }

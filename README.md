@@ -239,10 +239,11 @@ You can use the GitHub actions to create a release in GitHub. Four workflows are
 Steps 2a, 2b and 3 depend on a release tag being present marking the release. Tagging is done with `git tag -s <tag> -m "Message" && git push origin <tag>`.
 
 Development and tagging follow a per-minor-version working-branch model: a long-lived `vX.Y.Z-wip` branch (e.g. `v0.4.0-wip`) is the working branch, and release tags are placed **directly on that branch** rather than on `main`:
-- successive alpha tags `vX.Y.ZaN` (e.g. `v0.4.0a1`, `v0.4.0a2`, ...) as development progresses, and
+- successive alpha tags `vX.Y.ZaN` (e.g. `v0.4.0a1`, `v0.4.0a2`, ...) as development progresses,
+- optionally release-candidate tags `vX.Y.ZrcN` (e.g. `v0.4.0rc1`) once feature-complete and stabilizing, and
 - a final `vX.Y.Z` tag (e.g. `v0.4.0`) to close out the release.
 
-Keep `VERSION.txt` in step with the tag being cut (e.g. `0.4.0a1`), and when bumping an alpha also bump any pinned Docker image references (the published `ibaldin/e2sar:<version>` image and the loopback harness default image tag) in lockstep.
+Keep `VERSION.txt` in step with the tag being cut (e.g. `0.4.0rc1`), and when bumping the version also bump any pinned Docker image references (the published `ibaldin/e2sar:<version>` image and the loopback harness default image tag) in lockstep.
 
 All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b, Step 3, and Step 4. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
@@ -333,7 +334,7 @@ The regimes are: `a1`/`a2` (plain `sendmsg`/`recvfrom`, single/multi-thread), `b
 regime `n1` (conflicting `-o` set must be rejected). Regimes whose optimization is unavailable
 are reported `SKIP`, not `FAIL`. `sendmmsg`/`recvmmsg` are always compiled in on Linux;
 `liburing_*` require an image/binary built with `liburing-dev` (the published
-`ibaldin/e2sar:0.4.0a1` image includes it).
+`ibaldin/e2sar:0.4.0rc1` image includes it).
 
 #### Running natively on Linux (against a local build)
 
@@ -372,7 +373,7 @@ $ scripts/loopback-in-container.sh --bare --build-dir /path/to/build --num 50
 #### Running in a container (macOS and Linux)
 
 The wrapper prefers `podman` and falls back to `docker`, always uses `--network=host` (required for
-the high-performance loopback path), and by default pulls `ibaldin/e2sar:0.4.0a1`:
+the high-performance loopback path), and by default pulls `ibaldin/e2sar:0.4.0rc1`:
 
 ```bash
 # Full matrix against the published image (pulls it on first run)
@@ -380,7 +381,7 @@ $ scripts/loopback-in-container.sh
 
 # A subset, a different published version, or a locally built image
 $ scripts/loopback-in-container.sh --regimes a1,b1,c1
-$ scripts/loopback-in-container.sh --version 0.4.0a1
+$ scripts/loopback-in-container.sh --version 0.4.0rc1
 $ scripts/loopback-in-container.sh --image e2sar-perf:local --no-pull
 ```
 
