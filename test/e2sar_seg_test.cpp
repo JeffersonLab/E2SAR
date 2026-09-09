@@ -41,6 +41,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
 
     std::cout << "Running data test for 10 seconds against sync " << 
         uri.get_syncAddr().value().first << ":" << 
@@ -114,6 +115,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
     sflags.mtu = 64 + 40;
 
     // create a segmenter and start the threads, send MTU is set to force
@@ -190,6 +192,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
     sflags.mtu = 64 + 40;
 
     // create a segmenter and start the threads, send MTU is set to force
@@ -273,6 +276,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
     sflags.mtu = 64 + 40;
 
     // create a segmenter and start the threads, send MTU is set to force

@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
-# Run the e2sar_perf loopback regime matrix inside a Docker/Podman container on
-# a Linux host, where sendmmsg/recvmmsg and liburing are compiled in.
+# Run the e2sar_perf loopback regime matrix, either inside a Docker/Podman
+# container on a Linux host (where sendmmsg/recvmmsg and liburing are compiled
+# in) or "bare" against a local meson build on this host.
 #
 # Model (§3.3 of notes/loopback_test_scaffold.md):
-#   - Prefer podman, fall back to docker.
-#   - PULL a pre-built image (default ibaldin/e2sar:0.4.0a1); do NOT rebuild per run.
-#     The published image is expected to include sendmmsg/recvmmsg/liburing_send.
-#   - Always run with --network=host so loopback traffic uses the real host
-#     network stack (proper high-performance path), for both podman and docker.
-#   - Mount only the scripts dir; binaries come from the image at /e2sar-install.
+#   - Runtime is one of: podman, docker (containerized) or bare (native).
+#     Default: prefer podman, fall back to docker; pass --bare (or
+#     --runtime bare) to skip containers and use a local build instead.
+#   Containerized (podman/docker):
+#     - PULL a pre-built image (default ibaldin/e2sar:0.4.0a1); do NOT rebuild
+#       per run. The published image is expected to include
+#       sendmmsg/recvmmsg/liburing_send.
+#     - Always run with --network=host so loopback traffic uses the real host
+#       network stack (proper high-performance path).
+#     - Mount only the scripts dir; binaries come from the image at /e2sar-install.
+#   Bare (native):
+#     - No image, pull or build. Drives loopback-matrix.sh directly against
+#       $E2SAR_BUILD_DIR / --build-dir (default: <repo>/build). Useful for
+#       validating a local build, including on macOS where only the plain
+#       sendmsg/recvfrom regimes (a1/a2) are available.
 #   - Any unrecognized flag is passed straight through to loopback-matrix.sh.
 set -uo pipefail
 
@@ -34,26 +44,41 @@ NO_PULL=0                # --no-pull: use whatever image is already present
 IN_BUILD_DIR="/e2sar-install"   # binaries live here in the published image
 BUFSIZE=3145728          # kept in sync with the matrix default (for sysctl check)
 RUNTIME=""
+# Bare (native) mode: local build directory holding bin/e2sar_perf.
+HOST_BUILD_DIR="${E2SAR_BUILD_DIR:-$REPO_ROOT/build}"
 PASSTHROUGH=()
 
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS] [-- MATRIX_ARGS...]
 
-Run the loopback regime matrix inside a Docker/Podman container.
+Run the loopback regime matrix in a Docker/Podman container or bare on the host.
 
-CONTAINER OPTIONS:
+RUNTIME SELECTION:
+  --runtime R       Runtime: podman | docker | bare (default: auto-detect
+                    podman then docker)
+  --bare            Shorthand for --runtime bare: run against a local build,
+                    no container (only regimes compiled into the local binary
+                    run; the rest SKIP)
+
+CONTAINER OPTIONS (ignored in bare mode):
   --version X.Y.Z   Use ibaldin/e2sar:X.Y.Z (default: $IMAGE_VERSION)
   --image NAME[:TAG] Use an arbitrary image instead of the ibaldin/e2sar default
   --build           Build locally from Dockerfile.cli (tag e2sar-perf:local); iteration only
   --no-pull         Do not pull; use the image already present locally
-  --bufsize N       Socket buffer size for the host sysctl check (default: $BUFSIZE)
-  --runtime R       Force container runtime (podman|docker); default auto-detect
+
+BARE OPTION (ignored in container mode):
+  --build-dir DIR   Local build dir holding bin/e2sar_perf
+                    (default: \$E2SAR_BUILD_DIR or $HOST_BUILD_DIR)
+
+COMMON:
+  --bufsize N       Socket buffer size for the sysctl check (default: $BUFSIZE)
   -h, --help        Show this help
 
 Any other flags are forwarded to loopback-matrix.sh, e.g.:
   $(basename "$0") --regimes a1,b1,c1 --rate 5.0
   $(basename "$0") --only-special --num 50
+  $(basename "$0") --bare --regimes a1,a2 --num 20
   $(basename "$0") --version 0.4.0a1 -- --out /scripts/results.tsv
 EOF
     exit 0
@@ -68,11 +93,83 @@ while [[ $# -gt 0 ]]; do
         --no-pull)  NO_PULL=1; shift ;;
         --bufsize)  BUFSIZE="$2"; PASSTHROUGH+=(--bufsize "$2"); shift 2 ;;
         --runtime)  RUNTIME="$2"; shift 2 ;;
+        --bare)     RUNTIME="bare"; shift ;;
+        --build-dir) HOST_BUILD_DIR="$2"; shift 2 ;;
         -h|--help)  usage ;;
         --)         shift; while [[ $# -gt 0 ]]; do PASSTHROUGH+=("$1"); shift; done ;;
         *)          PASSTHROUGH+=("$1"); shift ;;
     esac
 done
+
+# --- Bare (native) mode: no container, drive the matrix against a local build ---
+if [[ "$RUNTIME" == "bare" ]]; then
+    log_info "Runtime: bare (native, no container)"
+    PERF="$HOST_BUILD_DIR/bin/e2sar_perf"
+    if [[ ! -x "$PERF" ]]; then
+        log_error "$PERF not found or not executable."
+        log_error "Build the project first, or pass --build-dir / set E2SAR_BUILD_DIR."
+        exit 1
+    fi
+    log_info "Build dir: $HOST_BUILD_DIR"
+
+    # --- Socket-buffer limit advisory (native equivalent of the container check) ---
+    # Running bare, the effective limit is this host's own kernel, not a VM.
+    check_bare_sysctls() {
+        local os key cur
+        os="$(uname -s)"
+        case "$os" in
+            Linux)
+                for key in net.core.rmem_max net.core.wmem_max; do
+                    cur="$(cat "/proc/sys/${key//.//}" 2>/dev/null)" || continue
+                    if [[ "$cur" =~ ^[0-9]+$ && "$cur" -lt "$BUFSIZE" ]]; then
+                        log_warn "$key=$cur is below --bufsize=$BUFSIZE; sockets will FAIL to open."
+                        log_warn "  Raise it:   sudo sysctl -w $key=$BUFSIZE"
+                        log_warn "  ...or lower the test buffer: pass --bufsize $cur (or smaller)."
+                    fi
+                done
+                ;;
+            Darwin)
+                # macOS clamps SO_SND/RCVBUF to kern.ipc.maxsockbuf.
+                cur="$(sysctl -n kern.ipc.maxsockbuf 2>/dev/null)" || return 0
+                if [[ "$cur" =~ ^[0-9]+$ && "$cur" -lt "$BUFSIZE" ]]; then
+                    log_warn "kern.ipc.maxsockbuf=$cur is below --bufsize=$BUFSIZE; sockets may FAIL to open."
+                    log_warn "  Raise it:   sudo sysctl -w kern.ipc.maxsockbuf=$BUFSIZE"
+                    log_warn "  ...or lower the test buffer: pass --bufsize $cur (or smaller)."
+                fi
+                ;;
+        esac
+    }
+    check_bare_sysctls
+
+    # --- Availability probe (defensive; the matrix SKIPs unavailable regimes) ---
+    log_info "Probing available optimizations in $PERF ..."
+    if probe="$("$PERF" --help 2>&1)"; then
+        avail_line="$(echo "$probe" | grep -i 'Available Optimizations' | head -1)"
+        if [[ -n "$avail_line" ]]; then
+            log_info "  ${avail_line#*Available}"
+        else
+            log_warn "Could not find 'Available Optimizations' in e2sar_perf --help output."
+        fi
+    else
+        log_warn "Availability probe failed; the matrix will still SKIP unavailable regimes per run."
+    fi
+
+    log_info "Running matrix bare on the host ..."
+    echo ""
+    set -x
+    "$SCRIPT_DIR/loopback-matrix.sh" \
+        --build-dir "$HOST_BUILD_DIR" ${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"}
+    rc=$?
+    set +x
+
+    echo ""
+    if [[ $rc -eq 0 ]]; then
+        log_info "Matrix completed: all non-skipped regimes passed."
+    else
+        log_error "Matrix reported failures (exit $rc)."
+    fi
+    exit $rc
+fi
 
 # --- Pick a runtime (§3.3 step 1) ---
 if [[ -z "$RUNTIME" ]]; then
@@ -84,6 +181,10 @@ if [[ -z "$RUNTIME" ]]; then
         log_error "Neither podman nor docker found on PATH."
         exit 1
     fi
+fi
+if [[ "$RUNTIME" != "podman" && "$RUNTIME" != "docker" ]]; then
+    log_error "Unknown --runtime '$RUNTIME' (expected podman, docker, or bare)."
+    exit 1
 fi
 log_info "Container runtime: $RUNTIME"
 

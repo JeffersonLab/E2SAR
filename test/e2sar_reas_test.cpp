@@ -43,6 +43,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         sflags.syncPeriodMs= 1000; // in ms
         sflags.syncPeriods = 5; // number of sync periods to use for sync
         sflags.useCP = false; // turn off CP
+        sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
 
         u_int16_t dataId = 0x0505;
         u_int32_t eventSrcId = 0x11223344;
@@ -53,6 +54,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
+        rflags.rcvSocketBufSize = 65536; // keep within Linux default rmem_max
 
 
         ip::address loopback = ip::make_address("127.0.0.1");
@@ -193,6 +195,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         sflags.syncPeriodMs= 1000; // in ms
         sflags.syncPeriods = 5; // number of sync periods to use for sync
         sflags.useCP = false; // turn off CP
+        sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
         sflags.mtu = 80; // make MTU ridiculously small to force SAR to work
 
         u_int16_t dataId = 0x0505;
@@ -204,6 +207,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest2)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
+        rflags.rcvSocketBufSize = 65536; // keep within Linux default rmem_max
 
 
         ip::address loopback = ip::make_address("127.0.0.1");
@@ -450,6 +454,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         sflags.syncPeriodMs= 1000; // in ms
         sflags.syncPeriods = 5; // number of sync periods to use for sync
         sflags.useCP = false; // turn off CP
+        sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
 
         u_int16_t dataId = 0x0505;
         u_int32_t eventSrcId = 0x11223344;
@@ -463,6 +468,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest4)
         Reassembler::ReassemblerFlags rflags;
 
         rflags.useCP = false; // turn off CP
+        rflags.rcvSocketBufSize = 65536; // keep within Linux default rmem_max
 
         rflags.portRange = 2;
 

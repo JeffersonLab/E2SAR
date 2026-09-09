@@ -303,6 +303,120 @@ There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which 
 
 For checking for memory leaks use [scripts/perf-valgrind-loopback.sh](scripts/perf-valgrind-loopback.sh) (run it from scripts/ and give parameters `./perf-valgrind-loopback.sh build /tmp/valgrind-report/` where build is the meson build directory and /tmp/valgrind-report is the directory where the script will place all the logs). Then you can run the XML report parser to get a more concise report `scripts/parse-valgrind-xml.py /tmp/valgrind-reports`. 
 
+### Loopback dataplane test harness
+
+The `scripts/` directory contains a back-to-back loopback test harness that drives
+`e2sar_perf` (sender + receiver) over `127.0.0.1` with the control plane disabled, exercising
+every send/receive code path across a matrix of regimes. It is made of three layered scripts:
+
+- [`scripts/perf-loopback.sh`](scripts/perf-loopback.sh) — single-run engine: starts one
+  receiver and one sender, classifies the run `PASS`/`FAIL`/`SKIP`, and emits a machine-readable
+  `RESULT ...` line.
+- [`scripts/loopback-matrix.sh`](scripts/loopback-matrix.sh) — orchestrator: iterates the regime
+  matrix, skips regimes whose optimization is not compiled into the binary, and tallies results
+  (optionally to a TSV via `--out`).
+- [`scripts/loopback-in-container.sh`](scripts/loopback-in-container.sh) — front-end wrapper
+  that selects a runtime: `podman`/`docker` (pulls a pre-built image and runs the matrix inside
+  it with host networking) or `bare` (`--bare`, runs the matrix directly against a local build,
+  no container). It performs the socket-buffer sysctl advisory and optimization probe in all
+  three modes.
+
+The regimes are: `a1`/`a2` (plain `sendmsg`/`recvfrom`, single/multi-thread), `b1`/`b2`
+(`sendmmsg`+`recvmmsg`), `c1`/`c2` (`liburing_send`+`recvmmsg`), special conditions `s1`–`s5`
+(IOV_MAX batching, deep io_uring ring, degenerate/oversized recvmmsg iovec), and the negative
+regime `n1` (conflicting `-o` set must be rejected). Regimes whose optimization is unavailable
+are reported `SKIP`, not `FAIL`. `sendmmsg`/`recvmmsg` are always compiled in on Linux;
+`liburing_*` require an image/binary built with `liburing-dev` (the published
+`ibaldin/e2sar:0.4.0a1` image includes it).
+
+#### Running natively on Linux (against a local build)
+
+Point the harness at your meson build directory and run the matrix (no container needed):
+
+```bash
+$ export E2SAR_BUILD_DIR="$(pwd)/build"
+$ scripts/loopback-matrix.sh                       # full matrix, sane defaults
+$ scripts/loopback-matrix.sh --regimes a1,b1,c1    # a subset
+$ scripts/loopback-matrix.sh --only-special --out /tmp/results.tsv
+```
+
+Or invoke a single run directly:
+
+```bash
+$ scripts/perf-loopback.sh --send-opt sendmmsg --recv-opt recvmmsg --threads 4
+```
+
+The default 3 MB socket buffers require the host limits to be high enough, otherwise the sockets
+fail to open ("System socket buffer set too low"). Raise them once per boot:
+
+```bash
+$ sudo sysctl -w net.core.rmem_max=3145728 net.core.wmem_max=3145728
+```
+
+The same matrix can also be driven through the front-end wrapper in **bare** mode, which adds the
+socket-buffer sysctl advisory and the optimization probe on top of `loopback-matrix.sh` (no
+container):
+
+```bash
+$ scripts/loopback-in-container.sh --bare                       # local build, full matrix
+$ scripts/loopback-in-container.sh --bare --regimes a1,a2       # a subset
+$ scripts/loopback-in-container.sh --bare --build-dir /path/to/build --num 50
+```
+
+#### Running in a container (macOS and Linux)
+
+The wrapper prefers `podman` and falls back to `docker`, always uses `--network=host` (required for
+the high-performance loopback path), and by default pulls `ibaldin/e2sar:0.4.0a1`:
+
+```bash
+# Full matrix against the published image (pulls it on first run)
+$ scripts/loopback-in-container.sh
+
+# A subset, a different published version, or a locally built image
+$ scripts/loopback-in-container.sh --regimes a1,b1,c1
+$ scripts/loopback-in-container.sh --version 0.4.0a1
+$ scripts/loopback-in-container.sh --image e2sar-perf:local --no-pull
+```
+
+Any flag the wrapper does not recognize is forwarded to `loopback-matrix.sh` (e.g. `--num`,
+`--rate`, `--mtu`, `--bufsize`, `--out`). On Linux, raise the host `net.core.*mem_max` sysctls as
+above (the wrapper reads the effective values via a `--network=host` container and warns if they
+are below `--bufsize`).
+
+**macOS notes.** The image is `linux/amd64`, so on Apple Silicon it runs under emulation and the
+container network stack lives in the Docker Desktop / colima Linux VM, not on the Mac:
+
+- The VM caps `net.core.rmem_max`/`net.core.wmem_max` (colima defaults to `212992`), below the 3 MB
+  default `--bufsize`. Either raise the VM limit or lower the buffer:
+  ```bash
+  $ colima ssh -- sudo sysctl -w net.core.rmem_max=3145728 net.core.wmem_max=3145728
+  # ...or, without touching the VM:
+  $ scripts/loopback-in-container.sh --bufsize 212992
+  ```
+- Under emulation there is small, *variable* UDP loss even at low rates, so a strict
+  (`--loss-tol 0`) run may report `FAIL` on loss alone. For a functional smoke test on macOS, add
+  `--allow-loss` (downgrades a fragment shortfall to a warning) and lower the rate:
+  ```bash
+  $ scripts/loopback-in-container.sh --regimes a1,a2 --num 20 \
+        --bufsize 212992 --rate 0.2 --allow-loss
+  ```
+  On a native Linux host these workarounds are unnecessary — use the default 3 MB buffers and
+  `--loss-tol 0`.
+
+**Running bare on macOS.** For validating a local macOS build there is no emulation, so `--bare`
+runs the native binary directly. Only the plain `sendmsg`/`recvfrom` regimes (`a1`/`a2`) are
+compiled in on macOS; the rest `SKIP`. A single `recvfrom` thread (`a1`) cannot drain the loopback
+socket at the default 1 Gbps, so lower the rate for a strict functional check:
+
+```bash
+$ scripts/loopback-in-container.sh --bare --regimes a1,a2 --rate 0.2 --num 50
+```
+
+At the default rate `a2` (multi-thread) still passes while `a1` shows loopback loss; add
+`--allow-loss` if you want to keep the full rate and only warn on the shortfall.
+
+The matrix exits non-zero if any non-skipped regime fails, so it can gate CI.
+
 ### Python
 
 The code can be tested using pytest

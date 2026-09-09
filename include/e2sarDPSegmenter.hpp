@@ -534,20 +534,22 @@ namespace e2sar
             /*
             * Tell threads to stop
             */ 
-            inline void stopThreads() 
+            inline void stopThreads()
             {
                 if (not threadsStop)
                 {
-                    // wait until queue empties
-                    while (not eventQueue.empty()) {}
-                    
-                    // tell sending threads to stop and
-                    // wait till they are done
+                    // wait until queue empties (only if send thread was started)
+                    if (sendThreadState.threadObj.joinable())
+                        while (not eventQueue.empty()) {}
+
+                    // tell sending threads to stop and wait till they are done
                     threadsStop = true;
-                    sendThreadState.threadObj.join();
+                    if (sendThreadState.threadObj.joinable())
+                        sendThreadState.threadObj.join();
                     // now we can stop the sync thread
                     syncThreadStop = true;
-                    syncThreadState.threadObj.join();
+                    if (syncThreadState.threadObj.joinable())
+                        syncThreadState.threadObj.join();
                 }
             }
         private:

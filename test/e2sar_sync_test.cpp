@@ -34,6 +34,11 @@ BOOST_AUTO_TEST_CASE(DPSyncTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    // unconnected socket avoids ICMP error delivery on Linux (connected sockets
+    // receive ICMP unreachable from non-existent sync target on the next send)
+    sflags.connectedSocket = false;
+    // keep send socket buffer within Linux's default wmem_max (~208KB)
+    sflags.sndSocketBufSize = 65536;
 
     // create a segmenter and start the threads
     Segmenter seg(uri, dataId, eventSrcId, sflags);

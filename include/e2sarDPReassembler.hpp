@@ -654,7 +654,7 @@ namespace e2sar
             /**
              * Tell threads to stop. Also causes recvEvent to exit with (-1) 
              */
-            void stopThreads() 
+            void stopThreads()
             {
                 if (not threadsStop)
                 {
@@ -662,19 +662,20 @@ namespace e2sar
 
                     recvThreadCond.notify_all();
 
-                    // wait to exit
-                    if (useCP)
+                    // wait to exit (only if thread was started)
+                    if (useCP && sendStateThreadState.threadObj.joinable())
                         sendStateThreadState.threadObj.join();
 
                     for(auto i = recvThreadState.begin(); i != recvThreadState.end(); ++i)
-                        i->threadObj.join();
+                        if (i->threadObj.joinable())
+                            i->threadObj.join();
 
                     // drain event queue
                     EventQueueItem* item{nullptr};
                     bool a{false};
                     do {
                         a = eventQueue.pop(item);
-                        if (a) 
+                        if (a)
                         {
                             if (item->event != nullptr)
                                 delete[] item->event;
@@ -682,7 +683,8 @@ namespace e2sar
                         }
                     } while (a);
 
-                    gcThreadState.threadObj.join();
+                    if (gcThreadState.threadObj.joinable())
+                        gcThreadState.threadObj.join();
 
                     // drain lost events queue - tuples are heap-allocated in logLostEvent
                     // and only freed by get_LostEvent(); if the caller never calls it they leak
