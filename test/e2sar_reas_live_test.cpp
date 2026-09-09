@@ -54,6 +54,7 @@ BOOST_AUTO_TEST_CASE(DPReasTest1)
 
     Reassembler::ReassemblerFlags rflags;
     rflags.validateCert = false;
+    rflags.rcvSocketBufSize = 65536; // accommodating Linux defaults
 
     ip::address loopback = ip::make_address("127.0.0.1");
     u_int16_t listen_port = 10000;

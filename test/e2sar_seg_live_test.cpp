@@ -55,6 +55,7 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs= 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // accommodating Linux low defaults
 
     // create a segmenter and start the threads
     // using the updated URI with sync info
@@ -163,6 +164,8 @@ BOOST_AUTO_TEST_CASE(DPSegLiveTest2)
     sflags.syncPeriodMs = 500; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
     sflags.mtu = 64 + 40;
+    sflags.sndSocketBufSize = 65536; // accommodating Linux low defaults
+
 
     // create a segmenter using URI sync and data info
     // and start the threads, send MTU is set to force

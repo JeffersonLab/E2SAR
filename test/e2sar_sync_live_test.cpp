@@ -55,6 +55,7 @@ BOOST_AUTO_TEST_CASE(DPSyncLiveTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; 
+    sflags.sndSocketBufSize = 65536; // accommodating Linux default
 
     // create a segmenter and start the threads
     // using the updated URI with sync info
