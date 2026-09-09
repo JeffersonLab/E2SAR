@@ -1,5 +1,6 @@
 #define BOOST_TEST_MODULE DPSegTests
 #include <stdlib.h>
+#include <climits>
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
@@ -40,12 +41,13 @@ BOOST_AUTO_TEST_CASE(DPSegTest1)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
 
     std::cout << "Running data test for 10 seconds against sync " << 
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     // create a segmenter and start the threads
@@ -113,6 +115,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
     sflags.mtu = 64 + 40;
 
     // create a segmenter and start the threads, send MTU is set to force
@@ -130,7 +133,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest2)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
@@ -189,6 +192,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
     sflags.mtu = 64 + 40;
 
     // create a segmenter and start the threads, send MTU is set to force
@@ -206,7 +210,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest3)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
@@ -272,6 +276,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
     Segmenter::SegmenterFlags sflags;
     sflags.syncPeriodMs = 1000; // in ms
     sflags.syncPeriods = 5; // number of sync periods to use for sync
+    sflags.sndSocketBufSize = 65536; // keep within Linux default wmem_max
     sflags.mtu = 64 + 40;
 
     // create a segmenter and start the threads, send MTU is set to force
@@ -289,7 +294,7 @@ BOOST_AUTO_TEST_CASE(DPSegTest4)
         uri.get_syncAddr().value().first << ":" << 
         uri.get_syncAddr().value().second << " and data " <<
         uri.get_dataAddrv4().value().first << ":" <<
-        uri.get_dataAddrv4().value().second << 
+        uri.get_dataAddrv4().value().second.first << 
         std::endl;
 
     std::string eventString{"THIS IS A VERY LONG EVENT MESSAGE WE WANT TO SEND EVERY 2 SECONDS."s};
@@ -369,4 +374,32 @@ BOOST_AUTO_TEST_CASE(DPSegTest5)
 
     std::remove(iniFileName.c_str());
 }
+
+BOOST_AUTO_TEST_CASE(DPSegTest6)
+{
+    std::cout << "DPSegTest6: test that openAndStart fails when sndSocketBufSize exceeds OS limit" << std::endl;
+
+    std::string segUriString{"ejfat://useless@192.168.100.1:9876/lb/1?sync=192.168.254.1:12345&data=10.250.100.123"};
+    EjfatURI uri(segUriString);
+
+    u_int16_t dataId = 0x0505;
+    u_int32_t eventSrcId = 0x11223344;
+    Segmenter::SegmenterFlags sflags;
+    sflags.syncPeriodMs = 1000;
+    sflags.syncPeriods = 5;
+    sflags.useCP = false;
+    sflags.sndSocketBufSize = INT_MAX;
+
+    Segmenter seg(uri, dataId, eventSrcId, sflags);
+
+    auto res = seg.openAndStart();
+
+    BOOST_CHECK(res.has_error());
+    if (res.has_error())
+    {
+        std::cout << "Expected error: " << res.error().message() << std::endl;
+        BOOST_CHECK(res.error().message().find("socket buffer") != std::string::npos);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

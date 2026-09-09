@@ -120,33 +120,48 @@ namespace e2sar
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
-        if (!rep.syncipv4address().empty())
         {
-            /** protobuf definition uses u_int32 */
-            u_int16_t short_port = rep.syncudpport();
-            auto o = string_to_ip(rep.syncipv4address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), short_port);
-            _cpuri.set_syncAddr(a);
+            u_int16_t short_port = static_cast<u_int16_t>(rep.syncudpport());
+            if (!rep.syncipv4address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv4address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
+            if (!rep.syncipv6address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv6address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
         }
 
-        if (!rep.dataipv4address().empty())
         {
-            auto o = string_to_ip(rep.dataipv4address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), DATAPLANE_PORT);
-            _cpuri.set_dataAddr(a);
-        }
+            u_int16_t minPort = static_cast<u_int16_t>(rep.dataminport());
+            u_int16_t maxPort = static_cast<u_int16_t>(rep.datamaxport());
+            if (minPort == 0 || maxPort == 0) {
+                minPort = DATAPLANE_PORT_MIN;
+                maxPort = DATAPLANE_PORT_MAX;
+            }
+            auto portRange = std::make_pair(minPort, maxPort);
 
-        if (!rep.dataipv6address().empty())
-        {
-            auto o = string_to_ip(rep.dataipv6address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), DATAPLANE_PORT);
-            _cpuri.set_dataAddr(a);
+            if (!rep.dataipv4address().empty())
+            {
+                auto o = string_to_ip(rep.dataipv4address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_dataAddr({o.value(), portRange});
+            }
+
+            if (!rep.dataipv6address().empty())
+            {
+                auto o = string_to_ip(rep.dataipv6address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_dataAddr({o.value(), portRange});
+            }
         }
 
         return rep.fpgalbid();
@@ -284,33 +299,48 @@ namespace e2sar
         if (!rep.lbid().empty())
             _cpuri.set_lbId(rep.lbid());
 
-        if (!rep.syncipv4address().empty())
         {
-            /** protobuf definition uses u_int32 */
-            u_int16_t short_port = rep.syncudpport();
-            auto o = string_to_ip(rep.syncipv4address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), short_port);
-            _cpuri.set_syncAddr(a);
+            u_int16_t short_port = static_cast<u_int16_t>(rep.syncudpport());
+            if (!rep.syncipv4address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv4address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
+            if (!rep.syncipv6address().empty())
+            {
+                auto o = string_to_ip(rep.syncipv6address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_syncAddr({o.value(), short_port});
+            }
         }
 
-        if (!rep.dataipv4address().empty())
         {
-            auto o = string_to_ip(rep.dataipv4address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), DATAPLANE_PORT);
-            _cpuri.set_dataAddr(a);
-        }
+            u_int16_t minPort = static_cast<u_int16_t>(rep.dataminport());
+            u_int16_t maxPort = static_cast<u_int16_t>(rep.datamaxport());
+            if (minPort == 0 || maxPort == 0) {
+                minPort = DATAPLANE_PORT_MIN;
+                maxPort = DATAPLANE_PORT_MAX;
+            }
+            auto portRange = std::make_pair(minPort, maxPort);
 
-        if (!rep.dataipv6address().empty())
-        {
-            auto o = string_to_ip(rep.dataipv6address());
-            if (o.has_error())
-                return o.error();
-            std::pair<ip::address, u_int16_t> a(o.value(), DATAPLANE_PORT);
-            _cpuri.set_dataAddr(a);
+            if (!rep.dataipv4address().empty())
+            {
+                auto o = string_to_ip(rep.dataipv4address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_dataAddr({o.value(), portRange});
+            }
+
+            if (!rep.dataipv6address().empty())
+            {
+                auto o = string_to_ip(rep.dataipv6address());
+                if (o.has_error())
+                    return o.error();
+                _cpuri.set_dataAddr({o.value(), portRange});
+            }
         }
 
         return 0;

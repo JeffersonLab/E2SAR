@@ -163,28 +163,61 @@ Using `snifgen.py` also requires using `host` network driver if receiving live t
 
 ### Development Docker
 
-We provide another Docker image which allows development inside the running container. It includes all necessary dependencies for a given version of E2SAR. VSCode can be attached to it to ease the development. 
+We provide a Docker image (`Dockerfile.dev`) that runs as `linux/amd64` and includes all build dependencies for a given E2SAR release. It supports two workflows: live development against a locally-mounted source tree, and fully self-contained development inside the container. VSCode can be attached to either for an IDE experience.
 
-To build this image (Dockerfile.dev) use the following command:
-```
-$ docker build -t <username>/<repo>:<version> -t <username>/<repo>:latest -f Dockerfile.dev .
+Build the image once (or after any change to `Dockerfile.dev`):
+```bash
+$ docker buildx build --platform linux/amd64 -f Dockerfile.dev -t e2sar-dev:latest .
 ```
 
-This docker image expects that user's GitHub SSH key is mounted read-only when it is started in order to be able to checkout the code. It also expects an optional E2SAR branch indicator as shown:
+#### Workflow A: mount local source tree (recommended for active development)
+
+This workflow mounts your checked-out source tree into the container. Edits made on the host are immediately visible inside the container without rebuilding the image. Build artifacts are stored in a Docker-managed named volume (`e2sar-build`) so the Linux filesystem is used rather than the host filesystem, keeping rebuilds fast.
+
+```bash
+$ docker run --platform linux/amd64 -it \
+    -v "$(pwd)":/workspace \
+    -v e2sar-build:/workspace/build-linux \
+    -w /workspace \
+    e2sar-dev:latest mount_src
 ```
-$ docker run --rm -v "${HOME}/.ssh/github_ecdsa:/src/git_ssh_key:ro" -e E2SAR_BRANCH=docker-dev ibaldin/e2sar-dev:latest
+
+The `mount_src` entrypoint command runs `meson setup` the first time (subsequent runs skip it if `build-linux/` already exists), then drops into a bash shell. From there:
+
+```bash
+# compile
+$ meson compile -C build-linux
+
+# run unit tests
+$ meson test -C build-linux --suite unit --timeout 0
 ```
-Note that the SSH key in the container must always be named `/src/git_ssh_key`. You can add `-d` option to background the process. If you want to preserve the container state, omit the `--rm` option above. Then after the container is stopped, it can be restarted (with all the changes) as follows:
+
+To connect VSCode to this container, install the `Dev Containers` extension, press `F1`, search for `Dev Containers: Attach to Running Container`, and open the `/workspace` folder. The `build-linux/` directory inside it contains the compiled artifacts.
+
+#### Workflow B: self-contained container with GitHub checkout
+
+This workflow clones a specific branch from GitHub inside the container. It requires your GitHub SSH key to be mounted read-only:
+
+```bash
+$ docker run --rm \
+    -v "${HOME}/.ssh/github_ecdsa:/src/git_ssh_key:ro" \
+    -e E2SAR_BRANCH=main \
+    e2sar-dev:latest setup_src
 ```
+
+Omit `--rm` if you want to preserve the container state across restarts. A stopped container can be resumed with:
+```bash
 $ docker start <container name>
 ```
 
-Once the container is started it checks out the appropriate branch and compiles it and then continues to run indefinitely. You can connect to it and find the code in `/src/E2SAR`:
-```
+Once running, connect to it and find the code under `/src/E2SAR`:
+```bash
 $ docker exec -ti <container id> bash
 # cd /src/E2SAR
+# meson compile -C build
 ```
-To connect VSCode be sure to install the `Dev Containers`  VSCode extension. To connect click `<F1>` then in the command prompt search for `Dev Containers: Attach to Running Container`. Select that, then select the running container. A new window will open connected to this container. You can open the `/src/E2SAR` folder in this workspace to find the source code. Compiling the code requires opening a terminal from inside VSCode. Locate `/src/E2SAR` directory then issue `meson compile -C build` command like explained above to build inside the container.
+
+To attach VSCode, use the `Dev Containers: Attach to Running Container` command and open `/src/E2SAR`.
 
 ## Installing and creating a distribution or a release
 
@@ -203,7 +236,14 @@ You can use the GitHub actions to create a release in GitHub. Four workflows are
 - Step 3: publish a release: using DEBs RPMs of dependencies and E2SAR itself built in steps 2a and 2b publish a release
 - Step 4: create a Conda package
 
-Steps 2a, 2b and 3 depend on the tag in the form of `vX.Y.Z` (e.g. `v0.1.5`) to be present on main marking the release. Tagging is done with `git tag -s vX.Y.Z -m "Message" && git push origin vX.Y.Z`
+Steps 2a, 2b and 3 depend on a release tag being present marking the release. Tagging is done with `git tag -s <tag> -m "Message" && git push origin <tag>`.
+
+Development and tagging follow a per-minor-version working-branch model: a long-lived `vX.Y.Z-wip` branch (e.g. `v0.4.0-wip`) is the working branch, and release tags are placed **directly on that branch** rather than on `main`:
+- successive alpha tags `vX.Y.ZaN` (e.g. `v0.4.0a1`, `v0.4.0a2`, ...) as development progresses,
+- optionally release-candidate tags `vX.Y.ZrcN` (e.g. `v0.4.0rc1`) once feature-complete and stabilizing, and
+- a final `vX.Y.Z` tag (e.g. `v0.4.0`) to close out the release.
+
+Keep `VERSION.txt` in step with the tag being cut (e.g. `0.4.0rc1`), and when bumping the version also bump any pinned Docker image references (the published `ibaldin/e2sar:<version>` image and the loopback harness default image tag) in lockstep.
 
 All workflows are manually triggered and take input parameters including the gRPC and BOOST versions and the version of E2SAR that needs to be built. Note that all artifacts in all workflows are versioned according to the operating system, version of gRPC, BOOST and E2SAR. To build for a new version of E2SAR you need to at least start with step 2a, then proceed to 2b and Step 3. If changing the version of gRPC and BOOST from default, start from Step 1, then on to 2a, 2b, Step 3, and Step 4. Step 1 is only specific to the versions of gRPC and BOOST and is not specific to the version of E2SAR.
 
@@ -269,6 +309,146 @@ E2SAR code comes with a set of tests under [test/](test/) folder. It relies on B
 There is a  [Jupyter notebook](scripts/notebooks/EJFAT/LBCP-tester.ipynb) which runs all the tests on FABRIC testbed.
 
 For checking for memory leaks use [scripts/perf-valgrind-loopback.sh](scripts/perf-valgrind-loopback.sh) (run it from scripts/ and give parameters `./perf-valgrind-loopback.sh build /tmp/valgrind-report/` where build is the meson build directory and /tmp/valgrind-report is the directory where the script will place all the logs). Then you can run the XML report parser to get a more concise report `scripts/parse-valgrind-xml.py /tmp/valgrind-reports`. 
+
+### Loopback dataplane test harness
+
+The `scripts/` directory contains a back-to-back loopback test harness that drives
+`e2sar_perf` (sender + receiver) over `127.0.0.1` with the control plane disabled, exercising
+every send/receive code path across a matrix of regimes. It is made of three layered scripts:
+
+- [`scripts/perf-loopback.sh`](scripts/perf-loopback.sh) — single-run engine: starts one
+  receiver and one sender, classifies the run `PASS`/`FAIL`/`SKIP`, and emits a machine-readable
+  `RESULT ...` line.
+- [`scripts/loopback-matrix.sh`](scripts/loopback-matrix.sh) — orchestrator: iterates the regime
+  matrix, skips regimes whose optimization is not compiled into the binary, and tallies results
+  (optionally to a TSV via `--out`).
+- [`scripts/loopback-in-container.sh`](scripts/loopback-in-container.sh) — front-end wrapper
+  that selects a runtime: `podman`/`docker` (pulls a pre-built image and runs the matrix inside
+  it with host networking) or `bare` (`--bare`, runs the matrix directly against a local build,
+  no container). It performs the socket-buffer sysctl advisory and optimization probe in all
+  three modes.
+
+The regimes are: `a1`/`a2` (plain `sendmsg`/`recvfrom`, single/multi-thread), `b1`/`b2`
+(`sendmmsg`+`recvmmsg`), `c1`/`c2` (`liburing_send`+`recvmmsg`), special conditions `s1`–`s5`
+(IOV_MAX batching, deep io_uring ring, degenerate/oversized recvmmsg iovec), and the negative
+regime `n1` (conflicting `-o` set must be rejected). Regimes whose optimization is unavailable
+are reported `SKIP`, not `FAIL`. `sendmmsg`/`recvmmsg` are always compiled in on Linux;
+`liburing_*` require an image/binary built with `liburing-dev` (the published
+`ibaldin/e2sar:0.4.0rc1` image includes it).
+
+#### Running natively on Linux (against a local build)
+
+Point the harness at your meson build directory and run the matrix (no container needed):
+
+```bash
+$ export E2SAR_BUILD_DIR="$(pwd)/build"
+$ scripts/loopback-matrix.sh                       # full matrix, sane defaults
+$ scripts/loopback-matrix.sh --regimes a1,b1,c1    # a subset
+$ scripts/loopback-matrix.sh --only-special --out /tmp/results.tsv
+```
+
+Or invoke a single run directly:
+
+```bash
+$ scripts/perf-loopback.sh --send-opt sendmmsg --recv-opt recvmmsg --threads 4
+```
+
+The default 3 MB socket buffers require the host limits to be high enough, otherwise the sockets
+fail to open ("System socket buffer set too low"). Raise them once per boot:
+
+```bash
+$ sudo sysctl -w net.core.rmem_max=3145728 net.core.wmem_max=3145728
+```
+
+The same matrix can also be driven through the front-end wrapper in **bare** mode, which adds the
+socket-buffer sysctl advisory and the optimization probe on top of `loopback-matrix.sh` (no
+container):
+
+```bash
+$ scripts/loopback-in-container.sh --bare                       # local build, full matrix
+$ scripts/loopback-in-container.sh --bare --regimes a1,a2       # a subset
+$ scripts/loopback-in-container.sh --bare --build-dir /path/to/build --num 50
+```
+
+#### Running in a container (macOS and Linux)
+
+The wrapper prefers `podman` and falls back to `docker`, always uses `--network=host` (required for
+the high-performance loopback path), and by default pulls `ibaldin/e2sar:0.4.0rc1`:
+
+```bash
+# Full matrix against the published image (pulls it on first run)
+$ scripts/loopback-in-container.sh
+
+# A subset, a different published version, or a locally built image
+$ scripts/loopback-in-container.sh --regimes a1,b1,c1
+$ scripts/loopback-in-container.sh --version 0.4.0rc1
+$ scripts/loopback-in-container.sh --image e2sar-perf:local --no-pull
+```
+
+Any flag the wrapper does not recognize is forwarded to `loopback-matrix.sh` (e.g. `--num`,
+`--rate`, `--mtu`, `--bufsize`, `--out`). On Linux, raise the host `net.core.*mem_max` sysctls as
+above (the wrapper reads the effective values via a `--network=host` container and warns if they
+are below `--bufsize`).
+
+**macOS notes.** The image is `linux/amd64`, so on Apple Silicon it runs under emulation and the
+container network stack lives in the Docker Desktop / colima Linux VM, not on the Mac:
+
+- The VM caps `net.core.rmem_max`/`net.core.wmem_max` (colima defaults to `212992`), below the 3 MB
+  default `--bufsize`. Either raise the VM limit or lower the buffer:
+  ```bash
+  $ colima ssh -- sudo sysctl -w net.core.rmem_max=3145728 net.core.wmem_max=3145728
+  # ...or, without touching the VM:
+  $ scripts/loopback-in-container.sh --bufsize 212992
+  ```
+- Under emulation there is small, *variable* UDP loss even at low rates, so a strict
+  (`--loss-tol 0`) run may report `FAIL` on loss alone. For a functional smoke test on macOS, add
+  `--allow-loss` (downgrades a fragment shortfall to a warning) and lower the rate:
+  ```bash
+  $ scripts/loopback-in-container.sh --regimes a1,a2 --num 20 \
+        --bufsize 212992 --rate 0.2 --allow-loss
+  ```
+  On a native Linux host these workarounds are unnecessary — use the default 3 MB buffers and
+  `--loss-tol 0`.
+
+**Running bare on macOS.** For validating a local macOS build there is no emulation, so `--bare`
+runs the native binary directly. Only the plain `sendmsg`/`recvfrom` regimes (`a1`/`a2`) are
+compiled in on macOS; the rest `SKIP`. A single `recvfrom` thread (`a1`) cannot drain the loopback
+socket at the default 1 Gbps, so lower the rate for a strict functional check:
+
+```bash
+$ scripts/loopback-in-container.sh --bare --regimes a1,a2 --rate 0.2 --num 50
+```
+
+At the default rate `a2` (multi-thread) still passes while `a1` shows loopback loss; add
+`--allow-loss` if you want to keep the full rate and only warn on the shortfall.
+
+#### Interpreting throughput and high-rate loss
+
+The matrix is a **code-path correctness gate, not a benchmark**: its intended verdict is the
+default paced 1 Gbps sweep (all regimes green). Any run above 1 Gbps is characterization,
+where loopback socket overrun is expected and the strict 0-loss tolerance is the wrong lens —
+add `--allow-loss` to keep the matrix green while exploring higher rates. Two behaviors are
+worth knowing:
+
+- **Paced runs undershoot the requested rate.** The sender's rate limiter sleeps a fixed
+  `event_bits / rate` between events and does *not* subtract the time already spent sending, so
+  the achieved rate asymptotes to `sleep / (sleep + send_cost)`. Slower send paths (e.g. the
+  multi-threaded `liburing_send` `c2` regime) undershoot more. Use a larger `--num` for a
+  steadier number — it amortizes fixed startup cost (ring init, worker registration, thread
+  spin-up).
+- **High-rate loss is receiver-side, and tunable.** At unlimited/high rates the UDP receive
+  socket buffer (capped by `net.core.rmem_max`) overflows and the kernel drops silently (sender
+  still reports `0 errors`). The knobs are receiver count (`--threads`) and the `recvmmsg` iovec
+  batch (`--rcviovecsize`, exposed on `scripts/perf-loopback.sh` — the matrix only sets it for
+  the `s4`/`s5` special regimes). To tune the receive path for a normal regime, drop to the
+  single-run engine, e.g. `scripts/perf-loopback.sh --send-opt liburing_send --recv-opt recvmmsg
+  --threads 8 --rcviovecsize 256 --mtu 9000 --rate 5 --num 2000`.
+
+See [`notes/2026-09-09-loopback-c2-throughput-characterization.md`](notes/2026-09-09-loopback-c2-throughput-characterization.md)
+for a worked example (the `c2` send path ceils at ~11.5 Gbps on loopback; the paced 0.82 Gbps
+was the pacer, not the send path).
+
+The matrix exits non-zero if any non-skipped regime fails, so it can gate CI.
 
 ### Python
 

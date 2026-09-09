@@ -38,4 +38,16 @@ BOOST_AUTO_TEST_CASE(DPOptTest2)
     BOOST_CHECK(res.has_error());
 #endif
 }
+
+BOOST_AUTO_TEST_CASE(DPOptTest3)
+{
+    std::vector<std::string> opts = {"recvmmsg"};
+    auto res = Optimizations::select(opts);
+#ifdef SENDMMSG_AVAILABLE
+    BOOST_CHECK(not res.has_error());
+    BOOST_CHECK(Optimizations::isSelected(Optimizations::Code::recvmmsg));
+#else
+    BOOST_CHECK(res.has_error());
+#endif
+}
 BOOST_AUTO_TEST_SUITE_END()

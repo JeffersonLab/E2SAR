@@ -39,6 +39,18 @@ void option_dependency(const po::variables_map &vm,
             throw std::logic_error(std::string("Option '") + for_what + "' requires option '" + required_option + "'.");
 }
 
+static void warnIfNonRoutable(const std::string &addr_str)
+{
+    if (NetUtil::isNonRoutable(addr_str))
+        std::cerr << "WARNING: '" << addr_str << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
+}
+
+static void warnIfNonRoutable(const std::vector<std::string> &addrs)
+{
+    for (const auto &a : addrs)
+        warnIfNonRoutable(a);
+}
+
 /**
  * @param lbname is the name of the loadbalancer you give it
  * @param senders is the list of IP addresses of sender nodes
@@ -72,6 +84,8 @@ result<int> reserveLB(LBManager &lbman,
         std::cout << std::endl;
         std::cout << "   Duration: " << duration_v << std::endl;    
     }
+
+    warnIfNonRoutable(senders);
 
     // attempt to reserve
     auto res = lbman.reserveLB(lbname, duration_v, senders, ipfam);
@@ -167,6 +181,7 @@ result<int> registerWorker(LBManager &lbman, const std::string &node_name,
 
     if (node_ip.length() > 0)
     {
+        warnIfNonRoutable(node_ip);
         return handleError(lbman.registerWorker(node_name, std::pair<ip::address, u_int16_t>(ip::make_address(node_ip), node_port), weight, src_cnt, min_factor, max_factor, keeplbhdr));
     } else
     {
@@ -374,6 +389,7 @@ result<int> addSenders(LBManager &lbman, const std::vector<std::string>& senders
         std::cout << "   Sender list: ";
         std::for_each(senders.begin(), senders.end(), [](const std::string& s) { std::cout << s << ' '; });
         std::cout << std::endl;
+        warnIfNonRoutable(senders);
         return handleError(lbman.addSenders(senders));
     } else
     {

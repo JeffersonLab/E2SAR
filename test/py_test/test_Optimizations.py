@@ -11,11 +11,17 @@ Or, add this path to PYTHONPATH, e.g,
 # export PYTHONPATH=<my_e2sar_build_path>/build/src/pybind
 """
 
+import sys
 import pytest
 
 # Make sure the compiled module is added to your path
 import e2sar_py
 opt = e2sar_py.Optimizations
+
+_no_sendmmsg = pytest.mark.skipif(
+    sys.platform == 'darwin',
+    reason='sendmmsg not available on macOS'
+)
 
 
 @pytest.mark.unit
@@ -25,6 +31,7 @@ def test_code_enum():
     assert int(opt.Code.sendmmsg) == 1
     assert int(opt.Code.liburing_send) == 2
     assert int(opt.Code.liburing_recv) == 3
+    assert int(opt.Code.recvmmsg) == 4
     assert int(opt.Code.unknown) == 15
 
 
@@ -35,6 +42,7 @@ def test_to_word():
     assert opt.toWord(opt.Code.sendmmsg) == 1 << int(opt.Code.sendmmsg)
     assert opt.toWord(opt.Code.liburing_send) == 1 << int(opt.Code.liburing_send)
     assert opt.toWord(opt.Code.liburing_recv) == 1 << int(opt.Code.liburing_recv)
+    assert opt.toWord(opt.Code.recvmmsg) == 1 << int(opt.Code.recvmmsg)
     assert opt.toWord(opt.Code.unknown) == 1 << int(opt.Code.unknown)
 
 
@@ -45,6 +53,7 @@ def test_to_string():
     assert opt.toString(opt.Code.sendmmsg) == "sendmmsg"
     assert opt.toString(opt.Code.liburing_send) == "liburing_send"
     assert opt.toString(opt.Code.liburing_recv) == "liburing_recv"
+    assert opt.toString(opt.Code.recvmmsg) == "recvmmsg"
     assert opt.toString(opt.Code.unknown) == "unknown"
 
 
@@ -55,6 +64,7 @@ def test_from_string():
     assert opt.fromString("sendmmsg") == opt.Code.sendmmsg
     assert opt.fromString("liburing_send") == opt.Code.liburing_send
     assert opt.fromString("liburing_recv") == opt.Code.liburing_recv
+    assert opt.fromString("recvmmsg") == opt.Code.recvmmsg
     assert opt.fromString("random_invalid") == opt.Code.unknown
 
 
@@ -74,6 +84,7 @@ def test_available_as_word():
 
 
 @pytest.mark.unit
+@_no_sendmmsg
 def test_select_by_string():
     """Test the select function with string inputs."""
     opt_names = ["sendmmsg"]
@@ -83,6 +94,7 @@ def test_select_by_string():
 
 
 @pytest.mark.unit
+@_no_sendmmsg
 def test_select_by_enum():
     """Test the select function with enum inputs."""
     # According to the underlying cpp implementation, "sendmmg" cannot be

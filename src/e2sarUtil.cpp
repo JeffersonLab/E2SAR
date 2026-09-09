@@ -4,6 +4,7 @@
 #include <set>
 #include <cstdlib>
 #include <boost/url.hpp>
+#include <boost/asio.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include "e2sarUtil.hpp"
@@ -26,7 +27,7 @@ namespace e2sar
     const std::vector<Optimizations::Code> Optimizations::available {
         Optimizations::Code::none
 #ifdef SENDMMSG_AVAILABLE
-        , Optimizations::Code::sendmmsg
+        , Optimizations::Code::sendmmsg, Optimizations::Code::recvmmsg
 #endif
 #ifdef LIBURING_AVAILABLE
         , Optimizations::Code::liburing_send, Optimizations::Code::liburing_recv
@@ -95,9 +96,10 @@ namespace e2sar
         }
 
         // check for conflict
-        if (isSelected(Code::sendmmsg) and
-            (isSelected(Code::liburing_recv) or 
-            isSelected(Code::liburing_send)))
+        if ((isSelected(Code::sendmmsg) and 
+            isSelected(Code::liburing_send)) or
+            (isSelected(Code::recvmmsg) and
+            isSelected(Code::liburing_recv)))
         {
             inst->selected_optimizations = toWord(Code::none);
             return E2SARErrorInfo{E2SARErrorc::LogicError, "Requested optimizations are incompatible"};
@@ -186,9 +188,10 @@ namespace e2sar
      *
      * @param uri URI to parse.
      */
-    EjfatURI::EjfatURI(const std::string &uri, TokenType tt, bool pV6) : 
-        rawURI{uri}, haveDatav4{false}, haveDatav6{false}, 
-        haveSync(false), useTls{false}, preferV6{pV6}
+    EjfatURI::EjfatURI(const std::string &uri, TokenType tt, bool pV6) :
+        rawURI{uri}, haveDatav4{false}, haveDatav6{false},
+        haveSyncv4{false}, haveSyncv6{false}, useTls{false}, preferV6{pV6},
+        dataMinPort{0}, dataMaxPort{0}
     {
 
         // parse the URI
@@ -278,87 +281,121 @@ namespace e2sar
             if (!param.key.compare("sessionid"s))
             {
                 sessionId = param.value;
-                continue;
             }
-            else 
+            else if (!param.key.compare("sync"s))
             {
-                // sync or data
                 result<std::pair<ip::address, u_int16_t>> r = string_tuple_to_ip_and_port(param.value);
-                if (r)
-                {
-                    std::pair<ip::address, int> p = r.value();
-                    if (!param.key.compare("sync"s))
-                    {
-                        haveSync = true;
-                        syncAddr = p.first;
-                        syncPort = p.second;
-                    }
-                    else if (!param.key.compare("data"s))
-                    {
-                        if (p.first.is_v4())
-                        {
-                            haveDatav4 = true;
-                            dataAddrv4 = p.first;
-                        }
-                        else
-                        {
-                            haveDatav6 = true;
-                            dataAddrv6 = p.first;
-                        }
-                        dataPort = (p.second == 0 ? DATAPLANE_PORT : p.second);
-                    }
-                    else
-                        throw E2SARException("Unknown parameter "s + param.key + " in URI "s + rawURI);
+                if (!r)
+                    throw E2SARException("Unable to parse sync address in URI "s + rawURI);
+                auto p = r.value();
+                if (p.first.is_v4()) {
+                    haveSyncv4 = true;
+                    syncAddrv4 = p.first;
+                    syncPortv4 = p.second;
+                } else {
+                    haveSyncv6 = true;
+                    syncAddrv6 = p.first;
+                    syncPortv6 = p.second;
                 }
-                else
-                    throw E2SARException("Unable to parse "s + param.key + " address in URI "s + rawURI);
             }
+            else if (!param.key.compare("data"s))
+            {
+                result<std::tuple<ip::address, u_int16_t, u_int16_t>> r = string_tuple_to_ip_and_port_range(param.value);
+                if (!r)
+                    throw E2SARException("Unable to parse data address in URI "s + rawURI);
+                auto [addr, minP, maxP] = r.value();
+                if (addr.is_v4()) {
+                    haveDatav4 = true;
+                    dataAddrv4 = addr;
+                } else {
+                    haveDatav6 = true;
+                    dataAddrv6 = addr;
+                }
+                if (minP == 0 && maxP == 0) {
+                    dataMinPort = DATAPLANE_PORT_MIN;
+                    dataMaxPort = DATAPLANE_PORT_MAX;
+                } else {
+                    dataMinPort = minP;
+                    dataMaxPort = maxP;
+                }
+            }
+            else
+                throw E2SARException("Unknown parameter "s + param.key + " in URI "s + rawURI);
         }
     }
 
     /** implicit conversion operator */
     EjfatURI::operator std::string() const
     {
-        // select which token to print
         auto token = std::cref(tokensByType[ttAsIdx(TokenType::all)]);
-
         if (!tokensByType[ttAsIdx(TokenType::load_balancer)].empty())
             token = std::cref(tokensByType[ttAsIdx(TokenType::load_balancer)]);
-
         if (!tokensByType[ttAsIdx(TokenType::reservation)].empty())
             token = std::cref(tokensByType[ttAsIdx(TokenType::reservation)]);
-
         if (!tokensByType[ttAsIdx(TokenType::session)].empty())
             token = std::cref(tokensByType[ttAsIdx(TokenType::session)]);
 
-        return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
+        auto portSuffix = [&]() -> std::string {
+            if (dataMinPort == dataMaxPort)
+                return ":"s + std::to_string(dataMinPort);
+            return ":"s + std::to_string(dataMinPort) + "-"s + std::to_string(dataMaxPort);
+        };
+
+        bool haveQuery = haveSyncv4 || haveSyncv6 || haveDatav4 || haveDatav6;
+        bool needAmp = false;
+        std::string qs;
+        if (haveSyncv4) {
+            qs += "sync="s + syncAddrv4.to_string() + ":"s + std::to_string(syncPortv4);
+            needAmp = true;
+        }
+        if (haveSyncv6) {
+            if (needAmp) qs += "&"s;
+            qs += "sync=["s + syncAddrv6.to_string() + "]:"s + std::to_string(syncPortv6);
+            needAmp = true;
+        }
+        if (haveDatav4) {
+            if (needAmp) qs += "&"s;
+            qs += "data="s + dataAddrv4.to_string() + portSuffix();
+            needAmp = true;
+        }
+        if (haveDatav6) {
+            if (needAmp) qs += "&"s;
+            qs += "data=["s + dataAddrv6.to_string() + "]"s + portSuffix();
+            needAmp = true;
+        }
+        if (!sessionId.empty()) {
+            if (needAmp) qs += "&"s;
+            qs += "sessionid="s + sessionId;
+        }
+
+        return (useTls ? "ejfats"s : "ejfat"s) + "://"s +
+               (!token.get().empty() ? token.get() + "@"s : ""s) +
                (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) + ":"s + std::to_string(cpPort) : cpHost + ":"s + std::to_string(cpPort)) +
                "/"s +
                (!lbId.empty() ? "lb/"s + lbId : ""s) +
-               (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
-               (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
-               (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
-               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
-               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
-               (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
+               (haveQuery ? "?"s + qs : ""s);
     }
 
     bool operator==(const EjfatURI &u1, const EjfatURI &u2)
     {
-        return (u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::all)] == 
+        return (u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::all)] ==
                     u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::all)] &&
-                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::load_balancer)] == 
+                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::load_balancer)] ==
                     u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::load_balancer)] &&
-                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::reservation)] == 
+                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::reservation)] ==
                     u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::reservation)] &&
-                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::session)] == 
+                u1.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::session)] ==
                     u2.tokensByType[EjfatURI::ttAsIdx(EjfatURI::TokenType::session)] &&
                 u1.cpAddr == u2.cpAddr &&
                 u1.cpPort == u2.cpPort &&
                 u1.dataAddrv4 == u2.dataAddrv4 &&
                 u1.dataAddrv6 == u2.dataAddrv6 &&
-                u1.syncAddr == u2.syncAddr &&
-                u1.syncPort == u2.syncPort &&
+                u1.dataMinPort == u2.dataMinPort &&
+                u1.dataMaxPort == u2.dataMaxPort &&
+                u1.syncAddrv4 == u2.syncAddrv4 &&
+                u1.syncPortv4 == u2.syncPortv4 &&
+                u1.syncAddrv6 == u2.syncAddrv6 &&
+                u1.syncPortv6 == u2.syncPortv6 &&
                 u1.lbId == u2.lbId &&
                 u1.sessionId == u2.sessionId &&
                 u1.lbName == u2.lbName);
@@ -366,20 +403,48 @@ namespace e2sar
 
     const std::string EjfatURI::to_string(TokenType tt) const
     {
-        // select which token to print
         auto token = std::cref(tokensByType[ttAsIdx(tt)]);
 
-        return (useTls ? "ejfats"s : "ejfat"s) + "://"s + (!token.get().empty() ? token.get() + "@"s : ""s) +
-               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string())  : cpHost) + ":"s +
+        auto portSuffix = [&]() -> std::string {
+            if (dataMinPort == dataMaxPort)
+                return ":"s + std::to_string(dataMinPort);
+            return ":"s + std::to_string(dataMinPort) + "-"s + std::to_string(dataMaxPort);
+        };
+
+        bool haveQuery = haveSyncv4 || haveSyncv6 || haveDatav4 || haveDatav6;
+        bool needAmp = false;
+        std::string qs;
+        if (haveSyncv4) {
+            qs += "sync="s + syncAddrv4.to_string() + ":"s + std::to_string(syncPortv4);
+            needAmp = true;
+        }
+        if (haveSyncv6) {
+            if (needAmp) qs += "&"s;
+            qs += "sync=["s + syncAddrv6.to_string() + "]:"s + std::to_string(syncPortv6);
+            needAmp = true;
+        }
+        if (haveDatav4) {
+            if (needAmp) qs += "&"s;
+            qs += "data="s + dataAddrv4.to_string() + portSuffix();
+            needAmp = true;
+        }
+        if (haveDatav6) {
+            if (needAmp) qs += "&"s;
+            qs += "data=["s + dataAddrv6.to_string() + "]"s + portSuffix();
+            needAmp = true;
+        }
+        if (!sessionId.empty()) {
+            if (needAmp) qs += "&"s;
+            qs += "sessionid="s + sessionId;
+        }
+
+        return (useTls ? "ejfats"s : "ejfat"s) + "://"s +
+               (!token.get().empty() ? token.get() + "@"s : ""s) +
+               (cpHost.empty() ? (cpAddr.is_v6() ? "[" + cpAddr.to_string() + "]" : cpAddr.to_string()) : cpHost) + ":"s +
                std::to_string(cpPort) +
                "/"s +
                (!lbId.empty() ? "lb/"s + lbId : ""s) +
-               (haveSync || haveDatav4 || haveDatav6 ? "?"s : ""s) +
-               (haveSync ? "sync="s + (syncAddr.is_v6() ? "[" + syncAddr.to_string() + "]" : syncAddr.to_string()) + ":"s + std::to_string(syncPort) : ""s) +
-               (haveSync && (haveDatav4 || haveDatav6) ? "&"s : ""s) +
-               (haveDatav4 ? "data="s + dataAddrv4.to_string() + (haveDatav6 ? "&"s : ""s) : ""s) +
-               (haveDatav6 ? "data="s + "[" + dataAddrv6.to_string() + "]" : ""s) +
-               (!sessionId.empty() ? "&sessionid="s + sessionId : ""s);
+               (haveQuery ? "?"s + qs : ""s);
     }
 
     // determine local outgoing address towards the dataplane
@@ -409,7 +474,17 @@ namespace e2sar
         if (intfRes.has_error())
             return intfRes.error();
 
-        return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+        if (intfRes.value().get<2>().is_unspecified()) {
+            // this is a hack - doesn't work with hosts with complex IP configuration
+            return NetUtil::getInterfaceIPs(intfRes.value().get<0>());
+        }
+        else {
+            std::vector<ip::address> ret;
+            // Source ip::address (v4 or v6) should be attached already 
+            ret.push_back(intfRes.value().get<2>());
+            return ret;
+        }
+
 #else
         return E2SARErrorInfo{E2SARErrorc::SystemError, "Capability to determine outgoing address not supported on this platform"};
 #endif

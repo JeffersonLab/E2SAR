@@ -1,0 +1,104 @@
+# udplbd2 mock config for running E2SAR live tests against the mock control
+# plane, NATIVELY (no docker). IMPORTANT: mock mode is a SINGLE-HOST / LOOPBACK
+# design.
+#
+# In mock mode udplbd rewrites the addresses it returns to the client:
+#   - data address  -> from mock.address_map, i.e. 192.0.2.1 -> 127.0.0.1:19522
+#   - sync address  -> first IPv4 in server.listen (below), UDP port = the
+#                      instance's event_number_port (e.g. 19531)
+# The E2SAR Segmenter/Reassembler then send sync+data to THOSE addresses, which
+# are all on 127.0.0.1. Therefore the mock and the E2SAR test process must run
+# on the SAME host (cpnode), sharing loopback.
+#
+# gRPC listens on 127.0.0.1:19523 with TLS disabled, so clients use a plaintext
+# URI:  ejfat://udplbd2changeme@127.0.0.1:19523/
+#
+# The notebook uploads this file to the cpnode and starts udplbd2 with:
+#   cd udplbd2; UDPLBD_CONFIG=$HOME/udplbd2_mock.yml ./target/release/udplbd mock
+
+lb:
+  mac_unicast: null
+  data_plane_interface: null
+  instances:
+    - ipv4: "192.0.2.1"
+      ipv6: "2001:DB8::1"
+      event_number_port: 19531
+    - ipv4: "192.0.2.2"
+      ipv6: "2001:DB8::2"
+      event_number_port: 19532
+    - ipv4: "192.0.2.3"
+      ipv6: "2001:DB8::3"
+      event_number_port: 19533
+    - ipv4: "192.0.2.4"
+      ipv6: "2001:DB8::4"
+      event_number_port: 19534
+    - ipv4: "192.0.2.5"
+      ipv6: "2001:DB8::5"
+      event_number_port: 19535
+    - ipv4: "192.0.2.6"
+      ipv6: "2001:DB8::6"
+      event_number_port: 19536
+    - ipv4: "192.0.2.7"
+      ipv6: "2001:DB8::7"
+      event_number_port: 19537
+    - ipv4: "192.0.2.8"
+      ipv6: "2001:DB8::8"
+      event_number_port: 19538
+
+database:
+  file: "/tmp/udplbd.db"
+  cleanup_interval: "600s"
+  cleanup_age: "4h"
+  archive_dir: "/tmp/udplbd-archive"
+  archive_rotation: "72h"
+  archive_keep: 10
+  fsync: false
+  backup_before_migrate: true
+
+controller:
+  duration: "1s"
+  offset: "800ms"
+
+server:
+  auth_token: "udplbd2changeme"
+  # Keep on loopback: this IP is echoed back to the client as the sync address,
+  # and the E2SAR test runs on the same host. Do NOT set 0.0.0.0 here (it would
+  # be returned verbatim as sync=0.0.0.0 and break the sync/segmenter tests).
+  listen:
+    - "127.0.0.1:19523"
+    - "[::1]:19523"
+  allow_private: true
+  # Allow the Reassembler to register a worker from 127.0.0.1 (mock is loopback).
+  allow_loopback: true
+  require_registration_from_dataplane: false
+  tls:
+    enable: false
+    cert_file: "x509/server_cert.pem"
+    key_file: "x509/server_key.pem"
+
+rest:
+  enable: true
+
+log:
+  level: debug
+
+smartnic: []
+
+mock:
+  address_map:
+    "192.0.2.1": "127.0.0.1:19522"
+    "192.0.2.2": "127.0.0.1:19523"
+    "192.0.2.3": "127.0.0.1:19524"
+    "192.0.2.4": "127.0.0.1:19525"
+    "192.0.2.5": "127.0.0.1:19526"
+    "192.0.2.6": "127.0.0.1:19527"
+    "192.0.2.7": "127.0.0.1:19528"
+    "192.0.2.8": "127.0.0.1:19529"
+    "2001:DB8::1": "[::1]:19522"
+    "2001:DB8::2": "[::1]:19523"
+    "2001:DB8::3": "[::1]:19524"
+    "2001:DB8::4": "[::1]:19525"
+    "2001:DB8::5": "[::1]:19526"
+    "2001:DB8::6": "[::1]:19527"
+    "2001:DB8::7": "[::1]:19528"
+    "2001:DB8::8": "[::1]:19529"

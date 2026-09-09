@@ -62,7 +62,7 @@ BOOST_AUTO_TEST_CASE(URITest2)
     BOOST_TEST(euri.get_cpAddr().value().first == ip::make_address("192.188.29.6"));
     BOOST_TEST(euri.get_cpAddr().value().second == 18020);
     BOOST_TEST(euri.get_dataAddrv4().value().first == ip::make_address("192.188.29.20"));
-    BOOST_TEST(euri.get_dataAddrv4().value().second == DATAPLANE_PORT);
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == std::make_pair(DATAPLANE_PORT_MIN, DATAPLANE_PORT_MAX));
     BOOST_TEST(euri.get_syncAddr().value().first == ip::make_address("192.188.29.6"));
     BOOST_TEST(euri.get_syncAddr().value().second == 19020);
 }
@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(URITest2_3)
     BOOST_TEST(euri.get_cpAddr().value().second == 18020);
     BOOST_TEST(euri.get_syncAddr().has_error());
     BOOST_TEST(euri.get_dataAddrv4().value().first == ip::make_address("192.188.29.20"));
-    BOOST_TEST(euri.get_dataAddrv4().value().second == DATAPLANE_PORT);
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == std::make_pair(DATAPLANE_PORT_MIN, DATAPLANE_PORT_MAX));
 }
 
 BOOST_AUTO_TEST_CASE(URITest2_4)
@@ -296,9 +296,9 @@ BOOST_AUTO_TEST_CASE(URITest13)
     EjfatURI euri(uri_string11);
 
     std::cout << static_cast<std::string>(euri) << " Dataplane address with custom port:" << euri.get_dataAddrv4().value().first <<
-        ":" << euri.get_dataAddrv4().value().second << std::endl;
+        ":" << euri.get_dataAddrv4().value().second.first << std::endl;
 
-    BOOST_CHECK(euri.get_dataAddrv4().value().second == 19020);
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == std::make_pair((u_int16_t)19020, (u_int16_t)19020));
 }
 
 BOOST_AUTO_TEST_CASE(URITest14)
@@ -306,12 +306,101 @@ BOOST_AUTO_TEST_CASE(URITest14)
     EjfatURI euri(uri_string12);
 
     std::cout << static_cast<std::string>(euri) << "Dataplane address with custom port v6: " << euri.get_dataAddrv6().value().first <<
-        ":" << euri.get_dataAddrv6().value().second << " v4: " << euri.get_dataAddrv4().value().first <<
-        ":" << euri.get_dataAddrv4().value().second << std::endl;
+        ":" << euri.get_dataAddrv6().value().second.first << " v4: " << euri.get_dataAddrv4().value().first <<
+        ":" << euri.get_dataAddrv4().value().second.first << std::endl;
 
     BOOST_CHECK(euri.get_dataAddrv6().value().first == ip::make_address("2001:400:a300::10"));
-    BOOST_CHECK(euri.get_dataAddrv6().value().second == 10000);
+    BOOST_CHECK(euri.get_dataAddrv6().value().second == std::make_pair((u_int16_t)10000, (u_int16_t)10000));
     BOOST_CHECK(euri.get_dataAddrv4().value().first == ip::make_address("192.188.29.10"));
-    BOOST_CHECK(euri.get_dataAddrv4().value().second == 10000);
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == std::make_pair((u_int16_t)10000, (u_int16_t)10000));
 }
+
+// dual sync: one IPv4, one IPv6 sync address
+std::string uri_dual_sync{"ejfat://token@192.188.29.6:18020/lb/36?sync=192.188.29.6:19020&sync=[2001:4860::1]:19021"};
+
+BOOST_AUTO_TEST_CASE(URITest_DualSync)
+{
+    EjfatURI euri(uri_dual_sync);
+
+    BOOST_CHECK(euri.has_syncAddrv4());
+    BOOST_CHECK(euri.has_syncAddrv6());
+    BOOST_CHECK(euri.get_syncAddrv4().value().first == ip::make_address("192.188.29.6"));
+    BOOST_CHECK(euri.get_syncAddrv4().value().second == 19020);
+    BOOST_CHECK(euri.get_syncAddrv6().value().first == ip::make_address("2001:4860::1"));
+    BOOST_CHECK(euri.get_syncAddrv6().value().second == 19021);
+
+    // get_syncAddr() with preferV6=false (default) picks v4
+    BOOST_CHECK(euri.get_syncAddr().value().first == ip::make_address("192.188.29.6"));
+
+    // get_syncAddr() with preferV6=true picks v6
+    EjfatURI euri6(uri_dual_sync, EjfatURI::TokenType::admin, true);
+    BOOST_CHECK(euri6.get_syncAddr().value().first == ip::make_address("2001:4860::1"));
+}
+
+// data port range: min-max
+std::string uri_data_range{"ejfat://token@192.188.29.6:18020/lb/36?data=1.2.3.4:1234-5678"};
+
+BOOST_AUTO_TEST_CASE(URITest_DataPortRange)
+{
+    EjfatURI euri(uri_data_range);
+
+    BOOST_CHECK(!euri.get_dataPortRange().has_error());
+    BOOST_CHECK(euri.get_dataPortRange().value().first == 1234);
+    BOOST_CHECK(euri.get_dataPortRange().value().second == 5678);
+    BOOST_CHECK(euri.get_dataAddrv4().value().second == std::make_pair((u_int16_t)1234, (u_int16_t)5678));
+}
+
+// data single port: treated as range (port, port)
+std::string uri_data_single{"ejfat://token@192.188.29.6:18020/lb/36?data=1.2.3.4:1234"};
+
+BOOST_AUTO_TEST_CASE(URITest_DataSinglePort)
+{
+    EjfatURI euri(uri_data_single);
+
+    BOOST_CHECK(euri.get_dataPortRange().value().first == 1234);
+    BOOST_CHECK(euri.get_dataPortRange().value().second == 1234);
+}
+
+// data default port range: no port specified -> 16384-32767
+std::string uri_data_no_port{"ejfat://token@192.188.29.6:18020/lb/36?data=1.2.3.4"};
+
+BOOST_AUTO_TEST_CASE(URITest_DataDefaultRange)
+{
+    EjfatURI euri(uri_data_no_port);
+
+    BOOST_CHECK(euri.get_dataPortRange().value().first == DATAPLANE_PORT_MIN);
+    BOOST_CHECK(euri.get_dataPortRange().value().second == DATAPLANE_PORT_MAX);
+}
+
+// full new-format URI: dual sync + dual data + port range
+std::string uri_full_new{"ejfat://token@192.188.29.6:18020/lb/99?sync=10.0.0.1:19000&sync=[2001:db8::1]:19001&data=10.0.0.2:16384-32767&data=[2001:db8::2]:16384-32767"};
+
+BOOST_AUTO_TEST_CASE(URITest_FullNewFormat)
+{
+    EjfatURI euri(uri_full_new);
+
+    BOOST_CHECK(euri.has_syncAddrv4());
+    BOOST_CHECK(euri.has_syncAddrv6());
+    BOOST_CHECK(euri.has_dataAddrv4());
+    BOOST_CHECK(euri.has_dataAddrv6());
+    BOOST_CHECK(euri.get_syncAddrv4().value().first == ip::make_address("10.0.0.1"));
+    BOOST_CHECK(euri.get_syncAddrv4().value().second == 19000);
+    BOOST_CHECK(euri.get_syncAddrv6().value().first == ip::make_address("2001:db8::1"));
+    BOOST_CHECK(euri.get_syncAddrv6().value().second == 19001);
+    BOOST_CHECK(euri.get_dataAddrv4().value().first == ip::make_address("10.0.0.2"));
+    BOOST_CHECK(euri.get_dataPortRange().value().first == 16384);
+    BOOST_CHECK(euri.get_dataPortRange().value().second == 32767);
+    BOOST_CHECK(euri.get_lbId() == "99");
+}
+
+// round-trip: parse -> to_string -> parse -> operator== must hold
+BOOST_AUTO_TEST_CASE(URITest_RoundTrip)
+{
+    EjfatURI euri1(uri_full_new);
+    std::string serialized = static_cast<std::string>(euri1);
+    std::cout << "Round-trip: " << serialized << std::endl;
+    EjfatURI euri2(serialized);
+    BOOST_CHECK(euri1 == euri2);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

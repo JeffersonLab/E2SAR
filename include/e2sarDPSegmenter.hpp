@@ -72,13 +72,10 @@ namespace e2sar
             // WARNING: Incompatible with optimizations that send entire batches of 
             // frames to the kernel, i.e. sendMmsg and io_uring
             const bool smooth;
-            // use multiple destination ports (for back-to-back testing only)
-            const bool multiPort;
             // which LB header version are we using
             const u_int8_t lbHdrVersion;
-
-            // Max size of internal queue holding events to be sent. 
-            static constexpr size_t QSIZE{2047};
+            // sync address family: false=IPv4 (default), true=IPv6
+            const bool syncV6;
 
             // size of CQE batch we peek
             static constexpr unsigned cqeBatchSize{100};
@@ -98,7 +95,7 @@ namespace e2sar
             };
 
             // Fast, lock-free, wait-free queue (supports multiple producers/consumers)
-            boost::lockfree::queue<EventQueueItem*, boost::lockfree::fixed_sized<true>> eventQueue{QSIZE};
+            boost::lockfree::queue<EventQueueItem*, boost::lockfree::fixed_sized<true>> eventQueue;
 
 #ifdef LIBURING_AVAILABLE
             std::vector<struct io_uring> rings;
@@ -354,6 +351,8 @@ namespace e2sar
              * - mtu - size of the MTU to attempt to fit the segmented data in (must accommodate
              * IP, UDP and LBRE headers). Value of 0 means auto-detect based on MTU of outgoing interface
              * - Linux only {1500}
+             * - eventQueueSize - sie of the queue used to send events. Default 2047 is generous, but
+             * in a situation where events are large and fast-coming, can overwhelm the host RAM.
              * - numSendSockets - number of sockets/source ports we will be sending data from. The
              * more, the more randomness the LAG will see in delivering to different FPGA ports. {4}
              * - sndSocketBufSize - socket buffer size for sending set via SO_SNDBUF setsockopt. Note
@@ -361,33 +360,33 @@ namespace e2sar
              * - rateGbps - send rate as floating point expression in Gbps. Negative value means unlimited. {-1.0}
              * - smooth - shape on a per sendmsg() call rather than after every event, doesn't work for
              * send optimizations and only works at low speeds (~<3Gbps) {false}
-             * - multiPort - use numSendSockets consecutive destination ports starting from EjfatURI data port, 
-             * rather than a single port; source ports are still randomized  {false}
              * - ticksAsREEventNum - override the RE event number field with the same event number as LB event number
              * which is a tick, primarily good for debugging {false}
              * - lbHdrVersion - version of the LB header to be used (2 or 3 are valid) {2}
+             * - syncV6 - use IPv6 sync address; false (default) always selects IPv4 sync regardless of dpV6 {false}
              */
-            struct SegmenterFlags 
+            struct SegmenterFlags
             {
-                bool dpV6; 
+                bool dpV6;
                 bool connectedSocket;
                 bool useCP;
                 u_int16_t warmUpMs;
                 u_int16_t syncPeriodMs;
                 u_int16_t syncPeriods;
                 u_int16_t mtu;
+                size_t eventQueueSize;
                 size_t numSendSockets;
                 int sndSocketBufSize;
                 float rateGbps;
                 bool smooth;
-                bool multiPort;
                 bool ticksAsREEventNum;
-                u_int8_t lbHdrVersion; 
+                u_int8_t lbHdrVersion;
+                bool syncV6;
 
                 SegmenterFlags(): dpV6{false}, connectedSocket{true},
                     useCP{true}, warmUpMs{1000}, syncPeriodMs{1000}, syncPeriods{2}, mtu{1500},
-                    numSendSockets{4}, sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false}, 
-                    multiPort{false}, ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2} {}
+                    eventQueueSize{2047}, numSendSockets{4},sndSocketBufSize{1024*1024*3}, rateGbps{-1.0}, smooth{false},
+                    ticksAsREEventNum{false}, lbHdrVersion{lbhdrVersion2}, syncV6{false} {}
                 /**
                  * Initialize flags from an INI file
                  * @param iniFile - path to the INI file
@@ -535,20 +534,22 @@ namespace e2sar
             /*
             * Tell threads to stop
             */ 
-            inline void stopThreads() 
+            inline void stopThreads()
             {
                 if (not threadsStop)
                 {
-                    // wait until queue empties
-                    while (not eventQueue.empty()) {}
-                    
-                    // tell sending threads to stop and
-                    // wait till they are done
+                    // wait until queue empties (only if send thread was started)
+                    if (sendThreadState.threadObj.joinable())
+                        while (not eventQueue.empty()) {}
+
+                    // tell sending threads to stop and wait till they are done
                     threadsStop = true;
-                    sendThreadState.threadObj.join();
+                    if (sendThreadState.threadObj.joinable())
+                        sendThreadState.threadObj.join();
                     // now we can stop the sync thread
                     syncThreadStop = true;
-                    syncThreadState.threadObj.join();
+                    if (syncThreadState.threadObj.joinable())
+                        syncThreadState.threadObj.join();
                 }
             }
         private:

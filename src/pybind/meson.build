@@ -10,7 +10,8 @@ pybind11_src = [
     'py_e2sarDP.cpp',
     'py_e2sarHeaders.cpp',
     'py_e2sarUtil.cpp',
-    'py_e2sarAffinity.cpp'
+    'py_e2sarAffinity.cpp',
+    'py_e2sarNetUtil.cpp'
     ]
 
 # check the version of Python by looking for python executable
@@ -28,7 +29,7 @@ pybind11_include_dir = run_command(
 pybind11_inc = include_directories(pybind11_include_dir)
 
 py_install.extension_module(pybind11_module_name,
-    sources: pybind11_src,
+    sources: pybind11_src + grpc_generated_headers,
     include_directories: [inc, pybind11_inc],
     dependencies: [py_install.dependency(),
         boost_dep, grpc_dep, protobuf_dep, thread_dep],

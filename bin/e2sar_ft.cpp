@@ -467,6 +467,7 @@ int main(int argc, char **argv)
     std::string fileExtension, filePrefix;
     size_t writeThreads, readThreads;
     int eventTimeoutMS;
+    unsigned int rcvIovecSize;
 
     auto opts = od.add_options()("help,h", "show this help message");
 
@@ -487,10 +488,11 @@ int main(int argc, char **argv)
     opts("port", po::value<u_int16_t>(&recvStartPort)->default_value(10000), "Starting UDP port number on which receiver listens. Defaults to 10000. [r] ");
     opts("ipv6,6", "force using IPv6 control plane address if URI specifies hostname (disables cert validation) [s,r]");
     opts("ipv4,4", "force using IPv4 control plane address if URI specifies hostname (disables cert validation) [s,r]");
+    opts("syncv6", po::bool_switch()->default_value(false), "use IPv6 sync address (default is IPv4 regardless of dataplane family) [s]");
     opts("novalidate,v", "don't validate server certificate [s,r]");
     opts("autoip", po::bool_switch()->default_value(false), "auto-detect dataplane outgoing ip address (conflicts with --ip; doesn't work for reassembler in back-to-back testing) [s,r]");
     opts("cores", po::value<std::vector<int>>(&coreList)->multitoken(), "optional list of cores to bind sender or receiver threads to; number of receiver threads is equal to the number of cores [s,r]");
-    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s]");
+    opts("optimize,o", po::value<std::vector<std::string>>(&optimizations)->multitoken(), "a list of optimizations to turn on [s,r]");
     opts("numa", po::value<int>(&numaNode)->default_value(-1), "bind all memory allocation to this NUMA node (if >= 0) [s,r]");
     opts("path,p", po::value<std::vector<std::string>>(&filePaths)->multitoken(), "path containing the files need to be sent or to save to. For send more than one can be specified, for receive only the first path is used. Files can be narrowed down by extension [s]");
     opts("extension,e", po::value<std::string>(&fileExtension), "extension of the files on the path that need to be sent or created [s,r]");
@@ -500,6 +502,7 @@ int main(int argc, char **argv)
     opts("prefix", po::value<std::string>(&filePrefix)->default_value("e2sar_out"), "prefix of the files to create [r]");
     opts("smooth", po::bool_switch()->default_value(false), "use smooth shaping in the sender (only works without optimizations and at low sub 3-5Gbps rates!) [s]");
     opts("timeout", po::value<int>(&eventTimeoutMS)->default_value(500), "event timeout on reassembly in MS [r]");
+    opts("rcviovecsize", po::value<unsigned int>(&rcvIovecSize)->default_value(100), "if using recvmmsg optimization, this many packets will be received at once [r]");
 
 
     po::positional_options_description p;
@@ -527,8 +530,10 @@ int main(int argc, char **argv)
         conflicting_options(vm, "recv", "dataid");
         conflicting_options(vm, "send", "threads");
         conflicting_options(vm, "ipv4", "ipv6");
+        conflicting_options(vm, "recv", "syncv6");
         conflicting_options(vm, "recv", "smooth");
         conflicting_options(vm, "send", "timeout");
+        conflicting_options(vm, "send", "rcviovecsize");
         option_dependency(vm, "recv", "ip");
         option_dependency(vm, "recv", "port");
         option_dependency(vm, "send", "ip");
@@ -647,6 +652,8 @@ int main(int argc, char **argv)
                 // register senders
                 if (not autoIP)
                 {
+                    if (NetUtil::isNonRoutable(sndrcvIP))
+                        std::cerr << "WARNING: '" << sndrcvIP << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
                     senders.push_back(sndrcvIP);
                     for (auto s: senders)
                         std::cout << s << " ";
@@ -679,6 +686,7 @@ int main(int argc, char **argv)
             sflags.numSendSockets = numSockets;
             sflags.rateGbps = rateGbps; // unlimited
             sflags.smooth = smooth;
+            sflags.syncV6 = vm["syncv6"].as<bool>();
 
             std::cout << "Control plane:                 " << (sflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Per frame rate smoothing:      " << (sflags.smooth ? "ON" : "OFF") << std::endl;
@@ -754,11 +762,11 @@ int main(int argc, char **argv)
             }
 
             rflags.useCP = withCP;
-            rflags.withLBHeader = not withCP;
             rflags.rcvSocketBufSize = sockBufSize;
             rflags.useHostAddress = preferHostAddr;
             rflags.validateCert = validate;
             rflags.eventTimeout_ms = eventTimeoutMS;
+            rflags.rcvIovecSize = rcvIovecSize;
 
             std::cout << "Control plane:                 " << (rflags.useCP ? "ON" : "OFF") << std::endl;
             std::cout << "Thread assignment to cores:    " << (vm.count("cores") ? "ON" : "OFF") << std::endl;
@@ -766,6 +774,9 @@ int main(int argc, char **argv)
             std::cout << "Event reassembly timeout (ms): " << rflags.eventTimeout_ms << std::endl;
 
             try {
+                if (not autoIP and rflags.useCP and NetUtil::isNonRoutable(sndrcvIP))
+                    std::cerr << "WARNING: '" << sndrcvIP << "' appears to be a non-routable (private/loopback/link-local) address" << std::endl;
+
                 if (vm.count("cores"))
                 {
                     if (not autoIP)
