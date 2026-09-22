@@ -2,7 +2,12 @@
 #define __ejfat_rs_decoder_h
 
 #include "ejfat_rs.h"
+
+// The neon_* decoders below are ARM-only; the scalar decoders and the decode
+// table build on any architecture.  EJFAT_RS_HAVE_NEON comes from ejfat_rs.h.
+#ifdef EJFAT_RS_HAVE_NEON
 #include <arm_neon.h>
+#endif
 
 // --------------------------------------------------------------------------
 // Reed-Solomon Decoder Implementation
@@ -732,6 +737,8 @@ int rs_decode_table_lookup_unpacked(rs_decode_table *table,
   return result;
 }
 
+#ifdef EJFAT_RS_HAVE_NEON
+
 // NEON-optimized table-based decoder for maximum performance
 int neon_rs_decode_table_lookup(rs_decode_table *table, rs_poly_vector *received,
                                 int *erasure_locations, int num_erasures,
@@ -1456,5 +1463,7 @@ int neon_rs_decode_dual_nibble_batch_blocked(rs_decode_table *table,
 
   return 0;
 }
+
+#endif // EJFAT_RS_HAVE_NEON
 
 #endif

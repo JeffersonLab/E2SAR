@@ -1,7 +1,12 @@
 #ifndef __ejfat_rs_h
 #define __ejfat_rs_h
 
+// The neon_* encoders below are ARM-only; the scalar encoders and the blocked
+// transposed layout helpers build on any architecture.
+#if defined(__ARM_NEON) || defined(__aarch64__)
+#define EJFAT_RS_HAVE_NEON 1
 #include <arm_neon.h>
+#endif
 
 // --------------------------------------------------------------------------------------
 
@@ -398,6 +403,8 @@ void fast_rs_encode_unpacked(rs_model *rs,
   *p1 = p.val[1];
 }
 
+#ifdef EJFAT_RS_HAVE_NEON
+
 void neon_rs_encode(rs_model *rs , rs_poly_vector *d , rs_poly_vector *p) {
 
   // --- for speed reasons, we do not check assmptions.  But the following must be true:
@@ -588,6 +595,8 @@ void neon_rs_encode_dual_nibble(rs_model *rs, char *data_bytes, char *parity_byt
   parity_bytes[1] = ((upper_parity[1] & 0x0F) << 4) | (lower_parity[1] & 0x0F);
 }
 
+#endif // EJFAT_RS_HAVE_NEON
+
 // --------------------------------------------------------------------------------------
 // Batched RS Encoding - Blocked Transposed Layout
 // --------------------------------------------------------------------------------------
@@ -671,6 +680,8 @@ void convert_from_blocked_transposed_parity(char *blocked, char *vector_major,
     }
   }
 }
+
+#ifdef EJFAT_RS_HAVE_NEON
 
 // Vectorized GF multiplication for 128-bit NEON (16 elements)
 static inline uint8x16_t neon_gf_mul_vec_128(uint8x16_t a, uint8x16_t b,
@@ -907,6 +918,7 @@ void neon_rs_encode_dual_nibble_batch_blocked(rs_model *rs, char *data_bytes_blo
   }
 }
 
+#endif // EJFAT_RS_HAVE_NEON
 
 #endif
 
